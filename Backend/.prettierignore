@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+*.log
+.env
+.env.*
+coverage
+*.config.js
+*.config.mjs
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
