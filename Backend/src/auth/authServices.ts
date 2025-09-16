@@ -1,5 +1,4 @@
 import { supabase, supabaseAdmin } from "../config/supabase";
-import { translateSupabaseError } from "../utils/supabaseErrorTranslator";
 import { CreateUserBody, LoginResult, AuthUser } from "./auth.types";
 
 export async function registerUser(
@@ -89,23 +88,32 @@ export async function loginUser(
     password,
   });
 
-  if (error || !data.session || !data.user) {
-    throw new Error(
-      translateSupabaseError(error?.message || "Error al iniciar sesión"),
-    );
+  if (error) {
+    throw new Error(`Error Supabase Auth: ${error.message}`);
   }
+  if (!data.session || !data.user) {
+    throw new Error("No se generó sesión de usuario.");
+  }
+
+  console.log("Buscando perfil para user ID:", data.user.id);
 
   // 2. Buscar perfil en la tabla users
-  const { data: profile, error: profileError } = await supabase
+  const { data: profiles, error: profileError } = await supabase
     .from("users")
     .select("*")
-    .eq("id", data.user.id)
-    .single();
+    .eq("id", data.user.id);
 
-  if (profileError || !profile) {
-    throw new Error(profileError?.message || "Perfil no encontrado.");
+  console.log("Perfiles encontrados:", profiles?.length);
+  console.log("Datos de perfiles:", profiles);
+
+  if (profileError) {
+    throw new Error(`Error buscando perfil: ${profileError.message}`);
+  }
+  if (!profiles || profiles.length === 0) {
+    throw new Error(`Perfil no encontrado para id=${data.user.id}`);
   }
 
+  const profile = profiles[0];
   // 3. Construir el AuthUser en base a las interfaces nuevas
   const authUser: AuthUser = {
     id: data.user.id,
