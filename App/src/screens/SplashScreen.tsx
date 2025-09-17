@@ -38,7 +38,7 @@ export const SplashScreen = ({ navigation }: Props) => {
 
     const timer = setTimeout(() => {
       navigation.popTo("Login");
-    }, 3000);
+    }, 2000);
 
     return () => clearTimeout(timer);
   }, []);
