@@ -51,6 +51,8 @@ export const useAuthActions = () => {
       const errorMessage =
         error.response?.data?.error || "Error al registrarse";
 
+      console.log(error);
+
       setServerError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {

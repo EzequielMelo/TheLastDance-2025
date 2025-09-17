@@ -5,6 +5,8 @@ export async function registerUser(
   body: CreateUserBody,
   file?: Express.Multer.File,
 ) {
+  console.log("paso", body);
+
   const { profile_code } = body;
 
   let userId: string | null = null;

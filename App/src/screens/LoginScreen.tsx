@@ -22,16 +22,28 @@ type Props = NativeStackScreenProps<RootStackParamList, "Login">;
 export const LoginScreen = ({ navigation }: Props) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+
   const [showPassword, setShowPassword] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
-  const {
-    user,
-    actionLoading,
-    actionError,
-    handleLogin: login,
-  } = useAuthActions();
+  const { actionLoading, actionError, handleLogin: login } = useAuthActions();
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) return "El correo es obligatorio";
+    if (!emailRegex.test(email)) return "Correo no válido";
+    return "";
+  };
+
+  const validatePassword = (password: string) => {
+    if (!password) return "La contraseña es obligatoria";
+    if (password.length < 6)
+      return "La contraseña debe tener al menos 6 caracteres";
+    return "";
+  };
 
   useEffect(() => {
     if (actionError) {
@@ -39,7 +51,17 @@ export const LoginScreen = ({ navigation }: Props) => {
     }
   }, [actionError]);
 
-  const handleLogin = () => login({ email, password });
+  const handleLogin = () => {
+    const emailErr = validateEmail(email);
+    const passwordErr = validatePassword(password);
+
+    setEmailError(emailErr);
+    setPasswordError(passwordErr);
+
+    if (!emailErr && !passwordErr) {
+      login({ email, password });
+    }
+  };
 
   return (
     <LinearGradient
@@ -84,6 +106,9 @@ export const LoginScreen = ({ navigation }: Props) => {
                   onBlur={() => setEmailFocused(false)}
                 />
               </View>
+              {emailError ? (
+                <Text className="text-red-500 text-sm mt-1">{emailError}</Text>
+              ) : null}
             </View>
 
             {/* Password */}
@@ -104,6 +129,7 @@ export const LoginScreen = ({ navigation }: Props) => {
                   onFocus={() => setPasswordFocused(true)}
                   onBlur={() => setPasswordFocused(false)}
                 />
+
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
                   className="absolute right-4 p-1"
@@ -115,6 +141,11 @@ export const LoginScreen = ({ navigation }: Props) => {
                   )}
                 </TouchableOpacity>
               </View>
+              {passwordError ? (
+                <Text className="text-red-500 text-sm mt-1">
+                  {passwordError}
+                </Text>
+              ) : null}
             </View>
 
             <TouchableOpacity className="self-end mb-7">
