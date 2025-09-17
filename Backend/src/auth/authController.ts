@@ -16,7 +16,10 @@ export const loginUser: RequestHandler = async (req, res) => {
     const result = await authService.loginUser(email, password);
     res.status(200).json({ message: "Login exitoso", ...result });
   } catch (error) {
-    res.status(400).json({ error: (error as Error).message });
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
+
+    res.status(400).json({ error: message });
   }
 };
 

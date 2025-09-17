@@ -6,7 +6,8 @@ import * as SecureStore from "expo-secure-store";
 const backendUrl =
   Constants.expoConfig?.extra?.backendUrl ||
   process.env.EXPO_PUBLIC_API_URL ||
-  "http://192.168.1.36:3000/api"; // URL por defecto para desarrollo local
+  "http://10.0.2.2:3000/api"; // URL para emulador
+// "http://192.168.1.36:3000/api"; // URL por defecto para desarrollo local
 
 // URL de producción comentada para referencia
 // "https://proyecto-mobileapp.onrender.com/api";

@@ -17,24 +17,21 @@ export const useAuthActions = () => {
 
   // Estados específicos de formularios/UI
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const handleLogin = async (credentials: LoginCredentials) => {
     try {
-      setError(null);
+      setServerError(null);
       setLoading(true);
 
       const response = await loginUser(credentials);
       await contextLogin(response.session.access_token, response.user);
 
       return { success: true };
-    } catch (err) {
-      const error = err as AxiosError<{ error: string }>;
-      const errorMessage =
-        error.response?.data?.error || "Error al iniciar sesión";
+    } catch (err: any) {
+      setServerError(err.response.data.error);
 
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
+      return { success: false, error: serverError };
     } finally {
       setLoading(false);
     }
@@ -42,7 +39,7 @@ export const useAuthActions = () => {
 
   const handleRegister = async (userData: RegisterData) => {
     try {
-      setError(null);
+      setServerError(null);
       setLoading(true);
 
       const response = await registerUser(userData);
@@ -54,7 +51,7 @@ export const useAuthActions = () => {
       const errorMessage =
         error.response?.data?.error || "Error al registrarse";
 
-      setError(errorMessage);
+      setServerError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
@@ -74,7 +71,7 @@ export const useAuthActions = () => {
     }
   };
 
-  const clearError = () => setError(null);
+  const clearError = () => setServerError(null);
 
   return {
     // Estado del contexto (user, token, isLoading, isAuthenticated)
@@ -82,7 +79,7 @@ export const useAuthActions = () => {
 
     // Estados específicos de UI
     actionLoading: loading, // Para diferenciar del isLoading del contexto
-    actionError: error,
+    actionError: serverError,
 
     // Acciones
     handleLogin,
