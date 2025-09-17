@@ -1,3 +1,4 @@
+import { AxiosError } from "axios";
 import api from "../api/axios";
 import { User } from "../types/User";
 
@@ -26,7 +27,8 @@ export interface LoginCredentials {
 export interface RegisterData {
   email: string;
   password: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   // Agregar más campos según tu backend
 }
 
@@ -36,10 +38,11 @@ export const loginUser = async (
 ): Promise<LoginResponse> => {
   try {
     const response = await api.post<LoginResponse>("/auth/login", credentials);
+
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
     // Re-lanzar error para que lo maneje quien llame al servicio
-    throw error;
+    throw error as AxiosError<{ error: string }>;
   }
 };
 
@@ -52,6 +55,7 @@ export const registerUser = async (
       "/auth/register",
       userData,
     );
+
     return response.data;
   } catch (error) {
     throw error;
