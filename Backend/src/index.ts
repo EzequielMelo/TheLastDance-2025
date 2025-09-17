@@ -6,12 +6,12 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 
+import { authenticateUser } from "./middlewares/authMiddleware";
+import { loadUserContext } from "./middlewares/loadUserContext";
+
 // Import routes
 import authRoutes from "./auth/authRoutes";
-// import userRoutes from "./routes/userRoutes";
-// import menuRoutes from "./routes/menuRoutes";
-// import orderRoutes from "./routes/orderRoutes";
-// import paymentRoutes from "./routes/paymentRoutes";
+import menuRoutes from "./modules/menu/menuRoutes";
 
 const app = express();
 const PORT = parseInt(process.env["PORT"] || "3000", 10);
@@ -49,11 +49,18 @@ app.get("/health", (_req, res) => {
   });
 });
 
+// Body parsers
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Health check
+app.get("/health", /* ... */);
+
 // API Routes (comentar si no existen aún)
 app.use("/api/auth", authRoutes);
+app.use("/api/menu", authenticateUser, loadUserContext, menuRoutes);
 /*
 app.use("/api/users", userRoutes);
-app.use("/api/menu", menuRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
 */
