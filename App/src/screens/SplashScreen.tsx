@@ -7,7 +7,7 @@ import { ChefHat, Utensils } from "lucide-react-native";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Splash">;
 
-export const SplashScreen = ({ navigation }: Props) => {
+export const SplashScreen = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -35,18 +35,12 @@ export const SplashScreen = ({ navigation }: Props) => {
 
   useEffect(() => {
     animateSequence();
-
-    const timer = setTimeout(() => {
-      navigation.popTo("Login");
-    }, 2000);
-
-    return () => clearTimeout(timer);
   }, []);
 
   return (
     <LinearGradient
       colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
-      className="flex-1 justify-center itemc"
+      className="flex-1 justify-center"
     >
       <Animated.View
         className={"items-center px-10"}
@@ -71,7 +65,7 @@ export const SplashScreen = ({ navigation }: Props) => {
           <Utensils size={24} color="#d4af37" strokeWidth={1.5} />
           <View className="flex flex-col">
             <ActivityIndicator className=" text-[#d4af37] mb-2" size={40} />
-            <View className="w-14 h-1 bg-[#d4af37]  mx-5" />
+            <View className="w-14 h-1 bg-[#d4af37] mx-5" />
           </View>
           <Utensils size={24} color="#d4af37" strokeWidth={1.5} />
         </View>

@@ -129,8 +129,12 @@ export async function loginUser(
 
   // 4. Retornar el LoginResult
   return {
-    token: data.session.access_token,
-    refreshToken: data.session.refresh_token,
+    session: {
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      token_type: data.session.token_type,
+      expires_in: data.session.expires_in,
+    },
     user: authUser,
   };
 }

@@ -25,13 +25,20 @@ export const useAuthActions = () => {
       setLoading(true);
 
       const response = await loginUser(credentials);
-      await contextLogin(response.session.access_token, response.user);
+      console.log("Login response:", response);
+
+      const token = response?.session?.access_token;
+      if (!token) throw new Error("No se recibió un token válido");
+
+      await contextLogin(token, response.user);
 
       return { success: true };
     } catch (err: any) {
-      setServerError(err.response.data.error);
+      const errorMessage =
+        err.response?.data?.error || err.message || "Error inesperado";
+      setServerError(errorMessage);
 
-      return { success: false, error: serverError };
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }

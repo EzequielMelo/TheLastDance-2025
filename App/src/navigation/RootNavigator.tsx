@@ -11,12 +11,16 @@ import { RegisterScreen } from "../screens/RegisterScreen";
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
-  const { token } = useAuth();
+  const { token, isLoading } = useAuth();
+
+  // 🔹 Mientras se cargan los datos del storage, mostramos Splash
+  if (isLoading) {
+    return <SplashScreen />;
+  }
 
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Splash"
         screenOptions={{
           headerStyle: {
             backgroundColor: "#151F2E",
@@ -25,17 +29,11 @@ export default function RootNavigator() {
         }}
       >
         {token ? (
-          /* Si hay token, mostrar pantalla principal */
+          // 🔹 Usuario autenticado → App principal
           <Stack.Screen name="Home" component={HomeScreen} />
         ) : (
+          // 🔹 Usuario no autenticado → Pantallas de auth
           <>
-            {/* Si no hay token, mostrar pantallas de autenticación */}
-
-            <Stack.Screen
-              name="Splash"
-              component={SplashScreen}
-              options={{ headerShown: false }}
-            />
             <Stack.Screen
               name="Login"
               component={LoginScreen}
