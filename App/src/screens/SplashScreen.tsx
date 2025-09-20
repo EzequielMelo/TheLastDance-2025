@@ -8,14 +8,8 @@ import animationVideo from "../../assets/chef-making-pizza.json";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Splash">;
 
-export default function SplashScreen({ navigation }: Props) {
+export default function SplashScreen() {
   const animation = useRef<LottieView>(null);
-
-  useEffect(() => {
-    setTimeout(() => {
-      navigation.replace("Login"); // Ir a Login después de unos segundos
-    }, 5000);
-  }, []);
 
   return (
     <View style={styles.container}>
