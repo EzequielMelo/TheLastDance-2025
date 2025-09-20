@@ -30,16 +30,15 @@ export default function RootNavigator() {
         ) : (
           <>
             {/* Si no hay token, mostrar pantallas de autenticación */}
+            <Stack.Screen
+              name="Splash"
+              component={SplashScreen}
+              options={{ headerShown: false }}
+            />
             {/*
-                <Stack.Screen
-                  name="Splash"
-                  component={SplashScreen}
-                  options={{ headerShown: false }}
-                />
                 <Stack.Screen name="Login" component={LoginScreen} />
                 <Stack.Screen name="Registro" component={RegisterScreen} />
-
-              */}
+                */}
           </>
         )}
       </Stack.Navigator>
