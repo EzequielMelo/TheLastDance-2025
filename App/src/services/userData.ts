@@ -1,6 +1,8 @@
 import { AxiosError } from "axios";
 import api from "../api/axios";
 import { User } from "../types/User";
+import { API_BASE_URL } from "../api/config";
+import * as SecureStore from "expo-secure-store";
 
 // Tipos para las respuestas del servidor
 interface LoginResponse {
@@ -25,11 +27,14 @@ export interface LoginCredentials {
 
 // Datos de registro
 export interface RegisterData {
-  email: string;
-  password: string;
   first_name: string;
   last_name: string;
-  // Agregar más campos según tu backend
+  email: string;
+  password: string;
+  dni: string;
+  cuil: string;
+  profile_code: string;
+  position_code?: string;
 }
 
 // Servicio de login - Solo lógica de API
@@ -47,18 +52,35 @@ export const loginUser = async (
 };
 
 // Servicio de registro - Solo lógica de API
-export const registerUser = async (
-  userData: RegisterData,
-): Promise<RegisterResponse> => {
-  try {
-    const response = await api.post<RegisterResponse>(
-      "/auth/register",
-      userData,
-    );
+export const registerUser = async (userData: RegisterData | FormData) => {
+  if (userData instanceof FormData) {
+    console.log("Usando fetch para FormData");
 
+    const token = await SecureStore.getItemAsync("authToken");
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: "POST",
+      headers,
+      body: userData,
+    });
+
+    if (!response.ok) {
+      // CAPTURAR EL ERROR ESPECÍFICO
+      const errorText = await response.text();
+      console.log("Error completo del backend:", errorText);
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    return await response.json();
+  } else {
+    // Usar axios para JSON
+    console.log("Usando axios para JSON");
+    const response = await api.post("/auth/register", userData);
     return response.data;
-  } catch (error) {
-    throw error;
   }
 };
 

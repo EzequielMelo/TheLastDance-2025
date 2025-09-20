@@ -59,6 +59,12 @@ export async function registerUser(
     ...(profile_code === "supervisor" || profile_code === "dueno"
       ? { dni: body.dni, cuil: body.cuil }
       : {}),
+    ...(profile_code === "cliente_registrado"
+      ? {
+          dni: body.dni,
+          cuil: body.cuil,
+        }
+      : {}),
   });
 
   if (dbError) {

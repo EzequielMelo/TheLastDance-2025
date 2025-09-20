@@ -27,7 +27,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootStackParamList";
 import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
-import { useAuthActions } from "../Hooks/useAuthActions";
+import { useAuthActions } from "../auth/useAuthActions";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Registro">;
 
@@ -41,8 +41,9 @@ export const RegisterScreen = ({ navigation }: Props) => {
     cuil: string;
     email: string;
     password: string;
-    file: File | null;
-    file_uri?: string;
+    imageUri?: string;
+    imageName?: string;
+    imageType?: string;
   }>({
     first_name: "",
     last_name: "",
@@ -52,8 +53,9 @@ export const RegisterScreen = ({ navigation }: Props) => {
     cuil: "",
     email: "",
     password: "",
-    file: null,
-    file_uri: undefined,
+    imageUri: undefined,
+    imageName: undefined,
+    imageType: undefined,
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -89,8 +91,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
           return "Mínimo 6 caracteres";
         break;
       case "file":
-        if (!value || !(value instanceof File))
-          return "Debes seleccionar una imagen";
+        if (!formData.imageUri) return "Debes seleccionar una imagen";
         break;
       case "profile_code":
         if (!value || value === "") return "Seleccione un perfil";
@@ -114,17 +115,81 @@ export const RegisterScreen = ({ navigation }: Props) => {
   const handleRegister = async () => {
     const newErrors: { [key: string]: string } = {};
     let valid = true;
-    Object.entries(formData).forEach(([key, value]) => {
-      const error = validateField(key, value);
+
+    // Validar campos básicos
+    const fieldsToValidate = [
+      "first_name",
+      "last_name",
+      "email",
+      "password",
+      "dni",
+      "cuil",
+      "profile_code",
+      "file",
+    ];
+
+    if (formData.profile_code === "empleado") {
+      fieldsToValidate.push("position_code");
+    }
+
+    fieldsToValidate.forEach(field => {
+      const error = validateField(
+        field,
+        formData[field as keyof typeof formData] as any,
+      );
       if (error) {
         valid = false;
-        newErrors[key] = error;
+        newErrors[field] = error;
       }
     });
+
     setErrors(newErrors);
     if (!valid) return;
 
-    await register(formData);
+    // CREAR FORMDATA CORRECTAMENTE
+    const formDataToSend = new FormData();
+
+    // Agregar campos de texto
+    formDataToSend.append("first_name", formData.first_name);
+    formDataToSend.append("last_name", formData.last_name);
+    formDataToSend.append("email", formData.email);
+    formDataToSend.append("password", formData.password);
+    formDataToSend.append("dni", formData.dni);
+    formDataToSend.append("cuil", formData.cuil);
+    formDataToSend.append("profile_code", formData.profile_code);
+
+    if (formData.profile_code === "empleado" && formData.position_code) {
+      formDataToSend.append("position_code", formData.position_code);
+    }
+
+    // AGREGAR IMAGEN
+    if (formData.imageUri) {
+      formDataToSend.append("file", {
+        uri: formData.imageUri,
+        type: formData.imageType || "image/jpeg",
+        name: formData.imageName || "profile_image.jpg",
+      } as any);
+    }
+
+    console.log("FormData creado correctamente");
+
+    // LLAMAR AL REGISTRO Y MANEJAR RESPUESTA
+    const result = await register(formDataToSend);
+
+    // SI EL REGISTRO FUE EXITOSO
+    if (result?.success) {
+      // Mostrar mensaje de éxito
+      ToastAndroid.show(
+        "¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.",
+        ToastAndroid.LONG,
+      );
+
+      // Navegar al LoginScreen después de un pequeño delay
+      setTimeout(() => {
+        navigation.navigate("Login");
+      }, 1500);
+    }
+    // Los errores ya se manejan en useAuthActions y se muestran en el useEffect
   };
 
   const renderInput = (
@@ -183,7 +248,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
   const renderDropdown = (
     field: string,
     icon: React.ReactNode,
-    options: string[],
+    options: { label: string; value: string }[], // 👈 ahora es un array de objetos
   ) => {
     const isFocused = focusedField === field;
     return (
@@ -215,9 +280,9 @@ export const RegisterScreen = ({ navigation }: Props) => {
             />
             {options.map(opt => (
               <Picker.Item
-                key={opt}
-                label={opt.charAt(0).toUpperCase() + opt.slice(1)}
-                value={opt}
+                key={opt.value}
+                label={opt.label} // 👈 lo que ve el usuario
+                value={opt.value} // 👈 lo que se envía al backend
               />
             ))}
           </Picker>
@@ -245,25 +310,54 @@ export const RegisterScreen = ({ navigation }: Props) => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: "images", // Corregido el deprecation warning
         allowsEditing: true,
         quality: 0.7,
       });
 
       if (!result.canceled) {
-        const uri = result.assets[0].uri;
-        const fileName = uri.split("/").pop()!;
-        const fileType = `image/${fileName.split(".").pop()}`;
-        const file = new File(
-          [await fetch(uri).then(r => r.blob())],
+        const asset = result.assets[0];
+        const uri = asset.uri;
+        const fileName = asset.fileName || uri.split("/").pop() || "image.jpg";
+
+        // ARREGLAR TIPO DE ARCHIVO - Crucial para que funcione
+        let fileType: string;
+        if (asset.type && asset.type !== "image") {
+          fileType = asset.type;
+        } else {
+          // Deducir tipo del nombre de archivo
+          const extension = fileName.split(".").pop()?.toLowerCase();
+          switch (extension) {
+            case "jpg":
+            case "jpeg":
+              fileType = "image/jpeg";
+              break;
+            case "png":
+              fileType = "image/png";
+              break;
+            case "gif":
+              fileType = "image/gif";
+              break;
+            default:
+              fileType = "image/jpeg";
+          }
+        }
+
+        console.log("Imagen seleccionada:", {
+          uri: uri.substring(0, 50) + "...",
           fileName,
-          { type: fileType },
-        );
+          fileType,
+        });
 
-        setFormData(prev => ({ ...prev, file, file_uri: uri }));
+        // GUARDAR DATOS DE IMAGEN CORRECTAMENTE
+        setFormData(prev => ({
+          ...prev,
+          imageUri: uri,
+          imageName: fileName,
+          imageType: fileType,
+        }));
 
-        const error = validateField("file", file);
-        setErrors(prev => ({ ...prev, file: error }));
+        setErrors(prev => ({ ...prev, file: "" }));
       }
     };
 
@@ -278,9 +372,9 @@ export const RegisterScreen = ({ navigation }: Props) => {
           onBlur={() => setFocusedField("")}
         >
           {icon}
-          {formData.file_uri ? (
+          {formData.imageUri ? (
             <Image
-              source={{ uri: formData.file_uri }}
+              source={{ uri: formData.imageUri }}
               className="h-10 w-10 rounded-lg ml-3"
             />
           ) : (
@@ -354,17 +448,17 @@ export const RegisterScreen = ({ navigation }: Props) => {
             "email-address",
           )}
           {renderDropdown("profile_code", <User size={20} color={"#888"} />, [
-            "dueño",
-            "supervisor",
-            "empleado",
-            "cliente",
+            { label: "Dueño", value: "dueno" },
+            { label: "Supervisor", value: "supervisor" },
+            { label: "Empleado", value: "empleado" },
+            { label: "Cliente", value: "cliente_registrado" },
           ])}
           {formData.profile_code === "empleado" &&
             renderDropdown("position_code", <User size={20} color={"#888"} />, [
-              "maître",
-              "mozo",
-              "cocinero",
-              "bartender",
+              { label: "maître", value: "maitre" },
+              { label: "mozo", value: "mozo" },
+              { label: "cocinero", value: "cocinero" },
+              { label: "bartender", value: "bartender" },
             ])}
           {renderInput(
             "dni",
