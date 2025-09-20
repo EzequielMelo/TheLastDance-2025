@@ -5,5 +5,10 @@
     "resolveJsonModule": true,
     "esModuleInterop": true
   },
-  "extends": "expo/tsconfig.base"
+  "extends": "expo/tsconfig.base",
+  "include": [
+    "src",
+    "src/types",
+    "nativewind-env.d.ts"
+  ]
 }

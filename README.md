@@ -75,6 +75,7 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
   <summary>Checklist de tareas</summary>
   <ul>
     <li>[x] Crear base de datos y conectarla con el Backend</li>
+    <li>[x] Menú en el backend: menuServices - menuController - menuRoutes y los tipos</li>
   </ul>
 </details>
 

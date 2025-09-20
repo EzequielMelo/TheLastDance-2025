@@ -17,23 +17,27 @@ export const useAuthActions = () => {
 
   // Estados específicos de formularios/UI
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const handleLogin = async (credentials: LoginCredentials) => {
     try {
-      setError(null);
+      setServerError(null);
       setLoading(true);
 
       const response = await loginUser(credentials);
-      await contextLogin(response.session.access_token, response.user);
+      console.log("Login response:", response);
+
+      const token = response?.session?.access_token;
+      if (!token) throw new Error("No se recibió un token válido");
+
+      await contextLogin(token, response.user);
 
       return { success: true };
-    } catch (err) {
-      const error = err as AxiosError<{ error: string }>;
+    } catch (err: any) {
       const errorMessage =
-        error.response?.data?.error || "Error al iniciar sesión";
+        err.response?.data?.error || err.message || "Error inesperado";
+      setServerError(errorMessage);
 
-      setError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
@@ -42,7 +46,7 @@ export const useAuthActions = () => {
 
   const handleRegister = async (userData: RegisterData) => {
     try {
-      setError(null);
+      setServerError(null);
       setLoading(true);
 
       const response = await registerUser(userData);
@@ -54,7 +58,9 @@ export const useAuthActions = () => {
       const errorMessage =
         error.response?.data?.error || "Error al registrarse";
 
-      setError(errorMessage);
+      console.log(error);
+
+      setServerError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
@@ -74,7 +80,7 @@ export const useAuthActions = () => {
     }
   };
 
-  const clearError = () => setError(null);
+  const clearError = () => setServerError(null);
 
   return {
     // Estado del contexto (user, token, isLoading, isAuthenticated)
@@ -82,7 +88,7 @@ export const useAuthActions = () => {
 
     // Estados específicos de UI
     actionLoading: loading, // Para diferenciar del isLoading del contexto
-    actionError: error,
+    actionError: serverError,
 
     // Acciones
     handleLogin,
