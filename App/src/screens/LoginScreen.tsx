@@ -15,7 +15,7 @@ import {
 import { useEffect, useState } from "react";
 import { LinearGradient } from "expo-linear-gradient";
 import { ChefHat, Lock, Eye, EyeOff, Mail } from "lucide-react-native";
-import { useAuthActions } from "../Hooks/useAuthActions";
+import { useAuthActions } from "../auth/useAuthActions";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Login">;
 

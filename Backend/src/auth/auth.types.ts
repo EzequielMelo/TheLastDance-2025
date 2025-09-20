@@ -16,6 +16,8 @@ export interface ClientUserBody extends BaseUserBody {
   profile_code: "cliente_registrado";
   email: string;
   password: string;
+  dni: string;
+  cuil: string;
 }
 
 // Empleado

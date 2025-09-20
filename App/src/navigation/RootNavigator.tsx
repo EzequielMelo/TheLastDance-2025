@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
 import { useAuth } from "../auth/useAuth";
 import HomeScreen from "../screens/HomeScreen";
-import { SplashScreen } from "../screens/SplashScreen";
+import SplashScreen from "../screens/SplashScreen";
 import { LoginScreen } from "../screens/LoginScreen";
 import { RegisterScreen } from "../screens/RegisterScreen";
 
@@ -12,9 +12,16 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
   const { token, isLoading } = useAuth();
+  const [showSplash, setShowSplash] = React.useState(true);
 
-  // 🔹 Mientras se cargan los datos del storage, mostramos Splash
-  if (isLoading) {
+  React.useEffect(() => {
+    if (!isLoading) {
+      const timer = setTimeout(() => setShowSplash(false), 2000); // 2s mínimo
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
+
+  if (showSplash) {
     return <SplashScreen />;
   }
 
@@ -22,17 +29,13 @@ export default function RootNavigator() {
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{
-          headerStyle: {
-            backgroundColor: "#151F2E",
-          },
+          headerStyle: { backgroundColor: "#151F2E" },
           headerTintColor: "#fff",
         }}
       >
         {token ? (
-          // 🔹 Usuario autenticado → App principal
           <Stack.Screen name="Home" component={HomeScreen} />
         ) : (
-          // 🔹 Usuario no autenticado → Pantallas de auth
           <>
             <Stack.Screen
               name="Login"

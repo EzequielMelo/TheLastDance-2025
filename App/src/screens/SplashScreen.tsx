@@ -1,79 +1,57 @@
+import React from "react";
+import { View, StyleSheet, Text } from "react-native";
+import LottieView from "lottie-react-native";
+import { useEffect, useRef } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootStackParamList";
-import { ActivityIndicator, Animated, Text, View } from "react-native";
-import React, { useEffect, useRef } from "react";
-import { LinearGradient } from "expo-linear-gradient";
-import { ChefHat, Utensils } from "lucide-react-native";
+import animationVideo from "../../assets/chef-making-pizza.json";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Splash">;
 
-export const SplashScreen = () => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-
-  const animateSequence = () => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 1000,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        tension: 50,
-        friction: 7,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  useEffect(() => {
-    animateSequence();
-  }, []);
+export default function SplashScreen() {
+  const animation = useRef<LottieView>(null);
 
   return (
-    <LinearGradient
-      colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
-      className="flex-1 justify-center"
-    >
-      <Animated.View
-        className={"items-center px-10"}
-        style={[
-          {
-            opacity: fadeAnim,
-            transform: [{ scale: scaleAnim }, { translateY: slideAnim }],
-          },
-        ]}
-      >
-        <View className="items-center mb-10">
-          <ChefHat size={80} color="#d4af37" strokeWidth={1.5} />
-          <Text className="text-5xl font-light text-white mt-5 text-center">
-            Bella Tavola
-          </Text>
-          <Text className="text-[#d4af37] mt-2 space-x-1">
-            Auténtica Cocina Italiana
-          </Text>
-        </View>
+    <View style={styles.container}>
+      <Text style={styles.topText}>The Last Dance - Restaurant</Text>
 
-        <View className="flex flex-row items-center mb-5">
-          <Utensils size={24} color="#d4af37" strokeWidth={1.5} />
-          <View className="flex flex-col">
-            <ActivityIndicator className=" text-[#d4af37] mb-2" size={40} />
-            <View className="w-14 h-1 bg-[#d4af37] mx-5" />
-          </View>
-          <Utensils size={24} color="#d4af37" strokeWidth={1.5} />
-        </View>
-
-        <Text className="text-[#cccccc] italic text-center">
-          "Donde cada plato cuenta una historia"
-        </Text>
-      </Animated.View>
-    </LinearGradient>
+      <View style={styles.animationContainer}>
+        <LottieView
+          ref={animation}
+          source={animationVideo}
+          autoPlay
+          loop={true}
+          style={{
+            width: 300,
+            height: 300,
+          }}
+        />
+      </View>
+    </View>
   );
-};
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#231C16",
+    justifyContent: "space-between", // <- separa arriba y abajo
+    alignItems: "center",
+    paddingVertical: 50, // espacio arriba y abajo
+  },
+  topText: {
+    color: "white",
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  animationContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  bottomText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+});

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AxiosError } from "axios";
-import { useAuth } from "../auth/useAuth"; // Usa el básico
+import { useAuth } from "./useAuth"; // Usa el básico
 import {
   loginUser,
   registerUser,
@@ -18,6 +18,8 @@ export const useAuthActions = () => {
   // Estados específicos de formularios/UI
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const handleLogin = async (credentials: LoginCredentials) => {
     try {
@@ -44,26 +46,26 @@ export const useAuthActions = () => {
     }
   };
 
-  const handleRegister = async (userData: RegisterData) => {
+  const handleRegister = async (userData: RegisterData | FormData) => {
     try {
-      setServerError(null);
-      setLoading(true);
+      setActionError(null);
+      setActionLoading(true);
 
       const response = await registerUser(userData);
-      await contextLogin(response.session.access_token, response.user);
+      console.log("Register response:", response);
 
-      return { success: true };
+      // IMPORTANTE: Limpiar error si fue exitoso
+      setActionError(null);
+
+      return { success: true, data: response };
     } catch (err) {
-      const error = err as AxiosError<{ error: string }>;
-      const errorMessage =
-        error.response?.data?.error || "Error al registrarse";
-
-      console.log(error);
-
-      setServerError(errorMessage);
+      const error = err as Error;
+      const errorMessage = error.message || "Error al registrarse";
+      console.log("Register error:", error);
+      setActionError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   };
 
