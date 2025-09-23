@@ -1,9 +1,5 @@
-import type {
-  CreateMenuItemDTO,
-  CreateMenuItemWithImagesDTO,
-  MenuItem,
-} from "./menu.types";
-// import { supabase, supabaseAdmin } from "../../config/supabase";
+import type { CreateMenuItemDTO, CreateMenuItemWithImagesDTO, MenuItem,} from "./menu.types";
+// import { supabase } from "../../config/supabase";
 import { supabaseAdmin } from "../../config/supabase";
 
 async function createMenuItem(
@@ -36,12 +32,21 @@ async function createMenuItem(
 
 type UploadImage = { filename: string; contentType: string; buffer: Buffer };
 
-async function uploadThreeImages(itemId: string, images: UploadImage[]) {
+async function uploadThreeImages(
+  itemId: string,
+  images: UploadImage[],
+  category: "plato" | "bebida",
+  name?: string
+) {
   if (images.length !== 3) throw new Error("Se requieren exactamente 3 imágenes");
+
+  const folder = category === "plato" ? "Platos" : "Bebidas";
+  const base = name ? slugify(name) : itemId;
 
   for (const [i, img] of images.entries()) {
     const pos = i + 1;
-    const path = `menu-images/${itemId}/${pos}-${img.filename}`;
+    const ext = img.contentType.split("/")[1] || "jpg";
+    const path = `${folder}/${base}-${pos}.${ext}`; // p.ej. Platos/milanesa-1.jpg
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from("menu-images")
@@ -51,11 +56,9 @@ async function uploadThreeImages(itemId: string, images: UploadImage[]) {
       });
     if (uploadError) throw uploadError;
 
-    const { error } = await supabaseAdmin.from("menu_item_images").insert({
-      item_id: itemId,
-      position: pos,
-      storage_path: path,
-    });
+    const { error } = await supabaseAdmin
+      .from("menu_item_images")
+      .insert({ item_id: itemId, position: pos, storage_path: path });
     if (error) throw error;
   }
 }
@@ -73,7 +76,7 @@ export async function createMenuItemWithImages(
   createdBy: string
 ) {
   const item = await createMenuItem(dto, createdBy);
-  await uploadThreeImages(item.id, dto.images);
+  await uploadThreeImages(item.id, dto.images, dto.category);
   await activateItem(item.id);
   return item;
 }
@@ -105,4 +108,10 @@ function mapRowToMenuItem(row: any): MenuItem {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function slugify(s: string) {
+  return s
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // saca acentos
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
 }

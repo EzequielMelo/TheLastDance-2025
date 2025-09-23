@@ -1,54 +1,21 @@
 import { supabase, supabaseAdmin } from "../config/supabase";
 import { CreateUserBody, LoginResult, AuthUser } from "./auth.types";
 
-
-const PROFILE_MAP: Record<string, string> = {
-  "dueño": "dueno",
-  "dueno": "dueno",
-  "supervisor": "supervisor",
-  "empleado": "empleado",
-  "cliente": "cliente_registrado",
-  "cliente_registrado": "cliente_registrado",
-  "cliente_anonimo": "cliente_anonimo",
-};
-
-const POSITION_MAP: Record<string, string> = {
-  "maître": "maitre",
-  "maitre": "maitre",
-  "mozo": "mozo",
-  "cocinero": "cocinero",
-  "bartender": "bartender",
-};
-
-function normalizeBody(body: CreateUserBody) {
-  const profile_code = PROFILE_MAP[body.profile_code] ?? body.profile_code;
-  // si no es empleado → position_code debe ser null
-  const position_code =
-    profile_code === "empleado"
-      ? (POSITION_MAP[(body as any).position_code] ??
-         ((body as any).position_code || null))
-      : null;
-
-  return { ...body, profile_code, position_code };
-}
-
 export async function registerUser(
   body: CreateUserBody,
   file?: Express.Multer.File,
 ) {
-  const norm = normalizeBody(body);
-  const { password: _omit, ...safeLog } = norm as any;
-  console.log("payload normalizado:", safeLog);
+  console.log("paso", body);
 
-  const { profile_code } = norm;
+  const { profile_code } = body;
 
   let userId: string | null = null;
   let email: string | undefined;
   let avatarUrl: string | null = null;
 
-  // Supabase Auth (excepto cliente_anonimo)
+  // Si es CLIENT, EMPLOYEE, SUPERVISOR u OWNER → usar Supabase Auth
   if (profile_code !== "cliente_anonimo") {
-    const { email: userEmail, password } = norm as {
+    const { email: userEmail, password } = body as {
       email: string;
       password: string;
     };
@@ -65,39 +32,34 @@ export async function registerUser(
     userId = authData.user.id;
     email = userEmail;
   } else {
+    // Si es CLIENT_ANONYMOUS → generar UUID local
     userId = crypto.randomUUID();
   }
 
+  // Foto de perfil opcional
   if (file) {
     avatarUrl = await uploadAvatar(userId!, file);
   }
 
-  const insertBase: any = {
+  // Insertar en tabla users
+  const { error: dbError } = await supabaseAdmin.from("users").insert({
     id: userId,
-    first_name: norm.first_name,
-    last_name: norm.last_name,
-    profile_code: norm.profile_code,
+    first_name: body.first_name,
+    last_name: body.last_name,
+    profile_code: body.profile_code,
     profile_image: avatarUrl,
-  };
-
-  const needsDocs =
-    profile_code === "empleado" ||
-    profile_code === "supervisor" ||
-    profile_code === "dueno" ||
-    profile_code === "cliente_registrado";
-
-  if (needsDocs) {
-    insertBase.dni = (norm as any).dni;
-    insertBase.cuil = (norm as any).cuil;
-  }
-
-  if (profile_code === "empleado") {
-    insertBase.position_code = (norm as any).position_code;
-  } else {
-    insertBase.position_code = null;
-  }
-
-  const { error: dbError } = await supabaseAdmin.from("users").insert(insertBase);
+    // opcionales según el tipo
+    ...(profile_code === "empleado"
+      ? {
+          position_code: body.position_code,
+          dni: body.dni,
+          cuil: body.cuil,
+        }
+      : {}),
+    ...(profile_code === "supervisor" || profile_code === "dueno"
+      ? { dni: body.dni, cuil: body.cuil }
+      : {}),
+  });
 
   if (dbError) {
     throw new Error("Error al crear perfil en DB: " + dbError.message);
@@ -108,10 +70,11 @@ export async function registerUser(
     user: {
       id: userId,
       email,
-      first_name: norm.first_name,
-      last_name: norm.last_name,
-      profile_code: norm.profile_code,
-      position_code: profile_code === "empleado" ? (norm as any).position_code : null,
+      first_name: body.first_name,
+      last_name: body.last_name,
+      profile_code: body.profile_code,
+      position_code:
+        profile_code === "empleado" ? body.position_code : undefined,
       photo_url: avatarUrl,
     },
   };
@@ -121,6 +84,7 @@ export async function loginUser(
   email: string,
   password: string,
 ): Promise<LoginResult> {
+  // 1. Login en Supabase Auth
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -135,6 +99,7 @@ export async function loginUser(
 
   console.log("Buscando perfil para user ID:", data.user.id);
 
+  // 2. Buscar perfil en la tabla users
   const { data: profiles, error: profileError } = await supabase
     .from("users")
     .select("*")
@@ -151,6 +116,7 @@ export async function loginUser(
   }
 
   const profile = profiles[0];
+  // 3. Construir el AuthUser en base a las interfaces nuevas
   const authUser: AuthUser = {
     id: data.user.id,
     email: data.user.email ?? null,
@@ -161,6 +127,7 @@ export async function loginUser(
     photo_url: profile.profile_image ?? null,
   };
 
+  // 4. Retornar el LoginResult
   return {
     session: {
       access_token: data.session.access_token,
@@ -186,21 +153,21 @@ async function uploadAvatar(
   userId: string,
   file: Express.Multer.File,
 ): Promise<string | null> {
-  const fileExt = (file.originalname.split(".").pop() || "jpg").toLowerCase();
+  const fileExt = file.originalname.split(".").pop();
   const fileName = `userPhoto.${fileExt}`;
   const filePath = `${userId}/${fileName}`;
 
   const { error: uploadError } = await supabaseAdmin.storage
-    .from("Profile Images")
+    .from("profile-images")
     .upload(filePath, file.buffer, {
-      contentType: file.mimetype || `image/${fileExt}`,
+      contentType: file.mimetype,
       upsert: true,
     });
 
   if (uploadError) throw new Error(uploadError.message);
 
   const { data } = supabaseAdmin.storage
-    .from("Profile Images")
+    .from("profile-images")
     .getPublicUrl(filePath);
   return data.publicUrl ?? null;
 }

@@ -6,9 +6,5 @@
     "esModuleInterop": true
   },
   "extends": "expo/tsconfig.base",
-  "include": [
-    "src",
-    "src/types",
-    "nativewind-env.d.ts"
-  ]
+  "include": ["src", "src/types", "nativewind-env.d.ts"]
 }

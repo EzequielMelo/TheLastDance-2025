@@ -3,4 +3,5 @@ export type RootStackParamList = {
   Registro: undefined;
   Home: undefined;
   Splash: undefined;
+  CreateMenuItem: { initialCategory?: "plato" | "bebida" } | undefined;
 };

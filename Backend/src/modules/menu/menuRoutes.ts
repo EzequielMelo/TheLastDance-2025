@@ -1,14 +1,20 @@
-import { Router } from 'express';
-import multer from 'multer';
-import { createMenuItemHandler, listMenuHandler } from './menuController';
+import express from "express";
+import multer from "multer";
+import { createMenuItemHandler, listMenuHandler } from "./menuController";
+import { authenticateUser } from "../../middlewares/authMiddleware";
 
-const router = Router();
-const upload = multer({ storage: multer.memoryStorage() }); // para recibir imágenes del celular
+const upload = multer({ storage: multer.memoryStorage() });
+const router = express.Router();
 
-// GET /menu?category=plato|bebida
-router.get('/', listMenuHandler);
+// Crear ítem (3 imágenes, rol requerido)
+router.post(
+  "/items",
+  authenticateUser,
+  upload.array("images", 3),
+  createMenuItemHandler
+);
 
-// POST /menu  (exactamente 3 archivos: photos)
-router.post('/', upload.array('photos', 3), createMenuItemHandler);
+// Listar ítems
+router.get("/items", listMenuHandler);
 
 export default router;

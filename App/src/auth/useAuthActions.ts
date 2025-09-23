@@ -27,7 +27,6 @@ export const useAuthActions = () => {
       setLoading(true);
 
       const response = await loginUser(credentials);
-      console.log("Login response:", response);
 
       const token = response?.session?.access_token;
       if (!token) throw new Error("No se recibió un token válido");
@@ -52,7 +51,6 @@ export const useAuthActions = () => {
       setActionLoading(true);
 
       const response = await registerUser(userData);
-      console.log("Register response:", response);
 
       // IMPORTANTE: Limpiar error si fue exitoso
       setActionError(null);

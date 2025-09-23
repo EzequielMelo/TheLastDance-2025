@@ -1,51 +1,160 @@
 import React, { useEffect, useState, useContext } from "react";
-import { View, Text, ActivityIndicator, Button } from "react-native";
-import { AuthContext } from "../auth/AuthContext";
-/*import { fetchUserData } from "../services/user";*/
+import { View, Text, ActivityIndicator, TouchableOpacity, ToastAndroid } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
-import { User } from "../types/User";
+import { AuthContext } from "../auth/AuthContext";
+import api from "../api/axios";
+import { Martini, UtensilsCrossed, LogOut } from "lucide-react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { User } from "../types/User"
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
-// eslint-disable-next-line no-unused-vars
+
 export default function HomeScreen({ navigation }: Props) {
   const { token, logout } = useContext(AuthContext);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Cargar perfil desde backend (usa el Authorization del interceptor)
   useEffect(() => {
-    const loadUser = async () => {
+    let mounted = true;
+    (async () => {
       try {
         if (!token) return;
-        /* Lógica para obtener datos del usuario */
-        /*
-        const fetchedUser = await fetchUserData(token);
-        setUser(fetchedUser);
-        */
-      } catch (error) {
-        console.error("Error fetching user data", error);
+        const { data } = await api.get("/auth/validate-token");
+        const u: User = data?.user ?? data; 
+        if (mounted)
+          setUser(u);
+      } catch (err: any) {
+        ToastAndroid.show("No se pudo cargar tu perfil", ToastAndroid.SHORT);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
-    };
-
-    loadUser();
+    })();
+    return () => { mounted = false; };
   }, [token]);
 
   const handleLogout = async () => {
     await logout();
   };
 
+  const goCreate = (initialCategory: "plato" | "bebida") => {
+    navigation.navigate("CreateMenuItem", { initialCategory });
+  };
+
   if (loading) {
-    return <ActivityIndicator />;
+    return (
+      <View className="flex-1 items-center justify-center bg-black">
+        <ActivityIndicator />
+      </View>
+    );
   }
 
+  const isCocinero = user?.position_code === "cocinero";
+  const isBartender = user?.position_code === "bartender";
+
   return (
-    <View style={{ padding: 20 }}>
-      <Text style={{ fontSize: 18 }}>¡Bienvenido!</Text>
-      {user && <Text style={{ marginTop: 10 }}>Email: {user.email}</Text>}
-      <Button title="Cerrar sesión" onPress={handleLogout} />
-    </View>
+    <LinearGradient colors={["#1a1a1a", "#2d1810", "#1a1a1a"]} className="flex-1">
+      <View className="px-6 pt-14 pb-8 flex-1">
+        {/* Header */}
+        <View className="mb-8">
+          <Text className="text-white text-2xl font-light">
+            ¡Hola{user?.first_name ? `, ${user.first_name}` : ""}!
+          </Text>
+          <Text className="text-gray-400 mt-1">
+            {user?.position_code
+              ? `Estás logueado como ${user.position_code}`
+              : "Bienvenido a Bella Tavola"}
+          </Text>
+        </View>
+
+        {/* Acciones por rol */}
+        <View className="gap-4">
+          {isCocinero && (
+            <ActionTile
+              title="Agregar plato"
+              subtitle="Publicá un nuevo plato en el menú"
+              onPress={() => goCreate("plato")}
+              icon={<UtensilsCrossed size={26} color="#1a1a1a" />}
+            />
+          )}
+
+          {isBartender && (
+            <ActionTile
+              title="Agregar bebida"
+              subtitle="Sumá una nueva bebida al menú"
+              onPress={() => goCreate("bebida")}
+              icon={<Martini size={26} color="#1a1a1a" />}
+            />
+          )}
+
+          {!isCocinero && !isBartender && (
+            <View className="rounded-2xl border border-white/15 p-4 bg-white/5">
+              <Text className="text-white text-base">
+                No tenés permisos para crear ítems del menú.
+              </Text>
+              <Text className="text-gray-400 mt-1 text-sm">
+                Solo <Text className="text-[#d4af37]">Cocinero</Text> puede crear{" "}
+                <Text className="text-[#d4af37]">platos</Text> y{" "}
+                <Text className="text-[#d4af37]">Bartender</Text> puede crear{" "}
+                <Text className="text-[#d4af37]">bebidas</Text>.
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Spacer */}
+        <View className="flex-1" />
+
+        {/* Logout */}
+        <TouchableOpacity
+          onPress={handleLogout}
+          className="flex-row items-center justify-center rounded-xl h-12 bg-white/10 border border-white/20"
+        >
+          <LogOut size={18} color="#fff" />
+          <Text className="text-white ml-2">Cerrar sesión</Text>
+        </TouchableOpacity>
+      </View>
+    </LinearGradient>
+  );
+}
+
+/** Tarjeta/CTA simple */
+function ActionTile({
+  title,
+  subtitle,
+  onPress,
+  icon,
+}: {
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+  icon: React.ReactNode;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      className="rounded-2xl overflow-hidden"
+      activeOpacity={0.92}
+    >
+      <LinearGradient
+        colors={["#d4af37", "#b8941f", "#d4af37"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        className="p-4"
+      >
+        <View className="flex-row items-center">
+          <View className="w-10 h-10 rounded-xl bg-[#1a1a1a] items-center justify-center">
+            {icon}
+          </View>
+          <View className="ml-3 flex-1">
+            <Text className="text-[#1a1a1a] text-base font-semibold">{title}</Text>
+            <Text className="text-[#1a1a1a] opacity-80 text-xs">{subtitle}</Text>
+          </View>
+          <Text className="text-[#1a1a1a] text-xl">›</Text>
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
   );
 }

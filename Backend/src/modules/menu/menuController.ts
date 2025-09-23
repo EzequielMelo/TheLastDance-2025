@@ -12,8 +12,13 @@ const createSchema = z.object({
 
 export async function createMenuItemHandler(req: Request, res: Response) {
   try {
-    const appUserId = req.user.appUserId as string;
-    const position = req.user.position_code as string;
+    if (!req.user) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const appUserId = req.user.appUserId;
+    const position = req.user.position_code;
+
     const parsed = createSchema.parse(req.body);
 
     if (parsed.category === "plato" && position !== "cocinero")

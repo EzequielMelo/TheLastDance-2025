@@ -6,9 +6,6 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 
-import { authenticateUser } from "./middlewares/authMiddleware";
-import { loadUserContext } from "./middlewares/loadUserContext";
-
 // Import routes
 import authRoutes from "./auth/authRoutes";
 import menuRoutes from "./modules/menu/menuRoutes";
@@ -49,16 +46,9 @@ app.get("/health", (_req, res) => {
   });
 });
 
-// Body parsers
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-
-// Health check
-app.get("/health", /* ... */);
-
 // API Routes (comentar si no existen aún)
 app.use("/api/auth", authRoutes);
-app.use("/api/menu", authenticateUser, loadUserContext, menuRoutes);
+app.use("/api/menu", menuRoutes);
 /*
 app.use("/api/users", userRoutes);
 app.use("/api/orders", orderRoutes);
@@ -101,19 +91,27 @@ const server = app.listen(PORT, "0.0.0.0", () => {
 });
 
 // Graceful shutdown
-process.on("SIGTERM", () => {
-  console.log("SIGTERM signal received.");
+const handleSignal = (sig: NodeJS.Signals) => {
+  console.log(`${sig} signal received.`);
   server.close(() => {
     console.log("HTTP server closed.");
-    process.exit(0);
+    // ⬇️ Solo cerramos el proceso en producción; en dev,
+    // dejá que nodemon maneje el reinicio sin hacer exit manual.
+    if (process.env["NODE_ENV"] === "production") {
+      process.exit(0);
+    }
   });
-});
+};
 
-process.on("SIGINT", () => {
-  console.log("SIGINT signal received.");
+process.on("SIGTERM", handleSignal);
+process.on("SIGINT", handleSignal);
+
+// Opcional: cuando nodemon reinicia suele mandar SIGUSR2
+process.on("SIGUSR2", () => {
+  console.log("SIGUSR2 received (nodemon restart).");
   server.close(() => {
-    console.log("HTTP server closed.");
-    process.exit(0);
+    console.log("HTTP server closed (nodemon).");
+    // no process.exit() en dev
   });
 });
 
