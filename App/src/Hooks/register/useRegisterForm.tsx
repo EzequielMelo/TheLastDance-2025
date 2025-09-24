@@ -1,124 +1,162 @@
 import { useState } from "react";
 import * as ImagePicker from "expo-image-picker";
 
+export type RNImage = { uri: string; name: string; type: string } | null;
+export type RegisterMode = "anon" | "registered";
+
 export type FormDataType = {
-  first_name: string;
-  last_name: string;
   profile_code: string;
   position_code: string;
   dni: string;
   cuil: string;
   email: string;
   password: string;
-  file: File | null;
+  file: RNImage;
   file_uri?: string;
+  first_name: string;
+  last_name: string;
+  mode?: RegisterMode;
 };
 
 export const useRegisterForm = (
   onSubmit: (data: FormDataType) => Promise<void>,
+  mode: RegisterMode = "registered",
 ) => {
-  const [formData, setFormData] = useState<FormDataType>({
-    first_name: "",
-    last_name: "",
-    profile_code: "",
-    position_code: "",
-    dni: "",
-    cuil: "",
-    email: "",
-    password: "",
-    file: null,
-    file_uri: undefined,
-  });
+  const [formData, setFormData] = useState<FormDataType>(() =>
+    mode === "anon"
+      ? {
+          mode,
+          first_name: "",
+          last_name: "",
+          dni: "",
+          cuil: "",
+          email: "",
+          password: "",
+          profile_code: "cliente_anonimo",
+          position_code: "",
+          file: null,
+          file_uri: undefined,
+        }
+      : {
+          mode,
+          first_name: "",
+          last_name: "",
+          dni: "",
+          cuil: "",
+          email: "",
+          password: "",
+          profile_code: "cliente_registrado",
+          position_code: "",
+          file: null,
+          file_uri: undefined,
+        }
+  );
 
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [focusedField, setFocusedField] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const validateField = (field: string, value: string | File | null) => {
+  const validateField = (field: string, value: any) => {
+    if (field === "file") {
+      return formData.file ? "" : "Debes seleccionar una imagen";
+    }
+
+    if (mode === "anon") {
+      switch (field) {
+        case "first_name":
+        case "last_name":
+          return !value || String(value).trim().length < 2 ? "Mínimo 2 caracteres" : "";
+        default:
+          return "";
+      }
+    }
+
     switch (field) {
       case "first_name":
       case "last_name":
-        if (!value || (typeof value === "string" && value.trim() === ""))
-          return "Campo obligatorio";
-        break;
+      case "dni":
+      case "cuil":
+        return !value ? "Campo obligatorio" : "";
       case "email":
-        if (
-          !value ||
-          (typeof value === "string" &&
-            !/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value))
-        )
-          return "Email inválido";
-        break;
+        return !value || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value)) ? "Email inválido" : "";
       case "password":
-        if (!value || (typeof value === "string" && value.length < 6))
-          return "Mínimo 6 caracteres";
-        break;
-      case "file":
-        if (!value || !(value instanceof File))
-          return "Debes seleccionar una imagen";
-        break;
-      case "profile_code":
-        if (!value || value === "") return "Seleccione un perfil";
-        break;
-      case "position_code":
-        if (formData.profile_code === "empleado" && (!value || value === ""))
-          return "Seleccione un cargo";
-        break;
+        return !value || String(value).length < 6 ? "Mínimo 6 caracteres" : "";
       default:
         return "";
     }
-    return "";
   };
 
-  const handleInputChange = (field: string, value: string | File) => {
+  const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    const error = validateField(field, value);
+    if (touched[field]) {
+      const error = validateField(field, value);
+      setErrors(prev => ({ ...prev, [field]: error }));
+    }
+  };
+
+  const handleBlur = (field: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    const error = validateField(field, (formData as any)[field]);
     setErrors(prev => ({ ...prev, [field]: error }));
   };
 
-  const pickImage = async (field: string) => {
+  const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
       alert("Se necesita permiso para acceder a la galería");
       return;
     }
 
+    const media = (ImagePicker as any).MediaType?.Images ?? ImagePicker.MediaTypeOptions.Images;
+
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: media as any,
       allowsEditing: true,
       quality: 0.7,
     });
 
     if (!result.canceled) {
-      const uri = result.assets[0].uri;
-      const fileName = uri.split("/").pop()!;
-      const fileType = `image/${fileName.split(".").pop()}`;
-      const file = new File([await fetch(uri).then(r => r.blob())], fileName, {
-        type: fileType,
-      });
+      const a = result.assets[0];
+      const uri = a.uri;
+      const name = a.fileName || uri.split("/").pop() || `img_${Date.now()}.jpg`;
+      const ext = (name.split(".").pop() || "jpg").toLowerCase();
+      const type = ext === "png" ? "image/png" : "image/jpeg";
 
-      setFormData(prev => ({ ...prev, file, file_uri: uri }));
-      const error = validateField("file", file);
+      const rnImage = { uri, name, type };
+      setFormData(prev => ({ ...prev, file: rnImage, file_uri: uri }));
+      // marcar file como tocado y validar
+      setTouched(prev => ({ ...prev, file: true }));
+      const error = validateField("file", rnImage);
       setErrors(prev => ({ ...prev, file: error }));
     }
   };
 
   const handleSubmit = async () => {
-    const newErrors: { [key: string]: string } = {};
-    let valid = true;
-    Object.entries(formData).forEach(([key, value]) => {
-      const error = validateField(key, value);
-      if (error) {
-        valid = false;
-        newErrors[key] = error;
-      }
-    });
-    setErrors(newErrors);
-    if (!valid) return;
+    const keysToCheck =
+      mode === "anon"
+        ? ["first_name", "last_name", "file"]
+        : ["first_name", "last_name", "dni", "cuil", "email", "password", "file"];
+
+    const allTouched = { ...touched };
+    keysToCheck.forEach(k => (allTouched[k] = true));
+    setTouched(allTouched);
+
+    const next: Record<string, string> = {};
+    let ok = true;
+    for (const k of keysToCheck) {
+      const e = validateField(k, (formData as any)[k]);
+      if (e) { ok = false; next[k] = e; }
+    }
+    setErrors(next);
+    if (!ok) return;
 
     setLoading(true);
-    await onSubmit(formData);
-    setLoading(false);
+    try {
+      await onSubmit(formData);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return {
@@ -128,6 +166,7 @@ export const useRegisterForm = (
     loading,
     setFocusedField,
     handleInputChange,
+    handleBlur,
     pickImage,
     handleSubmit,
   };

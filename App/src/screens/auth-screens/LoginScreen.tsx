@@ -45,7 +45,7 @@ export const LoginScreen = ({ navigation }: Props) => {
   return (
     <FormLayout
       title="Bienvenido"
-      subtitle="Inicia sesión en Bella Tavola"
+      subtitle="Inicia sesión en Last Dance"
       icon={<ChefHat size={60} color="#d4af37" strokeWidth={1.5} />}
       submitLabel="Iniciar Sesión"
       onSubmit={handleLogin}
@@ -53,6 +53,14 @@ export const LoginScreen = ({ navigation }: Props) => {
       bottomText="¿No tienes cuenta?"
       bottomLinkText="Regístrate"
       onBottomLinkPress={() => navigation.push("Registro")}
+      footerContent={
+        <TouchableOpacity
+          onPress={() => navigation.push("RegistroAnonimo")}
+          className="px-4 py-2 rounded-full bg-white/10 border border-white/20"
+        >
+          <Text className="text-white">Continuar sin cuenta</Text>
+        </TouchableOpacity>
+      }
     >
       {/* Email */}
       <View className="mb-5">

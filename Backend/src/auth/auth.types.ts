@@ -61,7 +61,6 @@ export interface LoginResult {
   session: {
     access_token: string;
     refresh_token: string;
-    // opcional: podés agregar otros campos si querés
     token_type?: string;
     expires_in?: number;
   };

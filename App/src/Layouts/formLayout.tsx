@@ -15,6 +15,7 @@ type Props = {
   bottomLinkText?: string; // "Regístrate"
   onBottomLinkPress?: () => void;
   showDivider?: boolean;
+  footerContent?: ReactNode;
 };
 
 export default function FormLayout({
@@ -29,6 +30,7 @@ export default function FormLayout({
   bottomLinkText,
   onBottomLinkPress,
   showDivider = true,
+  footerContent,
 }: Props) {
   return (
     <LinearGradient colors={["#1a1a1a", "#2d1810", "#1a1a1a"]} className="flex-1">
@@ -84,6 +86,7 @@ export default function FormLayout({
               </Text>
             </TouchableOpacity>
           ) : null}
+          {footerContent ? <View className="mt-4 items-center">{footerContent}</View> : null}
         </ScrollView>
       </KeyboardAvoidingView>
 

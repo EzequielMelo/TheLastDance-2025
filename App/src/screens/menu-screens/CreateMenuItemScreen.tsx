@@ -255,14 +255,7 @@ export default function CreateMenuItemScreen({ navigation }: any) {
   );
 }
 
-/** --- helpers UI --- */
-
-function Tag({
-  label,
-  active,
-  onPress,
-  disabled,
-}: {
+function Tag({label, active, onPress, disabled,}: {
   label: string;
   active?: boolean;
   onPress: () => void;
@@ -281,14 +274,7 @@ function Tag({
   );
 }
 
-function InputRow({
-  placeholder,
-  value,
-  onChangeText,
-  keyboardType = "default",
-  multiline = false,
-  numberOfLines = 1,
-}: {
+function InputRow({placeholder, value, onChangeText, keyboardType = "default", multiline = false, numberOfLines = 1,}: {
   placeholder: string;
   value: string;
   onChangeText: (v: string) => void;
@@ -314,11 +300,7 @@ function InputRow({
   );
 }
 
-function ImageSlotView({
-  slot,
-  onPick,
-  onRemove,
-}: {
+function ImageSlotView({slot, onPick, onRemove,}: {
   slot: ImageSlot;
   onPick: () => void;
   onRemove: () => void;
