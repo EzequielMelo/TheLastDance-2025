@@ -76,7 +76,7 @@ export const RegisterAnonymousScreen = ({ navigation }: Props) => {
       />
 
       <Text className="text-gray-400 text-xs">
-        Tu cuenta anónima puede navegar, pero algunas acciones estarán limitadas.
+        Este sistema de cuenta todavía está en desarrollo.
       </Text>
     </FormLayout>
   );

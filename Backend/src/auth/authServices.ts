@@ -13,12 +13,12 @@ export async function registerUser(
   let email: string | undefined;
   let avatarUrl: string | null = null;
 
-  // Si es CLIENT, EMPLOYEE, SUPERVISOR u OWNER → usar Supabase Auth
+  // Auth: todo menos cliente_anonimo se crea en Supabase Auth
   if (profile_code !== "cliente_anonimo") {
-    const { email: userEmail, password } = body as {
-      email: string;
-      password: string;
-    };
+    const { email: userEmail, password } = body as Extract<
+      CreateUserBody,
+      { email: string; password: string }
+    >;
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: userEmail,
@@ -32,7 +32,7 @@ export async function registerUser(
     userId = authData.user.id;
     email = userEmail;
   } else {
-    // Si es CLIENT_ANONYMOUS → generar UUID local
+    // anónimo => uuid local
     userId = crypto.randomUUID();
   }
 
@@ -41,26 +41,33 @@ export async function registerUser(
     avatarUrl = await uploadAvatar(userId!, file);
   }
 
-  // Insertar en tabla users
-  const { error: dbError } = await supabaseAdmin.from("users").insert({
+  // ---------- INSERT EN public.users ----------
+  // Armamos el payload de forma explícita según el perfil
+  const insertPayload: any = {
     id: userId,
     first_name: body.first_name,
     last_name: body.last_name,
     profile_code: body.profile_code,
     profile_image: avatarUrl,
-    // opcionales según el tipo
-    ...(profile_code === "empleado"
-      ? {
-          position_code: body.position_code,
-          dni: body.dni,
-          cuil: body.cuil,
-        }
-      : {}),
-    ...(profile_code === "supervisor" || profile_code === "dueno"
-      ? { dni: body.dni, cuil: body.cuil }
-      : {}),
-  });
+  };
 
+  if (profile_code === "empleado") {
+    // empleado: SIEMPRE position_code + dni/cuil
+    insertPayload.position_code = body.position_code;
+    insertPayload.dni = body.dni;
+    insertPayload.cuil = body.cuil;
+  } else if (profile_code === "supervisor" || profile_code === "dueno") {
+    // supervisor/dueno: dni/cuil
+    insertPayload.dni = body.dni;
+    insertPayload.cuil = body.cuil;
+  } else if (profile_code === "cliente_registrado") {
+    // ✅ cliente_registrado: agregar dni/cuil si vienen (en tu DTO son requeridos)
+    insertPayload.dni = (body as any).dni;
+    insertPayload.cuil = (body as any).cuil;
+  }
+  // cliente_anonimo: no agregamos dni/cuil/position_code
+
+  const { error: dbError } = await supabaseAdmin.from("users").insert(insertPayload);
   if (dbError) {
     throw new Error("Error al crear perfil en DB: " + dbError.message);
   }
@@ -73,8 +80,7 @@ export async function registerUser(
       first_name: body.first_name,
       last_name: body.last_name,
       profile_code: body.profile_code,
-      position_code:
-        profile_code === "empleado" ? body.position_code : undefined,
+      position_code: profile_code === "empleado" ? (body as any).position_code : undefined,
       photo_url: avatarUrl,
     },
   };

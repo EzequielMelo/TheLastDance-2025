@@ -6,6 +6,7 @@ import TextField from "../../components/form/TextField";
 import ImageField from "../../components/form/ImageField";
 import { useRegisterForm, FormDataType } from "../../Hooks/register/useRegisterForm";
 import { useAuthActions } from "../../auth/useAuthActions";
+import { ToastAndroid } from "react-native";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Registro">;
 
@@ -24,7 +25,10 @@ export const RegisterScreen = ({ navigation }: Props) => {
     if (data.file) fd.append("file", data.file as any);
 
     const result = await register(fd);
-    if (result?.success) navigation.navigate("Login");
+    if (result?.success) {
+      ToastAndroid.show("¡Cuenta creada exitosamente!", ToastAndroid.LONG);
+      setTimeout(() => navigation.navigate("Login"), 800);
+    }
   };
 
   const { formData, errors, loading, handleInputChange, handleBlur, pickImage, handleSubmit } =

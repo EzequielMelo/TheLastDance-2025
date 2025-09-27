@@ -21,6 +21,8 @@ export default function ImageField({
   focused = false,
   label = "Imagen",
 }: Props) {
+  const showError = !!error && !image;
+
   return (
     <View className="mb-4">
       <Text className="text-gray-300 mb-1">{label}</Text>
@@ -28,7 +30,7 @@ export default function ImageField({
         <TouchableOpacity
           onPress={onPick}
           className={`w-24 h-24 rounded-xl overflow-hidden bg-white/10 border items-center justify-center ${
-            error ? "border-red-500" : "border-white/20"
+            showError ? "border-red-500" : "border-white/20"
           } ${focused ? "border-[#d4af37]" : ""}`}
         >
           {image ? (
@@ -50,7 +52,10 @@ export default function ImageField({
           </TouchableOpacity>
         )}
       </View>
-      {!!error && <Text className="text-red-500 text-xs mt-1">{error}</Text>}
+
+      {showError && (
+        <Text className="text-red-500 text-xs mt-1">{error}</Text>
+      )}
     </View>
   );
 }
