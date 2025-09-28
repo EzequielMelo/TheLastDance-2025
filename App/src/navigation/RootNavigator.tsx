@@ -40,7 +40,7 @@ export default function RootNavigator() {
           <>
             <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
             {/* 🔒 Solo disponible logueado */}
-            <Stack.Screen name="CreateMenuItem" component={CreateMenuItemScreen} />
+            <Stack.Screen name="CreateMenuItem" component={CreateMenuItemScreen} options={{ title: "Agregar al menú", headerBackTitle: "Volver" }} />
           </>
         ) : (
           <>

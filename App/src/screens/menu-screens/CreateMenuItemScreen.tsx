@@ -1,4 +1,3 @@
-// src/screens/CreateMenuItemScreen.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, Image, ToastAndroid } from "react-native";
 import { ChefHat, ImagePlus, UtensilsCrossed, Martini } from "lucide-react-native";

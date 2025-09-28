@@ -65,7 +65,7 @@ export default function HomeScreen({ navigation }: Props) {
           <Text className="text-gray-400 mt-1">
             {user?.position_code
               ? `Estás logueado como ${user.position_code}`
-              : "Bienvenido a Bella Tavola"}
+              : "Bienvenido a Last Dance"}
           </Text>
         </View>
 

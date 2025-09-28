@@ -1,5 +1,6 @@
 import { supabase, supabaseAdmin } from "../config/supabase";
 import { CreateUserBody, LoginResult, AuthUser } from "./auth.types";
+import { sendPendingEmail } from "../lib/emails";
 
 export async function registerUser(
   body: CreateUserBody,
@@ -41,31 +42,38 @@ export async function registerUser(
     avatarUrl = await uploadAvatar(userId!, file);
   }
 
-  // ---------- INSERT EN public.users ----------
-  // Armamos el payload de forma explícita según el perfil
+  // ---------- Estado inicial ----------
+  // cliente_registrado => 'pendiente'
+  // Resto              => 'aprobado'
+  const initialState: "pendiente" | "aprobado" = 
+    profile_code === "cliente_registrado" ? "pendiente" : "aprobado";
+
+  // ---------- INSERT en users ----------
   const insertPayload: any = {
     id: userId,
     first_name: body.first_name,
     last_name: body.last_name,
     profile_code: body.profile_code,
     profile_image: avatarUrl,
+    state: initialState,
   };
 
   if (profile_code === "empleado") {
-    // empleado: SIEMPRE position_code + dni/cuil
-    insertPayload.position_code = body.position_code;
-    insertPayload.dni = body.dni;
-    insertPayload.cuil = body.cuil;
+    insertPayload.position_code = (body as any).position_code;
+    insertPayload.dni = (body as any).dni;
+    insertPayload.cuil = (body as any).cuil;
   } else if (profile_code === "supervisor" || profile_code === "dueno") {
-    // supervisor/dueno: dni/cuil
-    insertPayload.dni = body.dni;
-    insertPayload.cuil = body.cuil;
-  } else if (profile_code === "cliente_registrado") {
-    // ✅ cliente_registrado: agregar dni/cuil si vienen (en tu DTO son requeridos)
+    insertPayload.dni = (body as any).dni;
+    insertPayload.cuil = (body as any).cuil;
+  } else if (profile_code === "cliente_registrado" && email) {
+    sendPendingEmail(email, body.first_name).catch((err) =>
+      console.error("No se pudo enviar tplPending:", err?.message || err),
+    );
+    // dni/cuil vienen en el DTO de cliente
     insertPayload.dni = (body as any).dni;
     insertPayload.cuil = (body as any).cuil;
   }
-  // cliente_anonimo: no agregamos dni/cuil/position_code
+  // cliente_anonimo: sin dni/cuil/position_code
 
   const { error: dbError } = await supabaseAdmin.from("users").insert(insertPayload);
   if (dbError) {
@@ -90,7 +98,7 @@ export async function loginUser(
   email: string,
   password: string,
 ): Promise<LoginResult> {
-  // 1. Login en Supabase Auth
+  // 1) Login en Supabase Auth
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -105,7 +113,7 @@ export async function loginUser(
 
   console.log("Buscando perfil para user ID:", data.user.id);
 
-  // 2. Buscar perfil en la tabla users
+  // 2) Perfil en users
   const { data: profiles, error: profileError } = await supabase
     .from("users")
     .select("*")
@@ -122,7 +130,17 @@ export async function loginUser(
   }
 
   const profile = profiles[0];
-  // 3. Construir el AuthUser en base a las interfaces nuevas
+
+  // ✅ Bloqueo por estado (solo cliente_registrado)
+  if (profile.profile_code === "cliente_registrado" && profile.state !== "aprobado") {
+    if (profile.state === "pendiente") {
+      throw new Error("Tu registro está pendiente de aprobación.");
+    } else {
+      throw new Error("Tu registro fue rechazado.");
+    }
+  }
+
+  // 3) AuthUser
   const authUser: AuthUser = {
     id: data.user.id,
     email: data.user.email ?? null,
@@ -133,7 +151,7 @@ export async function loginUser(
     photo_url: profile.profile_image ?? null,
   };
 
-  // 4. Retornar el LoginResult
+  // 4) Resultado
   return {
     session: {
       access_token: data.session.access_token,
