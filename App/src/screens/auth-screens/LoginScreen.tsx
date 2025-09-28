@@ -1,6 +1,12 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
-import { View, Text, TextInput, TouchableOpacity, ToastAndroid } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ToastAndroid,
+} from "react-native";
 import { useEffect, useState } from "react";
 import { ChefHat, Lock, Eye, EyeOff, Mail } from "lucide-react-native";
 import { useAuthActions } from "../../auth/useAuthActions";
@@ -26,9 +32,17 @@ export const LoginScreen = ({ navigation }: Props) => {
   }, [actionError]);
 
   const validateEmail = (v: string) =>
-    !v ? "El correo es obligatorio" : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? "" : "Correo no válido";
+    !v
+      ? "El correo es obligatorio"
+      : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+        ? ""
+        : "Correo no válido";
   const validatePassword = (v: string) =>
-    !v ? "La contraseña es obligatoria" : v.length < 6 ? "Mínimo 6 caracteres" : "";
+    !v
+      ? "La contraseña es obligatoria"
+      : v.length < 6
+        ? "Mínimo 6 caracteres"
+        : "";
 
   const handleLogin = () => {
     const eErr = validateEmail(email);
@@ -37,7 +51,7 @@ export const LoginScreen = ({ navigation }: Props) => {
     setPasswordError(pErr);
     if (!eErr && !pErr) {
       login({ email, password });
-    }else {
+    } else {
       ToastAndroid.show("Revisá los campos resaltados", ToastAndroid.SHORT);
     }
   };
@@ -64,7 +78,9 @@ export const LoginScreen = ({ navigation }: Props) => {
     >
       {/* Email */}
       <View className="mb-5">
-        <View className={`flex-row items-center rounded-xl border px-4 h-14 bg-white/10 border-white/20 ${emailFocused ? "border-[#d4af37] bg-[#d4af371a]" : ""}`}>
+        <View
+          className={`flex-row items-center rounded-xl border px-4 h-14 bg-white/10 border-white/20 ${emailFocused ? "border-[#d4af37] bg-[#d4af371a]" : ""}`}
+        >
           <Mail size={20} color={emailFocused ? "#d4af37" : "#888"} />
           <TextInput
             className="flex-1 ml-2 text-white text-base p-0"
@@ -78,12 +94,16 @@ export const LoginScreen = ({ navigation }: Props) => {
             onBlur={() => setEmailFocused(false)}
           />
         </View>
-        {!!emailError && <Text className="text-red-500 text-sm mt-1">{emailError}</Text>}
+        {!!emailError && (
+          <Text className="text-red-500 text-sm mt-1">{emailError}</Text>
+        )}
       </View>
 
       {/* Password */}
       <View className="mb-5">
-        <View className={`flex-row items-center rounded-xl border px-4 h-14 bg-white/10 border-white/20 ${passwordFocused ? "border-[#d4af37] bg-[#d4af371a]" : ""}`}>
+        <View
+          className={`flex-row items-center rounded-xl border px-4 h-14 bg-white/10 border-white/20 ${passwordFocused ? "border-[#d4af37] bg-[#d4af371a]" : ""}`}
+        >
           <Lock size={20} color={passwordFocused ? "#d4af37" : "#888"} />
           <TextInput
             className="flex-1 ml-2 text-white text-base p-0 pr-10"
@@ -95,15 +115,26 @@ export const LoginScreen = ({ navigation }: Props) => {
             onFocus={() => setPasswordFocused(true)}
             onBlur={() => setPasswordFocused(false)}
           />
-          <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="absolute right-4 p-1">
-            {showPassword ? <EyeOff size={20} color="#888" /> : <Eye size={20} color="#888" />}
+          <TouchableOpacity
+            onPress={() => setShowPassword(!showPassword)}
+            className="absolute right-4 p-1"
+          >
+            {showPassword ? (
+              <EyeOff size={20} color="#888" />
+            ) : (
+              <Eye size={20} color="#888" />
+            )}
           </TouchableOpacity>
         </View>
-        {!!passwordError && <Text className="text-red-500 text-sm mt-1">{passwordError}</Text>}
+        {!!passwordError && (
+          <Text className="text-red-500 text-sm mt-1">{passwordError}</Text>
+        )}
       </View>
 
       <TouchableOpacity className="self-end mb-2">
-        <Text className="text-[#d4af37] text-sm">¿Olvidaste tu contraseña?</Text>
+        <Text className="text-[#d4af37] text-sm">
+          ¿Olvidaste tu contraseña?
+        </Text>
       </TouchableOpacity>
     </FormLayout>
   );
