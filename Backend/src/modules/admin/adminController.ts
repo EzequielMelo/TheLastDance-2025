@@ -1,7 +1,6 @@
 import type { Request, Response } from "express";
 import { supabaseAdmin } from "../../config/supabase";
-import { sendMail } from "../../lib/mailer";
-import { tplApproved, tplRejected } from "../../lib/emailTemplates";
+import { sendApprovedEmail, sendRejectedEmail } from "../../lib/emails";
 
 // Obtenemos el email REAL de Supabase Auth (no lo guardamos en users)
 async function getAuthEmailById(id: string): Promise<string | null> {
@@ -16,7 +15,9 @@ export async function listClients(req: Request, res: Response) {
     const state = (req.query["state"] as string) || "pendiente";
     const { data, error } = await supabaseAdmin
       .from("users")
-      .select("id, first_name, last_name, profile_code, state, created_at")
+      .select(
+        "id, first_name, last_name, profile_code, profile_image,state, created_at",
+      )
       .eq("profile_code", "cliente_registrado")
       .eq("state", state)
       .order("created_at", { ascending: false });
@@ -57,12 +58,8 @@ export async function approveClient(req: Request, res: Response) {
       return;
     }
 
-    // Enviar correo
-    await sendMail({
-      to: email,
-      subject: "Tu cuenta fue aprobada",
-      html: tplApproved(data.first_name),
-    });
+    // Enviar correo usando la nueva función
+    await sendApprovedEmail(email, data.first_name);
 
     res.json({ ok: true });
     return;
@@ -71,7 +68,6 @@ export async function approveClient(req: Request, res: Response) {
     return;
   }
 }
-
 // POST /api/admin/clients/:id/reject
 export async function rejectClient(req: Request, res: Response) {
   try {
@@ -104,12 +100,8 @@ export async function rejectClient(req: Request, res: Response) {
       return;
     }
 
-    // Enviar correo
-    await sendMail({
-      to: email,
-      subject: "Resultado de tu registro",
-      html: tplRejected(data.first_name, reason),
-    });
+    // Enviar correo usando la nueva función
+    await sendRejectedEmail(email, data.first_name, reason);
 
     res.json({ ok: true });
     return;

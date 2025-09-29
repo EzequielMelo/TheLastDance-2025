@@ -1,15 +1,20 @@
 import React, { useEffect, useState, useContext } from "react";
-import { View, Text, ActivityIndicator, TouchableOpacity, ToastAndroid } from "react-native";
+import {
+  View,
+  Text,
+  ActivityIndicator,
+  TouchableOpacity,
+  ToastAndroid,
+} from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
 import { AuthContext } from "../auth/AuthContext";
 import api from "../api/axios";
 import { Martini, UtensilsCrossed, LogOut } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { User } from "../types/User"
+import { User } from "../types/User";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
-
 
 export default function HomeScreen({ navigation }: Props) {
   const { token, logout } = useContext(AuthContext);
@@ -23,16 +28,17 @@ export default function HomeScreen({ navigation }: Props) {
       try {
         if (!token) return;
         const { data } = await api.get("/auth/validate-token");
-        const u: User = data?.user ?? data; 
-        if (mounted)
-          setUser(u);
+        const u: User = data?.user ?? data;
+        if (mounted) setUser(u);
       } catch (err: any) {
         ToastAndroid.show("No se pudo cargar tu perfil", ToastAndroid.SHORT);
       } finally {
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [token]);
 
   const handleLogout = async () => {
@@ -53,9 +59,13 @@ export default function HomeScreen({ navigation }: Props) {
 
   const isCocinero = user?.position_code === "cocinero";
   const isBartender = user?.position_code === "bartender";
+  const isDueno = user?.profile_code === "dueno";
 
   return (
-    <LinearGradient colors={["#1a1a1a", "#2d1810", "#1a1a1a"]} className="flex-1">
+    <LinearGradient
+      colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
+      className="flex-1"
+    >
       <View className="px-6 pt-14 pb-8 flex-1">
         {/* Header */}
         <View className="mb-8">
@@ -89,18 +99,15 @@ export default function HomeScreen({ navigation }: Props) {
             />
           )}
 
-          {!isCocinero && !isBartender && (
-            <View className="rounded-2xl border border-white/15 p-4 bg-white/5">
-              <Text className="text-white text-base">
-                No tenés permisos para crear ítems del menú.
+          {isDueno && (
+            <TouchableOpacity
+              onPress={() => navigation.navigate("Clients")}
+              className="flex-row items-center p-4 bg-white/10 rounded-lg mb-4"
+            >
+              <Text className="text-white text-lg font-medium">
+                Gestionar Usuarios Pendientes
               </Text>
-              <Text className="text-gray-400 mt-1 text-sm">
-                Solo <Text className="text-[#d4af37]">Cocinero</Text> puede crear{" "}
-                <Text className="text-[#d4af37]">platos</Text> y{" "}
-                <Text className="text-[#d4af37]">Bartender</Text> puede crear{" "}
-                <Text className="text-[#d4af37]">bebidas</Text>.
-              </Text>
-            </View>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -149,8 +156,12 @@ function ActionTile({
             {icon}
           </View>
           <View className="ml-3 flex-1">
-            <Text className="text-[#1a1a1a] text-base font-semibold">{title}</Text>
-            <Text className="text-[#1a1a1a] opacity-80 text-xs">{subtitle}</Text>
+            <Text className="text-[#1a1a1a] text-base font-semibold">
+              {title}
+            </Text>
+            <Text className="text-[#1a1a1a] opacity-80 text-xs">
+              {subtitle}
+            </Text>
           </View>
           <Text className="text-[#1a1a1a] text-xl">›</Text>
         </View>
