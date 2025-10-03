@@ -46,7 +46,20 @@ export default function RootNavigator() {
               options={{ headerShown: false }}
             />
             {/* 🔒 Solo disponible logueado */}
-            <Stack.Screen name="CreateMenuItem" component={CreateMenuItemScreen} options={{ title: "Agregar al menú", headerBackTitle: "Volver" }} />
+            <Stack.Screen
+              name="CreateMenuItem"
+              component={CreateMenuItemScreen}
+              options={{ title: "Agregar al menú", headerBackTitle: "Volver" }}
+            />
+            <Stack.Screen
+              name="Clients"
+              component={ClientsScreen}
+              options={{
+                title: "Usuarios Pendientes",
+                headerBackTitle: "Volver",
+              }}
+            />
+            <Stack.Screen name="AddStaff" component={AddStaffScreen} options={{ title: "Añadir miembro" }} />
           </>
         ) : (
           <>

@@ -17,7 +17,6 @@ import {
 } from "../../Hooks/register/useRegisterForm";
 import { useAuthActions } from "../../auth/useAuthActions";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
-import { BarCodeScanner } from "expo-barcode-scanner";
 import React, { useState, useRef } from "react";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Registro">;

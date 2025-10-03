@@ -5,6 +5,7 @@ import {
   processClientRejection,
   createStaff,
 } from "./adminServices";
+import type { Actor } from "../../types/admin.types";
 
 // GET /api/admin/clients?state=pendiente|aprobado|rechazado
 export async function listClients(req: Request, res: Response) {
@@ -63,8 +64,10 @@ export async function createStaffController(req: Request, res: Response) {
       return res.status(401).json({ error: "No autenticado" });
     }
 
+    const actor: Actor = { profile_code: req.user.profile_code as "dueno" | "supervisor" };
+
     const result = await createStaff(
-      { profile_code: req.user.profile_code as "dueno" | "supervisor" },
+      actor,
       req.body,
       req.file,
     );
@@ -72,7 +75,7 @@ export async function createStaffController(req: Request, res: Response) {
     return res.json(result);
   } catch (e: any) {
     const msg = e?.message || "Error al crear staff";
-    const status = /obligatorio|permiso|solo el dueÃ±o/i.test(msg) ? 400 : 500;
+    const status = /obligatorio|permiso|solo el dueño/i.test(msg) ? 400 : 500;
     return res.status(status).json({ error: msg });
   }
 }
