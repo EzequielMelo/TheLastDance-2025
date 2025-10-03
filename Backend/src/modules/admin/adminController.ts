@@ -69,13 +69,11 @@ export async function createStaffController(req: Request, res: Response) {
       return res.status(401).json({ error: "No autenticado" });
     }
 
-    const actor: Actor = { profile_code: req.user.profile_code as "dueno" | "supervisor" };
+    const actor: Actor = {
+      profile_code: req.user.profile_code as "dueno" | "supervisor",
+    };
 
-    const result = await createStaff(
-      actor,
-      req.body,
-      req.file,
-    );
+    const result = await createStaff(actor, req.body, req.file);
 
     return res.json(result);
   } catch (e: any) {

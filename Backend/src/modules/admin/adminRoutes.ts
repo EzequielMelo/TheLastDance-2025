@@ -32,18 +32,6 @@ const upload = multer({
 
 const router = express.Router();
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
-  fileFilter: (_req, file, cb) => {
-    const ok = /image\/(jpeg|png|webp)/.test(file.mimetype || "");
-    if (!ok) {
-      return cb(new Error("Tipo de imagen inválido (jpg/png/webp)"));
-    }
-    cb(null, true);
-  },
-});
-
 // Solo dueño/supervisor
 router.use(authenticateUser, roleGuard(["dueno", "supervisor"]));
 
