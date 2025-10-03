@@ -7,8 +7,9 @@ import HomeScreen from "../screens/HomeScreen";
 import SplashScreen from "../screens/SplashScreen";
 import { LoginScreen } from "../screens/auth-screens/LoginScreen";
 import { RegisterScreen } from "../screens/auth-screens/RegisterScreen";
-import { RegisterAnonymousScreen } from "../screens/auth-screens/RegisterAnonymousScreen";  
-import  CreateMenuItemScreen  from "../screens/menu-screens/CreateMenuItemScreen";
+import { RegisterAnonymousScreen } from "../screens/auth-screens/RegisterAnonymousScreen";
+import CreateMenuItemScreen from "../screens/menu-screens/CreateMenuItemScreen";
+import ClientsScreen from "../screens/admin-screens/UsersList";
 import AddStaffScreen from "../screens/admin-screens/AddStaffScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -39,16 +40,31 @@ export default function RootNavigator() {
       >
         {token ? (
           <>
-            <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+            <Stack.Screen
+              name="Home"
+              component={HomeScreen}
+              options={{ headerShown: false }}
+            />
             {/* 🔒 Solo disponible logueado */}
             <Stack.Screen name="CreateMenuItem" component={CreateMenuItemScreen} options={{ title: "Agregar al menú", headerBackTitle: "Volver" }} />
-            <Stack.Screen name="AddStaff" component={AddStaffScreen} options={{ title: "Añadir miembro" }} />
           </>
         ) : (
           <>
-            <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="Registro" component={RegisterScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="RegistroAnonimo" component={RegisterAnonymousScreen} options={{ headerShown: false }} />
+            <Stack.Screen
+              name="Login"
+              component={LoginScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Registro"
+              component={RegisterScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="RegistroAnonimo"
+              component={RegisterAnonymousScreen}
+              options={{ headerShown: false }}
+            />
           </>
         )}
       </Stack.Navigator>

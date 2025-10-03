@@ -6,4 +6,5 @@ export type RootStackParamList = {
   Splash: undefined;
   CreateMenuItem: { initialCategory?: "plato" | "bebida" } | undefined;
   AddStaff: undefined;
+  Clients: undefined; // Agregamos la ruta Clients
 };
