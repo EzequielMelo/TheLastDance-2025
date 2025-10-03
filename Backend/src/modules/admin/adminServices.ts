@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from "../../config/supabase";
+import { supabaseAdmin } from "../../config/supabase";
 import { sendApprovedEmail, sendRejectedEmail } from "../../lib/emails";
 import { uploadAvatar } from "../../lib/storage/avatarUpload";
 import {
@@ -143,9 +143,17 @@ export async function createStaff(
   body: CreateStaffBody,
   file?: Express.Multer.File,
 ) {
+  console.log("🔄 Iniciando createStaff con:", {
+    actor: actor.profile_code,
+    bodyKeys: Object.keys(body),
+    hasFile: !!file,
+    profileCode: body.profile_code,
+    email: body.email
+  });
+
   // Permisos
   if (body.profile_code === "supervisor" && actor.profile_code !== "dueno") {
-    throw new Error("Solo el dueÃ±o puede crear supervisores");
+    throw new Error("Solo el dueño puede crear supervisores");
   }
   if (
     body.profile_code === "empleado" &&
@@ -171,23 +179,31 @@ export async function createStaff(
   }
   if (!file) throw new Error("Foto obligatoria");
 
+  console.log("✅ Validaciones pasadas, creando usuario en Auth...");
+
   // Crear en Auth con email confirmado
   const { data: authData, error: authErr } =
-    await supabase.auth.admin.createUser({
+    await supabaseAdmin.auth.admin.createUser({
       email: body.email,
       password: body.password,
       email_confirm: true,
     });
+  
   if (authErr || !authData?.user) {
+    console.error("❌ Error creando usuario en Auth:", authErr);
     throw new Error(
       `No se pudo crear el usuario en Auth: ${authErr?.message || "desconocido"}`,
     );
   }
+  
   const userId = authData.user.id;
+  console.log("✅ Usuario creado en Auth con ID:", userId);
 
   try {
+    console.log("📸 Subiendo avatar...");
     // Subir avatar
     const profile_image = await uploadAvatar(userId, file);
+    console.log("✅ Avatar subido:", profile_image);
 
     // Insert en 'users' aprobado
     const row: any = {
@@ -204,8 +220,21 @@ export async function createStaff(
       row.position_code = body.position_code!;
     }
 
+    console.log("💾 Insertando en tabla users:", {
+      id: userId,
+      profile_code: row.profile_code,
+      state: row.state,
+      position_code: row.position_code,
+      hasImage: !!row.profile_image
+    });
+
     const { error: dbErr } = await supabaseAdmin.from("users").insert(row);
-    if (dbErr) throw new Error("Error al guardar perfil: " + dbErr.message);
+    if (dbErr) {
+      console.error("❌ Error insertando en users:", dbErr);
+      throw new Error("Error al guardar perfil: " + dbErr.message);
+    }
+
+    console.log("✅ Staff creado exitosamente!");
 
     return {
       message: "Staff creado correctamente.",
@@ -220,8 +249,11 @@ export async function createStaff(
       },
     };
   } catch (e) {
+    console.error("❌ Error en proceso, haciendo rollback...", e);
     // rollback best-effort
-    await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {});
+    await supabaseAdmin.auth.admin.deleteUser(userId).catch((rollbackErr) => {
+      console.error("❌ Error en rollback:", rollbackErr);
+    });
     throw e;
   }
 }

@@ -7,6 +7,7 @@ import {
   listClients,
   approveClient,
   rejectClient,
+  createStaffController,
   listTables,
   getTable,
   createTableController,
@@ -38,6 +39,9 @@ router.use(authenticateUser, roleGuard(["dueno", "supervisor"]));
 router.get("/clients", listClients);
 router.post("/clients/:id/approve", approveClient);
 router.post("/clients/:id/reject", rejectClient);
+
+// Ruta para crear staff (empleados/supervisores)
+router.post("/users/staff", upload.single("file"), createStaffController);
 
 // ========== RUTAS PARA MESAS ==========
 

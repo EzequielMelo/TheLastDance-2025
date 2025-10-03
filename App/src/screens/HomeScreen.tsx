@@ -61,6 +61,7 @@ export default function HomeScreen({ navigation }: Props) {
   const isCocinero = user?.position_code === "cocinero";
   const isBartender = user?.position_code === "bartender";
   const isDueno = user?.profile_code === "dueno";
+  const isSupervisor = user?.profile_code === "supervisor";
 
   return (
     <LinearGradient
@@ -86,7 +87,16 @@ export default function HomeScreen({ navigation }: Props) {
             <ActionTile
               title="Añadir empleado/supervisor"
               subtitle="Crear nuevos perfiles del equipo"
-              onPress={() => navigation.navigate("AddStaff")}
+              onPress={() => navigation.navigate("AddStaff", { userRole: "dueno" })}
+              icon={<PlusCircle size={26} color="#1a1a1a" />}
+            />
+          )}
+
+          {isSupervisor && (
+            <ActionTile
+              title="Añadir empleado"
+              subtitle="Crear nuevos empleados del equipo"
+              onPress={() => navigation.navigate("AddStaff", { userRole: "supervisor" })}
               icon={<PlusCircle size={26} color="#1a1a1a" />}
             />
           )}

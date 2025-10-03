@@ -27,7 +27,8 @@ export const RegisterAnonymousScreen = ({ navigation }: Props) => {
     if (!json?.token || !json?.user) throw new Error("Respuesta inválida");
 
     await login(json.token, json.user);
-    navigation.replace("Home");
+    // No hacer navegación manual - el NavigationContainer se recargará automáticamente
+    // cuando el estado de autenticación cambie
   };
 
   const { formData, errors, loading, handleInputChange, handleBlur, pickImage, handleSubmit } =

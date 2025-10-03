@@ -128,7 +128,34 @@ export const useRegisterForm = (
   };
 
   const handleSubmit = async () => {
-    // campos requeridos según perfil
+    // Para usuario anónimo, solo validamos nombre y apellido
+    if (mode === "anon") {
+      const keysToCheck = ["first_name", "last_name"];
+      if (requireFile) keysToCheck.push("file");
+
+      const allTouched = { ...touched };
+      keysToCheck.forEach(k => (allTouched[k] = true));
+      setTouched(allTouched);
+
+      const next: Record<string, string> = {};
+      let ok = true;
+      for (const k of keysToCheck) {
+        const e = validateField(k, (formData as any)[k]);
+        if (e) { ok = false; next[k] = e; }
+      }
+      setErrors(next);
+      if (!ok) return;
+
+      setLoading(true);
+      try {
+        await onSubmit(formData);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Para usuarios registrados: validación completa
     const p = formData.profile_code;
     const baseReq = ["first_name", "last_name", "email", "password"] as const;
     const clientRegReq = ["dni", "cuil"] as const;

@@ -10,7 +10,7 @@ import { RegisterScreen } from "../screens/auth-screens/RegisterScreen";
 import { RegisterAnonymousScreen } from "../screens/auth-screens/RegisterAnonymousScreen";
 import CreateMenuItemScreen from "../screens/menu-screens/CreateMenuItemScreen";
 import ClientsScreen from "../screens/admin-screens/UsersList";
-import AddStaffScreen from "../screens/admin-screens/AddStaffScreen";
+import { AddStaffScreen } from "../screens/admin-screens/AddStaffScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 

@@ -65,7 +65,18 @@ export async function rejectClient(req: Request, res: Response) {
 
 export async function createStaffController(req: Request, res: Response) {
   try {
+    console.log("📥 Petición createStaff recibida:", {
+      hasUser: !!req.user,
+      userProfile: req.user?.profile_code,
+      bodyKeys: Object.keys(req.body || {}),
+      hasFile: !!req.file,
+      fileName: req.file?.originalname,
+      fileSize: req.file?.size,
+      contentType: req.headers['content-type']
+    });
+
     if (!req.user) {
+      console.log("❌ No hay usuario autenticado");
       return res.status(401).json({ error: "No autenticado" });
     }
 
@@ -73,10 +84,13 @@ export async function createStaffController(req: Request, res: Response) {
       profile_code: req.user.profile_code as "dueno" | "supervisor",
     };
 
+    console.log("🚀 Llamando a createStaff service...");
     const result = await createStaff(actor, req.body, req.file);
+    console.log("✅ Staff creado, enviando respuesta:", result.message);
 
     return res.json(result);
   } catch (e: any) {
+    console.error("❌ Error en createStaffController:", e);
     const msg = e?.message || "Error al crear staff";
     const status = /obligatorio|permiso|solo el dueño/i.test(msg) ? 400 : 500;
     return res.status(status).json({ error: msg });

@@ -165,7 +165,84 @@ export async function loginUser(
   };
 }
 
+export async function registerAnonymousUser(
+  body: { first_name: string; last_name: string },
+  file?: Express.Multer.File,
+) {
+  // Generar UUID para usuario anónimo
+  const userId = crypto.randomUUID();
+  let avatarUrl: string | null = null;
+
+  // Subir foto si se proporciona
+  if (file) {
+    avatarUrl = await uploadAvatarService(userId, file);
+  }
+
+  // Insertar directamente en la tabla users
+  const insertPayload = {
+    id: userId,
+    first_name: body.first_name,
+    last_name: body.last_name,
+    profile_code: "cliente_anonimo",
+    profile_image: avatarUrl,
+    state: "aprobado", // Los usuarios anónimos se aprueban automáticamente
+  };
+
+  const { error: dbError } = await supabaseAdmin
+    .from("users")
+    .insert(insertPayload);
+
+  if (dbError) {
+    throw new Error("Error al crear perfil anónimo: " + dbError.message);
+  }
+
+  // Generar un token personalizado para el usuario anónimo
+  // Como no usa Supabase Auth, generamos un token simple
+  const token = `anon_${userId}_${Date.now()}`;
+
+  return {
+    message: "Usuario anónimo creado exitosamente.",
+    token,
+    user: {
+      id: userId,
+      email: null,
+      first_name: body.first_name,
+      last_name: body.last_name,
+      profile_code: "cliente_anonimo",
+      position_code: null,
+      photo_url: avatarUrl,
+    },
+  };
+}
+
 export async function verifyToken(accessToken: string) {
+  // Verificar si es un token anónimo
+  if (accessToken.startsWith("anon_")) {
+    const parts = accessToken.split("_");
+    if (parts.length >= 3) {
+      const userId = parts[1];
+      
+      // Verificar que el usuario existe en la tabla
+      const { data: profile, error } = await supabaseAdmin
+        .from("users")
+        .select("*")
+        .eq("id", userId)
+        .eq("profile_code", "cliente_anonimo")
+        .single();
+
+      if (error || !profile) {
+        throw new Error("Usuario anónimo no encontrado.");
+      }
+
+      return {
+        id: userId,
+        email: null,
+      };
+    }
+    throw new Error("Token anónimo inválido.");
+  }
+
+  // Token normal de Supabase Auth
   const { data, error } = await supabaseAdmin.auth.getUser(accessToken);
 
   if (error || !data?.user) {
