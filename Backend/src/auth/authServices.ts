@@ -1,7 +1,7 @@
 import { supabase, supabaseAdmin } from "../config/supabase";
 import { CreateUserBody, LoginResult, AuthUser } from "./auth.types";
 import { sendPendingEmail } from "../lib/emails";
-import { uploadAvatar } from "../lib/uploadAvatar";
+import { uploadAvatar as uploadAvatarService } from "../lib/storage/avatarUpload";
 
 export async function registerUser(
   body: CreateUserBody,
@@ -40,13 +40,13 @@ export async function registerUser(
 
   // Foto de perfil opcional
   if (file) {
-    avatarUrl = await uploadAvatar(userId!, file);
+    avatarUrl = await uploadAvatarService(userId!, file);
   }
 
   // ---------- Estado inicial ----------
   // cliente_registrado => 'pendiente'
   // Resto              => 'aprobado'
-  const initialState: "pendiente" | "aprobado" = 
+  const initialState: "pendiente" | "aprobado" =
     profile_code === "cliente_registrado" ? "pendiente" : "aprobado";
 
   // ---------- INSERT en users ----------
@@ -67,7 +67,7 @@ export async function registerUser(
     insertPayload.dni = (body as any).dni;
     insertPayload.cuil = (body as any).cuil;
   } else if (profile_code === "cliente_registrado" && email) {
-    sendPendingEmail(email, body.first_name).catch((err) =>
+    sendPendingEmail(email, body.first_name).catch(err =>
       console.error("No se pudo enviar tplPending:", err?.message || err),
     );
     // dni/cuil vienen en el DTO de cliente
@@ -76,7 +76,9 @@ export async function registerUser(
   }
   // cliente_anonimo: sin dni/cuil/position_code
 
-  const { error: dbError } = await supabaseAdmin.from("users").insert(insertPayload);
+  const { error: dbError } = await supabaseAdmin
+    .from("users")
+    .insert(insertPayload);
   if (dbError) {
     throw new Error("Error al crear perfil en DB: " + dbError.message);
   }
@@ -89,7 +91,8 @@ export async function registerUser(
       first_name: body.first_name,
       last_name: body.last_name,
       profile_code: body.profile_code,
-      position_code: profile_code === "empleado" ? (body as any).position_code : undefined,
+      position_code:
+        profile_code === "empleado" ? (body as any).position_code : undefined,
       photo_url: avatarUrl,
     },
   };
@@ -128,7 +131,10 @@ export async function loginUser(
   const profile = profiles[0];
 
   // ✅ Bloqueo por estado (solo cliente_registrado)
-  if (profile.profile_code === "cliente_registrado" && profile.state !== "aprobado") {
+  if (
+    profile.profile_code === "cliente_registrado" &&
+    profile.state !== "aprobado"
+  ) {
     if (profile.state === "pendiente") {
       throw new Error("Tu registro está pendiente de aprobación.");
     } else {
