@@ -1,14 +1,15 @@
-// Augmenta Express.Request para agregar `user`
 declare global {
   namespace Express {
     interface Request {
-      user: {
+      user?: {
         appUserId: string;
-        position_code: string; // 'cocinero' | 'bartender' | etc.
+        profile_code: "dueno" | "supervisor" | "empleado" | "cliente_registrado" | "cliente_anonimo";
+        position_code?: "maitre" | "mozo" | "cocinero" | "bartender" | null;
+        email?: string | null;
       };
     }
   }
 }
 
-// Hace que este .d.ts sea tratado como un módulo y no se lo saltee
+// Hace que este .d.ts sea tratado como un módulo
 export {};

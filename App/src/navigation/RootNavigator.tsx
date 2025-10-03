@@ -9,6 +9,7 @@ import { LoginScreen } from "../screens/auth-screens/LoginScreen";
 import { RegisterScreen } from "../screens/auth-screens/RegisterScreen";
 import { RegisterAnonymousScreen } from "../screens/auth-screens/RegisterAnonymousScreen";  
 import  CreateMenuItemScreen  from "../screens/menu-screens/CreateMenuItemScreen";
+import AddStaffScreen from "../screens/admin-screens/AddStaffScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -41,6 +42,7 @@ export default function RootNavigator() {
             <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
             {/* 🔒 Solo disponible logueado */}
             <Stack.Screen name="CreateMenuItem" component={CreateMenuItemScreen} options={{ title: "Agregar al menú", headerBackTitle: "Volver" }} />
+            <Stack.Screen name="AddStaff" component={AddStaffScreen} options={{ title: "Añadir miembro" }} />
           </>
         ) : (
           <>

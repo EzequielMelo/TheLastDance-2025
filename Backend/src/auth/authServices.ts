@@ -1,6 +1,7 @@
 import { supabase, supabaseAdmin } from "../config/supabase";
 import { CreateUserBody, LoginResult, AuthUser } from "./auth.types";
 import { sendPendingEmail } from "../lib/emails";
+import { uploadAvatar } from "../lib/uploadAvatar";
 
 export async function registerUser(
   body: CreateUserBody,
@@ -111,16 +112,11 @@ export async function loginUser(
     throw new Error("No se generó sesión de usuario.");
   }
 
-  console.log("Buscando perfil para user ID:", data.user.id);
-
   // 2) Perfil en users
   const { data: profiles, error: profileError } = await supabase
     .from("users")
     .select("*")
     .eq("id", data.user.id);
-
-  console.log("Perfiles encontrados:", profiles?.length);
-  console.log("Datos de perfiles:", profiles);
 
   if (profileError) {
     throw new Error(`Error buscando perfil: ${profileError.message}`);
@@ -171,27 +167,4 @@ export async function verifyToken(accessToken: string) {
   }
 
   return data.user;
-}
-
-async function uploadAvatar(
-  userId: string,
-  file: Express.Multer.File,
-): Promise<string | null> {
-  const fileExt = file.originalname.split(".").pop();
-  const fileName = `userPhoto.${fileExt}`;
-  const filePath = `${userId}/${fileName}`;
-
-  const { error: uploadError } = await supabaseAdmin.storage
-    .from("profile-images")
-    .upload(filePath, file.buffer, {
-      contentType: file.mimetype,
-      upsert: true,
-    });
-
-  if (uploadError) throw new Error(uploadError.message);
-
-  const { data } = supabaseAdmin.storage
-    .from("profile-images")
-    .getPublicUrl(filePath);
-  return data.publicUrl ?? null;
 }

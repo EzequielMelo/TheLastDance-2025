@@ -7,6 +7,7 @@ import api from "../api/axios";
 import { Martini, UtensilsCrossed, LogOut } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User"
+import { PlusCircle } from "lucide-react-native";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
@@ -53,6 +54,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   const isCocinero = user?.position_code === "cocinero";
   const isBartender = user?.position_code === "bartender";
+  const isOwner = user?.profile_code === "dueno"; 
 
   return (
     <LinearGradient colors={["#1a1a1a", "#2d1810", "#1a1a1a"]} className="flex-1">
@@ -71,6 +73,15 @@ export default function HomeScreen({ navigation }: Props) {
 
         {/* Acciones por rol */}
         <View className="gap-4">
+          {isOwner && (
+            <ActionTile
+              title="Añadir empleado/supervisor"
+              subtitle="Crear nuevos perfiles del equipo"
+              onPress={() => navigation.navigate("AddStaff")}
+              icon={<PlusCircle size={26} color="#1a1a1a" />}
+            />
+          )}
+
           {isCocinero && (
             <ActionTile
               title="Agregar plato"
@@ -89,16 +100,12 @@ export default function HomeScreen({ navigation }: Props) {
             />
           )}
 
-          {!isCocinero && !isBartender && (
+          {!isCocinero && !isBartender && !isOwner && (
             <View className="rounded-2xl border border-white/15 p-4 bg-white/5">
-              <Text className="text-white text-base">
-                No tenés permisos para crear ítems del menú.
-              </Text>
+              <Text className="text-white text-base">No tenés permisos para crear ítems del menú.</Text>
               <Text className="text-gray-400 mt-1 text-sm">
-                Solo <Text className="text-[#d4af37]">Cocinero</Text> puede crear{" "}
-                <Text className="text-[#d4af37]">platos</Text> y{" "}
-                <Text className="text-[#d4af37]">Bartender</Text> puede crear{" "}
-                <Text className="text-[#d4af37]">bebidas</Text>.
+                Solo <Text className="text-[#d4af37]">Cocinero</Text> crea <Text className="text-[#d4af37]">platos</Text> y{" "}
+                <Text className="text-[#d4af37]">Bartender</Text> crea <Text className="text-[#d4af37]">bebidas</Text>.
               </Text>
             </View>
           )}
