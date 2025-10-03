@@ -4,6 +4,11 @@ import {
   processClientApproval,
   processClientRejection,
   createStaff,
+  getAllTables,
+  getTableById,
+  createTable,
+  updateTable,
+  deleteTable,
 } from "./adminServices";
 
 // GET /api/admin/clients?state=pendiente|aprobado|rechazado
@@ -74,5 +79,152 @@ export async function createStaffController(req: Request, res: Response) {
     const msg = e?.message || "Error al crear staff";
     const status = /obligatorio|permiso|solo el dueÃ±o/i.test(msg) ? 400 : 500;
     return res.status(status).json({ error: msg });
+  }
+}
+
+// ========== CONTROLADORES PARA MESAS ==========
+
+// GET /api/admin/tables - Obtener todas las mesas
+export async function listTables(_req: Request, res: Response) {
+  try {
+    const tables = await getAllTables();
+    return res.json(tables);
+  } catch (e: any) {
+    return res.status(400).json({ error: e.message });
+  }
+}
+
+// GET /api/admin/tables/:id - Obtener una mesa por ID
+export async function getTable(req: Request, res: Response) {
+  try {
+    const id = req.params["id"];
+    if (!id) {
+      return res.status(400).json({ error: "ID de mesa requerido" });
+    }
+
+    const table = await getTableById(id);
+    if (!table) {
+      return res.status(404).json({ error: "Mesa no encontrada" });
+    }
+
+    return res.json(table);
+  } catch (e: any) {
+    return res.status(400).json({ error: e.message });
+  }
+}
+
+// POST /api/admin/tables - Crear una nueva mesa
+export async function createTableController(req: Request, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    // Verificar que se enviaron ambas imágenes
+    if (!req.files || !Array.isArray(req.files) || req.files.length !== 2) {
+      return res.status(400).json({
+        error:
+          "Se requieren exactamente 2 archivos: foto de la mesa y código QR",
+      });
+    }
+
+    const files = req.files as Express.Multer.File[];
+
+    // Identificar qué archivo es qué (por el nombre del campo o por orden)
+    const photoFile = files.find(f => f.fieldname === "photo") || files[0];
+    const qrFile = files.find(f => f.fieldname === "qr") || files[1];
+
+    if (!photoFile || !qrFile) {
+      return res.status(400).json({
+        error: "Se requieren ambos archivos: 'photo' y 'qr'",
+      });
+    }
+
+    const result = await createTable(
+      { profile_code: req.user.profile_code as "dueno" | "supervisor" },
+      req.body,
+      photoFile,
+      qrFile,
+      req.user.appUserId,
+    );
+
+    return res.status(201).json(result);
+  } catch (e: any) {
+    const status = e.message.includes("Permisos insuficientes")
+      ? 403
+      : e.message.includes("Ya existe")
+        ? 409
+        : 400;
+    return res.status(status).json({ error: e.message });
+  }
+}
+
+// PUT /api/admin/tables/:id - Actualizar una mesa
+export async function updateTableController(req: Request, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    const id = req.params["id"];
+    if (!id) {
+      return res.status(400).json({ error: "ID de mesa requerido" });
+    }
+
+    let photoFile: Express.Multer.File | undefined;
+    let qrFile: Express.Multer.File | undefined;
+
+    // Manejar archivos opcionales
+    if (req.files && Array.isArray(req.files)) {
+      photoFile = req.files.find(f => f.fieldname === "photo");
+      qrFile = req.files.find(f => f.fieldname === "qr");
+    }
+
+    const result = await updateTable(
+      { profile_code: req.user.profile_code as "dueno" | "supervisor" },
+      id,
+      req.body,
+      photoFile,
+      qrFile,
+    );
+
+    return res.json(result);
+  } catch (e: any) {
+    const status = e.message.includes("Permisos insuficientes")
+      ? 403
+      : e.message.includes("no encontrada")
+        ? 404
+        : e.message.includes("Ya existe")
+          ? 409
+          : 400;
+    return res.status(status).json({ error: e.message });
+  }
+}
+
+// DELETE /api/admin/tables/:id - Eliminar una mesa
+export async function deleteTableController(req: Request, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    const id = req.params["id"];
+    if (!id) {
+      return res.status(400).json({ error: "ID de mesa requerido" });
+    }
+
+    await deleteTable(
+      { profile_code: req.user.profile_code as "dueno" | "supervisor" },
+      id,
+    );
+
+    return res.json({ message: "Mesa eliminada correctamente" });
+  } catch (e: any) {
+    const status = e.message.includes("Permisos insuficientes")
+      ? 403
+      : e.message.includes("no encontrada")
+        ? 404
+        : 400;
+    return res.status(status).json({ error: e.message });
   }
 }

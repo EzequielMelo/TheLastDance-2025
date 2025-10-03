@@ -22,3 +22,21 @@ export type CreateStaffBody = CreateEmployeeBody | CreateSupervisorBody;
 
 // Quién ejecuta la acción
 export type Actor = { profile_code: "dueno" } | { profile_code: "supervisor" };
+
+// Tipos para las mesas
+export interface Table {
+  id: string;
+  number: number;
+  capacity: number;
+  type: string;
+  photo_url: string;
+  qr_url: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface CreateTableBody {
+  number: number;
+  capacity: number;
+  type: string;
+}
