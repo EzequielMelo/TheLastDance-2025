@@ -77,13 +77,14 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
 <p><em>Rol:</em> Backend / Infra.</p>
 
 <details open>
-  <summary>Checklist de tareas</summary>
+  <summary>Lista de tareas</summary>
   <ul>
     <li>[x] Crear base de datos y conectarla con el Backend</li>
     <li>[x] Menú en el backend: menuServices - menuController - menuRoutes y los tipos</li>
     <li>[x] Entidades en la base de datos menu - usuarios - etc</li>
     <li>[x] Mail de la compañia</li>
     <li>[x] Envios de mail notifando estado de cuenta</li>
+    <li>[x] Formulario para crear empleados/supervisores con lectura QR y Camara de fotos.</li>
   </ul>
 </details>
 
