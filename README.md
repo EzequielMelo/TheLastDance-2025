@@ -46,7 +46,10 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
   <!-- Marcar con [x] cuando se complete -->
   <ul>
     <li>[x] Crear esqueleto del proyecto y comunicarlo con el equipo</li>
-    <li>[ ] Coordinar reunion con el equipo</li>
+    <li>[x] Coordinar reunion con el equipo</li>
+    <li>[x] SplashScreen animado</li>
+    <li>[x] Autenticacion en backend completo</li>
+    <li>[x] Listado de usuarios en estado pendiente desde usuario Dueño</li>
   </ul>
 </details>
 
@@ -60,7 +63,9 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
 <details open>
   <summary>Lista de tareas</summary>
   <ul>
-    <li>[ ] </li>
+    <li>[x] Login funcional completo</li>
+    <li>[x] Registro de usuario completo</li>
+    <li>[x] Version preliminar del SplashScreen</li>
   </ul>
 </details>
 
@@ -76,6 +81,9 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
   <ul>
     <li>[x] Crear base de datos y conectarla con el Backend</li>
     <li>[x] Menú en el backend: menuServices - menuController - menuRoutes y los tipos</li>
+    <li>[x] Entidades en la base de datos menu - usuarios - etc</li>
+    <li>[x] Mail de la compañia</li>
+    <li>[x] Envios de mail notifando estado de cuenta</li>
   </ul>
 </details>
 
