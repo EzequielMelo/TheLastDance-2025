@@ -1,34 +1,23 @@
 import type { Request, Response } from "express";
-import { supabaseAdmin } from "../../config/supabase";
-import { sendApprovedEmail, sendRejectedEmail } from "../../lib/emails";
-
-// Obtenemos el email REAL de Supabase Auth (no lo guardamos en users)
-async function getAuthEmailById(id: string): Promise<string | null> {
-  const { data, error } = await supabaseAdmin.auth.admin.getUserById(id);
-  if (error || !data?.user) return null;
-  return data.user.email ?? null;
-}
+import {
+  getClientsByState,
+  processClientApproval,
+  processClientRejection,
+  createStaff,
+} from "./adminServices";
 
 // GET /api/admin/clients?state=pendiente|aprobado|rechazado
 export async function listClients(req: Request, res: Response) {
   try {
     const state = (req.query["state"] as string) || "pendiente";
-    const { data, error } = await supabaseAdmin
-      .from("users")
-      .select(
-        "id, first_name, last_name, profile_code, profile_image,state, created_at",
-      )
-      .eq("profile_code", "cliente_registrado")
-      .eq("state", state)
-      .order("created_at", { ascending: false });
-
-    if (error) throw error;
-    return res.json(data ?? []);
+    const clients = await getClientsByState(state);
+    return res.json(clients);
   } catch (e: any) {
     return res.status(400).json({ error: e.message });
   }
 }
 
+// POST /api/admin/clients/:id/approve
 export async function approveClient(req: Request, res: Response) {
   try {
     const id = req.params["id"];
@@ -37,34 +26,13 @@ export async function approveClient(req: Request, res: Response) {
       return;
     }
 
-    // Actualizar estado a 'aprobado'
-    const { data, error } = await supabaseAdmin
-      .from("users")
-      .update({ state: "aprobado" })
-      .eq("id", id)
-      .eq("profile_code", "cliente_registrado")
-      .select("id, first_name, last_name")
-      .single();
-
-    if (error || !data) {
-      res.status(404).json({ error: "Usuario no encontrado" });
-      return;
-    }
-
-    // Obtener email desde Auth
-    const email = await getAuthEmailById(id);
-    if (!email) {
-      res.status(404).json({ error: "Email no encontrado en Auth" });
-      return;
-    }
-
-    // Enviar correo usando la nueva función
-    await sendApprovedEmail(email, data.first_name);
-
+    await processClientApproval(id);
     res.json({ ok: true });
     return;
   } catch (e: any) {
-    res.status(400).json({ error: e.message });
+    // Determinar el código de estado basado en el mensaje de error
+    const statusCode = e.message.includes("no encontrado") ? 404 : 400;
+    res.status(statusCode).json({ error: e.message });
     return;
   }
 }
@@ -78,35 +46,33 @@ export async function rejectClient(req: Request, res: Response) {
     }
 
     const reason = (req.body?.reason as string) || "";
-
-    // Actualizar estado a 'rechazado'
-    const { data, error } = await supabaseAdmin
-      .from("users")
-      .update({ state: "rechazado" })
-      .eq("id", id)
-      .eq("profile_code", "cliente_registrado")
-      .select("id, first_name, last_name")
-      .single();
-
-    if (error || !data) {
-      res.status(404).json({ error: "Usuario no encontrado" });
-      return;
-    }
-
-    // Obtener email desde Auth
-    const email = await getAuthEmailById(id);
-    if (!email) {
-      res.status(404).json({ error: "Email no encontrado en Auth" });
-      return;
-    }
-
-    // Enviar correo usando la nueva función
-    await sendRejectedEmail(email, data.first_name, reason);
-
+    await processClientRejection(id, reason);
     res.json({ ok: true });
     return;
   } catch (e: any) {
-    res.status(400).json({ error: e.message });
+    // Determinar el código de estado basado en el mensaje de error
+    const statusCode = e.message.includes("no encontrado") ? 404 : 400;
+    res.status(statusCode).json({ error: e.message });
     return;
+  }
+}
+
+export async function createStaffController(req: Request, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    const result = await createStaff(
+      { profile_code: req.user.profile_code as "dueno" | "supervisor" },
+      req.body,
+      req.file,
+    );
+
+    return res.json(result);
+  } catch (e: any) {
+    const msg = e?.message || "Error al crear staff";
+    const status = /obligatorio|permiso|solo el dueÃ±o/i.test(msg) ? 400 : 500;
+    return res.status(status).json({ error: msg });
   }
 }
