@@ -2,6 +2,7 @@ import { supabase, supabaseAdmin } from "../config/supabase";
 import { CreateUserBody, LoginResult, AuthUser } from "./auth.types";
 import { sendPendingEmail } from "../lib/emails";
 import { uploadAvatar as uploadAvatarService } from "../lib/storage/avatarUpload";
+import { notifyNewClientRegistration } from "../services/pushNotificationService";
 
 export async function registerUser(
   body: CreateUserBody,
@@ -81,6 +82,14 @@ export async function registerUser(
     .insert(insertPayload);
   if (dbError) {
     throw new Error("Error al crear perfil en DB: " + dbError.message);
+  }
+
+  // Enviar notificación push si es un cliente registrado
+  if (profile_code === "cliente_registrado") {
+    const clientName = `${body.first_name} ${body.last_name}`;
+    notifyNewClientRegistration(clientName, userId!).catch(err =>
+      console.error("No se pudo enviar notificación push:", err?.message || err),
+    );
   }
 
   return {

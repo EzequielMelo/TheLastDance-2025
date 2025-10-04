@@ -19,7 +19,15 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/icono-adaptable.png"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.anonymous.apprestaurant",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
+      ]
     },
     "web": {
       "bundler": "metro"
@@ -35,6 +43,15 @@
         "expo-barcode-scanner",
         {
           "cameraPermission": "La aplicación necesita acceso a la cámara para escanear códigos de barras del DNI."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#ffffff",
+          "defaultChannel": "default",
+          "sounds": ["./assets/notification-sound.wav"]
         }
       ]
     ]

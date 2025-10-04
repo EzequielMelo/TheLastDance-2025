@@ -2,6 +2,7 @@ import React, { useEffect, useState, useContext } from "react";
 import {
   View,
   Text,
+  Image,
   ActivityIndicator,
   TouchableOpacity,
   ToastAndroid,
@@ -9,16 +10,17 @@ import {
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
 import { AuthContext } from "../auth/AuthContext";
+import { useNotifications } from "../auth/NotificationContext";
 import api from "../api/axios";
-import { Martini, UtensilsCrossed, LogOut } from "lucide-react-native";
+import { LogOut, Bell } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User";
-import { PlusCircle } from "lucide-react-native";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
 export default function HomeScreen({ navigation }: Props) {
   const { token, logout } = useContext(AuthContext);
+  const { showTestNotification } = useNotifications();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -62,6 +64,11 @@ export default function HomeScreen({ navigation }: Props) {
   const isBartender = user?.position_code === "bartender";
   const isDueno = user?.profile_code === "dueno";
   const isSupervisor = user?.profile_code === "supervisor";
+  const IMGS = {
+    newStaff: require("../../assets/new-staff.png"),
+    churrasco: require("../../assets/churrasco.png"),
+    fernet: require("../../assets/fernet.png"),
+  };
 
   return (
     <LinearGradient
@@ -88,7 +95,7 @@ export default function HomeScreen({ navigation }: Props) {
               title="Añadir empleado/supervisor"
               subtitle="Crear nuevos perfiles del equipo"
               onPress={() => navigation.navigate("AddStaff", { userRole: "dueno" })}
-              icon={<PlusCircle size={26} color="#1a1a1a" />}
+              icon={<Image source={IMGS.newStaff} style={{ width: 26, height: 26 }} />}
             />
           )}
 
@@ -97,7 +104,7 @@ export default function HomeScreen({ navigation }: Props) {
               title="Añadir empleado"
               subtitle="Crear nuevos empleados del equipo"
               onPress={() => navigation.navigate("AddStaff", { userRole: "supervisor" })}
-              icon={<PlusCircle size={26} color="#1a1a1a" />}
+              icon={<Image source={IMGS.newStaff} style={{ width: 26, height: 26 }} />}
             />
           )}
 
@@ -106,7 +113,7 @@ export default function HomeScreen({ navigation }: Props) {
               title="Agregar plato"
               subtitle="Publicá un nuevo plato en el menú"
               onPress={() => goCreate("plato")}
-              icon={<UtensilsCrossed size={26} color="#1a1a1a" />}
+              icon={<Image source={IMGS.churrasco} style={{ width: 26, height: 26 }} />}
             />
           )}
 
@@ -115,17 +122,29 @@ export default function HomeScreen({ navigation }: Props) {
               title="Agregar bebida"
               subtitle="Sumá una nueva bebida al menú"
               onPress={() => goCreate("bebida")}
-              icon={<Martini size={26} color="#1a1a1a" />}
+              icon={<Image source={IMGS.fernet} style={{ width: 26, height: 26 }} />}
             />
           )}
 
-          {isDueno && (
+          {isDueno || isSupervisor&& (
             <TouchableOpacity
               onPress={() => navigation.navigate("Clients")}
               className="flex-row items-center p-4 bg-white/10 rounded-lg mb-4"
             >
               <Text className="text-white text-lg font-medium">
                 Gestionar Usuarios Pendientes
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {(isDueno || isSupervisor) && (
+            <TouchableOpacity
+              onPress={showTestNotification}
+              className="flex-row items-center p-4 bg-blue-600/80 rounded-lg mb-4"
+            >
+              <Bell size={20} color="#fff" />
+              <Text className="text-white text-lg font-medium ml-2">
+                Probar Notificación
               </Text>
             </TouchableOpacity>
           )}
