@@ -23,7 +23,7 @@ type Client = {
   last_name: string;
   state: string;
   created_at: string;
-  profile_image?: string | null; // si en la tabla tenés foto
+  profile_image?: string | null;
 };
 
 export default function ClientsScreen({}: Props) {

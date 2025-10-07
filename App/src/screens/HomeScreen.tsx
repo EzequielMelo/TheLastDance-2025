@@ -2,6 +2,7 @@ import React, { useEffect, useState, useContext } from "react";
 import {
   View,
   Text,
+  Image,
   ActivityIndicator,
   TouchableOpacity,
   ToastAndroid,
@@ -19,9 +20,9 @@ import {
   QrCode,
   Camera,
 } from "lucide-react-native";
+import { LogOut, Bell } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User";
-import { PlusCircle } from "lucide-react-native";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
@@ -74,6 +75,11 @@ export default function HomeScreen({ navigation }: Props) {
   const isCliente =
     user?.profile_code === "cliente_registrado" ||
     user?.profile_code === "cliente_anonimo";
+  const IMGS = {
+    newStaff: require("../../assets/new-staff.png"),
+    churrasco: require("../../assets/churrasco.png"),
+    fernet: require("../../assets/fernet.png"),
+  };
 
   return (
     <LinearGradient
@@ -102,7 +108,12 @@ export default function HomeScreen({ navigation }: Props) {
               onPress={() =>
                 navigation.navigate("AddStaff", { userRole: "dueno" })
               }
-              icon={<PlusCircle size={26} color="#1a1a1a" />}
+              icon={
+                <Image
+                  source={IMGS.newStaff}
+                  style={{ width: 26, height: 26 }}
+                />
+              }
             />
           )}
 
@@ -113,7 +124,12 @@ export default function HomeScreen({ navigation }: Props) {
               onPress={() =>
                 navigation.navigate("AddStaff", { userRole: "supervisor" })
               }
-              icon={<PlusCircle size={26} color="#1a1a1a" />}
+              icon={
+                <Image
+                  source={IMGS.newStaff}
+                  style={{ width: 26, height: 26 }}
+                />
+              }
             />
           )}
 
@@ -122,7 +138,12 @@ export default function HomeScreen({ navigation }: Props) {
               title="Agregar plato"
               subtitle="Publicá un nuevo plato en el menú"
               onPress={() => goCreate("plato")}
-              icon={<UtensilsCrossed size={26} color="#1a1a1a" />}
+              icon={
+                <Image
+                  source={IMGS.churrasco}
+                  style={{ width: 26, height: 26 }}
+                />
+              }
             />
           )}
 
@@ -131,7 +152,9 @@ export default function HomeScreen({ navigation }: Props) {
               title="Agregar bebida"
               subtitle="Sumá una nueva bebida al menú"
               onPress={() => goCreate("bebida")}
-              icon={<Martini size={26} color="#1a1a1a" />}
+              icon={
+                <Image source={IMGS.fernet} style={{ width: 26, height: 26 }} />
+              }
             />
           )}
 
@@ -178,16 +201,60 @@ export default function HomeScreen({ navigation }: Props) {
             </>
           )}
 
-          {isDueno && (
-            <TouchableOpacity
-              onPress={() => navigation.navigate("Clients")}
-              className="flex-row items-center p-4 bg-white/10 rounded-lg mb-4"
-            >
-              <Text className="text-white text-lg font-medium">
-                Gestionar Usuarios Pendientes
-              </Text>
-            </TouchableOpacity>
+          {(isDueno || isSupervisor) && (
+            <ActionTile
+              title="Crear mesa"
+              subtitle="Agregá una nueva mesa al restaurante"
+              onPress={() => navigation.navigate("CreateTable")}
+              icon={<Table size={26} color="#1a1a1a" />}
+            />
           )}
+
+          {isMaitre && (
+            <>
+              <ActionTile
+                title="Gestionar Lista de Espera"
+                subtitle="Administrá las reservas y asignación de mesas"
+                onPress={() => navigation.navigate("ManageWaitingList")}
+                icon={<Users size={26} color="#1a1a1a" />}
+              />
+              <ActionTile
+                title="Generar Código QR"
+                subtitle="Crear QR para que clientes se unan a la lista"
+                onPress={() => navigation.navigate("GenerateWaitingListQR")}
+                icon={<QrCode size={26} color="#1a1a1a" />}
+              />
+            </>
+          )}
+
+          {isCliente && (
+            <>
+              <ActionTile
+                title="Unirse a Lista de Espera"
+                subtitle="Escanea el QR del maitre para hacer tu reserva"
+                onPress={() => navigation.navigate("ScanQR")}
+                icon={<Camera size={26} color="#1a1a1a" />}
+              />
+              <ActionTile
+                title="Ver Mi Posición"
+                subtitle="Consulta tu lugar en la lista de espera"
+                onPress={() => navigation.navigate("MyWaitingPosition")}
+                icon={<Users size={26} color="#1a1a1a" />}
+              />
+            </>
+          )}
+
+          {isDueno ||
+            (isSupervisor && (
+              <TouchableOpacity
+                onPress={() => navigation.navigate("Clients")}
+                className="flex-row items-center p-4 bg-white/10 rounded-lg mb-4"
+              >
+                <Text className="text-white text-lg font-medium">
+                  Gestionar Usuarios Pendientes
+                </Text>
+              </TouchableOpacity>
+            ))}
         </View>
 
         {/* Spacer */}

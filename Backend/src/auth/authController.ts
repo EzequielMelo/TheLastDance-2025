@@ -1,14 +1,10 @@
 import { RequestHandler } from "express";
 import * as authService from "./authServices";
 import { supabaseAdmin } from "../config/supabase";
+import { updateUserPushToken } from "../services/pushNotificationService";
 
 export const registerUser: RequestHandler = async (req, res) => {
   try {
-    console.log("=== REQUEST DEBUG ===");
-    console.log("Content-Type:", req.headers["content-type"]);
-    console.log("Body keys:", Object.keys(req.body));
-    console.log("File received:", !!req.file);
-
     if (req.file) {
       console.log("File info:", {
         fieldname: req.file.fieldname,
@@ -16,12 +12,7 @@ export const registerUser: RequestHandler = async (req, res) => {
         mimetype: req.file.mimetype,
         size: req.file.size,
       });
-    } else {
-      console.log("NO FILE - Body contains:", req.body);
-      // Si el archivo viene en body en lugar de req.file, es que no es FormData real
     }
-    console.log("====================");
-
     const result = await authService.registerUser(req.body, req.file);
     res.status(201).json(result);
   } catch (error) {
@@ -31,11 +22,6 @@ export const registerUser: RequestHandler = async (req, res) => {
 
 export const registerAnonymousUser: RequestHandler = async (req, res) => {
   try {
-    console.log("=== ANONYMOUS REGISTER DEBUG ===");
-    console.log("Content-Type:", req.headers["content-type"]);
-    console.log("Body keys:", Object.keys(req.body));
-    console.log("File received:", !!req.file);
-    
     if (req.file) {
       console.log("File info:", {
         fieldname: req.file.fieldname,
@@ -160,5 +146,65 @@ export const checkTokenValidity: RequestHandler = async (req, res) => {
       valid: false,
       error: err?.message || "Token inválido.",
     });
+  }
+};
+
+export const updatePushToken: RequestHandler = async (req, res) => {
+  try {
+    console.log('📱 Received updatePushToken request');
+    
+    const authHeader = req.headers.authorization || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      console.log('❌ No bearer token provided');
+      res.status(401).json({ error: "Token no proporcionado." });
+      return;
+    }
+
+    const token = authHeader.slice(7);
+    let userId: string;
+
+    // Verificar si es un token anónimo o normal
+    if (token.startsWith("anon_")) {
+      console.log('🔍 Processing anonymous token');
+      const parts = token.split("_");
+      if (parts.length >= 3 && parts[1]) {
+        userId = parts[1];
+        console.log('✅ Anonymous user ID extracted:', userId);
+      } else {
+        console.log('❌ Invalid anonymous token format');
+        res.status(401).json({ error: "Token anónimo inválido." });
+        return;
+      }
+    } else {
+      // Token normal de Supabase Auth
+      console.log('🔍 Processing Supabase auth token');
+      const authUser = await authService.verifyToken(token);
+      if (!authUser.id) {
+        console.log('❌ No user ID found in token');
+        res.status(401).json({ error: "ID de usuario no encontrado." });
+        return;
+      }
+      userId = authUser.id;
+      console.log('✅ Supabase user ID extracted:', userId);
+    }
+
+    const { pushToken } = req.body;
+    console.log('📱 Push token received:', pushToken);
+    
+    if (!pushToken) {
+      console.log('❌ No push token provided in request body');
+      res.status(400).json({ error: "Push token es requerido" });
+      return;
+    }
+
+    // Actualizar el push token usando el servicio
+    console.log('🔄 Updating push token for user:', userId);
+    await updateUserPushToken(userId, pushToken);
+    console.log('✅ Push token updated successfully');
+
+    res.status(200).json({ message: "Push token actualizado exitosamente" });
+  } catch (error) {
+    console.error("❌ Error en updatePushToken:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
   }
 };
