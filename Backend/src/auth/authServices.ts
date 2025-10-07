@@ -8,7 +8,7 @@ export async function registerUser(
   body: CreateUserBody,
   file?: Express.Multer.File,
 ) {
-  console.log("paso", body);
+  console.log("🔄 registerUser service called with:", { body, hasFile: !!file });
 
   const { profile_code } = body;
 
@@ -28,7 +28,14 @@ export async function registerUser(
       password,
     });
 
-    if (authError || !authData.user) {
+    if (authError) {
+      if (authError.message.includes('User already registered') || authError.message.includes('already registered')) {
+        throw new Error(`El email ${userEmail} ya está registrado. Por favor usa otro email.`);
+      }
+      throw new Error("Error al crear usuario en Auth: " + authError.message);
+    }
+    
+    if (!authData.user) {
       throw new Error("Error al crear usuario en Auth");
     }
 
@@ -41,7 +48,14 @@ export async function registerUser(
 
   // Foto de perfil opcional
   if (file) {
-    avatarUrl = await uploadAvatarService(userId!, file);
+    console.log("📸 Uploading avatar...");
+    try {
+      avatarUrl = await uploadAvatarService(userId!, file);
+      console.log("✅ Avatar uploaded:", avatarUrl);
+    } catch (error) {
+      console.error("❌ Avatar upload failed:", error);
+      throw new Error("Error al subir imagen de perfil");
+    }
   }
 
   // ---------- Estado inicial ----------

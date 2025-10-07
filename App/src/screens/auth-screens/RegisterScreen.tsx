@@ -17,6 +17,7 @@ import {
 } from "../../Hooks/register/useRegisterForm";
 import { useAuthActions } from "../../auth/useAuthActions";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
 import React, { useState, useRef } from "react";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Registro">;
@@ -204,6 +205,56 @@ export const RegisterScreen = ({ navigation }: Props) => {
     }
   };
 
+  const pickImageFromGallery = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        ToastAndroid.show(
+          "Se necesita permiso para acceder a la galería",
+          ToastAndroid.SHORT
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const photoFile = {
+          uri: result.assets[0].uri,
+          type: "image/jpeg",
+          name: "photo.jpg",
+        };
+        handleInputChange("file", photoFile);
+        ToastAndroid.show("Foto seleccionada correctamente", ToastAndroid.SHORT);
+      }
+    } catch (error) {
+      console.error("Error seleccionando imagen:", error);
+      ToastAndroid.show("Error al seleccionar imagen", ToastAndroid.SHORT);
+    }
+  };
+
+  const selectPhotoOption = () => {
+    Alert.alert("Seleccionar foto", "¿Cómo deseas agregar la foto?", [
+      {
+        text: "Tomar foto",
+        onPress: () => openCamera("photo"),
+      },
+      {
+        text: "Galería",
+        onPress: pickImageFromGallery,
+      },
+      {
+        text: "Cancelar",
+        style: "cancel",
+      },
+    ]);
+  };
+
   const toggleCameraType = () => {
     setFacing(current => (current === "back" ? "front" : "back"));
   };
@@ -373,7 +424,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
         <ImageField
           label="Foto"
           image={formData.file}
-          onPick={() => openCamera("photo")}
+          onPick={selectPhotoOption}
           onClear={() => {
             handleInputChange("file", null);
           }}

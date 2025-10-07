@@ -19,6 +19,8 @@ async function sendExpoPushNotification(
     data: notificationData.data || {},
   }));
 
+  console.log('📨 Sending push notifications to tokens:', expoPushTokens);
+
   try {
     const response = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
@@ -31,7 +33,19 @@ async function sendExpoPushNotification(
     });
 
     const result = await response.json();
-    console.log('Push notification sent:', result);
+    console.log('📱 Push notification response:', result);
+    
+    // Log detallado de resultados
+    if (result && typeof result === 'object' && 'data' in result && Array.isArray(result.data)) {
+      result.data.forEach((item: any, index: number) => {
+        if (item.status === 'error') {
+          console.log(`❌ Token ${index + 1} error:`, item.message);
+        } else {
+          console.log(`✅ Token ${index + 1} sent successfully`);
+        }
+      });
+    }
+    
     return result;
   } catch (error) {
     console.error('Error sending push notification:', error);

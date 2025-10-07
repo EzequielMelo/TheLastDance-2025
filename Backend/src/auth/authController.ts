@@ -5,11 +5,6 @@ import { updateUserPushToken } from "../services/pushNotificationService";
 
 export const registerUser: RequestHandler = async (req, res) => {
   try {
-    console.log("=== REQUEST DEBUG ===");
-    console.log("Content-Type:", req.headers["content-type"]);
-    console.log("Body keys:", Object.keys(req.body));
-    console.log("File received:", !!req.file);
-
     if (req.file) {
       console.log("File info:", {
         fieldname: req.file.fieldname,
@@ -17,12 +12,7 @@ export const registerUser: RequestHandler = async (req, res) => {
         mimetype: req.file.mimetype,
         size: req.file.size,
       });
-    } else {
-      console.log("NO FILE - Body contains:", req.body);
-      // Si el archivo viene en body en lugar de req.file, es que no es FormData real
     }
-    console.log("====================");
-
     const result = await authService.registerUser(req.body, req.file);
     res.status(201).json(result);
   } catch (error) {
@@ -32,11 +22,6 @@ export const registerUser: RequestHandler = async (req, res) => {
 
 export const registerAnonymousUser: RequestHandler = async (req, res) => {
   try {
-    console.log("=== ANONYMOUS REGISTER DEBUG ===");
-    console.log("Content-Type:", req.headers["content-type"]);
-    console.log("Body keys:", Object.keys(req.body));
-    console.log("File received:", !!req.file);
-    
     if (req.file) {
       console.log("File info:", {
         fieldname: req.file.fieldname,

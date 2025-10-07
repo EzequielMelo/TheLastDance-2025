@@ -1,12 +1,11 @@
 {
   "expo": {
     "name": "app-restaurant",
-    "slug": "app-restaurant",
+    "slug": "app-restaurant", 
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icono.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/icono-adaptable.png",
       "resizeMode": "contain",
@@ -17,43 +16,21 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icono-adaptable.png"
+        "foregroundImage": "./assets/icono-adaptable.png",
+        "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.apprestaurant",
-      "googleServicesFile": "./google-services.json",
-      "permissions": [
-        "android.permission.RECORD_AUDIO",
-        "android.permission.CAMERA",
-        "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.VIBRATE"
-      ]
+      "package": "com.anonymous.apprestaurant"
     },
     "web": {
       "bundler": "metro"
     },
     "plugins": [
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "La aplicación necesita acceso a la cámara para tomar fotos y escanear documentos."
-        }
-      ],
-      [
-        "expo-barcode-scanner",
-        {
-          "cameraPermission": "La aplicación necesita acceso a la cámara para escanear códigos de barras del DNI."
-        }
-      ],
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#ffffff",
-          "defaultChannel": "default",
-          "sounds": ["./assets/notification-sound.wav"]
-        }
-      ]
-    ]
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c88bacd6-f3c2-4626-ae66-3a6cb5659877"
+      }
+    }
   }
 }

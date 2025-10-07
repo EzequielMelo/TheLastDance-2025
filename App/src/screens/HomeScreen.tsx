@@ -10,7 +10,6 @@ import {
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
 import { AuthContext } from "../auth/AuthContext";
-import { useNotifications } from "../auth/NotificationContext";
 import api from "../api/axios";
 import { LogOut, Bell } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -20,7 +19,6 @@ type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
 export default function HomeScreen({ navigation }: Props) {
   const { token, logout } = useContext(AuthContext);
-  const { showTestNotification } = useNotifications();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -133,18 +131,6 @@ export default function HomeScreen({ navigation }: Props) {
             >
               <Text className="text-white text-lg font-medium">
                 Gestionar Usuarios Pendientes
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {(isDueno || isSupervisor) && (
-            <TouchableOpacity
-              onPress={showTestNotification}
-              className="flex-row items-center p-4 bg-blue-600/80 rounded-lg mb-4"
-            >
-              <Bell size={20} color="#fff" />
-              <Text className="text-white text-lg font-medium ml-2">
-                Probar Notificación
               </Text>
             </TouchableOpacity>
           )}

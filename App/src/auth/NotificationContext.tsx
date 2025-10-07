@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import Constants from 'expo-constants';
 import { NotificationService } from '../services/notificationService';
 import { AuthContext } from './AuthContext';
 import api from '../api/axios';
@@ -30,52 +31,53 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   }, []);
 
   useEffect(() => {
-    // Enviar token al backend cuando CUALQUIER usuario se loguee
-    // (no solo supervisores/dueños, para preparar futuras funcionalidades)
-    console.log('=== NOTIFICATION DEBUG ===');
-    console.log('User:', user?.first_name || 'No user');
-    console.log('Token exists:', !!token);
-    console.log('Push token:', expoPushToken || 'No push token');
-    console.log('========================');
-    
     if (user && token && expoPushToken) {
-      console.log('✅ Enviando push token al backend...');
       sendTokenToBackend();
-    } else {
-      console.log('❌ No se envía token - falta:', {
-        user: !user,
-        token: !token, 
-        expoPushToken: !expoPushToken
-      });
     }
   }, [user, token, expoPushToken]);
 
-  const setupNotifications = async () => {
-    // Configurar canal de notificaciones
-    await NotificationService.setupNotificationChannel();
-
-    // Registrar para notificaciones push
-    const token = await NotificationService.registerForPushNotifications();
-    setExpoPushToken(token);
+  const generateToken = () => {
+    const timestamp = Date.now().toString(36);
+    const randomPart = Math.random().toString(36).substr(2, 15);
+    const tokenId = (timestamp + randomPart).substr(0, 22);
+    return `ExponentPushToken[${tokenId}]`;
   };
 
-  const sendTokenToBackend = async () => {
-    if (!expoPushToken || !token) {
-      console.log('❌ sendTokenToBackend: Missing requirements', {
-        expoPushToken: !!expoPushToken,
-        token: !!token
-      });
+  const setupNotifications = async () => {
+    const isExpoGo = Constants.executionEnvironment === 'storeClient';
+    
+    if (isExpoGo) {
+      setExpoPushToken(generateToken());
       return;
     }
 
     try {
-      console.log('🚀 Enviando push token al backend:', expoPushToken);
+      await NotificationService.setupNotificationChannel();
+      let token = await NotificationService.registerForPushNotifications();
+      
+      if (!token && __DEV__) {
+        token = generateToken();
+      }
+      
+      setExpoPushToken(token);
+    } catch (error) {
+      if (__DEV__) {
+        setExpoPushToken(generateToken());
+      }
+    }
+  };
+
+  const sendTokenToBackend = async () => {
+    if (!expoPushToken || !token) {
+      return;
+    }
+
+    try {   
       await api.post('/auth/update-push-token', {
         pushToken: expoPushToken,
       });
-      console.log('✅ Push token sent to backend successfully');
-    } catch (error) {
-      console.error('❌ Failed to send push token to backend:', error);
+    } catch (error: any) {
+      console.error('Error enviando token:', error);
     }
   };
 
