@@ -44,24 +44,41 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   };
 
   const setupNotifications = async () => {
-    const isExpoGo = Constants.executionEnvironment === 'storeClient';
+    console.log('🔧 Setting up notifications...');
     
-    if (isExpoGo) {
-      setExpoPushToken(generateToken());
-      return;
-    }
-
     try {
+      // Configurar canal de notificaciones para Android
       await NotificationService.setupNotificationChannel();
+      
+      // SIEMPRE intentar obtener token REAL primero
+      console.log('🎯 Attempting to get REAL push token...');
       let token = await NotificationService.registerForPushNotifications();
       
-      if (!token && __DEV__) {
-        token = generateToken();
+      if (token) {
+        console.log('✅ REAL token obtained:', token);
+        setExpoPushToken(token);
+        return;
       }
       
-      setExpoPushToken(token);
+      // Solo usar token simulado si es Expo Go Y falló el real
+      const isExpoGo = Constants.executionEnvironment === 'storeClient';
+      if (isExpoGo) {
+        console.log('📱 Expo Go detected, using simulated token as fallback');
+        const simulatedToken = generateToken();
+        setExpoPushToken(simulatedToken);
+        return;
+      }
+      
+      console.log('❌ Could not obtain any token');
+      setExpoPushToken(null);
+      
     } catch (error) {
-      if (__DEV__) {
+      console.error('❌ Error in setupNotifications:', error);
+      
+      // Solo en caso de error crítico, usar token simulado
+      const isExpoGo = Constants.executionEnvironment === 'storeClient';
+      if (isExpoGo) {
+        console.log('🆘 Using simulated token due to error');
         setExpoPushToken(generateToken());
       }
     }

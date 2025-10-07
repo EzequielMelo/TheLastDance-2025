@@ -124,7 +124,7 @@ export default function HomeScreen({ navigation }: Props) {
             />
           )}
 
-          {isDueno || isSupervisor&& (
+          {(isDueno || isSupervisor) && (
             <TouchableOpacity
               onPress={() => navigation.navigate("Clients")}
               className="flex-row items-center p-4 bg-white/10 rounded-lg mb-4"

@@ -8,6 +8,8 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
+android/
+restaurant-push-notifications-firebase-adminsdk-fbsvc-6ba4a7314f.json
 
 # Native
 .kotlin/

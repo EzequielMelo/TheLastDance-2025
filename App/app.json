@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "app-restaurant",
-    "slug": "app-restaurant", 
+    "slug": "app-restaurant",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icono.png",
@@ -11,21 +11,22 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "ios": {
-      "supportsTablet": true
-    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icono-adaptable.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.apprestaurant"
-    },
-    "web": {
-      "bundler": "metro"
+      "package": "com.anonymous.apprestaurant",
+      "googleServicesFile": "./google-services.json"
     },
     "plugins": [
-      "expo-notifications"
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icono.png",
+          "color": "#ffffff"
+        }
+      ]
     ],
     "extra": {
       "eas": {

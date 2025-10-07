@@ -26,28 +26,51 @@ export class NotificationService {
   private static expoPushToken: string | null = null;
 
   static async registerForPushNotifications(): Promise<string | null> {
-    if (Constants.executionEnvironment === 'storeClient' || !Device.isDevice) {
-      return null;
-    }
-
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    if (finalStatus !== 'granted') {
+    if (!Device.isDevice) {
+      console.log('🚫 Push notifications only work on physical devices');
       return null;
     }
 
     try {
-      const tokenData = await Notifications.getExpoPushTokenAsync();
+      // Solicitar permisos explícitamente
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        console.log('🔑 Requesting notification permissions...');
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== 'granted') {
+        console.log('❌ Notification permissions denied');
+        return null;
+      }
+
+      // Intentar obtener token REAL con projectId específico
+      console.log('🎯 Attempting to get REAL Expo push token...');
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: 'c88bacd6-f3c2-4626-ae66-3a6cb5659877'
+      });
+      
       this.expoPushToken = tokenData.data;
+      console.log('✅ REAL Expo push token obtained:', this.expoPushToken);
+      
       return this.expoPushToken;
     } catch (error) {
-      return null;
+      console.error('❌ Error getting real push token:', error);
+      
+      // Segundo intento sin projectId
+      try {
+        console.log('🔄 Trying without explicit projectId...');
+        const tokenData = await Notifications.getExpoPushTokenAsync();
+        this.expoPushToken = tokenData.data;
+        console.log('✅ Alternative token obtained:', this.expoPushToken);
+        return this.expoPushToken;
+      } catch (fallbackError) {
+        console.error('❌ Fallback token attempt failed:', fallbackError);
+        return null;
+      }
     }
   }
 

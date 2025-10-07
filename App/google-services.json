@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "834893691073",
+    "project_id": "restaurant-push-notifications",
+    "storage_bucket": "restaurant-push-notifications.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:834893691073:android:51d25be535c9127fa6bc40",
+        "android_client_info": {
+          "package_name": "com.anonymous.apprestaurant"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC4nP5kalmaNn8_K_7IeYTX5N7RSo6udPA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

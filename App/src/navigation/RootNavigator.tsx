@@ -3,7 +3,6 @@ import { NavigationContainer, useNavigation } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
 import { useAuth } from "../auth/useAuth";
-import { NotificationService } from "../services/notificationService";
 import HomeScreen from "../screens/HomeScreen";
 import SplashScreen from "../screens/SplashScreen";
 import { LoginScreen } from "../screens/auth-screens/LoginScreen";
@@ -19,7 +18,6 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 function NavigatorContent() {
   const { token, isLoading } = useAuth();
   const [showSplash, setShowSplash] = React.useState(true);
-  const navigation = useNavigation();
 
   React.useEffect(() => {
     if (!isLoading) {
@@ -27,33 +25,6 @@ function NavigatorContent() {
       return () => clearTimeout(timer);
     }
   }, [isLoading]);
-
-  // Configurar listeners de notificaciones cuando el navegador esté listo
-  React.useEffect(() => {
-    const setupNotificationListeners = async () => {
-      // Configurar listener para cuando se toca una notificación
-      const notificationListener = NotificationService.setupNotificationListener((data: any) => {
-        console.log('Notification tapped:', data);
-        
-        // Navegar según el tipo de notificación
-        if (data.type === 'new_client_registration') {
-          (navigation as any).navigate('Clients');
-        }
-      });
-
-      // Configurar listener para notificaciones en primer plano
-      const foregroundListener = NotificationService.setupForegroundListener((notification) => {
-        console.log('Notification received in foreground:', notification);
-      });
-
-      return () => {
-        notificationListener?.remove?.();
-        foregroundListener?.remove?.();
-      };
-    };
-
-    setupNotificationListeners();
-  }, [navigation]);
 
   if (showSplash) {
     return <SplashScreen />;
