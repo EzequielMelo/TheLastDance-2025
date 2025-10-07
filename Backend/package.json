@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.ts",
+    "start": "node dist/index.js",
     "clean": "rm -rf dist",
     "rebuild": "npm run clean && npm run build",
     "type-check": "tsc --noEmit",
