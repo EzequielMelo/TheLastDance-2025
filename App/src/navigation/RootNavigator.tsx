@@ -16,6 +16,7 @@ import CreateTableScreen from "../screens/admin-screens/CreateTableScreen";
 import ManageWaitingListScreen from "../screens/table-screens/ManageWaitingListScreen";
 import GenerateWaitingListQRScreen from "../screens/table-screens/GenerateWaitingListQRScreen";
 import ScanQRScreen from "../screens/table-screens/ScanQRScreen";
+import ScanTableQRScreen from "../screens/table-screens/ScanTableQRScreen";
 import JoinWaitingListScreen from "../screens/table-screens/JoinWaitingListScreen";
 import MyWaitingPositionScreen from "../screens/table-screens/MyWaitingPositionScreen";
 
@@ -33,66 +34,6 @@ function NavigatorContent() {
       return () => clearTimeout(timer);
     }
   }, [isLoading]);
-
-  // Configurar listeners de notificaciones cuando el navegador esté listo
-  React.useEffect(() => {
-    const setupNotificationListeners = async () => {
-      // Configurar listener para cuando se toca una notificación
-      const notificationListener =
-        NotificationService.setupNotificationListener((data: any) => {
-          console.log("Notification tapped:", data);
-
-          // Navegar según el tipo de notificación
-          if (data.type === "new_client_registration") {
-            (navigation as any).navigate("Clients");
-          }
-        });
-
-      // Configurar listener para notificaciones en primer plano
-      const foregroundListener = NotificationService.setupForegroundListener(
-        notification => {
-          console.log("Notification received in foreground:", notification);
-        },
-      );
-
-      return () => {
-        notificationListener?.remove?.();
-        foregroundListener?.remove?.();
-      };
-    };
-
-    setupNotificationListeners();
-  }, [navigation]);
-
-  // Configurar listeners de notificaciones cuando el navegador esté listo
-  React.useEffect(() => {
-    const setupNotificationListeners = async () => {
-      // Configurar listener para cuando se toca una notificación
-      const notificationListener =
-        NotificationService.setupNotificationListener((data: any) => {
-          console.log("Notification tapped:", data);
-
-          // Navegar según el tipo de notificación
-          if (data.type === "new_client_registration") {
-            (navigation as any).navigate("Clients");
-          }
-        });
-
-      // Configurar listener para notificaciones en primer plano
-      const foregroundListener = NotificationService.setupForegroundListener(
-        notification => {
-          console.log("Notification received in foreground:", notification);
-        },
-      );
-
-      return () => {
-        notificationListener?.remove?.();
-        foregroundListener?.remove?.();
-      };
-    };
-
-    setupNotificationListeners();
-  }, [navigation]);
 
   // Debug: mostrar estado
   console.log(
@@ -161,6 +102,11 @@ function NavigatorContent() {
             name="ScanQR"
             component={ScanQRScreen}
             options={{ title: "Escanear QR", headerBackTitle: "Volver" }}
+          />
+          <Stack.Screen
+            name="ScanTableQR"
+            component={ScanTableQRScreen}
+            options={{ title: "Confirmar Mesa", headerBackTitle: "Volver" }}
           />
           <Stack.Screen
             name="JoinWaitingList"

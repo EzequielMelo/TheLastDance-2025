@@ -13,4 +13,5 @@ export type RootStackParamList = {
   ScanQR: undefined; // Escanear QR para clientes
   JoinWaitingList: { qrData: any }; // Formulario con datos del QR
   MyWaitingPosition: undefined; // Ver posición en lista de espera
+  ScanTableQR: undefined; // Escanear QR de mesa para confirmar llegada
 };

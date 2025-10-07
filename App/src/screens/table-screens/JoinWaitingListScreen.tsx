@@ -129,12 +129,10 @@ export default function JoinWaitingListScreen() {
     switch (type) {
       case "vip":
         return "VIP";
-      case "estandar":
-        return "Estándar";
       case "accesible":
         return "Accesible";
       default:
-        return "Sin preferencia";
+        return "Estándar";
     }
   };
 
@@ -233,7 +231,6 @@ export default function JoinWaitingListScreen() {
             </Text>
             <View className="space-y-2">
               {[
-                { value: "sin_preferencia", icon: Table },
                 { value: "estandar", icon: Table },
                 { value: "vip", icon: Crown },
                 { value: "accesible", icon: Table },

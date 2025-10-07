@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,10 +9,19 @@ import {
   Modal,
   Alert,
 } from "react-native";
-import { Table, ImagePlus, Users, Camera } from "lucide-react-native";
+import {
+  Table,
+  ImagePlus,
+  Users,
+  Camera,
+  QrCode,
+  CheckCircle,
+} from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as SecureStore from "expo-secure-store";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
+import QRCode from "react-native-qrcode-svg";
+import * as QRCodeGenerator from "qrcode";
 import FormLayout from "../../Layouts/formLayout";
 import api from "../../api/axios";
 import { useAuth } from "../../auth/AuthContext";
@@ -31,11 +40,77 @@ export default function CreateTableScreen({ navigation }: any) {
   const [images, setImages] = useState<[ImageSlot, ImageSlot]>([null, null]);
   const [showCamera, setShowCamera] = useState(false);
   const [facing, setFacing] = useState<CameraType>("back");
+  const [qrGenerated, setQrGenerated] = useState(false);
+  const [debugQR, setDebugQR] = useState(false); // Para debug
 
   // Solo dueño y supervisor pueden crear mesas
   const canCreate =
     currentUser?.profile_code === "dueno" ||
     currentUser?.profile_code === "supervisor";
+
+  // Generar QR automáticamente cuando se tiene número de mesa
+  useEffect(() => {
+    const generateTableQR = async () => {
+      if (number && Number(number) > 0 && !qrGenerated) {
+        try {
+          console.log(`Generando QR para mesa ${number}...`);
+
+          // Generar QR directamente como Data URL usando la librería qrcode
+          const qrContent = generateQRContent(number);
+          console.log("QR Content:", qrContent);
+
+          const qrDataURL = await QRCodeGenerator.toDataURL(qrContent, {
+            width: 400,
+            margin: 2,
+            color: {
+              dark: "#000000",
+              light: "#FFFFFF",
+            },
+            errorCorrectionLevel: "M",
+          });
+
+          console.log("QR generado como Data URL");
+
+          const qrImage: ImageSlot = {
+            uri: qrDataURL,
+            name: `table_${number}_qr.png`,
+            type: "image/png",
+          };
+
+          const next = [...images] as [ImageSlot, ImageSlot];
+          next[1] = qrImage; // QR va en la segunda posición
+          setImages(next);
+          setQrGenerated(true);
+          ToastAndroid.show(
+            "QR de mesa generado automáticamente ✔️",
+            ToastAndroid.SHORT,
+          );
+        } catch (error) {
+          console.error("Error generando QR:", error);
+          ToastAndroid.show("Error generando QR de mesa", ToastAndroid.SHORT);
+        }
+      }
+    };
+
+    generateTableQR();
+  }, [number, qrGenerated, images]);
+
+  // Regenerar QR cuando cambie el número de mesa
+  useEffect(() => {
+    if (number && Number(number) > 0 && qrGenerated) {
+      setQrGenerated(false);
+      const next = [...images] as [ImageSlot, ImageSlot];
+      next[1] = null; // Limpiar QR anterior
+      setImages(next);
+    }
+  }, [number]);
+
+  // Generar el contenido del QR con deeplink
+  const generateQRContent = (tableNumber: string) => {
+    // Temporal: usar solo el número de mesa, luego será el ID
+    // Formato: thelastdance://table/{tableId}
+    return `thelastdance://table/${tableNumber}`;
+  };
 
   // Función para seleccionar desde galería
   const pickFromGallery = async (index: 0 | 1) => {
@@ -135,12 +210,7 @@ export default function CreateTableScreen({ navigation }: any) {
     ]);
   };
 
-  // Función para manejar QR (solo galería)
-  const pickQR = () => {
-    pickFromGallery(1);
-  };
-
-  const removeAt = (index: 0 | 1) => {
+  const removeAt = (index: 0) => {
     const next = [...images] as [ImageSlot, ImageSlot];
     next[index] = null;
     setImages(next);
@@ -167,9 +237,17 @@ export default function CreateTableScreen({ navigation }: any) {
       return false;
     }
 
-    if (!images[0] || !images[1]) {
+    if (!images[0]) {
       ToastAndroid.show(
-        "Necesitás 2 imágenes: foto de la mesa y código QR",
+        "Necesitás agregar una foto de la mesa",
+        ToastAndroid.SHORT,
+      );
+      return false;
+    }
+
+    if (!images[1] || !qrGenerated) {
+      ToastAndroid.show(
+        "Esperá a que se genere el código QR automáticamente",
         ToastAndroid.SHORT,
       );
       return false;
@@ -186,7 +264,7 @@ export default function CreateTableScreen({ navigation }: any) {
     const selected = images.filter(Boolean);
     if (selected.length !== 2) {
       ToastAndroid.show(
-        "Debés seleccionar exactamente 2 imágenes.",
+        "Se necesita la foto de la mesa y el QR generado automáticamente.",
         ToastAndroid.LONG,
       );
       setIsSubmitting(false);
@@ -317,8 +395,8 @@ export default function CreateTableScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Imágenes (2) */}
-        <Text className="text-gray-300 mt-4 mb-2">Imágenes (2)</Text>
+        {/* Imágenes */}
+        <Text className="text-gray-300 mt-4 mb-2">Imágenes</Text>
         <View className="flex-row gap-3">
           <View className="flex-1">
             <View className="flex-row items-center justify-between mb-2">
@@ -340,18 +418,99 @@ export default function CreateTableScreen({ navigation }: any) {
             />
           </View>
           <View className="flex-1">
-            <Text className="text-gray-400 text-xs mb-2 text-center">
-              Código QR
-            </Text>
-            <ImageSlotView
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-gray-400 text-xs text-center flex-1">
+                Código QR (Auto)
+              </Text>
+              <View className="flex-row items-center">
+                {qrGenerated && (
+                  <TouchableOpacity
+                    onPress={() => setDebugQR(!debugQR)}
+                    className="bg-purple-600 px-2 py-1 rounded mr-1"
+                  >
+                    <Text className="text-white text-xs">Ver</Text>
+                  </TouchableOpacity>
+                )}
+                {qrGenerated && <CheckCircle size={12} color="#22c55e" />}
+              </View>
+            </View>
+            <QRSlotView
               slot={images[1]}
-              onPick={pickQR}
-              onRemove={() => removeAt(1)}
-              isLarge
+              tableNumber={number}
+              qrGenerated={qrGenerated}
             />
           </View>
         </View>
       </FormLayout>
+
+      {/* QR Preview para debug */}
+      {debugQR && number && Number(number) > 0 && (
+        <View
+          style={{
+            position: "absolute",
+            left: 20,
+            top: 100,
+            width: 240,
+            height: 280,
+            zIndex: 1000,
+          }}
+        >
+          <View
+            style={{
+              padding: 20,
+              backgroundColor: "white",
+              width: 240,
+              height: 280,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 10,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 3.84,
+              elevation: 5,
+            }}
+          >
+            <QRCode
+              value={generateQRContent(number)}
+              size={200}
+              color="black"
+              backgroundColor="white"
+              quietZone={10}
+              enableLinearGradient={false}
+            />
+            <Text style={{ color: "black", fontSize: 12, marginTop: 10 }}>
+              Mesa #{number}
+            </Text>
+            <Text
+              style={{
+                color: "gray",
+                fontSize: 10,
+                marginTop: 5,
+                textAlign: "center",
+              }}
+            >
+              {generateQRContent(number)}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => setDebugQR(false)}
+            style={{
+              position: "absolute",
+              top: 5,
+              right: 5,
+              backgroundColor: "red",
+              borderRadius: 15,
+              width: 30,
+              height: 30,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ color: "white", fontWeight: "bold" }}>×</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Modal de Cámara */}
       <Modal visible={showCamera} animationType="slide">
@@ -488,6 +647,62 @@ function ImageSlotView({
           <ImagePlus size={26} color="#888" />
           <Text className="text-gray-400 text-xs mt-1">Agregar</Text>
         </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+function QRSlotView({
+  slot,
+  tableNumber,
+  qrGenerated,
+}: {
+  slot: ImageSlot;
+  tableNumber: string;
+  qrGenerated: boolean;
+}) {
+  const sizeClass = "h-32";
+
+  return (
+    <View
+      className={`${sizeClass} rounded-xl overflow-hidden bg-white/10 border border-white/20 items-center justify-center`}
+    >
+      {slot ? (
+        <>
+          <Image source={{ uri: slot.uri }} className="w-full h-full" />
+          <View className="absolute top-1 right-1 bg-green-600 px-2 py-1 rounded flex-row items-center">
+            <CheckCircle size={10} color="white" />
+            <Text className="text-white text-xs ml-1">Auto</Text>
+          </View>
+        </>
+      ) : (
+        <View className="items-center justify-center h-full">
+          {tableNumber && Number(tableNumber) > 0 ? (
+            <View className="items-center">
+              <View className="mb-2 p-3 bg-white/5 rounded-lg">
+                <QrCode size={32} color={qrGenerated ? "#22c55e" : "#d4af37"} />
+              </View>
+              <Text
+                className={`text-xs font-medium ${qrGenerated ? "text-green-400" : "text-yellow-400"}`}
+              >
+                {qrGenerated ? "QR Listo" : "Generando..."}
+              </Text>
+              {qrGenerated && (
+                <Text className="text-gray-500 text-xs mt-1">
+                  Mesa #{tableNumber}
+                </Text>
+              )}
+            </View>
+          ) : (
+            <View className="items-center">
+              <View className="mb-2 p-3 bg-white/5 rounded-lg">
+                <QrCode size={32} color="#888" />
+              </View>
+              <Text className="text-gray-400 text-xs">Ingresa número</Text>
+              <Text className="text-gray-500 text-xs mt-1">de mesa</Text>
+            </View>
+          )}
+        </View>
       )}
     </View>
   );

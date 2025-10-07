@@ -73,15 +73,7 @@ export default function ScanQRScreen() {
 
       const qrData = JSON.parse(atob(encodedData));
 
-      // Verificar que no haya expirado
-      if (Date.now() > qrData.expires_at) {
-        Alert.alert(
-          "QR Expirado",
-          "Este código QR ya no es válido. Solicita uno nuevo al maitre.",
-          [{ text: "OK", onPress: () => setScanned(false) }],
-        );
-        return;
-      }
+      console.log("QR Data parsed:", qrData);
 
       // Verificar la acción
       if (qrData.action !== "join_waiting_list") {

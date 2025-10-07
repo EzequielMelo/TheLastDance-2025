@@ -5,6 +5,7 @@ import {
   getClientPosition,
   getTablesStatus,
   assignClientToTable,
+  activateTableByClient,
   freeTable,
   cancelWaitingListEntry,
   markAsNoShow,
@@ -223,6 +224,42 @@ export async function assignTableHandler(req: Request, res: Response) {
     }
 
     return res.json({ message: result.message });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+// POST /api/tables/:id/activate - Activar mesa cuando cliente escanea QR
+export async function activateTableHandler(req: Request, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    const tableId = req.params["id"];
+    if (!tableId) {
+      return res.status(400).json({ error: "ID de mesa requerido" });
+    }
+
+    // El cliente debe estar autenticado y ser un cliente (registrado o anónimo)
+    const allowedProfiles = ["cliente_registrado", "cliente_anonimo"];
+    if (!allowedProfiles.includes(req.user.profile_code)) {
+      return res
+        .status(403)
+        .json({ error: "Solo clientes pueden activar mesas" });
+    }
+
+    const result = await activateTableByClient(tableId, req.user.appUserId);
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.message });
+    }
+
+    return res.json({
+      success: true,
+      message: result.message,
+      table: result.table,
+    });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }

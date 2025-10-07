@@ -251,12 +251,12 @@ export async function assignClientToTable({
       );
     }
 
-    // 5. Ocupar mesa
+    // 5. Asignar cliente a la mesa (sin ocuparla todavía)
     const { error: updateTableError } = await supabaseAdmin
       .from("tables")
       .update({
-        is_occupied: true,
         id_client: waitingEntry.client_id,
+        // is_occupied sigue siendo false - se activará cuando el cliente escanee el QR de la mesa
       })
       .eq("id", table_id);
 
@@ -271,10 +271,97 @@ export async function assignClientToTable({
         })
         .eq("id", waiting_list_id);
 
-      throw new Error(`Error ocupando mesa: ${updateTableError.message}`);
+      throw new Error(`Error asignando mesa: ${updateTableError.message}`);
     }
 
-    return { success: true, message: "Cliente asignado exitosamente" };
+    return {
+      success: true,
+      message:
+        "Cliente asignado a la mesa exitosamente. El cliente debe escanear el QR de la mesa para activarla.",
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error.message || "Error interno del servidor",
+    };
+  }
+}
+
+// Activar mesa cuando el cliente escanea el QR
+export async function activateTableByClient(
+  tableId: string,
+  clientId: string,
+): Promise<{ success: boolean; message: string; table?: any }> {
+  try {
+    // 1. Verificar si el cliente ya tiene una mesa ocupada
+    const { data: existingOccupiedTable, error: existingError } =
+      await supabaseAdmin
+        .from("tables")
+        .select("id, number, is_occupied")
+        .eq("id_client", clientId)
+        .eq("is_occupied", true)
+        .limit(1);
+
+    if (existingError) {
+      throw new Error(
+        `Error verificando mesas ocupadas: ${existingError.message}`,
+      );
+    }
+
+    if (existingOccupiedTable && existingOccupiedTable.length > 0) {
+      const occupiedTable = existingOccupiedTable[0];
+      return {
+        success: false,
+        message: `Ya tienes la mesa ${occupiedTable?.number || "una mesa"} ocupada. Solo puedes tener una mesa activa a la vez.`,
+      };
+    }
+
+    // 2. Verificar que la mesa esté asignada al cliente pero no ocupada
+    const { data: table, error: tableError } = await supabaseAdmin
+      .from("tables")
+      .select("id, number, id_client, is_occupied")
+      .eq("id", tableId)
+      .single();
+
+    if (tableError || !table) {
+      return { success: false, message: "Mesa no encontrada" };
+    }
+
+    // 3. Verificar que la mesa esté asignada al cliente correcto
+    if (table.id_client !== clientId) {
+      return {
+        success: false,
+        message:
+          "Esta mesa no está asignada a tu usuario. Solo puedes activar mesas que te hayan sido asignadas por el maitre.",
+      };
+    }
+
+    // 4. Verificar que no esté ya ocupada
+    if (table.is_occupied) {
+      return { success: false, message: "La mesa ya está activa" };
+    }
+
+    // 5. Activar la mesa
+    const { error: updateError } = await supabaseAdmin
+      .from("tables")
+      .update({
+        is_occupied: true,
+      })
+      .eq("id", tableId);
+
+    if (updateError) {
+      throw new Error(`Error activando mesa: ${updateError.message}`);
+    }
+
+    return {
+      success: true,
+      message: `Mesa ${table.number} activada exitosamente. ¡Bienvenido a The Last Dance!`,
+      table: {
+        id: table.id,
+        table_number: table.number,
+        is_occupied: true,
+      },
+    };
   } catch (error: any) {
     return {
       success: false,

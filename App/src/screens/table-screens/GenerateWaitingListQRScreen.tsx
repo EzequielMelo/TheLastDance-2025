@@ -31,9 +31,9 @@ export default function GenerateWaitingListQRScreen() {
     user?.profile_code === "dueno" ||
     user?.profile_code === "supervisor";
 
-  // Función para obtener tiempo restante (sin useEffect problemático)
+  // Función para obtener tiempo restante (sin expiración)
   const getTimeLeft = () => {
-    if (!expiresAt) return "30:00";
+    if (!expiresAt) return "Sin expiración";
 
     const now = new Date().getTime();
     const expiry = expiresAt.getTime();
@@ -60,15 +60,24 @@ export default function GenerateWaitingListQRScreen() {
         return;
       }
 
-      const newCode = `waitlist-${Date.now()}`;
-      const expiration = new Date();
-      expiration.setMinutes(expiration.getMinutes() + 30);
+      // ✅ Datos estructurados para el QR
+      const qrPayload = {
+        action: "join_waiting_list",
+        restaurant_id: "thelastdance_main",
+        generated_by: user?.id,
+        generated_at: Date.now(),
+        version: "1.0",
+      };
 
-      console.log("GenerateWaitingListQRScreen - Código generado:", newCode);
-      console.log("GenerateWaitingListQRScreen - Expiración:", expiration);
+      // ✅ Crear deeplink navegable (sin expiración)
+      const encodedData = btoa(JSON.stringify(qrPayload));
+      const deeplink = `thelastdance://join-waiting-list?data=${encodedData}`;
 
-      setQrData(newCode);
-      setExpiresAt(expiration);
+      console.log("GenerateWaitingListQRScreen - Deeplink generado:", deeplink);
+      console.log("GenerateWaitingListQRScreen - Payload:", qrPayload);
+
+      setQrData(deeplink);
+      setExpiresAt(null); // Sin expiración
       setIsActive(true);
 
       console.log(
@@ -86,7 +95,7 @@ export default function GenerateWaitingListQRScreen() {
   const shareQR = async () => {
     try {
       await Share.share({
-        message: `Únete a nuestra lista de espera: ${qrData}`,
+        message: `¡Únete a nuestra lista de espera!\n\nEscanea este código QR o usa este enlace:\n${qrData}\n\n🍽️ The Last Dance Restaurant`,
         title: "Lista de Espera - The Last Dance",
       });
     } catch (error) {
@@ -326,7 +335,7 @@ export default function GenerateWaitingListQRScreen() {
                 fontSize: 14,
               }}
             >
-              El código QR será válido por 30 minutos
+              El código QR estará activo hasta que lo desactives manualmente
             </Text>
           </>
         )}

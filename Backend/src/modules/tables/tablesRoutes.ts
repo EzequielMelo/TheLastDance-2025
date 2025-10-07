@@ -10,6 +10,7 @@ import {
   markAsNoShowHandler,
   getTablesStatusHandler,
   assignTableHandler,
+  activateTableHandler,
   freeTableHandler,
 } from "./tablesController";
 
@@ -71,6 +72,9 @@ router.post(
   roleGuard(["dueno", "supervisor", "maitre"]),
   assignTableHandler,
 );
+
+// POST /api/tables/:id/activate - Activar mesa por QR (solo clientes)
+router.post("/:id/activate", authenticateUser, activateTableHandler);
 
 // POST /api/tables/:id/free - Liberar mesa (staff)
 router.post(

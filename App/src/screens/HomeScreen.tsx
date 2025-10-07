@@ -11,16 +11,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
 import { AuthContext } from "../auth/AuthContext";
 import api from "../api/axios";
-import {
-  Martini,
-  UtensilsCrossed,
-  LogOut,
-  Table,
-  Users,
-  QrCode,
-  Camera,
-} from "lucide-react-native";
-import { LogOut, Bell } from "lucide-react-native";
+import { LogOut, Table, Users, QrCode, Camera } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User";
 
@@ -198,63 +189,23 @@ export default function HomeScreen({ navigation }: Props) {
                 onPress={() => navigation.navigate("MyWaitingPosition")}
                 icon={<Users size={26} color="#1a1a1a" />}
               />
-            </>
-          )}
-
-          {(isDueno || isSupervisor) && (
-            <ActionTile
-              title="Crear mesa"
-              subtitle="Agregá una nueva mesa al restaurante"
-              onPress={() => navigation.navigate("CreateTable")}
-              icon={<Table size={26} color="#1a1a1a" />}
-            />
-          )}
-
-          {isMaitre && (
-            <>
               <ActionTile
-                title="Gestionar Lista de Espera"
-                subtitle="Administrá las reservas y asignación de mesas"
-                onPress={() => navigation.navigate("ManageWaitingList")}
-                icon={<Users size={26} color="#1a1a1a" />}
-              />
-              <ActionTile
-                title="Generar Código QR"
-                subtitle="Crear QR para que clientes se unan a la lista"
-                onPress={() => navigation.navigate("GenerateWaitingListQR")}
+                title="Confirmar Llegada a Mesa"
+                subtitle="Escanea el QR de tu mesa para confirmar tu llegada"
+                onPress={() => navigation.navigate("ScanTableQR")}
                 icon={<QrCode size={26} color="#1a1a1a" />}
               />
             </>
           )}
 
-          {isCliente && (
-            <>
-              <ActionTile
-                title="Unirse a Lista de Espera"
-                subtitle="Escanea el QR del maitre para hacer tu reserva"
-                onPress={() => navigation.navigate("ScanQR")}
-                icon={<Camera size={26} color="#1a1a1a" />}
-              />
-              <ActionTile
-                title="Ver Mi Posición"
-                subtitle="Consulta tu lugar en la lista de espera"
-                onPress={() => navigation.navigate("MyWaitingPosition")}
-                icon={<Users size={26} color="#1a1a1a" />}
-              />
-            </>
+          {(isDueno || isSupervisor) && (
+            <ActionTile
+              title="Gestionar Usuarios Pendientes"
+              subtitle="Administrá usuarios y solicitudes pendientes"
+              onPress={() => navigation.navigate("Clients")}
+              icon={<Users size={26} color="#1a1a1a" />}
+            />
           )}
-
-          {isDueno ||
-            (isSupervisor && (
-              <TouchableOpacity
-                onPress={() => navigation.navigate("Clients")}
-                className="flex-row items-center p-4 bg-white/10 rounded-lg mb-4"
-              >
-                <Text className="text-white text-lg font-medium">
-                  Gestionar Usuarios Pendientes
-                </Text>
-              </TouchableOpacity>
-            ))}
         </View>
 
         {/* Spacer */}

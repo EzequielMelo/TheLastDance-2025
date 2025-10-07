@@ -392,7 +392,7 @@ export async function createTable(
       photo_url: "", // Temporal
       qr_url: "", // Temporal
       is_occupied: false,
-      client_id: null,
+      id_client: null,
     })
     .select()
     .single();
