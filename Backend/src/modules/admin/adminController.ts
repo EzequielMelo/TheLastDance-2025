@@ -72,7 +72,7 @@ export async function createStaffController(req: Request, res: Response) {
       hasFile: !!req.file,
       fileName: req.file?.originalname,
       fileSize: req.file?.size,
-      contentType: req.headers['content-type']
+      contentType: req.headers["content-type"],
     });
 
     if (!req.user) {
@@ -135,31 +135,27 @@ export async function createTableController(req: Request, res: Response) {
       return res.status(401).json({ error: "No autenticado" });
     }
 
-    // Verificar que se enviaron ambas imágenes
-    if (!req.files || !Array.isArray(req.files) || req.files.length !== 2) {
+    // Verificar que se enviaron ambas imágenes usando el mismo patrón que menu
+    const files = (req.files || []) as Express.Multer.File[];
+    if (files.length !== 2) {
       return res.status(400).json({
         error:
-          "Se requieren exactamente 2 archivos: foto de la mesa y código QR",
+          "Se requieren exactamente 2 imágenes: foto de la mesa y código QR",
       });
     }
 
-    const files = req.files as Express.Multer.File[];
-
-    // Identificar qué archivo es qué (por el nombre del campo o por orden)
-    const photoFile = files.find(f => f.fieldname === "photo") || files[0];
-    const qrFile = files.find(f => f.fieldname === "qr") || files[1];
-
-    if (!photoFile || !qrFile) {
-      return res.status(400).json({
-        error: "Se requieren ambos archivos: 'photo' y 'qr'",
-      });
-    }
+    // Convertir archivos al formato esperado por el servicio
+    const images = files.map(f => ({
+      filename: f.originalname,
+      contentType: f.mimetype,
+      buffer: f.buffer,
+      fieldname: f.fieldname,
+    }));
 
     const result = await createTable(
       { profile_code: req.user.profile_code as "dueno" | "supervisor" },
       req.body,
-      photoFile,
-      qrFile,
+      images,
       req.user.appUserId,
     );
 
@@ -186,21 +182,23 @@ export async function updateTableController(req: Request, res: Response) {
       return res.status(400).json({ error: "ID de mesa requerido" });
     }
 
-    let photoFile: Express.Multer.File | undefined;
-    let qrFile: Express.Multer.File | undefined;
-
-    // Manejar archivos opcionales
-    if (req.files && Array.isArray(req.files)) {
-      photoFile = req.files.find(f => f.fieldname === "photo");
-      qrFile = req.files.find(f => f.fieldname === "qr");
-    }
+    // Manejar archivos opcionales usando el mismo patrón que menu
+    const files = (req.files || []) as Express.Multer.File[];
+    const images =
+      files.length > 0
+        ? files.map(f => ({
+            filename: f.originalname,
+            contentType: f.mimetype,
+            buffer: f.buffer,
+            fieldname: f.fieldname,
+          }))
+        : undefined;
 
     const result = await updateTable(
       { profile_code: req.user.profile_code as "dueno" | "supervisor" },
       id,
       req.body,
-      photoFile,
-      qrFile,
+      images,
     );
 
     return res.json(result);
