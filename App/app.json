@@ -11,21 +11,20 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "ios": {
+      "supportsTablet": true
+    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icono-adaptable.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.anonymous.apprestaurant",
-      "googleServicesFile": "./google-services.json"
-      "package": "com.anonymous.apprestaurant",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
-      ],
-      "package": "com.ezzmellow.apprestaurant"
+      ]
     },
     "web": {
       "bundler": "metro"
