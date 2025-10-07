@@ -51,6 +51,7 @@ export default function ManageWaitingListScreen() {
     null,
   );
   const [assigningTable, setAssigningTable] = useState(false);
+  const [freeingTable, setFreeingTable] = useState<string | null>(null);
   const [averageWaitTime, setAverageWaitTime] = useState<number | undefined>();
   const [totalWaiting, setTotalWaiting] = useState(0);
   const [occupiedCount, setOccupiedCount] = useState(0);
@@ -79,6 +80,14 @@ export default function ManageWaitingListScreen() {
       setTables(tablesData.tables || []);
       setOccupiedCount(tablesData.occupied_count || 0);
       setAvailableCount(tablesData.available_count || 0);
+
+      // Debug: verificar estructura de mesas ocupadas
+      const occupiedTables =
+        tablesData.tables?.filter(t => t.is_occupied) || [];
+      console.log(
+        "Mesas ocupadas recibidas:",
+        JSON.stringify(occupiedTables, null, 2),
+      );
     } catch (error: any) {
       console.error("Error loading data:", error);
       ToastAndroid.show("Error al cargar datos", ToastAndroid.SHORT);
@@ -128,21 +137,64 @@ export default function ManageWaitingListScreen() {
   };
 
   const handleFreeTable = async (tableId: string) => {
-    Alert.alert("Liberar Mesa", "¿Confirmas que quieres liberar esta mesa?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Liberar",
-        onPress: async () => {
-          try {
-            await api.post(`/tables/${tableId}/free`);
-            ToastAndroid.show("Mesa liberada", ToastAndroid.SHORT);
-            loadData();
-          } catch (error: any) {
-            ToastAndroid.show("Error al liberar mesa", ToastAndroid.SHORT);
-          }
+    // Encontrar la mesa en los datos para mostrar información específica
+    const table = tables.find(t => t.id === tableId);
+    const tableNumber = table?.number || "desconocida";
+
+    // Debug: verificar estructura de datos
+    console.log(
+      "Mesa encontrada para liberar:",
+      JSON.stringify(table, null, 2),
+    );
+
+    const clientName = table?.client
+      ? `${table.client.first_name} ${table.client.last_name}`
+      : "Sin cliente asignado";
+
+    Alert.alert(
+      "⚠️ Liberar Mesa",
+      `¿Estás seguro que quieres liberar la mesa ${tableNumber}?\n\n` +
+        `Esta acción:\n` +
+        `• Liberará la mesa inmediatamente\n` +
+        `• Removerá al cliente actual de la mesa\n` +
+        `• No se puede deshacer\n\n` +
+        `${
+          table?.is_occupied
+            ? "La mesa está actualmente ocupada por el cliente."
+            : table?.client
+              ? "La mesa está asignada pero el cliente aún no la ha confirmado."
+              : "La mesa está disponible."
+        }`,
+      [
+        {
+          text: "Cancelar",
+          style: "cancel",
         },
-      },
-    ]);
+        {
+          text: "SÍ, LIBERAR",
+          style: "destructive",
+          onPress: async () => {
+            setFreeingTable(tableId);
+            try {
+              await api.post(`/tables/${tableId}/free`);
+              ToastAndroid.show(
+                `Mesa ${tableNumber} liberada correctamente`,
+                ToastAndroid.LONG,
+              );
+              await loadData();
+            } catch (error: any) {
+              ToastAndroid.show(
+                `Error al liberar mesa ${tableNumber}`,
+                ToastAndroid.LONG,
+              );
+              console.error("Error liberando mesa:", error);
+            } finally {
+              setFreeingTable(null);
+            }
+          },
+        },
+      ],
+    );
   };
 
   if (!canManage) {
@@ -191,7 +243,12 @@ export default function ManageWaitingListScreen() {
         new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime(),
     );
 
-  const availableTables = tables.filter(table => !table.is_occupied);
+  const availableTables = tables.filter(
+    table => !table.is_occupied && !table.client,
+  );
+  const assignedTables = tables.filter(
+    table => !table.is_occupied && table.client,
+  );
   const occupiedTables = tables.filter(table => table.is_occupied);
 
   return (
@@ -295,6 +352,7 @@ export default function ManageWaitingListScreen() {
                 key={table.id}
                 table={table}
                 onFree={() => handleFreeTable(table.id)}
+                isFreeing={freeingTable === table.id}
               />
             ))}
           </View>
@@ -531,28 +589,49 @@ function ClientCard({
 function TableCard({
   table,
   onFree,
+  isFreeing = false,
 }: {
   table: TableStatus;
   onFree: () => void;
+  isFreeing?: boolean;
 }) {
+  // Determinar el estado de la mesa
+  const getTableState = () => {
+    if (table.is_occupied) return "occupied";
+    if (table.client) return "assigned";
+    return "available";
+  };
+
+  const tableState = getTableState();
+
+  // Configuración de colores según el estado
+  const stateConfig = {
+    occupied: {
+      bg: "bg-red-500/20 border border-red-500/30",
+      text: "text-red-400",
+    },
+    assigned: {
+      bg: "bg-yellow-500/20 border border-yellow-500/30",
+      text: "text-yellow-400",
+    },
+    available: {
+      bg: "bg-green-500/20 border border-green-500/30",
+      text: "text-green-400",
+    },
+  };
+
   return (
     <View
-      className={`rounded-xl p-3 min-w-[120px] ${
-        table.is_occupied
-          ? "bg-red-500/20 border border-red-500/30"
-          : "bg-green-500/20 border border-green-500/30"
-      }`}
+      className={`rounded-xl p-3 min-w-[120px] ${stateConfig[tableState].bg}`}
     >
       <View className="items-center">
-        <Text
-          className={`font-bold text-lg ${table.is_occupied ? "text-red-400" : "text-green-400"}`}
-        >
+        <Text className={`font-bold text-lg ${stateConfig[tableState].text}`}>
           {table.number}
         </Text>
         <Text className="text-gray-400 text-xs">{table.capacity} personas</Text>
         <Text className="text-gray-400 text-xs">{table.type}</Text>
 
-        {table.is_occupied ? (
+        {tableState === "occupied" ? (
           <>
             {table.client && (
               <Text className="text-gray-300 text-xs mt-1 text-center">
@@ -561,9 +640,41 @@ function TableCard({
             )}
             <TouchableOpacity
               onPress={onFree}
-              className="bg-red-600 rounded px-2 py-1 mt-2"
+              disabled={isFreeing}
+              className={`rounded px-3 py-2 mt-2 border ${
+                isFreeing
+                  ? "bg-gray-600 border-gray-500"
+                  : "bg-red-600 hover:bg-red-700 border-red-500"
+              }`}
             >
-              <Text className="text-white text-xs">Liberar</Text>
+              <Text className="text-white text-xs font-semibold">
+                {isFreeing ? "🔄 Liberando..." : "⚠️ Liberar"}
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : tableState === "assigned" ? (
+          <>
+            {table.client && (
+              <Text className="text-gray-300 text-xs mt-1 text-center">
+                {table.client.first_name} {table.client.last_name}
+              </Text>
+            )}
+            <Text className="text-yellow-400 text-xs mt-1">Asignada</Text>
+            <Text className="text-gray-400 text-xs">
+              Esperando confirmación
+            </Text>
+            <TouchableOpacity
+              onPress={onFree}
+              disabled={isFreeing}
+              className={`rounded px-3 py-2 mt-2 border ${
+                isFreeing
+                  ? "bg-gray-600 border-gray-500"
+                  : "bg-yellow-600 hover:bg-yellow-700 border-yellow-500"
+              }`}
+            >
+              <Text className="text-white text-xs font-semibold">
+                {isFreeing ? "🔄 Liberando..." : "↩️ Reasignar"}
+              </Text>
             </TouchableOpacity>
           </>
         ) : (

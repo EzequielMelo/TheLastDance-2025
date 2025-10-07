@@ -21,7 +21,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as SecureStore from "expo-secure-store";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import QRCode from "react-native-qrcode-svg";
-import * as QRCodeGenerator from "qrcode";
+import { captureRef } from "react-native-view-shot";
 import FormLayout from "../../Layouts/formLayout";
 import api from "../../api/axios";
 import { useAuth } from "../../auth/AuthContext";
@@ -42,58 +42,71 @@ export default function CreateTableScreen({ navigation }: any) {
   const [facing, setFacing] = useState<CameraType>("back");
   const [qrGenerated, setQrGenerated] = useState(false);
   const [debugQR, setDebugQR] = useState(false); // Para debug
+  const [qrMounted, setQrMounted] = useState(false);
+  const qrRef = useRef<View>(null);
+  const debugQrRef = useRef<View>(null);
 
   // Solo dueño y supervisor pueden crear mesas
   const canCreate =
     currentUser?.profile_code === "dueno" ||
     currentUser?.profile_code === "supervisor";
 
-  // Generar QR automáticamente cuando se tiene número de mesa
+  // Montar el componente QR cuando hay número
   useEffect(() => {
-    const generateTableQR = async () => {
-      if (number && Number(number) > 0 && !qrGenerated) {
-        try {
-          console.log(`Generando QR para mesa ${number}...`);
+    if (number && Number(number) > 0) {
+      setQrMounted(true);
+      setQrGenerated(false);
+      // Limpiar QR anterior
+      const next = [...images] as [ImageSlot, ImageSlot];
+      next[1] = null;
+      setImages(next);
+    } else {
+      setQrMounted(false);
+      setQrGenerated(false);
+    }
+  }, [number]);
 
-          // Generar QR directamente como Data URL usando la librería qrcode
-          const qrContent = generateQRContent(number);
-          console.log("QR Content:", qrContent);
+  // Función para capturar QR
+  const captureQRImage = async (
+    ref: React.RefObject<View | null>,
+    source: string,
+  ) => {
+    if (!ref.current) {
+      console.log(`${source} QR ref no disponible`);
+      return null;
+    }
 
-          const qrDataURL = await QRCodeGenerator.toDataURL(qrContent, {
-            width: 400,
-            margin: 2,
-            color: {
-              dark: "#000000",
-              light: "#FFFFFF",
-            },
-            errorCorrectionLevel: "M",
-          });
+    try {
+      console.log(`Capturando QR desde ${source}...`);
 
-          console.log("QR generado como Data URL");
+      const uri = await captureRef(ref.current, {
+        format: "png",
+        quality: 1.0,
+        result: "tmpfile",
+        height: 400,
+        width: 400,
+      });
 
-          const qrImage: ImageSlot = {
-            uri: qrDataURL,
-            name: `table_${number}_qr.png`,
-            type: "image/png",
-          };
+      console.log(`QR capturado desde ${source}:`, uri);
+      return uri;
+    } catch (error) {
+      console.error(`Error capturando QR desde ${source}:`, error);
+      return null;
+    }
+  };
 
-          const next = [...images] as [ImageSlot, ImageSlot];
-          next[1] = qrImage; // QR va en la segunda posición
-          setImages(next);
-          setQrGenerated(true);
-          ToastAndroid.show(
-            "QR de mesa generado automáticamente ✔️",
-            ToastAndroid.SHORT,
-          );
-        } catch (error) {
-          console.error("Error generando QR:", error);
-          ToastAndroid.show("Error generando QR de mesa", ToastAndroid.SHORT);
-        }
-      }
-    };
+  // Generar QR automáticamente cuando se monta (pero no capturar todavía)
+  useEffect(() => {
+    if (qrMounted && !qrGenerated) {
+      // Marcar como generado después de un breve delay para que se renderice
+      const timeout = setTimeout(() => {
+        setQrGenerated(true);
+        ToastAndroid.show("QR de mesa listo ✔️", ToastAndroid.SHORT);
+      }, 1000);
 
-    generateTableQR();
-  }, [number, qrGenerated, images]);
+      return () => clearTimeout(timeout);
+    }
+  }, [qrMounted, qrGenerated]);
 
   // Regenerar QR cuando cambie el número de mesa
   useEffect(() => {
@@ -106,10 +119,11 @@ export default function CreateTableScreen({ navigation }: any) {
   }, [number]);
 
   // Generar el contenido del QR con deeplink
-  const generateQRContent = (tableNumber: string) => {
-    // Temporal: usar solo el número de mesa, luego será el ID
+  const generateQRContent = (tableNumber: string, tableId?: string) => {
+    // Si tenemos el ID real de la mesa, usarlo; sino usar el número temporalmente
     // Formato: thelastdance://table/{tableId}
-    return `thelastdance://table/${tableNumber}`;
+    const idToUse = tableId || tableNumber;
+    return `thelastdance://table/${idToUse}`;
   };
 
   // Función para seleccionar desde galería
@@ -245,9 +259,9 @@ export default function CreateTableScreen({ navigation }: any) {
       return false;
     }
 
-    if (!images[1] || !qrGenerated) {
+    if (!qrGenerated) {
       ToastAndroid.show(
-        "Esperá a que se genere el código QR automáticamente",
+        "Esperá a que se genere el código QR",
         ToastAndroid.SHORT,
       );
       return false;
@@ -264,7 +278,11 @@ export default function CreateTableScreen({ navigation }: any) {
     const selected = images.filter(Boolean);
     if (selected.length !== 2) {
       ToastAndroid.show(
-        "Se necesita la foto de la mesa y el QR generado automáticamente.",
+        !images[0]
+          ? "Falta la foto de la mesa"
+          : !images[1]
+            ? "Falta generar el QR. Presiona 'Generar QR' primero."
+            : "Se necesitan ambas imágenes para crear la mesa.",
         ToastAndroid.LONG,
       );
       setIsSubmitting(false);
@@ -314,7 +332,19 @@ export default function CreateTableScreen({ navigation }: any) {
         throw new Error(msg || `HTTP ${resp.status}`);
       }
 
+      const result = await resp.json();
+
       ToastAndroid.show("Mesa creada correctamente ✔️", ToastAndroid.LONG);
+
+      // Mostrar el ID de la mesa creada para debug
+      if (result?.id) {
+        console.log("Mesa creada con ID:", result.id);
+        ToastAndroid.show(
+          `Mesa creada con ID: ${result.id}`,
+          ToastAndroid.SHORT,
+        );
+      }
+
       navigation.goBack();
     } catch (e: any) {
       ToastAndroid.show(e?.message || "Error creando mesa", ToastAndroid.LONG);
@@ -420,12 +450,82 @@ export default function CreateTableScreen({ navigation }: any) {
           <View className="flex-1">
             <View className="flex-row items-center justify-between mb-2">
               <Text className="text-gray-400 text-xs text-center flex-1">
-                Código QR (Auto)
+                Código QR
               </Text>
               <View className="flex-row items-center">
-                {qrGenerated && (
+                {qrGenerated && !images[1] && (
+                  <TouchableOpacity
+                    onPress={async () => {
+                      ToastAndroid.show("Generando QR...", ToastAndroid.SHORT);
+
+                      // Abrir el debug QR
+                      setDebugQR(true);
+
+                      // Esperar a que se renderice
+                      await new Promise(resolve => setTimeout(resolve, 500));
+
+                      // Capturar automáticamente
+                      const uri = await captureQRImage(debugQrRef, "debug");
+                      if (uri) {
+                        const qrImage: ImageSlot = {
+                          uri,
+                          name: `table_${number}_qr.png`,
+                          type: "image/png",
+                        };
+
+                        const next = [...images] as [ImageSlot, ImageSlot];
+                        next[1] = qrImage;
+                        setImages(next);
+
+                        ToastAndroid.show(
+                          "QR generado exitosamente!",
+                          ToastAndroid.SHORT,
+                        );
+                      }
+
+                      // Cerrar el debug después de un momento
+                      setTimeout(() => setDebugQR(false), 1000);
+                    }}
+                    className="bg-green-500 px-3 py-1 rounded mr-2"
+                  >
+                    <Text className="text-white text-xs font-semibold">
+                      Generar QR
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {qrGenerated && images[1] && (
                   <TouchableOpacity
                     onPress={() => setDebugQR(!debugQR)}
+                    className="bg-blue-500 px-3 py-1 rounded mr-2"
+                  >
+                    <Text className="text-white text-xs font-semibold">
+                      {debugQR ? "Ocultar" : "Ver QR"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {qrGenerated && debugQR && !images[1] && (
+                  <TouchableOpacity
+                    onPress={async () => {
+                      console.log("Capturando QR manualmente...");
+                      const uri = await captureQRImage(debugQrRef, "debug");
+                      if (uri) {
+                        const qrImage: ImageSlot = {
+                          uri,
+                          name: `table_${number}_qr.png`,
+                          type: "image/png",
+                        };
+
+                        const next = [...images] as [ImageSlot, ImageSlot];
+                        next[1] = qrImage;
+                        setImages(next);
+                        ToastAndroid.show(
+                          "QR capturado para envío ✔️",
+                          ToastAndroid.SHORT,
+                        );
+                      }
+                    }}
                     className="bg-purple-600 px-2 py-1 rounded mr-1"
                   >
                     <Text className="text-white text-xs">Ver</Text>
@@ -443,6 +543,40 @@ export default function CreateTableScreen({ navigation }: any) {
         </View>
       </FormLayout>
 
+      {/* QR Generator (siempre montado cuando hay número) */}
+      {qrMounted && (
+        <View
+          style={{
+            position: "absolute",
+            left: -1000,
+            top: -1000,
+            width: 400,
+            height: 400,
+          }}
+        >
+          <View
+            ref={qrRef}
+            style={{
+              padding: 50,
+              backgroundColor: "white",
+              width: 400,
+              height: 400,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <QRCode
+              value={generateQRContent(number)}
+              size={300}
+              color="black"
+              backgroundColor="white"
+              quietZone={10}
+              enableLinearGradient={false}
+            />
+          </View>
+        </View>
+      )}
+
       {/* QR Preview para debug */}
       {debugQR && number && Number(number) > 0 && (
         <View
@@ -456,6 +590,7 @@ export default function CreateTableScreen({ navigation }: any) {
           }}
         >
           <View
+            ref={debugQrRef}
             style={{
               padding: 20,
               backgroundColor: "white",

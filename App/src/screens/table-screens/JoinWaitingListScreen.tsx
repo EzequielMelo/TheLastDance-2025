@@ -42,7 +42,7 @@ export default function JoinWaitingListScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RoutePropType>();
-  const { qrData } = route.params;
+  const { qrData } = route.params || {};
 
   const [partySize, setPartySize] = useState("2");
   const [tableType, setTableType] = useState("estandar");
@@ -52,7 +52,7 @@ export default function JoinWaitingListScreen() {
 
   useEffect(() => {
     // Verificar si el QR ha expirado
-    if (Date.now() > qrData.expires_at) {
+    if (qrData && qrData.expires_at && Date.now() > qrData.expires_at) {
       setQrExpired(true);
     }
   }, [qrData]);
@@ -65,7 +65,7 @@ export default function JoinWaitingListScreen() {
       return;
     }
 
-    if (qrExpired) {
+    if (qrData && qrExpired) {
       Alert.alert(
         "QR Expirado",
         "Este código QR ya no es válido. Solicita uno nuevo al maitre.",
@@ -149,7 +149,7 @@ export default function JoinWaitingListScreen() {
     }
   };
 
-  if (qrExpired) {
+  if (qrData && qrExpired) {
     return (
       <LinearGradient
         colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}

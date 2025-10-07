@@ -18,6 +18,7 @@ import ScanQRScreen from "../screens/table-screens/ScanQRScreen";
 import ScanTableQRScreen from "../screens/table-screens/ScanTableQRScreen";
 import JoinWaitingListScreen from "../screens/table-screens/JoinWaitingListScreen";
 import MyWaitingPositionScreen from "../screens/table-screens/MyWaitingPositionScreen";
+import MenuScreen from "../screens/MenuScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -115,6 +116,11 @@ function NavigatorContent() {
             name="MyWaitingPosition"
             component={MyWaitingPositionScreen}
             options={{ title: "Mi Posición", headerBackTitle: "Volver" }}
+          />
+          <Stack.Screen
+            name="Menu"
+            component={MenuScreen}
+            options={{ headerShown: false }}
           />
         </>
       ) : (

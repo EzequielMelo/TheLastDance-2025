@@ -61,14 +61,11 @@ export default function ScanTableQRScreen() {
       }
 
       try {
-        const response = await api.get("/api/tables/status");
-        const myOccupiedTables = response.data.tables?.filter(
-          (table: any) => table.id_client === user?.id && table.is_occupied,
-        );
+        const response = await api.get("/tables/my-table");
 
-        setHasOccupiedTable(myOccupiedTables && myOccupiedTables.length > 0);
+        setHasOccupiedTable(response.data.hasOccupiedTable);
       } catch (error) {
-        console.error("Error checking occupied table:", error);
+        console.error("Error checking my table:", error);
         setHasOccupiedTable(false);
       } finally {
         setLoading(false);
@@ -112,7 +109,7 @@ export default function ScanTableQRScreen() {
       console.log("Extracted table ID:", tableId);
 
       // Llamar al endpoint para activar la mesa
-      const response = await api.post(`/api/tables/${tableId}/activate`);
+      const response = await api.post(`/tables/${tableId}/activate`);
 
       if (response.data.success) {
         // Mostrar éxito

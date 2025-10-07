@@ -164,33 +164,72 @@ export async function getClientPosition(clientId: string): Promise<{
 
 // Obtener estado de todas las mesas
 export async function getTablesStatus(): Promise<TablesStatusResponse> {
-  const { data, error } = await supabaseAdmin
+  // Obtener todas las mesas
+  const { data: tablesData, error: tablesError } = await supabaseAdmin
     .from("tables")
     .select("*")
     .order("number", { ascending: true });
 
-  if (error) {
-    throw new Error(`Error obteniendo estado de mesas: ${error.message}`);
+  if (tablesError) {
+    throw new Error(`Error obteniendo estado de mesas: ${tablesError.message}`);
   }
 
-  // Por ahora no incluimos información del cliente para evitar problemas de FK
-  const tables: TableWithClient[] = data.map(table => ({
-    ...table,
-    // Si hay client_id, podríamos hacer una consulta separada aquí
-    client: undefined,
-  }));
+  // Obtener información de clientes para mesas ocupadas O asignadas
+  const tablesWithClients = tablesData.filter(table => table.id_client);
+  const clientIds = tablesWithClients.map(table => table.id_client);
+
+  let clientsData: any[] = [];
+  if (clientIds.length > 0) {
+    console.log("Buscando información de clientes para IDs:", clientIds);
+
+    const { data: clients, error: clientsError } = await supabaseAdmin
+      .from("users")
+      .select("id, first_name, last_name")
+      .in("id", clientIds);
+
+    console.log("Datos de clientes obtenidos:", clients);
+
+    if (clientsError) {
+      console.warn("Error obteniendo datos de clientes:", clientsError.message);
+    } else {
+      clientsData = clients || [];
+    }
+  }
+
+  // Mapear los datos para incluir información del cliente
+  const tables: TableWithClient[] = tablesData.map(table => {
+    const client = table.id_client
+      ? clientsData.find(c => c.id === table.id_client)
+      : undefined;
+
+    return {
+      ...table,
+      client,
+    };
+  });
   const occupiedCount = tables.filter(t => t.is_occupied).length;
+  const assignedCount = tables.filter(
+    t => t.id_client && !t.is_occupied,
+  ).length;
+  const unavailableCount = tables.filter(
+    t => t.is_occupied || t.id_client,
+  ).length;
   const totalCapacity = tables.reduce((sum, t) => sum + t.capacity, 0);
   const occupiedCapacity = tables
     .filter(t => t.is_occupied)
+    .reduce((sum, t) => sum + t.capacity, 0);
+  const assignedCapacity = tables
+    .filter(t => t.id_client && !t.is_occupied)
     .reduce((sum, t) => sum + t.capacity, 0);
 
   return {
     tables,
     occupied_count: occupiedCount,
-    available_count: tables.length - occupiedCount,
+    assigned_count: assignedCount,
+    available_count: tables.length - unavailableCount,
     total_capacity: totalCapacity,
     occupied_capacity: occupiedCapacity,
+    assigned_capacity: assignedCapacity,
   };
 }
 
@@ -215,16 +254,20 @@ export async function assignClientToTable({
       };
     }
 
-    // 2. Verificar que la mesa esté disponible
+    // 2. Verificar que la mesa esté disponible (no ocupada Y sin cliente asignado)
     const { data: table, error: tableError } = await supabaseAdmin
       .from("tables")
-      .select("id, capacity, is_occupied")
+      .select("id, capacity, is_occupied, id_client")
       .eq("id", table_id)
       .eq("is_occupied", false)
+      .is("id_client", null)
       .single();
 
     if (tableError || !table) {
-      return { success: false, message: "Mesa no disponible" };
+      return {
+        success: false,
+        message: "Mesa no disponible o ya asignada a otro cliente",
+      };
     }
 
     // 3. Verificar capacidad
@@ -289,7 +332,7 @@ export async function assignClientToTable({
 
 // Activar mesa cuando el cliente escanea el QR
 export async function activateTableByClient(
-  tableId: string,
+  tableIdOrNumber: string,
   clientId: string,
 ): Promise<{ success: boolean; message: string; table?: any }> {
   try {
@@ -317,11 +360,43 @@ export async function activateTableByClient(
     }
 
     // 2. Verificar que la mesa esté asignada al cliente pero no ocupada
-    const { data: table, error: tableError } = await supabaseAdmin
-      .from("tables")
-      .select("id, number, id_client, is_occupied")
-      .eq("id", tableId)
-      .single();
+    // Intentar buscar por ID primero, luego por número si falla
+    let table: any = null;
+    let tableError: any = null;
+
+    // Intentar como ID numérico
+    if (!isNaN(Number(tableIdOrNumber))) {
+      const { data: tableById, error: errorById } = await supabaseAdmin
+        .from("tables")
+        .select("id, number, id_client, is_occupied")
+        .eq("id", Number(tableIdOrNumber))
+        .single();
+
+      if (!errorById && tableById) {
+        table = tableById;
+      } else {
+        // Si falló como ID, intentar como número de mesa
+        const { data: tableByNumber, error: errorByNumber } =
+          await supabaseAdmin
+            .from("tables")
+            .select("id, number, id_client, is_occupied")
+            .eq("number", Number(tableIdOrNumber))
+            .single();
+
+        table = tableByNumber;
+        tableError = errorByNumber;
+      }
+    } else {
+      // Si no es numérico, solo intentar como número
+      const { data: tableByNumber, error: errorByNumber } = await supabaseAdmin
+        .from("tables")
+        .select("id, number, id_client, is_occupied")
+        .eq("number", Number(tableIdOrNumber))
+        .single();
+
+      table = tableByNumber;
+      tableError = errorByNumber;
+    }
 
     if (tableError || !table) {
       return { success: false, message: "Mesa no encontrada" };
@@ -347,7 +422,7 @@ export async function activateTableByClient(
       .update({
         is_occupied: true,
       })
-      .eq("id", tableId);
+      .eq("id", table.id);
 
     if (updateError) {
       throw new Error(`Error activando mesa: ${updateError.message}`);
@@ -375,7 +450,21 @@ export async function freeTable(
   tableId: string,
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const { error } = await supabaseAdmin
+    // 1. Obtener información de la mesa antes de liberarla
+    const { data: table, error: tableError } = await supabaseAdmin
+      .from("tables")
+      .select("id, number, id_client")
+      .eq("id", tableId)
+      .single();
+
+    if (tableError || !table) {
+      throw new Error("Mesa no encontrada");
+    }
+
+    const clientId = table.id_client;
+
+    // 2. Liberar la mesa
+    const { error: updateError } = await supabaseAdmin
       .from("tables")
       .update({
         is_occupied: false,
@@ -383,8 +472,71 @@ export async function freeTable(
       })
       .eq("id", tableId);
 
-    if (error) {
-      throw new Error(`Error liberando mesa: ${error.message}`);
+    if (updateError) {
+      throw new Error(`Error liberando mesa: ${updateError.message}`);
+    }
+
+    // 3. Si había un cliente asignado, actualizar su estado en waiting_list
+    if (clientId) {
+      console.log(`=== LIBERANDO MESA - ACTUALIZANDO CLIENTE ===`);
+      console.log(`Cliente ID: ${clientId}`);
+      console.log(`Mesa número: ${table.number}`);
+
+      // Buscar la entrada más reciente del cliente en waiting_list
+      const { data: waitingEntry, error: waitingError } = await supabaseAdmin
+        .from("waiting_list")
+        .select("id, status, client_id")
+        .eq("client_id", clientId)
+        .order("seated_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      console.log(`Entrada en waiting_list encontrada:`, waitingEntry);
+      console.log(`Error en búsqueda:`, waitingError);
+
+      if (waitingError) {
+        console.warn(
+          "Error buscando entrada en waiting_list:",
+          waitingError.message,
+        );
+      } else if (waitingEntry) {
+        console.log(`Estado actual del cliente: ${waitingEntry.status}`);
+
+        // Si el cliente tenía estado 'seated', cambiarlo a 'displaced'
+        // (indica que fue removido por staff, no por cancelación propia)
+        if (waitingEntry.status === "seated") {
+          console.log(`Cambiando estado de 'seated' a 'displaced'...`);
+
+          const { error: statusUpdateError } = await supabaseAdmin
+            .from("waiting_list")
+            .update({
+              status: "displaced",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", waitingEntry.id);
+
+          if (statusUpdateError) {
+            console.error(
+              "ERROR actualizando estado en waiting_list:",
+              statusUpdateError.message,
+            );
+          } else {
+            console.log(
+              `✅ Cliente ${clientId} cambiado de 'seated' a 'displaced' exitosamente`,
+            );
+          }
+        } else {
+          console.log(
+            `Cliente tiene estado '${waitingEntry.status}', no se requiere cambio`,
+          );
+        }
+      } else {
+        console.warn(
+          `No se encontró entrada en waiting_list para cliente ${clientId}`,
+        );
+      }
+    } else {
+      console.log(`Mesa ${table.number} no tenía cliente asignado`);
     }
 
     return { success: true, message: "Mesa liberada exitosamente" };

@@ -6,7 +6,7 @@ export interface WaitingListEntry {
   party_size: number;
   preferred_table_type?: "vip" | "estandar" | "accesible";
   special_requests?: string;
-  status: "waiting" | "seated" | "cancelled";
+  status: "waiting" | "seated" | "cancelled" | "no_show" | "displaced";
   priority: number;
   joined_at: string;
   seated_at?: string;
@@ -65,7 +65,9 @@ export interface WaitingListResponse {
 export interface TablesStatusResponse {
   tables: TableWithClient[];
   occupied_count: number;
+  assigned_count: number;
   available_count: number;
   total_capacity: number;
   occupied_capacity: number;
+  assigned_capacity: number;
 }

@@ -1,3 +1,5 @@
+import type { StackNavigationProp } from "@react-navigation/stack";
+
 export type RootStackParamList = {
   Login: undefined;
   Registro: undefined;
@@ -11,7 +13,10 @@ export type RootStackParamList = {
   ManageWaitingList: undefined; // Nueva ruta para gestionar lista de espera
   GenerateWaitingListQR: undefined; // Generar QR para maitre
   ScanQR: undefined; // Escanear QR para clientes
-  JoinWaitingList: { qrData: any }; // Formulario con datos del QR
+  JoinWaitingList: { qrData?: any }; // Formulario con datos del QR
   MyWaitingPosition: undefined; // Ver posición en lista de espera
   ScanTableQR: undefined; // Escanear QR de mesa para confirmar llegada
+  Menu: undefined; // Menú para clientes
 };
+
+export type RootStackNavigationProp = StackNavigationProp<RootStackParamList>;
