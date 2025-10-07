@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { supabaseAdmin } from "../../config/supabase";
 import {
   getWaitingList,
   addToWaitingList,
@@ -79,10 +80,14 @@ export async function getMyPositionHandler(req: Request, res: Response) {
       console.log(
         `Usuario ${req.user?.appUserId} no está en la lista de espera`,
       );
+      return res.json({
+        inQueue: false,
+        message: "No estás en la lista de espera",
+      });
     } else {
       console.error("Error obteniendo posición:", e.message);
+      return res.status(500).json({ error: "Error interno del servidor" });
     }
-    return res.status(400).json({ error: e.message });
   }
 }
 
@@ -288,5 +293,145 @@ export async function freeTableHandler(req: Request, res: Response) {
     return res.json({ message: result.message });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
+  }
+}
+
+// GET /api/tables/my-table - Ver mi mesa ocupada (clientes)
+export async function getMyTableHandler(req: Request, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    const { data: myTable, error } = await supabaseAdmin
+      .from("tables")
+      .select("id, number, is_occupied")
+      .eq("id_client", req.user.appUserId)
+      .eq("is_occupied", true)
+      .single();
+
+    if (error && error.code !== "PGRST116") {
+      // PGRST116 = no rows found, otros errores sí son problemáticos
+      throw error;
+    }
+
+    return res.json({
+      hasOccupiedTable: !!myTable,
+      table: myTable || null,
+    });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+// GET /api/tables/my-assigned - Ver mi mesa asignada pero no ocupada (clientes)
+export async function getMyAssignedTableHandler(req: Request, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    const { data: assignedTable, error } = await supabaseAdmin
+      .from("tables")
+      .select("id, number, is_occupied")
+      .eq("id_client", req.user.appUserId)
+      .eq("is_occupied", false)
+      .single();
+
+    if (error && error.code !== "PGRST116") {
+      // PGRST116 = no rows found, otros errores sí son problemáticos
+      throw error;
+    }
+
+    return res.json({
+      hasAssignedTable: !!assignedTable,
+      table: assignedTable || null,
+    });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+// GET /api/tables/my-status - Obtener estado completo del cliente
+export async function getMyStatusHandler(req: Request, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    const clientId = req.user.appUserId;
+
+    // 1. Verificar mesa ocupada
+    const { data: occupiedTable, error: occupiedError } = await supabaseAdmin
+      .from("tables")
+      .select("id, number")
+      .eq("id_client", clientId)
+      .eq("is_occupied", true)
+      .single();
+
+    if (occupiedTable && !occupiedError) {
+      return res.json({
+        status: "seated",
+        table: occupiedTable,
+      });
+    }
+
+    // 2. Verificar mesa asignada pero no ocupada
+    const { data: assignedTable, error: assignedError } = await supabaseAdmin
+      .from("tables")
+      .select("id, number")
+      .eq("id_client", clientId)
+      .eq("is_occupied", false)
+      .single();
+
+    if (assignedTable && !assignedError) {
+      return res.json({
+        status: "assigned",
+        table: assignedTable,
+      });
+    }
+
+    // 3. Verificar estado en waiting_list (cualquier estado)
+    const { data: waitingEntry, error: waitingError } = await supabaseAdmin
+      .from("waiting_list")
+      .select("id, status, party_size")
+      .eq("client_id", clientId)
+      .order("seated_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (waitingEntry && !waitingError) {
+      if (waitingEntry.status === "displaced") {
+        return res.json({
+          status: "displaced",
+          waitingListId: waitingEntry.id,
+        });
+      } else if (waitingEntry.status === "waiting") {
+        // Calcular posición solo si está waiting
+        try {
+          const positionData = await getClientPosition(clientId);
+          return res.json({
+            status: "in_queue",
+            position: positionData.position,
+            estimatedWait: positionData.estimatedWait,
+            waitingListId: waitingEntry.id,
+          });
+        } catch {
+          // Si falla el cálculo de posición, aún está en waiting
+          return res.json({
+            status: "in_queue",
+            waitingListId: waitingEntry.id,
+          });
+        }
+      }
+    }
+
+    // 4. No está en ninguna lista/mesa
+    return res.json({
+      status: "not_in_queue",
+    });
+  } catch (e: any) {
+    console.error("Error obteniendo estado del cliente:", e.message);
+    return res.status(500).json({ error: "Error interno del servidor" });
   }
 }

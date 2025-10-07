@@ -12,6 +12,9 @@ import {
   assignTableHandler,
   activateTableHandler,
   freeTableHandler,
+  getMyTableHandler,
+  getMyAssignedTableHandler,
+  getMyStatusHandler,
 } from "./tablesController";
 
 const router = express.Router();
@@ -64,6 +67,15 @@ router.get(
   roleGuard(["dueno", "supervisor", "maitre", "mozo"]),
   getTablesStatusHandler,
 );
+
+// GET /api/tables/my-table - Ver mi mesa ocupada (clientes)
+router.get("/my-table", authenticateUser, getMyTableHandler);
+
+// GET /api/tables/my-assigned - Ver mi mesa asignada pero no ocupada (clientes)
+router.get("/my-assigned", authenticateUser, getMyAssignedTableHandler);
+
+// GET /api/tables/my-status - Ver estado completo del cliente (clientes)
+router.get("/my-status", authenticateUser, getMyStatusHandler);
 
 // POST /api/tables/assign - Asignar cliente a mesa (maitre, supervisor, dueño)
 router.post(

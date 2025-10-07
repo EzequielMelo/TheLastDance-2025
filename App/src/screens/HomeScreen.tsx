@@ -14,6 +14,7 @@ import api from "../api/axios";
 import { LogOut, Table, Users, QrCode, Camera } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User";
+import ClientFlowNavigation from "../components/navigation/ClientFlowNavigation";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
@@ -175,28 +176,7 @@ export default function HomeScreen({ navigation }: Props) {
             </>
           )}
 
-          {isCliente && (
-            <>
-              <ActionTile
-                title="Unirse a Lista de Espera"
-                subtitle="Escanea el QR del maitre para hacer tu reserva"
-                onPress={() => navigation.navigate("ScanQR")}
-                icon={<Camera size={26} color="#1a1a1a" />}
-              />
-              <ActionTile
-                title="Ver Mi Posición"
-                subtitle="Consulta tu lugar en la lista de espera"
-                onPress={() => navigation.navigate("MyWaitingPosition")}
-                icon={<Users size={26} color="#1a1a1a" />}
-              />
-              <ActionTile
-                title="Confirmar Llegada a Mesa"
-                subtitle="Escanea el QR de tu mesa para confirmar tu llegada"
-                onPress={() => navigation.navigate("ScanTableQR")}
-                icon={<QrCode size={26} color="#1a1a1a" />}
-              />
-            </>
-          )}
+          {isCliente && <ClientFlowNavigation />}
 
           {(isDueno || isSupervisor) && (
             <ActionTile
