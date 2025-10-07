@@ -31,6 +31,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const loadAuth = async () => {
     try {
+      console.log("AuthContext - Starting loadAuth...");
       setIsLoading(true);
 
       // Token desde SecureStore (seguro)
@@ -39,15 +40,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Usuario desde AsyncStorage (no sensible)
       const storedUser = await AsyncStorage.getItem("userData");
 
+      console.log(
+        "AuthContext - storedToken:",
+        !!storedToken,
+        "storedUser:",
+        !!storedUser,
+      );
+
       if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(JSON.parse(storedUser) as User);
+        console.log("AuthContext - Auth data loaded successfully");
       }
     } catch (error) {
       console.error("Error loading auth data:", error);
       // En caso de error, limpiar datos corruptos
       await clearAuthData();
     } finally {
+      console.log("AuthContext - Setting isLoading to false");
       setIsLoading(false);
     }
   };

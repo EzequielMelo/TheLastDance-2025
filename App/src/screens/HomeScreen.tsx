@@ -11,7 +11,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
 import { AuthContext } from "../auth/AuthContext";
 import api from "../api/axios";
-import { LogOut, Bell } from "lucide-react-native";
+import { LogOut, Table, Users, QrCode, Camera } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User";
 
@@ -60,8 +60,12 @@ export default function HomeScreen({ navigation }: Props) {
 
   const isCocinero = user?.position_code === "cocinero";
   const isBartender = user?.position_code === "bartender";
+  const isMaitre = user?.position_code === "maitre";
   const isDueno = user?.profile_code === "dueno";
   const isSupervisor = user?.profile_code === "supervisor";
+  const isCliente =
+    user?.profile_code === "cliente_registrado" ||
+    user?.profile_code === "cliente_anonimo";
   const IMGS = {
     newStaff: require("../../assets/new-staff.png"),
     churrasco: require("../../assets/churrasco.png"),
@@ -92,8 +96,15 @@ export default function HomeScreen({ navigation }: Props) {
             <ActionTile
               title="Añadir empleado/supervisor"
               subtitle="Crear nuevos perfiles del equipo"
-              onPress={() => navigation.navigate("AddStaff", { userRole: "dueno" })}
-              icon={<Image source={IMGS.newStaff} style={{ width: 26, height: 26 }} />}
+              onPress={() =>
+                navigation.navigate("AddStaff", { userRole: "dueno" })
+              }
+              icon={
+                <Image
+                  source={IMGS.newStaff}
+                  style={{ width: 26, height: 26 }}
+                />
+              }
             />
           )}
 
@@ -101,8 +112,15 @@ export default function HomeScreen({ navigation }: Props) {
             <ActionTile
               title="Añadir empleado"
               subtitle="Crear nuevos empleados del equipo"
-              onPress={() => navigation.navigate("AddStaff", { userRole: "supervisor" })}
-              icon={<Image source={IMGS.newStaff} style={{ width: 26, height: 26 }} />}
+              onPress={() =>
+                navigation.navigate("AddStaff", { userRole: "supervisor" })
+              }
+              icon={
+                <Image
+                  source={IMGS.newStaff}
+                  style={{ width: 26, height: 26 }}
+                />
+              }
             />
           )}
 
@@ -111,7 +129,12 @@ export default function HomeScreen({ navigation }: Props) {
               title="Agregar plato"
               subtitle="Publicá un nuevo plato en el menú"
               onPress={() => goCreate("plato")}
-              icon={<Image source={IMGS.churrasco} style={{ width: 26, height: 26 }} />}
+              icon={
+                <Image
+                  source={IMGS.churrasco}
+                  style={{ width: 26, height: 26 }}
+                />
+              }
             />
           )}
 
@@ -120,19 +143,68 @@ export default function HomeScreen({ navigation }: Props) {
               title="Agregar bebida"
               subtitle="Sumá una nueva bebida al menú"
               onPress={() => goCreate("bebida")}
-              icon={<Image source={IMGS.fernet} style={{ width: 26, height: 26 }} />}
+              icon={
+                <Image source={IMGS.fernet} style={{ width: 26, height: 26 }} />
+              }
             />
           )}
 
+          {((isDueno || isSupervisor) ) && (
+            <ActionTile
+              title="Crear mesa"
+              subtitle="Agregá una nueva mesa al restaurante"
+              onPress={() => navigation.navigate("CreateTable")}
+              icon={<Table size={26} color="#1a1a1a" />}
+            />
+          )}
+
+          {isMaitre && (
+            <>
+              <ActionTile
+                title="Gestionar Lista de Espera"
+                subtitle="Administrá las reservas y asignación de mesas"
+                onPress={() => navigation.navigate("ManageWaitingList")}
+                icon={<Users size={26} color="#1a1a1a" />}
+              />
+              <ActionTile
+                title="Generar Código QR"
+                subtitle="Crear QR para que clientes se unan a la lista"
+                onPress={() => navigation.navigate("GenerateWaitingListQR")}
+                icon={<QrCode size={26} color="#1a1a1a" />}
+              />
+            </>
+          )}
+
+          {isCliente && (
+            <>
+              <ActionTile
+                title="Unirse a Lista de Espera"
+                subtitle="Escanea el QR del maitre para hacer tu reserva"
+                onPress={() => navigation.navigate("ScanQR")}
+                icon={<Camera size={26} color="#1a1a1a" />}
+              />
+              <ActionTile
+                title="Ver Mi Posición"
+                subtitle="Consulta tu lugar en la lista de espera"
+                onPress={() => navigation.navigate("MyWaitingPosition")}
+                icon={<Users size={26} color="#1a1a1a" />}
+              />
+              <ActionTile
+                title="Confirmar Llegada a Mesa"
+                subtitle="Escanea el QR de tu mesa para confirmar tu llegada"
+                onPress={() => navigation.navigate("ScanTableQR")}
+                icon={<QrCode size={26} color="#1a1a1a" />}
+              />
+            </>
+          )}
+
           {(isDueno || isSupervisor) && (
-            <TouchableOpacity
+            <ActionTile
+              title="Gestionar Usuarios Pendientes"
+              subtitle="Administrá usuarios y solicitudes pendientes"
               onPress={() => navigation.navigate("Clients")}
-              className="flex-row items-center p-4 bg-white/10 rounded-lg mb-4"
-            >
-              <Text className="text-white text-lg font-medium">
-                Gestionar Usuarios Pendientes
-              </Text>
-            </TouchableOpacity>
+              icon={<Users size={26} color="#1a1a1a" />}
+            />
           )}
         </View>
 

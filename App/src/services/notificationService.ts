@@ -1,10 +1,10 @@
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+import Constants from "expo-constants";
+import { Platform } from "react-native";
 
 // Configurar handler solo si no estamos en Expo Go
-if (Constants.executionEnvironment !== 'storeClient') {
+if (Constants.executionEnvironment !== "storeClient") {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
@@ -17,7 +17,7 @@ if (Constants.executionEnvironment !== 'storeClient') {
 }
 
 export interface NotificationData {
-  type: 'new_client_registration';
+  type: "new_client_registration";
   clientId: string;
   clientName: string;
 }
@@ -26,14 +26,14 @@ export class NotificationService {
   private static expoPushToken: string | null = null;
 
   static async registerForPushNotifications(): Promise<string | null> {
-    if (!Device.isDevice) {
-      console.log('🚫 Push notifications only work on physical devices');
+    if (Constants.executionEnvironment === "storeClient" || !Device.isDevice) {
       return null;
     }
 
     try {
       // Solicitar permisos explícitamente
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      const { status: existingStatus } =
+      await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
 
       if (existingStatus !== 'granted') {
@@ -75,16 +75,19 @@ export class NotificationService {
   }
 
   static async setupNotificationChannel() {
-    if (Constants.executionEnvironment === 'storeClient' || Platform.OS !== 'android') {
+    if (
+      Constants.executionEnvironment === "storeClient" ||
+      Platform.OS !== "android"
+    ) {
       return;
     }
 
-    await Notifications.setNotificationChannelAsync('client_registrations', {
-      name: 'Registro de Clientes',
-      description: 'Notificaciones de nuevos registros de clientes',
+    await Notifications.setNotificationChannelAsync("client_registrations", {
+      name: "Registro de Clientes",
+      description: "Notificaciones de nuevos registros de clientes",
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#d4af37',
+      lightColor: "#d4af37",
     });
   }
 
@@ -98,9 +101,9 @@ export class NotificationService {
         title,
         body,
         data,
-        sound: 'default',
-        ...(Platform.OS === 'android' && {
-          channelId: 'client_registrations',
+        sound: "default",
+        ...(Platform.OS === "android" && {
+          channelId: "client_registrations",
         }),
       },
       trigger: null,

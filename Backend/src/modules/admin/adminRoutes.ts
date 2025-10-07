@@ -52,24 +52,10 @@ router.get("/tables", listTables);
 router.get("/tables/:id", getTable);
 
 // POST /api/admin/tables - Crear nueva mesa (requiere 2 archivos: photo y qr)
-router.post(
-  "/tables",
-  upload.fields([
-    { name: "photo", maxCount: 1 },
-    { name: "qr", maxCount: 1 },
-  ]),
-  createTableController,
-);
+router.post("/tables", upload.array("images", 2), createTableController);
 
 // PUT /api/admin/tables/:id - Actualizar mesa (archivos opcionales)
-router.put(
-  "/tables/:id",
-  upload.fields([
-    { name: "photo", maxCount: 1 },
-    { name: "qr", maxCount: 1 },
-  ]),
-  updateTableController,
-);
+router.put("/tables/:id", upload.array("images", 2), updateTableController);
 
 // DELETE /api/admin/tables/:id - Eliminar mesa
 router.delete("/tables/:id", deleteTableController);

@@ -23,6 +23,14 @@ export interface Client {
   created_at: string;
 }
 
+// Tipo para imágenes unificado (similar al de menu)
+type UploadImage = {
+  filename: string;
+  contentType: string;
+  buffer: Buffer;
+  fieldname?: string;
+};
+
 export interface ClientApprovalData {
   id: string;
   first_name: string;
@@ -148,7 +156,7 @@ export async function createStaff(
     bodyKeys: Object.keys(body),
     hasFile: !!file,
     profileCode: body.profile_code,
-    email: body.email
+    email: body.email,
   });
 
   // Permisos
@@ -188,14 +196,14 @@ export async function createStaff(
       password: body.password,
       email_confirm: true,
     });
-  
+
   if (authErr || !authData?.user) {
     console.error("❌ Error creando usuario en Auth:", authErr);
     throw new Error(
       `No se pudo crear el usuario en Auth: ${authErr?.message || "desconocido"}`,
     );
   }
-  
+
   const userId = authData.user.id;
   console.log("✅ Usuario creado en Auth con ID:", userId);
 
@@ -225,7 +233,7 @@ export async function createStaff(
       profile_code: row.profile_code,
       state: row.state,
       position_code: row.position_code,
-      hasImage: !!row.profile_image
+      hasImage: !!row.profile_image,
     });
 
     const { error: dbErr } = await supabaseAdmin.from("users").insert(row);
@@ -251,7 +259,7 @@ export async function createStaff(
   } catch (e) {
     console.error("❌ Error en proceso, haciendo rollback...", e);
     // rollback best-effort
-    await supabaseAdmin.auth.admin.deleteUser(userId).catch((rollbackErr) => {
+    await supabaseAdmin.auth.admin.deleteUser(userId).catch(rollbackErr => {
       console.error("❌ Error en rollback:", rollbackErr);
     });
     throw e;
@@ -260,17 +268,27 @@ export async function createStaff(
 
 // ========== SERVICIOS PARA MESAS ==========
 
-// Función helper para subir imágenes de mesa
+// Función helper para subir imágenes de mesa (unificada)
 async function uploadTableImage(
   tableId: string,
-  file: Express.Multer.File,
+  image: UploadImage,
   type: "photo" | "qr",
 ): Promise<string> {
   try {
+    // Convertir UploadImage a formato compatible con las funciones existentes
+    const multerFile: Express.Multer.File = {
+      fieldname: image.fieldname || type,
+      originalname: image.filename,
+      encoding: "7bit",
+      mimetype: image.contentType,
+      buffer: image.buffer,
+      size: image.buffer.length,
+    } as Express.Multer.File;
+
     if (type === "photo") {
-      return await uploadTablePhoto(tableId, file);
+      return await uploadTablePhoto(tableId, multerFile);
     } else {
-      return await uploadTableQR(tableId, file);
+      return await uploadTableQR(tableId, multerFile);
     }
   } catch (error) {
     throw new Error(
@@ -324,12 +342,11 @@ export async function checkTableNumberExists(number: number): Promise<boolean> {
   return !!data;
 }
 
-// Crear una nueva mesa
+// Crear una nueva mesa (sistema unificado)
 export async function createTable(
   actor: Actor,
   body: CreateTableBody,
-  photoFile: Express.Multer.File,
-  qrFile: Express.Multer.File,
+  images: UploadImage[],
   createdBy: string,
 ): Promise<Table> {
   // Verificar permisos
@@ -352,8 +369,10 @@ export async function createTable(
     throw new Error("La capacidad debe ser mayor a 0");
   }
 
-  if (!photoFile || !qrFile) {
-    throw new Error("Se requieren ambas imágenes: foto de la mesa y código QR");
+  if (!images || images.length !== 2) {
+    throw new Error(
+      "Se requieren exactamente 2 imágenes: foto de la mesa y código QR",
+    );
   }
 
   // Verificar que el número de mesa no esté en uso
@@ -372,6 +391,8 @@ export async function createTable(
       created_by: createdBy,
       photo_url: "", // Temporal
       qr_url: "", // Temporal
+      is_occupied: false,
+      id_client: null,
     })
     .select()
     .single();
@@ -381,10 +402,19 @@ export async function createTable(
   }
 
   try {
+    // Identificar las imágenes (por fieldname o por posición)
+    const photoImage =
+      images.find(img => img.fieldname === "photo") || images[0];
+    const qrImage = images.find(img => img.fieldname === "qr") || images[1];
+
+    if (!photoImage || !qrImage) {
+      throw new Error("No se pudieron identificar ambas imágenes (photo y qr)");
+    }
+
     // Subir las imágenes
     const [photoUrl, qrUrl] = await Promise.all([
-      uploadTableImage(tableData.id, photoFile, "photo"),
-      uploadTableImage(tableData.id, qrFile, "qr"),
+      uploadTableImage(tableData.id, photoImage, "photo"),
+      uploadTableImage(tableData.id, qrImage, "qr"),
     ]);
 
     // Actualizar las URLs de las imágenes
@@ -412,13 +442,12 @@ export async function createTable(
   }
 }
 
-// Actualizar una mesa
+// Actualizar una mesa (sistema unificado)
 export async function updateTable(
   actor: Actor,
   id: string,
   body: Partial<CreateTableBody>,
-  photoFile?: Express.Multer.File,
-  qrFile?: Express.Multer.File,
+  images?: UploadImage[],
 ): Promise<Table> {
   // Verificar permisos
   if (!["dueno", "supervisor"].includes(actor.profile_code)) {
@@ -455,12 +484,19 @@ export async function updateTable(
   if (body.type !== undefined) updateData.type = body.type;
 
   // Subir nuevas imágenes si se proporcionan
-  if (photoFile) {
-    updateData.photo_url = await uploadTableImage(id, photoFile, "photo");
-  }
+  if (images && images.length > 0) {
+    // Buscar la imagen de foto (por fieldname o posición)
+    const photoImage =
+      images.find(img => img.fieldname === "photo") || images[0];
+    if (photoImage) {
+      updateData.photo_url = await uploadTableImage(id, photoImage, "photo");
+    }
 
-  if (qrFile) {
-    updateData.qr_url = await uploadTableImage(id, qrFile, "qr");
+    // Buscar la imagen QR (por fieldname o posición)
+    const qrImage = images.find(img => img.fieldname === "qr") || images[1];
+    if (qrImage) {
+      updateData.qr_url = await uploadTableImage(id, qrImage, "qr");
+    }
   }
 
   // Actualizar la mesa

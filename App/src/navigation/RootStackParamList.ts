@@ -7,4 +7,11 @@ export type RootStackParamList = {
   CreateMenuItem: { initialCategory?: "plato" | "bebida" } | undefined;
   AddStaff: { userRole: "dueno" | "supervisor" };
   Clients: undefined; // Agregamos la ruta Clients
+  CreateTable: undefined; // Nueva ruta para crear mesas
+  ManageWaitingList: undefined; // Nueva ruta para gestionar lista de espera
+  GenerateWaitingListQR: undefined; // Generar QR para maitre
+  ScanQR: undefined; // Escanear QR para clientes
+  JoinWaitingList: { qrData: any }; // Formulario con datos del QR
+  MyWaitingPosition: undefined; // Ver posición en lista de espera
+  ScanTableQR: undefined; // Escanear QR de mesa para confirmar llegada
 };
