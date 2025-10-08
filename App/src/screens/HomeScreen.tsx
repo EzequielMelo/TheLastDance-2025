@@ -11,7 +11,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
 import { AuthContext } from "../auth/AuthContext";
 import api from "../api/axios";
-import { LogOut, Table, Users, QrCode, Camera } from "lucide-react-native";
+import { LogOut, Users, QrCode, User as UserIcon } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User";
 import ClientFlowNavigation from "../components/navigation/ClientFlowNavigation";
@@ -47,6 +47,40 @@ export default function HomeScreen({ navigation }: Props) {
     await logout();
   };
 
+  const getProfileLabel = (profileCode: string, positionCode?: string) => {
+    const profileLabels: { [key: string]: string } = {
+      dueno: "Dueño",
+      supervisor: "Supervisor",
+      empleado: "Empleado",
+      cliente_registrado: "Cliente Registrado",
+      cliente_anonimo: "Cliente Anónimo",
+    };
+
+    const positionLabels: { [key: string]: string } = {
+      cocinero: "Cocinero",
+      bartender: "Bartender", 
+      maitre: "Maître",
+      mozo: "Mozo",
+    };
+
+    let label = profileLabels[profileCode] || profileCode;
+    if (positionCode && positionLabels[positionCode]) {
+      label += ` - ${positionLabels[positionCode]}`;
+    }
+    return label;
+  };
+
+  const getProfileColor = (profileCode: string) => {
+    const colors: { [key: string]: string } = {
+      dueno: "#430fa6", // aura
+      supervisor: "#ea580c", // naranja
+      empleado: "#2563eb", // azul
+      cliente_registrado: "#16a34a", // verde
+      cliente_anonimo: "#6b7280", // gris
+    };
+    return colors[profileCode] || "#6b7280";
+  };
+
   const goCreate = (initialCategory: "plato" | "bebida") => {
     navigation.navigate("CreateMenuItem", { initialCategory });
   };
@@ -73,6 +107,9 @@ export default function HomeScreen({ navigation }: Props) {
     newStaff: require("../../assets/new-staff.png"),
     churrasco: require("../../assets/churrasco.png"),
     fernet: require("../../assets/fernet.png"),
+    mesa: require("../../assets/mesa-circular.png"),
+    user_pending: require("../../assets/user-pending.png"),
+    mozo: require("../../assets/mozo.png"),
   };
 
   return (
@@ -81,16 +118,60 @@ export default function HomeScreen({ navigation }: Props) {
       className="flex-1"
     >
       <View className="px-6 pt-14 pb-8 flex-1">
-        {/* Header */}
-        <View className="mb-8">
-          <Text className="text-white text-2xl font-light">
-            ¡Hola{user?.first_name ? `, ${user.first_name}` : ""}!
-          </Text>
-          <Text className="text-gray-400 mt-1">
-            {user?.position_code
-              ? `Estás logueado como ${user.position_code}`
-              : "Bienvenido a Last Dance"}
-          </Text>
+        {/* User Profile Card */}
+        <View className="mt-10 mb-8">
+          <LinearGradient
+            colors={["rgba(255,255,255,0.1)", "rgba(255,255,255,0.05)"]}
+            className="rounded-2xl p-4"
+            style={{
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.1)",
+            }}
+          >
+            <View className="flex-row items-center">
+              {/* Profile Image */}
+              <View className="relative">
+                {user?.photo_url ? (
+                  <Image
+                    source={{ uri: user.photo_url }}
+                    className="w-16 h-16 rounded-full"
+                    style={{ resizeMode: "cover" }}
+                  />
+                ) : (
+                  <View className="w-16 h-16 rounded-full bg-gray-600 items-center justify-center">
+                    <UserIcon size={32} color="#d1d5db" />
+                  </View>
+                )}
+                {/* Status Indicator */}
+                <View 
+                  className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-[#1a1a1a]"
+                  style={{ backgroundColor: getProfileColor(user?.profile_code || "") }}
+                />
+              </View>
+
+              {/* User Info */}
+              <View className="ml-4 flex-1">
+                <Text className="text-white text-lg font-semibold">
+                  {user?.first_name} {user?.last_name}
+                </Text>
+                <View className="flex-row items-center mt-1">
+                  <View 
+                    className="px-2 py-1 rounded-md"
+                    style={{ backgroundColor: getProfileColor(user?.profile_code || "") }}
+                  >
+                    <Text className="text-white text-xs font-medium">
+                      {getProfileLabel(user?.profile_code || "", user?.position_code || undefined)}
+                    </Text>
+                  </View>
+                </View>
+                {user?.email && (
+                  <Text className="text-gray-400 text-sm mt-1">
+                    {user.email}
+                  </Text>
+                )}
+              </View>
+            </View>
+          </LinearGradient>
         </View>
 
         {/* Acciones por rol */}
@@ -157,7 +238,7 @@ export default function HomeScreen({ navigation }: Props) {
               title="Crear mesa"
               subtitle="Agregá una nueva mesa al restaurante"
               onPress={() => navigation.navigate("CreateTable")}
-              icon={<Table size={26} color="#1a1a1a" />}
+              icon={<Image source={IMGS.mesa} style={{ width: 26, height: 26 }} />}
             />
           )}
 
@@ -183,7 +264,7 @@ export default function HomeScreen({ navigation }: Props) {
               title="Panel del Mesero"
               subtitle="Gestioná tus mesas asignadas (máximo 3)"
               onPress={() => navigation.navigate("WaiterDashboard")}
-              icon={<Table size={26} color="#1a1a1a" />}
+              icon={<Image source={IMGS.mesa} style={{ width: 26, height: 26 }} />}
             />
           )}
 
@@ -195,13 +276,13 @@ export default function HomeScreen({ navigation }: Props) {
                 title="Gestionar Usuarios Pendientes"
                 subtitle="Administrá usuarios y solicitudes pendientes"
                 onPress={() => navigation.navigate("Clients")}
-                icon={<Users size={26} color="#1a1a1a" />}
+                icon={<Image source={IMGS.user_pending} style={{ width: 26, height: 26 }} />}
               />
               <ActionTile
                 title="Gestión de Meseros"
                 subtitle="Ver y supervisar meseros y sus mesas asignadas"
                 onPress={() => navigation.navigate("AllWaiters")}
-                icon={<Users size={26} color="#1a1a1a" />}
+                icon={<Image source={IMGS.mozo} style={{ width: 26, height: 26 }} />}
               />
             </>
           )}

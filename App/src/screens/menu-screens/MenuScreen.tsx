@@ -1,34 +1,20 @@
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  ActivityIndicator,
-  Alert,
-  RefreshControl,
-  Dimensions,
-} from "react-native";
+import {View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, RefreshControl, Dimensions} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { RouteProp } from "@react-navigation/native";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
-import {
-  ChefHat,
-  Coffee,
-  Clock,
-  DollarSign,
-  ArrowLeft,
-  Utensils,
-  Filter,
-  RefreshCw,
-} from "lucide-react-native";
+import {ChefHat, Coffee, Clock, ArrowLeft, Utensils, Filter, RefreshCw, Plus, Minus} from "lucide-react-native";
 import api from "../../api/axios";
+import { useCart } from "../../context/CartContext";
+import FloatingCart from "../../components/cart/FloatingCart";
+import CartModal from "../../components/cart/CartModal";
 
 const { width } = Dimensions.get("window");
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type MenuScreenRouteProp = RouteProp<RootStackParamList, "Menu">;
 
 interface MenuItemImage {
   id: string;
@@ -54,10 +40,16 @@ interface MenuItem {
 
 export default function MenuScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<MenuScreenRouteProp>();
+  const { pendingCount, addItem, updateQuantity, getItemQuantity } = useCart();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<"all" | "plato" | "bebida">("all");
+  const [cartModalVisible, setCartModalVisible] = useState(false);
+
+  // Obtener tableId de los parámetros de ruta
+  const tableId = route.params?.tableId;
 
   useEffect(() => {
     loadMenuItems();
@@ -86,6 +78,21 @@ export default function MenuScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     loadMenuItems();
+  };
+
+  const handleAddToCart = (item: MenuItem) => {
+    addItem({
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      prepMinutes: item.prepMinutes,
+      category: item.category,
+      image_url: item.menu_item_images?.[0]?.image_url,
+    });
+  };
+
+  const handleQuantityChange = (itemId: string, newQuantity: number) => {
+    updateQuantity(itemId, newQuantity);
   };
 
   const formatPrice = (price: number) => {
@@ -219,7 +226,10 @@ export default function MenuScreen() {
       {/* Menu Items */}
       <ScrollView 
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}
+        contentContainerStyle={{ 
+          paddingHorizontal: 24, 
+          paddingBottom: pendingCount > 0 ? 120 : 24 // Más espacio cuando hay items en el carrito
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -379,23 +389,87 @@ export default function MenuScreen() {
                       {item.description}
                     </Text>
 
-                    {/* Footer with prep time */}
+                    {/* Footer with prep time and cart controls */}
                     <View style={{
                       flexDirection: "row",
                       alignItems: "center",
+                      justifyContent: "space-between",
                       paddingTop: 12,
                       borderTopWidth: 1,
                       borderTopColor: "rgba(255,255,255,0.1)",
                     }}>
-                      <Clock size={16} color="#d4af37" />
-                      <Text style={{
-                        color: "#d4af37",
-                        fontSize: 14,
-                        fontWeight: "500",
-                        marginLeft: 6,
-                      }}>
-                        Tiempo estimado: {item.prepMinutes} min
-                      </Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                        <Clock size={16} color="#d4af37" />
+                        <Text style={{
+                          color: "#d4af37",
+                          fontSize: 14,
+                          fontWeight: "500",
+                          marginLeft: 6,
+                        }}>
+                          {item.prepMinutes} min
+                        </Text>
+                      </View>
+
+                      {/* Add to cart controls */}
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        {getItemQuantity(item.id) > 0 ? (
+                          <View style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            backgroundColor: "#d4af37",
+                            borderRadius: 8,
+                            paddingHorizontal: 4,
+                          }}>
+                            <TouchableOpacity
+                              onPress={() => handleQuantityChange(item.id, getItemQuantity(item.id) - 1)}
+                              style={{
+                                padding: 8,
+                              }}
+                            >
+                              <Minus size={16} color="#1a1a1a" />
+                            </TouchableOpacity>
+                            
+                            <Text style={{
+                              color: "#1a1a1a",
+                              fontWeight: "600",
+                              fontSize: 16,
+                              marginHorizontal: 12,
+                            }}>
+                              {getItemQuantity(item.id)}
+                            </Text>
+                            
+                            <TouchableOpacity
+                              onPress={() => handleQuantityChange(item.id, getItemQuantity(item.id) + 1)}
+                              style={{
+                                padding: 8,
+                              }}
+                            >
+                              <Plus size={16} color="#1a1a1a" />
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            onPress={() => handleAddToCart(item)}
+                            style={{
+                              backgroundColor: "#d4af37",
+                              borderRadius: 8,
+                              paddingHorizontal: 16,
+                              paddingVertical: 8,
+                              flexDirection: "row",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Plus size={16} color="#1a1a1a" />
+                            <Text style={{
+                              color: "#1a1a1a",
+                              fontWeight: "600",
+                              marginLeft: 4,
+                            }}>
+                              Agregar
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
                     </View>
                   </View>
                 </View>
@@ -404,6 +478,16 @@ export default function MenuScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Floating Cart Component */}
+      <FloatingCart onPress={() => setCartModalVisible(true)} />
+
+      {/* Cart Modal Component */}
+      <CartModal
+        visible={cartModalVisible}
+        onClose={() => setCartModalVisible(false)}
+        tableId={tableId}
+      />
     </LinearGradient>
   );
 }

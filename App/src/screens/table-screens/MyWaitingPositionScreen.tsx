@@ -154,12 +154,9 @@ export default function MyWaitingPositionScreen() {
                 return;
               }
 
-              console.log("Cancelando reserva con ID:", myEntry.id);
-
               // Llamar al endpoint para cancelar la reserva
               await api.put(`/tables/waiting-list/${myEntry.id}/cancel`, {});
 
-              console.log("Reserva cancelada exitosamente");
               ToastAndroid.show(
                 "Reserva cancelada exitosamente",
                 ToastAndroid.SHORT,

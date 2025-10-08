@@ -16,7 +16,7 @@ export type RootStackParamList = {
   JoinWaitingList: { qrData?: any }; // Formulario con datos del QR
   MyWaitingPosition: undefined; // Ver posición en lista de espera
   ScanTableQR: undefined; // Escanear QR de mesa para confirmar llegada
-  Menu: undefined; // Menú para clientes
+  Menu: { tableId?: string } | undefined; // Menú para clientes
   WaiterDashboard: undefined; // Panel del mesero
   AllWaiters: undefined; // Gestión de meseros (admin/supervisor)
   TableChat: { tableId: string }; // Chat entre cliente y mesero

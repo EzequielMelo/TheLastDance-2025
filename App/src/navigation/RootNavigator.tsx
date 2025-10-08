@@ -19,6 +19,7 @@ import ScanTableQRScreen from "../screens/table-screens/ScanTableQRScreen";
 import JoinWaitingListScreen from "../screens/table-screens/JoinWaitingListScreen";
 import MyWaitingPositionScreen from "../screens/table-screens/MyWaitingPositionScreen";
 import MenuScreen from "../screens/menu-screens/MenuScreen";
+import { CartProvider } from "../context/CartContext";
 import WaiterDashboardScreen from "../screens/waiter-screens/WaiterDashboardScreen";
 import AllWaitersScreen from "../screens/admin-screens/AllWaitersScreen";
 import TableChatScreen from "../screens/chat/TableChatScreen";
@@ -36,16 +37,6 @@ function NavigatorContent() {
       return () => clearTimeout(timer);
     }
   }, [isLoading]);
-
-  // Debug: mostrar estado
-  console.log(
-    "RootNavigator - isLoading:",
-    isLoading,
-    "token:",
-    !!token,
-    "showSplash:",
-    showSplash,
-  );
 
   if (showSplash || isLoading) {
     return <SplashScreen />;
@@ -167,7 +158,9 @@ function NavigatorContent() {
 export default function RootNavigator() {
   return (
     <NavigationContainer>
-      <NavigatorContent />
+      <CartProvider>
+        <NavigatorContent />
+      </CartProvider>
     </NavigationContainer>
   );
 }

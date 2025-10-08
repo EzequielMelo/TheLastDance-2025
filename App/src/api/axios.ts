@@ -22,10 +22,6 @@ api.interceptors.request.use(
       config.headers["Content-Type"] = "application/json";
     }
 
-    console.log(
-      `${config.method?.toUpperCase()} ${config.url} - ${config.data instanceof FormData ? "FormData" : "JSON"}`,
-    );
-
     return config;
   },
   error => Promise.reject(error),
@@ -34,9 +30,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   response => response,
   error => {
-    if (__DEV__) {
-      console.log(
-        `Error: ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.response?.status}`,
+    // Solo mostrar errores en desarrollo si son críticos
+    if (__DEV__ && error.response?.status >= 500) {
+      console.error(
+        `Server Error: ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.response?.status}`,
       );
     }
     return Promise.reject(error);

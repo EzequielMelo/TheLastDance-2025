@@ -13,6 +13,7 @@ import authRoutes from "./auth/authRoutes";
 import menuRoutes from "./modules/menu/menuRoutes";
 import adminRoutes from "./modules/admin/adminRoutes";
 import tablesRoutes from "./modules/tables/tablesRoutes";
+import ordersRoutes from "./modules/orders/ordersRoutes";
 import waiterRoutes from "./modules/waiter/waiterRoutes";
 import chatRoutes from "./modules/chat/chatRoutes";
 
@@ -153,11 +154,11 @@ app.use("/api/auth", authRoutes);
 app.use("/api/menu", menuRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/tables", tablesRoutes);
+app.use("/api/orders", ordersRoutes);
 app.use("/api/waiter", waiterRoutes);
 app.use("/api/chat", chatRoutes);
 /*
 app.use("/api/users", userRoutes);
-app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
 */
 

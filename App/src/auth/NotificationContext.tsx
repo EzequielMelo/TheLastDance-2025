@@ -44,14 +44,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   };
 
   const setupNotifications = async () => {
-    console.log('🔧 Setting up notifications...');
-    
     try {
       // Configurar canal de notificaciones para Android
       await NotificationService.setupNotificationChannel();
       
       // SIEMPRE intentar obtener token REAL primero
-      console.log('🎯 Attempting to get REAL push token...');
       let token = await NotificationService.registerForPushNotifications();
       
       if (token) {
