@@ -37,16 +37,6 @@ function NavigatorContent() {
     }
   }, [isLoading]);
 
-  // Debug: mostrar estado
-  console.log(
-    "RootNavigator - isLoading:",
-    isLoading,
-    "token:",
-    !!token,
-    "showSplash:",
-    showSplash,
-  );
-
   if (showSplash || isLoading) {
     return <SplashScreen />;
   }

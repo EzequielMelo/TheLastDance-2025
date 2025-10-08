@@ -158,7 +158,10 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                     { text: "Cancelar", style: "cancel" },
                     {
                       text: "Llamar",
-                      onPress: () => console.log("Llamar mozo"),
+                      onPress: () => {
+                        // TODO: Implementar notificación al mozo
+                        Alert.alert("Enviado", "El mozo ha sido notificado");
+                      },
                     },
                   ]);
                 }}

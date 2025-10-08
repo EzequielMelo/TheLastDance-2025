@@ -32,7 +32,6 @@ export default function ScanTableQRScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<NavigationProp>();
 
-  console.log("ScanTableQRScreen - navigation available:", !!navigation);
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -82,8 +81,6 @@ export default function ScanTableQRScreen() {
     setProcessing(true);
 
     try {
-      console.log("Scanned QR data:", data);
-
       // Por ahora, vamos a simular que el QR contiene el ID de la mesa
       // En el futuro, esto será un deeplink como: thelastdance://table/{tableId}
       let tableId: string;
@@ -105,8 +102,6 @@ export default function ScanTableQRScreen() {
         );
         return;
       }
-
-      console.log("Extracted table ID:", tableId);
 
       // Llamar al endpoint para activar la mesa
       const response = await api.post(`/tables/${tableId}/activate`);

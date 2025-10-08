@@ -109,6 +109,7 @@ export default function HomeScreen({ navigation }: Props) {
     fernet: require("../../assets/fernet.png"),
     mesa: require("../../assets/mesa-circular.png"),
     user_pending: require("../../assets/user-pending.png"),
+    mozo: require("../../assets/mozo.png"),
   };
 
   return (
@@ -263,7 +264,7 @@ export default function HomeScreen({ navigation }: Props) {
               title="Panel del Mesero"
               subtitle="Gestioná tus mesas asignadas (máximo 3)"
               onPress={() => navigation.navigate("WaiterDashboard")}
-              icon={<Table size={26} color="#1a1a1a" />}
+              icon={<Image source={IMGS.mesa} style={{ width: 26, height: 26 }} />}
             />
           )}
 
@@ -281,7 +282,7 @@ export default function HomeScreen({ navigation }: Props) {
                 title="Gestión de Meseros"
                 subtitle="Ver y supervisar meseros y sus mesas asignadas"
                 onPress={() => navigation.navigate("AllWaiters")}
-                icon={<Users size={26} color="#1a1a1a" />}
+                icon={<Image source={IMGS.mozo} style={{ width: 26, height: 26 }} />}
               />
             </>
           )}

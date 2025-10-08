@@ -165,7 +165,6 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
     data: string,
   ): { dni?: string; firstName?: string; lastName?: string } => {
     try {
-      console.log("Datos escaneados:", data);
       const fields = data.split("@");
 
       let dni = "";
@@ -187,8 +186,6 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
           dni = dniMatch[1];
         }
       }
-
-      console.log("Campos separados:", fields);
 
       if (fields.length >= 5) {
         lastName = fields[1]?.trim() || "";
@@ -232,7 +229,6 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
       if (firstName && firstName.length > 1) result.firstName = firstName;
       if (lastName && lastName.length > 1) result.lastName = lastName;
 
-      console.log("Datos extraídos:", result);
       return result;
     } catch (error) {
       console.error("Error parseando datos del DNI:", error);
@@ -412,24 +408,12 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
         formDataToSend.append("file", formData.file as any);
       }
 
-      console.log('Enviando datos del staff:', {
-        first_name: formData.first_name.trim(),
-        last_name: formData.last_name.trim(),
-        email: formData.email.trim(),
-        dni: formData.dni.trim(),
-        cuil: formData.cuil.trim(),
-        profile_code: formData.profile_code,
-        position_code: formData.profile_code === "empleado" ? formData.position_code : null,
-        hasFile: !!formData.file
-      });
-
       const response = await api.post('/admin/users/staff', formDataToSend, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
       
-      console.log('Respuesta del servidor:', response.data);
       ToastAndroid.show("¡Staff creado exitosamente!", ToastAndroid.LONG);
       navigation.goBack();
     } catch (error: any) {

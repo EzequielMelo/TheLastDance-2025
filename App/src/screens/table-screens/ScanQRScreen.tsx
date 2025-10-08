@@ -29,8 +29,6 @@ export default function ScanQRScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<NavigationProp>();
 
-  // Debug: verificar que la navegación esté disponible
-  console.log("ScanQRScreen - navigation available:", !!navigation);
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -72,8 +70,6 @@ export default function ScanQRScreen() {
       }
 
       const qrData = JSON.parse(atob(encodedData));
-
-      console.log("QR Data parsed:", qrData);
 
       // Verificar la acción
       if (qrData.action !== "join_waiting_list") {

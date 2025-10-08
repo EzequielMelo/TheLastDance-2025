@@ -59,7 +59,6 @@ export const useAuthActions = () => {
     } catch (err) {
       const error = err as Error;
       const errorMessage = error.message || "Error al registrarse";
-      console.log("Register error:", error);
       setActionError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {

@@ -85,8 +85,6 @@ export default function CartModal({ visible, onClose, tableId }: CartModalProps)
         quantity: item.quantity,
         image_url: item.image_url,
       }));
-
-      console.log("Enviando pedido:", orderData);
       
       const response = await api.post('/orders', {
         table_id: tableId,
