@@ -11,6 +11,7 @@ import authRoutes from "./auth/authRoutes";
 import menuRoutes from "./modules/menu/menuRoutes";
 import adminRoutes from "./modules/admin/adminRoutes";
 import tablesRoutes from "./modules/tables/tablesRoutes";
+import waiterRoutes from "./modules/waiter/waiterRoutes";
 
 const app = express();
 const PORT = parseInt(process.env["PORT"] || "3000", 10);
@@ -105,6 +106,7 @@ app.get("/", (_req, res) => {
           <div class="endpoint">GET /api/tables/* - Gestión de mesas</div>
           <div class="endpoint">GET /api/menu/* - Menú del restaurante</div>
           <div class="endpoint">GET /api/admin/* - Panel administrativo</div>
+          <div class="endpoint">GET /api/waiter/* - Gestión de meseros</div>
         </div>
         
         <p class="info">
@@ -148,6 +150,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/menu", menuRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/tables", tablesRoutes);
+app.use("/api/waiter", waiterRoutes);
 /*
 app.use("/api/users", userRoutes);
 app.use("/api/orders", orderRoutes);

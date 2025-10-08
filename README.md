@@ -38,8 +38,6 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
 <!-- ==================== EZEQUIEL ==================== -->
 <h3 id="seccion-ezequiel-melo">Ezequiel Melo (Líder)</h3>
 
-<p><em>Rol:</em> Coordinación, definición de alcance, asignaciones, revisiones.</p>
-
 <details open>
   <summary>Lista de tareas</summary>
 
@@ -50,6 +48,10 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
     <li>[x] SplashScreen animado</li>
     <li>[x] Autenticacion en backend completo</li>
     <li>[x] Listado de usuarios en estado pendiente desde usuario Dueño</li>
+    <li>[x] Deploy del backend en Render</li>
+    <li>[x] Sistema de Mesas y listas de espera</li>
+    <li>[ ] Chat cliente - mecero</li>
+    <li>[ ] Sistema de meceros - </li>
   </ul>
 </details>
 
@@ -58,14 +60,14 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
 <!-- ==================== MAXIMO ==================== -->
 <h3 id="seccion-maximo-pasqui">Máximo Pasqui</h3>
 
-<p><em>Rol:</em> Frontend / UI.</p>
-
 <details open>
   <summary>Lista de tareas</summary>
   <ul>
     <li>[x] Login funcional completo</li>
     <li>[x] Registro de usuario completo</li>
     <li>[x] Version preliminar del SplashScreen</li>
+    <li>[ ] Creacion de juegos</li>
+    <li>[ ] Sistema de descuentos asociado a los juegos</li>
   </ul>
 </details>
 
@@ -73,8 +75,6 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
 
 <!-- ==================== JUAN PABLO ==================== -->
 <h3 id="seccion-juan-pablo-cortez">Juan Pablo Cortez</h3>
-
-<p><em>Rol:</em> Backend / Infra.</p>
 
 <details open>
   <summary>Lista de tareas</summary>
@@ -85,6 +85,9 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
     <li>[x] Mail de la compañia</li>
     <li>[x] Envios de mail notifando estado de cuenta</li>
     <li>[x] Formulario para crear empleados/supervisores con lectura QR y Camara de fotos.</li>
+    <li>[x] Visualizacion del menu en los clientes</li>
+    <li>[x] Push notifications</li>
+    <li>[ ] Creacion de pedidos</li>
   </ul>
 </details>
 

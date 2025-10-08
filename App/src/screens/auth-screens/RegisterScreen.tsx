@@ -19,6 +19,7 @@ import { useAuthActions } from "../../auth/useAuthActions";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import React, { useState, useRef } from "react";
+import { Logger } from "../../utils/Logger";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Registro">;
 
@@ -37,7 +38,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
     data: string,
   ): { dni?: string; firstName?: string; lastName?: string } => {
     try {
-      console.log("Datos escaneados:", data); // Para debug
+      Logger.debug("Datos escaneados:", data);
 
       // El formato típico del PDF417 del DNI argentino puede tener diferentes estructuras
       const fields = data.split("@");
@@ -73,7 +74,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
       // fields[3]: sexo (M/F)
       // fields[4]: DNI
 
-      console.log("Campos separados:", fields); // Para debug
+      Logger.debug("Campos separados:", fields);
 
       if (fields.length >= 5) {
         // Extraer datos según la estructura conocida
@@ -130,11 +131,11 @@ export const RegisterScreen = ({ navigation }: Props) => {
       if (firstName && firstName.length > 1) result.firstName = firstName;
       if (lastName && lastName.length > 1) result.lastName = lastName;
 
-      console.log("Datos extraídos:", result); // Para debug
+      Logger.debug("Datos extraídos:", result);
 
       return result;
     } catch (error) {
-      console.error("Error parseando datos del DNI:", error);
+      Logger.error("Error parseando datos del DNI:", error);
       return {};
     }
   };
@@ -199,7 +200,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
         setShowCamera(false);
         setCameraMode(null);
       } catch (error) {
-        console.error("Error tomando la foto:", error);
+        Logger.error("Error tomando la foto:", error);
         ToastAndroid.show("Error al tomar la foto", ToastAndroid.SHORT);
       }
     }
@@ -207,11 +208,12 @@ export const RegisterScreen = ({ navigation }: Props) => {
 
   const pickImageFromGallery = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         ToastAndroid.show(
           "Se necesita permiso para acceder a la galería",
-          ToastAndroid.SHORT
+          ToastAndroid.SHORT,
         );
         return;
       }
@@ -230,10 +232,13 @@ export const RegisterScreen = ({ navigation }: Props) => {
           name: "photo.jpg",
         };
         handleInputChange("file", photoFile);
-        ToastAndroid.show("Foto seleccionada correctamente", ToastAndroid.SHORT);
+        ToastAndroid.show(
+          "Foto seleccionada correctamente",
+          ToastAndroid.SHORT,
+        );
       }
     } catch (error) {
-      console.error("Error seleccionando imagen:", error);
+      Logger.error("Error seleccionando imagen:", error);
       ToastAndroid.show("Error al seleccionar imagen", ToastAndroid.SHORT);
     }
   };
