@@ -17,6 +17,8 @@ export type RootStackParamList = {
   MyWaitingPosition: undefined; // Ver posición en lista de espera
   ScanTableQR: undefined; // Escanear QR de mesa para confirmar llegada
   Menu: { tableId?: string } | undefined; // Menú para clientes
+  WaiterDashboard: undefined; // Panel del mesero
+  AllWaiters: undefined; // Gestión de meseros (admin/supervisor)
 };
 
 export type RootStackNavigationProp = StackNavigationProp<RootStackParamList>;

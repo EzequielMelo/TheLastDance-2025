@@ -96,11 +96,13 @@ export default function HomeScreen({ navigation }: Props) {
   const isCocinero = user?.position_code === "cocinero";
   const isBartender = user?.position_code === "bartender";
   const isMaitre = user?.position_code === "maitre";
+  const isMozo = user?.position_code === "mozo";
   const isDueno = user?.profile_code === "dueno";
   const isSupervisor = user?.profile_code === "supervisor";
   const isCliente =
     user?.profile_code === "cliente_registrado" ||
     user?.profile_code === "cliente_anonimo";
+
   const IMGS = {
     newStaff: require("../../assets/new-staff.png"),
     churrasco: require("../../assets/churrasco.png"),
@@ -230,7 +232,7 @@ export default function HomeScreen({ navigation }: Props) {
             />
           )}
 
-          {((isDueno || isSupervisor) ) && (
+          {(isDueno || isSupervisor) && (
             <ActionTile
               title="Crear mesa"
               subtitle="Agregá una nueva mesa al restaurante"
@@ -256,15 +258,32 @@ export default function HomeScreen({ navigation }: Props) {
             </>
           )}
 
+          {isMozo && (
+            <ActionTile
+              title="Panel del Mesero"
+              subtitle="Gestioná tus mesas asignadas (máximo 3)"
+              onPress={() => navigation.navigate("WaiterDashboard")}
+              icon={<Table size={26} color="#1a1a1a" />}
+            />
+          )}
+
           {isCliente && <ClientFlowNavigation />}
 
           {(isDueno || isSupervisor) && (
-            <ActionTile
-              title="Gestionar Usuarios Pendientes"
-              subtitle="Administrá usuarios y solicitudes pendientes"
-              onPress={() => navigation.navigate("Clients")}
-              icon={<Image source={IMGS.user_pending} style={{ width: 26, height: 26 }} />}
-            />
+            <>
+              <ActionTile
+                title="Gestionar Usuarios Pendientes"
+                subtitle="Administrá usuarios y solicitudes pendientes"
+                onPress={() => navigation.navigate("Clients")}
+                icon={<Image source={IMGS.user_pending} style={{ width: 26, height: 26 }} />}
+              />
+              <ActionTile
+                title="Gestión de Meseros"
+                subtitle="Ver y supervisar meseros y sus mesas asignadas"
+                onPress={() => navigation.navigate("AllWaiters")}
+                icon={<Users size={26} color="#1a1a1a" />}
+              />
+            </>
           )}
         </View>
 

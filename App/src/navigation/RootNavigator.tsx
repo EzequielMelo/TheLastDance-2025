@@ -20,6 +20,8 @@ import JoinWaitingListScreen from "../screens/table-screens/JoinWaitingListScree
 import MyWaitingPositionScreen from "../screens/table-screens/MyWaitingPositionScreen";
 import MenuScreen from "../screens/menu-screens/MenuScreen";
 import { CartProvider } from "../context/CartContext";
+import WaiterDashboardScreen from "../screens/waiter-screens/WaiterDashboardScreen";
+import AllWaitersScreen from "../screens/admin-screens/AllWaitersScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -122,6 +124,16 @@ function NavigatorContent() {
             name="Menu"
             component={MenuScreen}
             options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="WaiterDashboard"
+            component={WaiterDashboardScreen}
+            options={{ title: "Panel del Mesero", headerBackTitle: "Volver" }}
+          />
+          <Stack.Screen
+            name="AllWaiters"
+            component={AllWaitersScreen}
+            options={{ title: "Gestión de Meseros", headerBackTitle: "Volver" }}
           />
         </>
       ) : (

@@ -25,6 +25,7 @@ import { captureRef } from "react-native-view-shot";
 import FormLayout from "../../Layouts/formLayout";
 import api from "../../api/axios";
 import { useAuth } from "../../auth/AuthContext";
+import { Logger } from "../../utils/Logger";
 
 type ImageSlot = { uri: string; name: string; type: string } | null;
 
@@ -41,10 +42,8 @@ export default function CreateTableScreen({ navigation }: any) {
   const [showCamera, setShowCamera] = useState(false);
   const [facing, setFacing] = useState<CameraType>("back");
   const [qrGenerated, setQrGenerated] = useState(false);
-  const [debugQR, setDebugQR] = useState(false); // Para debug
   const [qrMounted, setQrMounted] = useState(false);
   const qrRef = useRef<View>(null);
-  const debugQrRef = useRef<View>(null);
 
   // Solo dueño y supervisor pueden crear mesas
   const canCreate =
@@ -72,12 +71,12 @@ export default function CreateTableScreen({ navigation }: any) {
     source: string,
   ) => {
     if (!ref.current) {
-      console.log(`${source} QR ref no disponible`);
+      Logger.warn(`${source} QR ref no disponible`);
       return null;
     }
 
     try {
-      console.log(`Capturando QR desde ${source}...`);
+      Logger.debug(`Capturando QR desde ${source}...`);
 
       const uri = await captureRef(ref.current, {
         format: "png",
@@ -87,10 +86,10 @@ export default function CreateTableScreen({ navigation }: any) {
         width: 400,
       });
 
-      console.log(`QR capturado desde ${source}:`, uri);
+      Logger.info(`QR capturado desde ${source}:`, uri);
       return uri;
     } catch (error) {
-      console.error(`Error capturando QR desde ${source}:`, error);
+      Logger.error(`Error capturando QR desde ${source}:`, error);
       return null;
     }
   };
@@ -195,7 +194,7 @@ export default function CreateTableScreen({ navigation }: any) {
         setShowCamera(false);
         ToastAndroid.show("Foto de la mesa capturada ✔️", ToastAndroid.SHORT);
       } catch (error) {
-        console.error("Error tomando la foto:", error);
+        Logger.error("Error tomando la foto:", error);
         ToastAndroid.show("Error al tomar la foto", ToastAndroid.SHORT);
       }
     }
@@ -338,7 +337,7 @@ export default function CreateTableScreen({ navigation }: any) {
 
       // Mostrar el ID de la mesa creada para debug
       if (result?.id) {
-        console.log("Mesa creada con ID:", result.id);
+        Logger.info("Mesa creada con ID:", result.id);
         ToastAndroid.show(
           `Mesa creada con ID: ${result.id}`,
           ToastAndroid.SHORT,
@@ -458,14 +457,11 @@ export default function CreateTableScreen({ navigation }: any) {
                     onPress={async () => {
                       ToastAndroid.show("Generando QR...", ToastAndroid.SHORT);
 
-                      // Abrir el debug QR
-                      setDebugQR(true);
-
                       // Esperar a que se renderice
                       await new Promise(resolve => setTimeout(resolve, 500));
 
                       // Capturar automáticamente
-                      const uri = await captureQRImage(debugQrRef, "debug");
+                      const uri = await captureQRImage(qrRef, "qr");
                       if (uri) {
                         const qrImage: ImageSlot = {
                           uri,
@@ -482,9 +478,6 @@ export default function CreateTableScreen({ navigation }: any) {
                           ToastAndroid.SHORT,
                         );
                       }
-
-                      // Cerrar el debug después de un momento
-                      setTimeout(() => setDebugQR(false), 1000);
                     }}
                     className="bg-green-500 px-3 py-1 rounded mr-2"
                   >
@@ -494,43 +487,6 @@ export default function CreateTableScreen({ navigation }: any) {
                   </TouchableOpacity>
                 )}
 
-                {qrGenerated && images[1] && (
-                  <TouchableOpacity
-                    onPress={() => setDebugQR(!debugQR)}
-                    className="bg-blue-500 px-3 py-1 rounded mr-2"
-                  >
-                    <Text className="text-white text-xs font-semibold">
-                      {debugQR ? "Ocultar" : "Ver QR"}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {qrGenerated && debugQR && !images[1] && (
-                  <TouchableOpacity
-                    onPress={async () => {
-                      console.log("Capturando QR manualmente...");
-                      const uri = await captureQRImage(debugQrRef, "debug");
-                      if (uri) {
-                        const qrImage: ImageSlot = {
-                          uri,
-                          name: `table_${number}_qr.png`,
-                          type: "image/png",
-                        };
-
-                        const next = [...images] as [ImageSlot, ImageSlot];
-                        next[1] = qrImage;
-                        setImages(next);
-                        ToastAndroid.show(
-                          "QR capturado para envío ✔️",
-                          ToastAndroid.SHORT,
-                        );
-                      }
-                    }}
-                    className="bg-purple-600 px-2 py-1 rounded mr-1"
-                  >
-                    <Text className="text-white text-xs">Ver</Text>
-                  </TouchableOpacity>
-                )}
                 {qrGenerated && <CheckCircle size={12} color="#22c55e" />}
               </View>
             </View>
@@ -574,76 +530,6 @@ export default function CreateTableScreen({ navigation }: any) {
               enableLinearGradient={false}
             />
           </View>
-        </View>
-      )}
-
-      {/* QR Preview para debug */}
-      {debugQR && number && Number(number) > 0 && (
-        <View
-          style={{
-            position: "absolute",
-            left: 20,
-            top: 100,
-            width: 240,
-            height: 280,
-            zIndex: 1000,
-          }}
-        >
-          <View
-            ref={debugQrRef}
-            style={{
-              padding: 20,
-              backgroundColor: "white",
-              width: 240,
-              height: 280,
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 10,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.25,
-              shadowRadius: 3.84,
-              elevation: 5,
-            }}
-          >
-            <QRCode
-              value={generateQRContent(number)}
-              size={200}
-              color="black"
-              backgroundColor="white"
-              quietZone={10}
-              enableLinearGradient={false}
-            />
-            <Text style={{ color: "black", fontSize: 12, marginTop: 10 }}>
-              Mesa #{number}
-            </Text>
-            <Text
-              style={{
-                color: "gray",
-                fontSize: 10,
-                marginTop: 5,
-                textAlign: "center",
-              }}
-            >
-              {generateQRContent(number)}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => setDebugQR(false)}
-            style={{
-              position: "absolute",
-              top: 5,
-              right: 5,
-              backgroundColor: "red",
-              borderRadius: 15,
-              width: 30,
-              height: 30,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Text style={{ color: "white", fontWeight: "bold" }}>×</Text>
-          </TouchableOpacity>
         </View>
       )}
 
