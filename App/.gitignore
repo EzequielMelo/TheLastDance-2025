@@ -9,7 +9,16 @@ dist/
 web-build/
 expo-env.d.ts
 android/
-restaurant-push-notifications-firebase-adminsdk-fbsvc-6ba4a7314f.json
+# Archivos de configuración privados - No compartir
+restaurant-push-notifications-firebase-adminsdk-*.json
+google-services.json
+app.json
+eas.json
+src/api/config.ts
+
+# Credenciales de build
+*.keystore
+credentials.json
 
 # Native
 .kotlin/
