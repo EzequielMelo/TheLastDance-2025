@@ -5,6 +5,8 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import { createServer } from "http";
+import { setupSocketIO } from "./socket/chatSocket";
 
 // Import routes
 import authRoutes from "./auth/authRoutes";
@@ -12,6 +14,7 @@ import menuRoutes from "./modules/menu/menuRoutes";
 import adminRoutes from "./modules/admin/adminRoutes";
 import tablesRoutes from "./modules/tables/tablesRoutes";
 import waiterRoutes from "./modules/waiter/waiterRoutes";
+import chatRoutes from "./modules/chat/chatRoutes";
 
 const app = express();
 const PORT = parseInt(process.env["PORT"] || "3000", 10);
@@ -151,6 +154,7 @@ app.use("/api/menu", menuRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/tables", tablesRoutes);
 app.use("/api/waiter", waiterRoutes);
+app.use("/api/chat", chatRoutes);
 /*
 app.use("/api/users", userRoutes);
 app.use("/api/orders", orderRoutes);
@@ -184,13 +188,26 @@ app.use(
   },
 );
 
+// Create HTTP server and setup Socket.IO
+const httpServer = createServer(app);
+const io = setupSocketIO(httpServer);
+
+// Hacer io accesible para debugging (solo en desarrollo)
+if (process.env["NODE_ENV"] !== "production") {
+  app.set("socketio", io);
+}
+
 // Start server
-const server = app.listen(PORT, "0.0.0.0", () => {
+const server = httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(
     `🚀 Server running on port ${PORT} in ${process.env["NODE_ENV"] || "development"} mode`,
   );
   console.log(`📍 Health check available at http://localhost:${PORT}/health`);
+  console.log(`💬 Socket.IO chat server ready`);
 });
+
+// Make io available for other modules
+export { io };
 
 // Graceful shutdown
 const handleSignal = (sig: NodeJS.Signals) => {

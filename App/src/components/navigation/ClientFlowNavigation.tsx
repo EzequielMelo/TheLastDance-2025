@@ -152,20 +152,20 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
               >
                 <Text className="text-white font-semibold">Ver Menú</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  Alert.alert("Llamar Mozo", "¿Necesitas asistencia?", [
-                    { text: "Cancelar", style: "cancel" },
-                    {
-                      text: "Llamar",
-                      onPress: () => console.log("Llamar mozo"),
-                    },
-                  ]);
-                }}
-                className="bg-blue-600 px-6 py-3 rounded-lg"
-              >
-                <Text className="text-white font-semibold">Llamar Mozo</Text>
-              </TouchableOpacity>
+              {occupiedTable && (
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate("TableChat", {
+                      tableId: occupiedTable.id,
+                    })
+                  }
+                  className="bg-blue-600 px-6 py-3 rounded-lg"
+                >
+                  <Text className="text-white font-semibold">
+                    Chat con Mesero
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         );

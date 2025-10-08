@@ -10,9 +10,12 @@ import {
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../../auth/useAuth";
 import { API_BASE_URL } from "../../api/config";
 import { Logger } from "../../utils/Logger";
+import { useChatNotifications } from "../../Hooks/useChatNotifications";
+import { ChatNotificationBadge } from "../../components/chat/ChatNotificationBadge";
 
 interface WaiterTable {
   id: string;
@@ -37,11 +40,16 @@ interface WaiterInfo {
 
 export default function WaiterDashboardScreen() {
   const { user, token } = useAuth();
+  const navigation = useNavigation();
   const [waiterInfo, setWaiterInfo] = useState<WaiterInfo | null>(null);
   const [availableTables, setAvailableTables] = useState<WaiterTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showAvailableTables, setShowAvailableTables] = useState(false);
+
+  // Hook para notificaciones de chat
+  const { getUnreadCount, markTableAsRead, refreshNotifications } =
+    useChatNotifications();
 
   useEffect(() => {
     if (user?.position_code === "mozo") {
@@ -201,7 +209,7 @@ export default function WaiterDashboardScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadWaiterData();
+    await Promise.all([loadWaiterData(), refreshNotifications()]);
     setRefreshing(false);
   };
 
@@ -226,6 +234,24 @@ export default function WaiterDashboardScreen() {
 
       {item.id_client && (
         <Text style={styles.clientInfo}>👤 Con cliente asignado</Text>
+      )}
+
+      {item.is_occupied && item.id_client && (
+        <View style={styles.chatButtonContainer}>
+          <TouchableOpacity
+            style={styles.chatButton}
+            onPress={() => {
+              // Marcar como leído y navegar
+              markTableAsRead(item.id);
+              (navigation as any).navigate("TableChat", { tableId: item.id });
+            }}
+          >
+            <Text style={styles.chatButtonText}>💬 Chat con Cliente</Text>
+          </TouchableOpacity>
+
+          {/* Notificación de mensajes no leídos */}
+          <ChatNotificationBadge count={getUnreadCount(item.id)} size="small" />
+        </View>
       )}
 
       <TouchableOpacity
@@ -495,6 +521,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#d4af37",
     marginBottom: 8,
+  },
+  chatButtonContainer: {
+    position: "relative",
+    marginBottom: 8,
+  },
+  chatButton: {
+    backgroundColor: "#2563eb",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  chatButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
   },
   unassignButton: {
     backgroundColor: "#e53e3e",

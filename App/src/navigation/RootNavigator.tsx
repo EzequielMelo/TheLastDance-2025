@@ -21,6 +21,7 @@ import MyWaitingPositionScreen from "../screens/table-screens/MyWaitingPositionS
 import MenuScreen from "../screens/menu-screens/MenuScreen";
 import WaiterDashboardScreen from "../screens/waiter-screens/WaiterDashboardScreen";
 import AllWaitersScreen from "../screens/admin-screens/AllWaitersScreen";
+import TableChatScreen from "../screens/chat/TableChatScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -133,6 +134,11 @@ function NavigatorContent() {
             name="AllWaiters"
             component={AllWaitersScreen}
             options={{ title: "Gestión de Meseros", headerBackTitle: "Volver" }}
+          />
+          <Stack.Screen
+            name="TableChat"
+            component={TableChatScreen}
+            options={{ headerShown: false }}
           />
         </>
       ) : (
