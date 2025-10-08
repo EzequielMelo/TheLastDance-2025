@@ -92,7 +92,7 @@ export async function listMenuItems(category?: "plato" | "bebida") {
 
   const { data, error } = await q;
   if (error) throw error;
-  return (data ?? []).map(mapRowToMenuItem);
+  return (data ?? []).map(mapRowToMenuItemWithImages);
 }
 
 function mapRowToMenuItem(row: any): MenuItem {
@@ -107,6 +107,27 @@ function mapRowToMenuItem(row: any): MenuItem {
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapRowToMenuItemWithImages(row: any): MenuItem & { menu_item_images: any[] } {
+  const supabaseUrl = process.env["SUPABASE_URL"];
+  
+  return {
+    id: row.id,
+    category: row.category,
+    name: row.name,
+    description: row.description,
+    prepMinutes: row.prep_minutes,
+    price: Number(row.price),
+    createdBy: row.created_by,
+    isActive: row.is_active,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    menu_item_images: (row.menu_item_images || []).map((img: any) => ({
+      ...img,
+      image_url: `${supabaseUrl}/storage/v1/object/public/menu-images/${img.storage_path}`
+    })),
   };
 }
 

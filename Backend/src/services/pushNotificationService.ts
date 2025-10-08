@@ -181,6 +181,49 @@ export async function notifyEmployees(title: string, body: string, data?: any) {
   }
 }
 
+// Función para notificar al cliente recién registrado sobre el estado de su cuenta
+export async function notifyClientAccountCreated(clientId: string) {
+  try {
+    console.log(`Enviando notificación de cuenta creada al cliente: ${clientId}`);
+    
+    // Obtener el push token del cliente específico
+    const { data: client, error } = await supabaseAdmin
+      .from('users')
+      .select('push_token, name')
+      .eq('id', clientId)
+      .single();
+
+    if (error) {
+      console.error('Error obteniendo datos del cliente:', error);
+      return;
+    }
+
+    if (!client?.push_token) {
+      console.log('Cliente no tiene push token registrado');
+      return;
+    }
+
+    console.log(`Enviando notificación de cuenta creada a: ${client.name}`);
+
+    // Preparar datos de la notificación para el cliente
+    const notificationData: PushNotificationData = {
+      title: 'Cuenta creada exitosamente',
+      body: 'Para ingresar a la aplicación la cuenta debe ser aprobada',
+      data: {
+        type: 'account_created',
+        status: 'pending_approval',
+      },
+    };
+
+    // Enviar notificación al cliente específico
+    await sendExpoPushNotification([client.push_token], notificationData);
+    
+    console.log('Notificación de cuenta creada enviada exitosamente');
+  } catch (error) {
+    console.error('Error al enviar notificación de cuenta creada:', error);
+  }
+}
+
 // Función para actualizar el push token de un usuario
 export async function updateUserPushToken(userId: string, pushToken: string) {
   try {
