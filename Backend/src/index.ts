@@ -38,6 +38,85 @@ app.use(morgan(process.env["NODE_ENV"] === "production" ? "combined" : "dev"));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
+// Root endpoint - Página de bienvenida
+app.get("/", (_req, res) => {
+  const uptime = process.uptime();
+  const uptimeFormatted = `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${Math.floor(uptime % 60)}s`;
+
+  res.status(200).send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>The Last Dance - Restaurant API</title>
+      <meta charset="utf-8">
+      <style>
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+          background: linear-gradient(135deg, #1a1a1a 0%, #2d1810 100%);
+          color: #fff;
+          margin: 0;
+          padding: 2rem;
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .container {
+          text-align: center;
+          max-width: 600px;
+          padding: 2rem;
+          border: 1px solid #d4af37;
+          border-radius: 12px;
+          background: rgba(0,0,0,0.3);
+        }
+        h1 { color: #d4af37; margin-bottom: 1rem; }
+        .status { color: #22c55e; font-weight: bold; }
+        .endpoints { 
+          background: rgba(0,0,0,0.5); 
+          padding: 1rem; 
+          border-radius: 8px; 
+          margin: 1rem 0; 
+          text-align: left;
+        }
+        .endpoint { 
+          margin: 0.5rem 0; 
+          font-family: monospace; 
+          color: #d4af37; 
+        }
+        .info { color: #9ca3af; font-size: 0.9rem; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>🍽️ The Last Dance Restaurant API</h1>
+        <p class="status">✅ Servidor activo y funcionando</p>
+        
+        <div class="info">
+          <p><strong>Uptime:</strong> ${uptimeFormatted}</p>
+          <p><strong>Ambiente:</strong> ${process.env["NODE_ENV"] || "development"}</p>
+          <p><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
+        </div>
+        
+        <div class="endpoints">
+          <h3>📡 Endpoints disponibles:</h3>
+          <div class="endpoint">GET /health - Estado del servidor</div>
+          <div class="endpoint">GET /ping - Ping rápido</div>
+          <div class="endpoint">POST /api/auth/* - Autenticación</div>
+          <div class="endpoint">GET /api/tables/* - Gestión de mesas</div>
+          <div class="endpoint">GET /api/menu/* - Menú del restaurante</div>
+          <div class="endpoint">GET /api/admin/* - Panel administrativo</div>
+        </div>
+        
+        <p class="info">
+          Backend desarrollado para The Last Dance Restaurant<br>
+          Sistema de gestión de mesas y reservas
+        </p>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
 // Health check endpoint
 app.get("/health", (_req, res) => {
   res.status(200).json({
@@ -45,6 +124,22 @@ app.get("/health", (_req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env["NODE_ENV"] || "development",
+  });
+});
+
+// Ping endpoint para UptimeRobot (más ligero)
+app.get("/ping", (_req, res) => {
+  res.status(200).json({
+    status: "alive",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Endpoint bajo /api para compatibilidad
+app.get("/api/ping", (_req, res) => {
+  res.status(200).json({
+    status: "alive",
+    timestamp: new Date().toISOString(),
   });
 });
 

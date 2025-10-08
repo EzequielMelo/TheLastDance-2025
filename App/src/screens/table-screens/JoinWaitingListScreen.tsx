@@ -96,7 +96,12 @@ export default function JoinWaitingListScreen() {
           },
           {
             text: "Ir al inicio",
-            onPress: () => navigation.navigate("Home"),
+            onPress: () => {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Home" }],
+              });
+            },
           },
         ],
       );

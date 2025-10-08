@@ -57,37 +57,69 @@ export default function MyWaitingPositionScreen() {
     try {
       setError(null);
 
-      // Obtener posición y datos de mi entrada (ahora incluye la entrada completa)
-      const positionResponse = await api.get<{
-        position: number;
-        estimatedWait?: number;
-        entry: WaitingListEntry;
-      }>("/tables/waiting-list/my-position");
+      // Usar el endpoint que detecta el estado completo del cliente
+      const statusResponse = await api.get("/tables/my-status");
+      const status = statusResponse.data.status;
 
-      console.log("Datos recibidos de my-position:", positionResponse.data);
+      console.log("Estado del cliente:", status, statusResponse.data);
 
-      setPosition({
-        position: positionResponse.data.position,
-        estimatedWait: positionResponse.data.estimatedWait,
-      });
+      if (status === "assigned") {
+        // El cliente ya fue asignado a una mesa
+        setPosition(null);
+        setMyEntry(null);
+        setError(
+          `¡Tu mesa está lista! Se te ha asignado la mesa ${statusResponse.data.table.number}. Ve al restaurante y escanea el código QR de tu mesa para confirmar tu llegada.`,
+        );
+        return;
+      }
 
-      // Usar la entrada completa que devuelve el API
-      setMyEntry(positionResponse.data.entry);
+      if (status === "seated") {
+        // El cliente ya está sentado
+        setPosition(null);
+        setMyEntry(null);
+        setError(
+          `Ya estás en tu mesa ${statusResponse.data.table.number}. ¡Disfruta tu experiencia!`,
+        );
+        return;
+      }
 
-      console.log("Entrada establecida:", positionResponse.data.entry);
+      if (status === "in_queue") {
+        // Cliente en lista de espera normal
+        setPosition({
+          position: statusResponse.data.position || 0,
+          estimatedWait: statusResponse.data.estimatedWait,
+        });
+
+        // Crear entrada simulada para mostrar la info
+        setMyEntry({
+          id: statusResponse.data.waitingListId || "",
+          party_size: 0,
+          status: "waiting",
+          priority: 0,
+          joined_at: new Date().toISOString(),
+        });
+        return;
+      }
+
+      if (status === "displaced") {
+        setPosition(null);
+        setMyEntry(null);
+        setError(
+          "El maitre liberó tu mesa por motivos operativos. Puedes unirte nuevamente a la lista de espera.",
+        );
+        return;
+      }
+
+      // No está en ninguna lista
+      console.log(
+        "Usuario no está en la lista de espera - mostrando pantalla informativa",
+      );
+      setError("No estás en la lista de espera");
     } catch (error: any) {
       const message =
         error.response?.data?.error || "Error al cargar tu posición";
-
-      if (error.response?.status === 400 && message.includes("no encontrado")) {
-        console.log(
-          "Usuario no está en la lista de espera - mostrando pantalla informativa",
-        );
-        setError("No estás en la lista de espera");
-      } else {
-        console.error("Error loading position:", error);
-        setError(message);
-      }
+      console.error("Error loading position:", error);
+      setError(message);
     } finally {
       setLoading(false);
       setRefreshing(false);

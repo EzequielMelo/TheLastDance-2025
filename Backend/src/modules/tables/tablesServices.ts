@@ -239,12 +239,12 @@ export async function assignClientToTable({
   table_id,
 }: AssignTableRequest): Promise<{ success: boolean; message: string }> {
   try {
-    // 1. Verificar que el cliente esté en la lista de espera
+    // 1. Verificar que el cliente esté en la lista de espera (waiting o displaced)
     const { data: waitingEntry, error: waitingError } = await supabaseAdmin
       .from("waiting_list")
       .select("client_id, party_size, status")
       .eq("id", waiting_list_id)
-      .eq("status", "waiting")
+      .in("status", ["waiting", "displaced"])
       .single();
 
     if (waitingError || !waitingEntry) {
