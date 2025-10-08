@@ -147,7 +147,7 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
             </Text>
             <View className="flex-row gap-4">
               <TouchableOpacity
-                onPress={() => navigation.navigate("Menu")}
+                onPress={() => navigation.navigate("Menu", { tableId: occupiedTable?.id })}
                 className="bg-yellow-600 px-6 py-3 rounded-lg"
               >
                 <Text className="text-white font-semibold">Ver Menú</Text>

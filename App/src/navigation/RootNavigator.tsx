@@ -19,6 +19,7 @@ import ScanTableQRScreen from "../screens/table-screens/ScanTableQRScreen";
 import JoinWaitingListScreen from "../screens/table-screens/JoinWaitingListScreen";
 import MyWaitingPositionScreen from "../screens/table-screens/MyWaitingPositionScreen";
 import MenuScreen from "../screens/menu-screens/MenuScreen";
+import { CartProvider } from "../context/CartContext";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -149,7 +150,9 @@ function NavigatorContent() {
 export default function RootNavigator() {
   return (
     <NavigationContainer>
-      <NavigatorContent />
+      <CartProvider>
+        <NavigatorContent />
+      </CartProvider>
     </NavigationContainer>
   );
 }

@@ -11,6 +11,7 @@ import authRoutes from "./auth/authRoutes";
 import menuRoutes from "./modules/menu/menuRoutes";
 import adminRoutes from "./modules/admin/adminRoutes";
 import tablesRoutes from "./modules/tables/tablesRoutes";
+import ordersRoutes from "./modules/orders/ordersRoutes";
 
 const app = express();
 const PORT = parseInt(process.env["PORT"] || "3000", 10);
@@ -148,9 +149,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/menu", menuRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/tables", tablesRoutes);
+app.use("/api/orders", ordersRoutes);
 /*
 app.use("/api/users", userRoutes);
-app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
 */
 
