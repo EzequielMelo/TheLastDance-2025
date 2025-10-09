@@ -1,4 +1,7 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { getUserOrders } from '../api/orders';
+import type { Order } from '../types/Order';
+import { useAuth } from '../auth/useAuth';
 
 export interface CartItem {
   id: string;
@@ -11,30 +14,37 @@ export interface CartItem {
 }
 
 export interface CartContextType {
-  // Items pendientes (carrito actual)
-  pendingItems: CartItem[];
-  // Items confirmados (ya enviados a cocina)
-  confirmedItems: CartItem[];
+  // Items en el carrito local (no enviados aún)
+  cartItems: CartItem[];
+  // Items de pedidos enviados pero pendientes de confirmación por empleados
+  pendingOrderItems: CartItem[];
   
-  // Funciones para items pendientes
+  // Estado del pedido actual
+  hasPendingOrder: boolean;
+  
+  // Funciones para items del carrito local
   addItem: (item: Omit<CartItem, 'quantity'>) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   removeItem: (itemId: string) => void;
   getItemQuantity: (itemId: string) => number;
-  clearPendingItems: () => void;
+  clearCart: () => void;
   
-  // Función para confirmar pedido
-  confirmOrder: () => void;
+  // Función para enviar pedido
+  submitOrder: () => Promise<void>;
+  
+  // Función para refrescar desde la BD
+  refreshOrders: () => Promise<void>;
+  
+  // Estado de carga
+  isLoading: boolean;
   
   // Totales
-  pendingAmount: number;
-  confirmedAmount: number;
-  totalAmount: number;
-  pendingTime: number;
-  totalTime: number;
-  pendingCount: number;
-  confirmedCount: number;
-  totalCount: number;
+  cartAmount: number;
+  pendingOrderAmount: number;
+  cartTime: number;
+  pendingOrderTime: number;
+  cartCount: number;
+  pendingOrderCount: number;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -52,11 +62,86 @@ interface CartProviderProps {
 }
 
 export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
-  const [pendingItems, setPendingItems] = useState<CartItem[]>([]);
-  const [confirmedItems, setConfirmedItems] = useState<CartItem[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [pendingOrderItems, setPendingOrderItems] = useState<CartItem[]>([]);
+  const [hasPendingOrder, setHasPendingOrder] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
+
+  // Función para convertir OrderItem a CartItem
+  const orderItemToCartItem = (orderItem: any): CartItem => ({
+    id: orderItem.menu_item_id,
+    name: orderItem.menu_item?.name || 'Producto',
+    price: orderItem.unit_price,
+    quantity: orderItem.quantity,
+    prepMinutes: orderItem.menu_item?.prep_minutes || 0,
+    category: orderItem.menu_item?.category || 'otro',
+    image_url: orderItem.menu_item?.image_url,
+  });
+
+  // Función para cargar pedidos desde la BD
+  const loadOrdersFromDatabase = async () => {
+    if (!user) return;
+    
+    try {
+      setIsLoading(true);
+      const orders = await getUserOrders();
+      
+      // Solo procesar pedidos con status "pending"
+      const pendingOrders = orders.filter((order: Order) => order.status === 'pending');
+      
+      if (pendingOrders.length > 0) {
+        // Si hay pedidos pending, el usuario no puede crear más
+        setHasPendingOrder(true);
+        
+        // Mostrar todos los items de pedidos pending
+        const allPendingItems: CartItem[] = [];
+        pendingOrders.forEach((order: Order) => {
+          const cartItems = order.order_items.map(orderItemToCartItem);
+          allPendingItems.push(...cartItems);
+        });
+        
+        setPendingOrderItems(allPendingItems);
+        // Limpiar carrito local si hay pedidos pending
+        setCartItems([]);
+      } else {
+        // No hay pedidos pending, el usuario puede agregar al carrito
+        setHasPendingOrder(false);
+        setPendingOrderItems([]);
+      }
+      
+    } catch (error) {
+      console.error('Error cargando pedidos:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Cargar pedidos al montar el componente o cuando cambie el usuario
+  useEffect(() => {
+    if (user) {
+      loadOrdersFromDatabase();
+    } else {
+      // Si no hay usuario, limpiar todo
+      setCartItems([]);
+      setPendingOrderItems([]);
+      setHasPendingOrder(false);
+    }
+  }, [user]);
+
+  // Función pública para refrescar órdenes
+  const refreshOrders = async () => {
+    await loadOrdersFromDatabase();
+  };
 
   const addItem = (newItem: Omit<CartItem, 'quantity'>) => {
-    setPendingItems(currentItems => {
+    // Solo permitir agregar items si no hay pedido pending
+    if (hasPendingOrder) {
+      console.warn('No se pueden agregar items mientras hay un pedido pendiente');
+      return;
+    }
+    
+    setCartItems(currentItems => {
       const existingItem = currentItems.find(item => item.id === newItem.id);
       
       if (existingItem) {
@@ -74,7 +159,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   };
 
   const removeItem = (itemId: string) => {
-    setPendingItems(currentItems => currentItems.filter(item => item.id !== itemId));
+    setCartItems(currentItems => currentItems.filter(item => item.id !== itemId));
   };
 
   const updateQuantity = (itemId: string, quantity: number) => {
@@ -83,45 +168,44 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       return;
     }
 
-    setPendingItems(currentItems =>
+    setCartItems(currentItems =>
       currentItems.map(item =>
         item.id === itemId ? { ...item, quantity } : item
       )
     );
   };
 
-  const clearPendingItems = () => {
-    setPendingItems([]);
+  const clearCart = () => {
+    setCartItems([]);
   };
 
   const getItemQuantity = (itemId: string): number => {
-    const item = pendingItems.find(item => item.id === itemId);
+    const item = cartItems.find(item => item.id === itemId);
     return item?.quantity || 0;
   };
 
-  const confirmOrder = () => {
-    // Mover items pendientes a confirmados
-    setConfirmedItems(prev => [...prev, ...pendingItems]);
-    // Limpiar items pendientes
-    setPendingItems([]);
+  const submitOrder = async () => {
+    // Esta función ahora solo limpia el carrito local
+    // El verdadero envío del pedido se hace desde CartModal usando createOrder
+    setCartItems([]);
+    // Refrescamos desde la BD para obtener el estado actualizado
+    await refreshOrders();
   };
 
   // Cálculos derivados
-  const pendingCount = pendingItems.reduce((total, item) => total + item.quantity, 0);
-  const confirmedCount = confirmedItems.reduce((total, item) => total + item.quantity, 0);
-  const totalCount = pendingCount + confirmedCount;
+  const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
+  const pendingOrderCount = pendingOrderItems.reduce((total, item) => total + item.quantity, 0);
 
-  const pendingAmount = pendingItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-  const confirmedAmount = confirmedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-  const totalAmount = pendingAmount + confirmedAmount;
+  const cartAmount = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+  const pendingOrderAmount = pendingOrderItems.reduce((total, item) => total + (item.price * item.quantity), 0);
   
-  // Cálculo del tiempo estimado para items pendientes:
+  // Cálculo del tiempo estimado para items del carrito:
   // Separamos platos y bebidas porque se preparan en paralelo
-  const pendingTime = (() => {
-    if (pendingItems.length === 0) return 0;
+  const cartTime = (() => {
+    if (cartItems.length === 0) return 0;
     
-    const platos = pendingItems.filter(item => item.category === 'plato');
-    const bebidas = pendingItems.filter(item => item.category === 'bebida');
+    const platos = cartItems.filter(item => item.category === 'plato');
+    const bebidas = cartItems.filter(item => item.category === 'bebida');
     
     const platosCount = platos.reduce((sum, item) => sum + item.quantity, 0);
     const bebidasCount = bebidas.reduce((sum, item) => sum + item.quantity, 0);
@@ -146,13 +230,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     return Math.max(tiempoPlatos, tiempoBebidas);
   })();
 
-  // Tiempo total considerando todos los items (pendientes + confirmados)
-  const totalTime = (() => {
-    const allItems = [...pendingItems, ...confirmedItems];
-    if (allItems.length === 0) return 0;
+  // Tiempo estimado para pedidos pendientes
+  const pendingOrderTime = (() => {
+    if (pendingOrderItems.length === 0) return 0;
     
-    const platos = allItems.filter(item => item.category === 'plato');
-    const bebidas = allItems.filter(item => item.category === 'bebida');
+    const platos = pendingOrderItems.filter(item => item.category === 'plato');
+    const bebidas = pendingOrderItems.filter(item => item.category === 'bebida');
     
     const platosCount = platos.reduce((sum, item) => sum + item.quantity, 0);
     const bebidasCount = bebidas.reduce((sum, item) => sum + item.quantity, 0);
@@ -177,22 +260,23 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   })();
 
   const value: CartContextType = {
-    pendingItems,
-    confirmedItems,
+    cartItems,
+    pendingOrderItems,
+    hasPendingOrder,
     addItem,
     removeItem,
     updateQuantity,
-    clearPendingItems,
+    clearCart,
     getItemQuantity,
-    confirmOrder,
-    pendingAmount,
-    confirmedAmount,
-    totalAmount,
-    pendingTime,
-    totalTime,
-    pendingCount,
-    confirmedCount,
-    totalCount,
+    submitOrder,
+    refreshOrders,
+    isLoading,
+    cartAmount,
+    pendingOrderAmount,
+    cartTime,
+    pendingOrderTime,
+    cartCount,
+    pendingOrderCount,
   };
 
   return (

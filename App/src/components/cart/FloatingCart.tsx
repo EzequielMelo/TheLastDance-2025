@@ -8,7 +8,7 @@ interface FloatingCartProps {
 }
 
 export default function FloatingCart({ onPress }: FloatingCartProps) {
-  const { pendingCount, pendingAmount, pendingTime } = useCart();
+  const { cartCount, cartAmount, cartTime, hasPendingOrder } = useCart();
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('es-AR', {
@@ -17,7 +17,8 @@ export default function FloatingCart({ onPress }: FloatingCartProps) {
     }).format(price);
   };
 
-  if (pendingCount === 0) return null;
+  // Solo mostrar si hay items en el carrito local (no si hay pedido pending)
+  if (cartCount === 0 || hasPendingOrder) return null;
 
   return (
     <TouchableOpacity
@@ -55,7 +56,7 @@ export default function FloatingCart({ onPress }: FloatingCartProps) {
             fontSize: 12,
             fontWeight: "600",
           }}>
-            {pendingCount}
+            {cartCount}
           </Text>
         </View>
         
@@ -65,14 +66,14 @@ export default function FloatingCart({ onPress }: FloatingCartProps) {
             fontSize: 18,
             fontWeight: "600",
           }}>
-            {formatPrice(pendingAmount)}
+            {formatPrice(cartAmount)}
           </Text>
           <Text style={{
             color: "#1a1a1a",
             fontSize: 12,
             opacity: 0.8,
           }}>
-            Tiempo: {pendingTime} min
+            Tiempo: {cartTime} min
           </Text>
         </View>
       </View>

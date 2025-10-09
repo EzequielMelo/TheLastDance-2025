@@ -5,7 +5,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
-import {ChefHat, Coffee, Clock, ArrowLeft, Utensils, Filter, RefreshCw, Plus, Minus} from "lucide-react-native";
+import {ChefHat, Coffee, Clock, ArrowLeft, Utensils, Filter, RefreshCw, Plus, Minus, Lock} from "lucide-react-native";
 import api from "../../api/axios";
 import { useCart } from "../../context/CartContext";
 import FloatingCart from "../../components/cart/FloatingCart";
@@ -41,7 +41,7 @@ interface MenuItem {
 export default function MenuScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<MenuScreenRouteProp>();
-  const { pendingCount, addItem, updateQuantity, getItemQuantity } = useCart();
+  const { cartCount, addItem, updateQuantity, getItemQuantity, hasPendingOrder } = useCart();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -78,6 +78,15 @@ export default function MenuScreen() {
   };
 
   const handleAddToCart = (item: MenuItem) => {
+    if (hasPendingOrder) {
+      Alert.alert(
+        "Pedido en proceso", 
+        "Tienes un pedido enviado esperando confirmación. No puedes agregar más items hasta que sea procesado.",
+        [{ text: "Entendido" }]
+      );
+      return;
+    }
+    
     addItem({
       id: item.id,
       name: item.name,
@@ -225,7 +234,7 @@ export default function MenuScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ 
           paddingHorizontal: 24, 
-          paddingBottom: pendingCount > 0 ? 120 : 24 // Más espacio cuando hay items en el carrito
+          paddingBottom: cartCount > 0 ? 120 : 24 // Más espacio cuando hay items en el carrito
         }}
         refreshControl={
           <RefreshControl
@@ -448,22 +457,38 @@ export default function MenuScreen() {
                           <TouchableOpacity
                             onPress={() => handleAddToCart(item)}
                             style={{
-                              backgroundColor: "#d4af37",
+                              backgroundColor: hasPendingOrder ? "#6b7280" : "#d4af37",
                               borderRadius: 8,
                               paddingHorizontal: 16,
                               paddingVertical: 8,
                               flexDirection: "row",
                               alignItems: "center",
+                              opacity: hasPendingOrder ? 0.8 : 1,
                             }}
                           >
-                            <Plus size={16} color="#1a1a1a" />
-                            <Text style={{
-                              color: "#1a1a1a",
-                              fontWeight: "600",
-                              marginLeft: 4,
-                            }}>
-                              Agregar
-                            </Text>
+                            {hasPendingOrder ? (
+                              <>
+                                <Lock size={16} color="#ffffff" />
+                                <Text style={{
+                                  color: "#ffffff",
+                                  fontWeight: "600",
+                                  marginLeft: 4,
+                                }}>
+                                  Bloqueado
+                                </Text>
+                              </>
+                            ) : (
+                              <>
+                                <Plus size={16} color="#1a1a1a" />
+                                <Text style={{
+                                  color: "#1a1a1a",
+                                  fontWeight: "600",
+                                  marginLeft: 4,
+                                }}>
+                                  Agregar
+                                </Text>
+                              </>
+                            )}
                           </TouchableOpacity>
                         )}
                       </View>

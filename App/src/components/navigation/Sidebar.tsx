@@ -59,7 +59,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
   const clientState = useClientState();
   
   // Hook del carrito para obtener información de items
-  const { totalCount, pendingCount, confirmedCount } = useCart();
+  const { cartCount, pendingOrderCount, hasPendingOrder } = useCart();
   
   // Extraer datos del cliente si corresponde
   const { state, waitingPosition, assignedTable, occupiedTable, refresh } = isClient ? clientState : {
@@ -323,13 +323,14 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
         if (onOpenCart) {
           let cartSubtitle = "Revisa y confirma tus pedidos";
           
+          const totalCount = cartCount + pendingOrderCount;
           if (totalCount > 0) {
             const parts = [];
-            if (pendingCount > 0) {
-              parts.push(`${pendingCount} pendiente${pendingCount === 1 ? '' : 's'}`);
+            if (cartCount > 0) {
+              parts.push(`${cartCount} en carrito`);
             }
-            if (confirmedCount > 0) {
-              parts.push(`${confirmedCount} confirmado${confirmedCount === 1 ? '' : 's'}`);
+            if (pendingOrderCount > 0) {
+              parts.push(`${pendingOrderCount} enviado${pendingOrderCount === 1 ? '' : 's'}`);
             }
             cartSubtitle = parts.join(', ');
           }

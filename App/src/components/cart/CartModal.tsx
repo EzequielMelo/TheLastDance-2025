@@ -21,6 +21,8 @@ import {ChefHat,
 } from "lucide-react-native";
 import { useCart } from "../../context/CartContext";
 import api from "../../api/axios";
+import { createOrder } from "../../api/orders";
+import type { CreateOrderRequest } from "../../types/Order";
 
 interface CartModalProps {
   visible: boolean;
@@ -29,28 +31,30 @@ interface CartModalProps {
 
 export default function CartModal({ visible, onClose }: CartModalProps) {
   const { 
-    pendingItems, 
-    confirmedItems, 
-    pendingCount, 
-    confirmedCount,
-    totalCount,
-    pendingAmount, 
-    confirmedAmount,
-    totalAmount,
-    pendingTime,
-    totalTime,
+    cartItems, 
+    pendingOrderItems, 
+    hasPendingOrder,
+    cartCount, 
+    pendingOrderCount,
+    cartAmount, 
+    pendingOrderAmount,
+    cartTime,
+    pendingOrderTime,
     updateQuantity, 
     removeItem, 
-    confirmOrder
+    submitOrder,
+    refreshOrders
   } = useCart();
 
   const [tableId, setTableId] = useState<string | null>(null);
   const [loadingTable, setLoadingTable] = useState(false);
 
-  // Obtener el ID de la mesa del cliente logueado
+  // Obtener el ID de la mesa del cliente logueado y refrescar órdenes
   useEffect(() => {
     if (visible) {
       fetchUserTable();
+      // Refrescar órdenes cada vez que se abre el modal
+      refreshOrders().catch(console.error);
     }
   }, [visible]);
 
@@ -87,13 +91,15 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
     return category === "plato" ? "#ef4444" : "#3b82f6";
   };
 
-  const handleQuantityChange = (itemId: string, newQuantity: number) => {
-    updateQuantity(itemId, newQuantity);
-  };
-
   const handleConfirmOrder = async () => {
-    if (pendingItems.length === 0) {
-      Alert.alert('Error', 'No hay items pendientes para confirmar');
+    if (cartItems.length === 0) {
+      Alert.alert('Error', 'No hay items en el carrito para enviar');
+      return;
+    }
+
+    // Verificar si ya hay un pedido pending
+    if (hasPendingOrder) {
+      Alert.alert('Error', 'Ya tienes un pedido pendiente. No puedes enviar otro hasta que sea procesado.');
       return;
     }
 
@@ -115,36 +121,36 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
     }
 
     try {
-      const orderData = pendingItems.map(item => ({
-        id: item.id,
-        name: item.name,
-        category: item.category,
-        price: item.price,
-        prepMinutes: item.prepMinutes,
-        quantity: item.quantity,
-        image_url: item.image_url,
-      }));
-      
-      const response = await api.post('/orders', {
+      const orderData: CreateOrderRequest = {
         table_id: tableId,
-        items: orderData,
-        totalAmount: pendingAmount,
-        estimatedTime: pendingTime
-      });
+        items: cartItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          price: item.price,
+          prepMinutes: item.prepMinutes,
+          quantity: item.quantity,
+          image_url: item.image_url,
+        })),
+        totalAmount: cartAmount,
+        estimatedTime: cartTime
+      };
 
-      if (response.status === 201) {
-        // Confirmar el pedido (mover a confirmados)
-        confirmOrder();
-        
-        Alert.alert(
-          "Pedido Confirmado",
-          `Tu pedido por ${formatPrice(pendingAmount)} ha sido enviado a la cocina.`,
-          [{ text: "OK", onPress: onClose }]
-        );
-      }
-    } catch (error) {
-      console.error("Error al confirmar pedido:", error);
-      Alert.alert("Error", "No se pudo confirmar el pedido. Intenta de nuevo.");
+      // Usar el nuevo API de orders
+      await createOrder(orderData);
+
+      // Enviar el pedido (limpia carrito local y refresca desde BD)
+      await submitOrder();
+      
+      Alert.alert(
+        "Pedido Enviado",
+        `Tu pedido por ${formatPrice(cartAmount)} ha sido enviado. Espera a que sea confirmado por el personal.`,
+        [{ text: "OK", onPress: onClose }]
+      );
+      
+    } catch (error: any) {
+      console.error("Error al enviar pedido:", error);
+      Alert.alert("Error", error.message || "No se pudo enviar el pedido. Intenta de nuevo.");
     }
   };
 
@@ -173,7 +179,7 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
                 fontWeight: "600",
                 marginLeft: 8,
               }}>
-                Mi Pedido
+                {hasPendingOrder ? "Pedido Enviado" : "Mi Carrito"}
               </Text>
             </View>
             
@@ -194,13 +200,18 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
             fontSize: 14, 
             marginTop: 4 
           }}>
-            {totalCount > 0 && `${totalCount} ${totalCount === 1 ? 'producto' : 'productos'} • Tiempo estimado: ${totalTime} min`}
+            {hasPendingOrder 
+              ? `${pendingOrderCount} ${pendingOrderCount === 1 ? 'producto' : 'productos'} enviados • Esperando confirmación`
+              : cartCount > 0 
+                ? `${cartCount} ${cartCount === 1 ? 'producto' : 'productos'} • Tiempo estimado: ${cartTime} min`
+                : "Tu carrito está vacío"
+            }
           </Text>
         </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24 }}>
-          {/* Items Confirmados */}
-          {confirmedItems.length > 0 && (
+          {/* Pedido Enviado (Pendiente de Confirmación) */}
+          {hasPendingOrder && pendingOrderItems.length > 0 && (
             <View style={{ marginBottom: 24 }}>
               <View style={{
                 flexDirection: "row",
@@ -208,41 +219,41 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
                 marginBottom: 16,
                 paddingBottom: 8,
                 borderBottomWidth: 1,
-                borderBottomColor: "rgba(34, 197, 94, 0.3)",
+                borderBottomColor: "rgba(255, 165, 0, 0.3)",
               }}>
-                <CheckCircle size={20} color="#22c55e" />
+                <Clock size={20} color="#ffa500" />
                 <Text style={{
-                  color: "#22c55e",
+                  color: "#ffa500",
                   fontSize: 18,
                   fontWeight: "600",
                   marginLeft: 8,
                 }}>
-                  Confirmados ({confirmedCount} items)
+                  Pedido Enviado ({pendingOrderCount} items)
                 </Text>
                 <Text style={{
                   color: "#9ca3af",
                   fontSize: 14,
                   marginLeft: 8,
                 }}>
-                  - En preparación
+                  - Esperando confirmación
                 </Text>
               </View>
 
-              {confirmedItems.map((item, index) => {
+              {pendingOrderItems.map((item, index) => {
                 const CategoryIcon = getCategoryIcon(item.category as "plato" | "bebida");
                 const categoryColor = getCategoryColor(item.category as "plato" | "bebida");
                 
                 return (
                   <View
-                    key={`confirmed-${item.id}-${index}`}
+                    key={`pending-${item.id}-${index}`}
                     style={{
                       flexDirection: "row",
-                      backgroundColor: "rgba(34, 197, 94, 0.1)",
+                      backgroundColor: "rgba(255, 165, 0, 0.1)",
                       borderRadius: 12,
                       marginBottom: 12,
                       padding: 12,
                       borderWidth: 1,
-                      borderColor: "rgba(34, 197, 94, 0.2)",
+                      borderColor: "rgba(255, 165, 0, 0.2)",
                     }}
                   >
                     {item.image_url && (
@@ -283,15 +294,15 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
                         {formatPrice(item.price)} x {item.quantity}
                       </Text>
                       <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
-                        <Clock size={12} color="#22c55e" />
-                        <Text style={{ color: "#22c55e", fontSize: 12, marginLeft: 4 }}>
+                        <Clock size={12} color="#ffa500" />
+                        <Text style={{ color: "#ffa500", fontSize: 12, marginLeft: 4 }}>
                           {item.prepMinutes} min
                         </Text>
                       </View>
                     </View>
                     
                     <Text style={{
-                      color: "#22c55e",
+                      color: "#ffa500",
                       fontSize: 16,
                       fontWeight: "600",
                       alignSelf: "center",
@@ -301,11 +312,27 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
                   </View>
                 );
               })}
+
+              <View style={{
+                backgroundColor: "rgba(255, 165, 0, 0.1)",
+                borderRadius: 12,
+                padding: 16,
+                marginTop: 16,
+                borderWidth: 1,
+                borderColor: "rgba(255, 165, 0, 0.2)",
+              }}>
+                <Text style={{ color: "#ffa500", fontSize: 16, textAlign: "center" }}>
+                  Tu pedido está siendo revisado por el personal.
+                </Text>
+                <Text style={{ color: "#9ca3af", fontSize: 14, textAlign: "center", marginTop: 4 }}>
+                  No puedes agregar más items hasta que este pedido sea confirmado.
+                </Text>
+              </View>
             </View>
           )}
 
-          {/* Items Pendientes */}
-          {pendingItems.length > 0 && (
+          {/* Carrito Local (Solo si no hay pedido pending) */}
+          {!hasPendingOrder && cartItems.length > 0 && (
             <View>
               <View style={{
                 flexDirection: "row",
@@ -315,25 +342,25 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
                 borderBottomWidth: 1,
                 borderBottomColor: "rgba(212, 175, 55, 0.3)",
               }}>
-                <Clock size={20} color="#d4af37" />
+                <ShoppingCart size={20} color="#d4af37" />
                 <Text style={{
                   color: "#d4af37",
                   fontSize: 18,
                   fontWeight: "600",
                   marginLeft: 8,
                 }}>
-                  Pendientes ({pendingCount} items)
+                  En el Carrito ({cartCount} items)
                 </Text>
                 <Text style={{
                   color: "#9ca3af",
                   fontSize: 14,
                   marginLeft: 8,
                 }}>
-                  - Por confirmar
+                  - Listo para enviar
                 </Text>
               </View>
 
-              {pendingItems.map((item) => {
+              {cartItems.map((item) => {
                 const CategoryIcon = getCategoryIcon(item.category as "plato" | "bebida");
                 const categoryColor = getCategoryColor(item.category as "plato" | "bebida");
                 
@@ -436,7 +463,7 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
                           paddingHorizontal: 4,
                         }}>
                           <TouchableOpacity
-                            onPress={() => handleQuantityChange(item.id, item.quantity - 1)}
+                            onPress={() => updateQuantity(item.id, item.quantity - 1)}
                             style={{ padding: 6 }}
                           >
                             <Minus size={14} color="#1a1a1a" />
@@ -452,7 +479,7 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
                           </Text>
                           
                           <TouchableOpacity
-                            onPress={() => handleQuantityChange(item.id, item.quantity + 1)}
+                            onPress={() => updateQuantity(item.id, item.quantity + 1)}
                             style={{ padding: 6 }}
                           >
                             <Plus size={14} color="#1a1a1a" />
@@ -467,7 +494,7 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
           )}
 
           {/* Estado vacío */}
-          {pendingItems.length === 0 && confirmedItems.length === 0 && (
+          {!hasPendingOrder && cartItems.length === 0 && (
             <View style={{
               alignItems: "center",
               justifyContent: "center",
@@ -495,7 +522,7 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
         </ScrollView>
 
         {/* Footer */}
-        {(pendingItems.length > 0 || confirmedItems.length > 0) && (
+        {((cartItems.length > 0 && !hasPendingOrder) || (hasPendingOrder && pendingOrderItems.length > 0)) && (
           <View style={{
             padding: 24,
             borderTopWidth: 1,
@@ -507,39 +534,39 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
               padding: 16,
               marginBottom: 16,
             }}>
-              {confirmedItems.length > 0 && (
+              {hasPendingOrder && (
                 <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
-                  <Text style={{ color: "#22c55e", fontSize: 16 }}>
-                    Confirmado ({confirmedCount} items)
+                  <Text style={{ color: "#ffa500", fontSize: 16 }}>
+                    Pedido Enviado ({pendingOrderCount} items)
                   </Text>
-                  <Text style={{ color: "#22c55e", fontSize: 16, fontWeight: "600" }}>
-                    {formatPrice(confirmedAmount)}
+                  <Text style={{ color: "#ffa500", fontSize: 16, fontWeight: "600" }}>
+                    {formatPrice(pendingOrderAmount)}
                   </Text>
                 </View>
               )}
               
-              {pendingItems.length > 0 && (
+              {!hasPendingOrder && cartItems.length > 0 && (
                 <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
                   <Text style={{ color: "#d4af37", fontSize: 16 }}>
-                    Pendiente ({pendingCount} items)
+                    En Carrito ({cartCount} items)
                   </Text>
                   <Text style={{ color: "#d4af37", fontSize: 16, fontWeight: "600" }}>
-                    {formatPrice(pendingAmount)}
+                    {formatPrice(cartAmount)}
                   </Text>
                 </View>
               )}
               
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                 <Text style={{ color: "#d1d5db", fontSize: 16 }}>
-                  Tiempo estimado total
+                  Tiempo estimado
                 </Text>
                 <Text style={{ color: "#d1d5db", fontSize: 16, fontWeight: "600" }}>
-                  {totalTime} minutos
+                  {hasPendingOrder ? pendingOrderTime : cartTime} minutos
                 </Text>
               </View>
             </View>
 
-            {pendingItems.length > 0 && (
+            {!hasPendingOrder && cartItems.length > 0 && (
               <TouchableOpacity
                 onPress={handleConfirmOrder}
                 disabled={loadingTable}
@@ -562,10 +589,27 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
                 }}>
                   {loadingTable 
                     ? "Verificando mesa..." 
-                    : `Confirmar Pedido • ${formatPrice(pendingAmount)}`
+                    : `Enviar Pedido • ${formatPrice(cartAmount)}`
                   }
                 </Text>
               </TouchableOpacity>
+            )}
+
+            {hasPendingOrder && (
+              <View style={{
+                backgroundColor: "rgba(255, 165, 0, 0.1)",
+                borderRadius: 12,
+                padding: 16,
+                borderWidth: 1,
+                borderColor: "rgba(255, 165, 0, 0.2)",
+              }}>
+                <Text style={{ color: "#ffa500", fontSize: 16, textAlign: "center", fontWeight: "600" }}>
+                  Pedido en Revisión
+                </Text>
+                <Text style={{ color: "#9ca3af", fontSize: 14, textAlign: "center", marginTop: 4 }}>
+                  El personal confirmará tu pedido pronto
+                </Text>
+              </View>
             )}
           </View>
         )}
