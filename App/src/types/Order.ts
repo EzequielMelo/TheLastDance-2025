@@ -1,3 +1,12 @@
+// Status para items individuales
+export type OrderItemStatus =
+  | "pending" // Item esperando aprobación del mozo
+  | "accepted" // Item aceptado, va a cocina
+  | "rejected" // Item rechazado por el mozo
+  | "preparing" // Item en preparación (cocina)
+  | "ready" // Item listo para servir
+  | "delivered"; // Item entregado al cliente
+
 export interface OrderItem {
   id: string;
   order_id: string;
@@ -5,6 +14,7 @@ export interface OrderItem {
   quantity: number;
   unit_price: number;
   subtotal: number;
+  status: OrderItemStatus; // NUEVO: Status individual del item
   created_at: string;
   menu_item?: {
     id: string;
@@ -16,22 +26,14 @@ export interface OrderItem {
   };
 }
 
+// ORDEN REFACTORIZADA: Solo is_paid, sin status
 export interface Order {
   id: string;
   user_id: string;
   table_id?: string;
   total_amount: number;
   estimated_time: number;
-  status:
-    | "pending"
-    | "confirmed"
-    | "preparing"
-    | "ready"
-    | "delivered"
-    | "cancelled"
-    | "accepted"
-    | "rejected"
-    | "partial";
+  is_paid: boolean; // NUEVO: Reemplaza status - solo indica si está pagada
   notes?: string;
   created_at: string;
   updated_at: string;

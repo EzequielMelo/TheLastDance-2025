@@ -5,7 +5,6 @@ import {
   getOrderById,
   getUserOrders,
   getTableOrders,
-  updateOrderStatus,
   getPendingOrders,
   getWaiterPendingOrders,
   getWaiterActiveOrders,
@@ -13,6 +12,10 @@ import {
   rejectOrder,
   partialRejectOrder,
   addItemsToPartialOrder,
+  addItemsToExistingOrder,
+  waiterItemsActionNew,
+  getWaiterPendingItems,
+  replaceRejectedItems,
 } from "./ordersServices";
 import type { CreateOrderDTO } from "./orders.types";
 
@@ -37,19 +40,7 @@ const createOrderSchema = z.object({
   notes: z.string().optional(),
 });
 
-const updateStatusSchema = z.object({
-  status: z.enum([
-    "pending",
-    "confirmed",
-    "preparing",
-    "ready",
-    "delivered",
-    "cancelled",
-    "accepted",
-    "rejected",
-    "partial",
-  ]),
-});
+// Schema obsoleto eliminado - ya no se usan estados a nivel de orden
 
 const waiterActionSchema = z.object({
   action: z.enum(["accept", "reject", "partial"]),
@@ -72,6 +63,19 @@ const addItemToPartialOrderSchema = z.object({
     )
     .min(1)
     .max(10),
+});
+
+const replaceRejectedItemsSchema = z.object({
+  rejectedItemIds: z.array(z.string().uuid()).min(1),
+  newItems: z
+    .array(
+      z.object({
+        menu_item_id: z.string().uuid(),
+        quantity: z.number().int().min(1).max(10),
+        unit_price: z.number().positive(),
+      }),
+    )
+    .min(1),
 });
 
 // Crear nuevo pedido
@@ -194,57 +198,8 @@ export async function getTableOrdersHandler(
 }
 
 // Actualizar estado del pedido (para empleados)
-export async function updateOrderStatusHandler(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
-    if (!req.user) {
-      res.status(401).json({ error: "Usuario no autenticado" });
-      return;
-    }
-
-    // Verificar permisos (solo empleados pueden cambiar estados)
-    const userProfile = req.user.profile_code;
-    const userPosition = req.user.position_code;
-    const canUpdateStatus =
-      userProfile === "dueno" ||
-      userProfile === "supervisor" ||
-      userPosition === "mozo" ||
-      userPosition === "maitre";
-
-    if (!canUpdateStatus) {
-      res.status(403).json({
-        error: "No tienes permisos para actualizar pedidos",
-      });
-      return;
-    }
-
-    const { orderId } = req.params;
-    const parsed = updateStatusSchema.parse(req.body);
-
-    if (!orderId) {
-      res.status(400).json({ error: "ID del pedido requerido" });
-      return;
-    }
-
-    const updatedOrder = await updateOrderStatus(orderId, parsed.status);
-
-    console.log(
-      `✅ Estado del pedido ${orderId} actualizado a: ${parsed.status}`,
-    );
-    res.json({
-      success: true,
-      message: "Estado actualizado exitosamente",
-      order: updatedOrder,
-    });
-  } catch (error: any) {
-    console.error("❌ Error en updateOrderStatusHandler:", error);
-    res.status(400).json({
-      error: error.message || "Error al actualizar estado del pedido",
-    });
-  }
-}
+// FUNCIÓN OBSOLETA - Eliminada con el nuevo sistema de estados por item
+// Los estados ahora se manejan únicamente a nivel de item individual
 
 // Obtener pedidos pendientes (para empleados)
 export async function getPendingOrdersHandler(
@@ -513,6 +468,224 @@ export async function addItemsToPartialOrderHandler(
 
     res.status(400).json({
       error: error.message || "Error al agregar items al pedido parcial",
+    });
+  }
+}
+
+// Agregar items a una orden existente (acepted/partial/pending)
+export async function addItemsToExistingOrderHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Usuario no autenticado" });
+      return;
+    }
+
+    const { orderId } = req.params;
+    if (!orderId) {
+      res.status(400).json({ error: "ID de orden requerido" });
+      return;
+    }
+
+    const parsed = addItemToPartialOrderSchema.parse(req.body);
+    const userId = req.user.appUserId;
+
+    console.log(
+      `🛒 Agregando items a orden existente ${orderId} para usuario:`,
+      userId,
+    );
+    console.log("📦 Items a agregar:", JSON.stringify(parsed.items, null, 2));
+
+    const result = await addItemsToExistingOrder(orderId, parsed.items, userId);
+
+    console.log(`✅ Items agregados exitosamente a orden ${orderId}`);
+    res.json({
+      success: true,
+      message:
+        "Items agregados exitosamente. Los nuevos items están pendientes de aprobación.",
+      order: result,
+    });
+  } catch (error: any) {
+    console.error("❌ Error en addItemsToExistingOrderHandler:", error);
+
+    if (error.name === "ZodError") {
+      res.status(400).json({
+        error: "Datos de items inválidos",
+        details: error.errors,
+      });
+      return;
+    }
+
+    res.status(400).json({
+      error: error.message || "Error al agregar items a la orden existente",
+    });
+  }
+}
+
+// Acción del mozo sobre items específicos (aceptar/rechazar items individuales)
+export async function waiterItemsActionHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Usuario no autenticado" });
+      return;
+    }
+
+    // Verificar que sea mozo
+    const userPosition = req.user.position_code;
+    const userProfile = req.user.profile_code;
+    const isWaiter =
+      userPosition === "mozo" ||
+      userProfile === "dueno" ||
+      userProfile === "supervisor";
+
+    if (!isWaiter) {
+      res.status(403).json({
+        error: "Solo los mozos pueden realizar esta acción",
+      });
+      return;
+    }
+
+    const { orderId } = req.params;
+    if (!orderId) {
+      res.status(400).json({ error: "ID de orden requerido" });
+      return;
+    }
+
+    const { itemIds, action, notes } = req.body;
+
+    if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
+      res.status(400).json({ error: "Se requiere al menos un ID de item" });
+      return;
+    }
+
+    if (!["accept", "reject"].includes(action)) {
+      res.status(400).json({ error: "Acción debe ser 'accept' o 'reject'" });
+      return;
+    }
+
+    console.log(
+      `🔄 Mozo ${action} items [${itemIds.join(", ")}] en orden ${orderId}`,
+    );
+
+    const result = await waiterItemsActionNew(
+      orderId,
+      action as "accept" | "reject",
+      itemIds,
+      notes,
+    );
+
+    res.json({
+      success: true,
+      message: `Items ${action === "accept" ? "aceptados" : "rechazados"} exitosamente`,
+      order: result,
+    });
+  } catch (error: any) {
+    console.error("❌ Error en waiterItemsActionHandler:", error);
+    res.status(500).json({
+      error: error.message || "Error al procesar acción sobre items",
+    });
+  }
+}
+
+// Obtener items pendientes que necesitan revisión del mozo
+export async function getWaiterPendingItemsHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    console.log(
+      "📋 Obteniendo items pendientes para mozo:",
+      req.user?.appUserId,
+    );
+
+    if (!req.user?.appUserId) {
+      res.status(401).json({
+        success: false,
+        message: "Usuario no autenticado",
+      });
+      return;
+    }
+
+    // Verificar que sea mozo
+    const userPosition = req.user.position_code;
+    const userProfile = req.user.profile_code;
+    const isWaiter =
+      userPosition === "mozo" ||
+      userProfile === "dueno" ||
+      userProfile === "supervisor";
+
+    if (!isWaiter) {
+      res.status(403).json({
+        success: false,
+        error: "Solo los mozos pueden acceder a esta función",
+      });
+      return;
+    }
+
+    const ordersWithPendingItems = await getWaiterPendingItems(
+      req.user.appUserId,
+    );
+
+    res.status(200).json({
+      success: true,
+      data: ordersWithPendingItems,
+      message: `${ordersWithPendingItems.length} órdenes con items pendientes encontradas`,
+    });
+  } catch (error: any) {
+    console.error("❌ Error obteniendo items pendientes:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error interno del servidor",
+      error: error.message || "Error desconocido",
+    });
+  }
+}
+
+// Reemplazar items rechazados con nuevos items
+export async function replaceRejectedItemsHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Usuario no autenticado" });
+      return;
+    }
+
+    const { orderId } = req.params;
+    const parsed = replaceRejectedItemsSchema.parse(req.body);
+    const userId = req.user.appUserId;
+
+    if (!orderId) {
+      res.status(400).json({ error: "ID del pedido requerido" });
+      return;
+    }
+
+    console.log(
+      `🔄 Reemplazando items rechazados en orden ${orderId} para usuario ${userId}`,
+    );
+
+    const updatedOrder = await replaceRejectedItems(
+      orderId,
+      userId,
+      parsed.rejectedItemIds,
+      parsed.newItems,
+    );
+
+    res.json({
+      success: true,
+      message: "Items rechazados reemplazados exitosamente",
+      order: updatedOrder,
+    });
+  } catch (error: any) {
+    console.error("❌ Error reemplazando items rechazados:", error);
+    res.status(400).json({
+      error: error.message || "Error al reemplazar items rechazados",
     });
   }
 }

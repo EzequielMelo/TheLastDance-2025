@@ -5,12 +5,15 @@ import {
   getOrderHandler,
   getUserOrdersHandler,
   getTableOrdersHandler,
-  updateOrderStatusHandler,
   getPendingOrdersHandler,
   getWaiterPendingOrdersHandler,
   getWaiterActiveOrdersHandler,
   waiterOrderActionHandler,
   addItemsToPartialOrderHandler,
+  addItemsToExistingOrderHandler,
+  waiterItemsActionHandler,
+  getWaiterPendingItemsHandler,
+  replaceRejectedItemsHandler,
 } from "./ordersController";
 
 const router = express.Router();
@@ -30,10 +33,16 @@ router.get("/pending", getPendingOrdersHandler);
 // Rutas específicas para mozos
 router.get("/waiter/pending", getWaiterPendingOrdersHandler);
 router.get("/waiter/active", getWaiterActiveOrdersHandler);
+router.get("/waiter/pending-items", getWaiterPendingItemsHandler); // Solo items pendientes
 router.put("/:orderId/waiter-action", waiterOrderActionHandler);
+router.put("/:orderId/waiter-items-action", waiterItemsActionHandler); // Acción sobre items específicos
 
-// Agregar items a pedido parcial
+// Agregar items a pedido parcial (legacy)
 router.put("/:orderId/add-items", addItemsToPartialOrderHandler);
+// Agregar items a cualquier orden existente (nuevo sistema granular)
+router.put("/:orderId/add-items-to-existing", addItemsToExistingOrderHandler);
+// Reemplazar items rechazados con nuevos items
+router.put("/:orderId/replace-rejected-items", replaceRejectedItemsHandler);
 
 // Obtener pedido específico por ID
 router.get("/:orderId", getOrderHandler);
@@ -41,7 +50,7 @@ router.get("/:orderId", getOrderHandler);
 // Obtener pedidos de una mesa específica
 router.get("/table/:tableId", getTableOrdersHandler);
 
-// Actualizar estado del pedido (para empleados)
-router.patch("/:orderId/status", updateOrderStatusHandler);
+// RUTA OBSOLETA - Eliminada con el nuevo sistema de estados por item
+// Los estados ahora se manejan únicamente a nivel de item individual
 
 export default router;

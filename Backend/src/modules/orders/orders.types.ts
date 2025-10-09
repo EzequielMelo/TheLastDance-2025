@@ -1,13 +1,15 @@
-export type OrderStatus =
-  | "pending"
-  | "confirmed"
-  | "preparing"
-  | "ready"
-  | "delivered"
-  | "cancelled"
-  | "accepted"
-  | "rejected"
-  | "partial";
+// ============= NUEVOS TIPOS REFACTORIZADOS =============
+
+// Status para items individuales (el estado se maneja a nivel de item)
+export type OrderItemStatus =
+  | "pending" // Item esperando aprobación del mozo
+  | "accepted" // Item aceptado, va a cocina
+  | "rejected" // Item rechazado por el mozo
+  | "preparing" // Item en preparación (cocina)
+  | "ready" // Item listo para servir
+  | "delivered"; // Item entregado al cliente
+
+// ============= INTERFACES =============
 
 export interface CreateOrderDTO {
   table_id?: string | undefined;
@@ -32,13 +34,14 @@ export interface OrderItemDTO {
   quantity: number;
 }
 
+// ORDEN REFACTORIZADA: Solo is_paid, sin status
 export interface Order {
   id: string;
   user_id: string;
   table_id?: string;
   total_amount: number;
   estimated_time: number;
-  status: OrderStatus;
+  is_paid: boolean; // NUEVO: Reemplaza status
   notes?: string;
   created_at: string;
   updated_at: string;
@@ -51,6 +54,7 @@ export interface OrderItem {
   quantity: number;
   unit_price: number;
   subtotal: number;
+  status: OrderItemStatus; // Status individual del item
   created_at: string;
   // Datos del producto (join)
   menu_item?: {
@@ -77,18 +81,20 @@ export interface OrderWithItems extends Order {
   };
 }
 
-// Tipos para acciones del mozo
-export type WaiterOrderAction = "accept" | "reject" | "partial";
+// ============= TIPOS PARA ACCIONES DEL MOZO =============
 
-export interface WaiterOrderActionDTO {
-  action: WaiterOrderAction;
-  rejectedItemIds?: string[]; // IDs de items rechazados (solo para partial)
+// Acciones que puede realizar el mozo sobre items individuales
+export type WaiterItemAction = "accept" | "reject";
+
+export interface WaiterItemActionDTO {
+  action: WaiterItemAction;
+  itemIds: string[]; // IDs de items a procesar
   notes?: string; // Mensaje opcional del mozo
 }
 
-export interface OrderActionResponse {
+export interface ItemActionResponse {
   success: boolean;
   message: string;
   order: OrderWithItems;
-  rejectedItems?: OrderItem[]; // Items que fueron rechazados
+  affectedItems: OrderItem[]; // Items que fueron procesados
 }

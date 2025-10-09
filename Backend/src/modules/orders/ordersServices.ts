@@ -1,9 +1,8 @@
 import { supabaseAdmin } from "../../config/supabase";
 import type {
   CreateOrderDTO,
-  Order,
   OrderWithItems,
-  OrderStatus,
+  OrderItemStatus,
 } from "./orders.types";
 
 // Crear nuevo pedido
@@ -55,7 +54,7 @@ export async function createOrder(
         table_id: orderData.table_id || null,
         total_amount: totalAmount,
         estimated_time: estimatedTime,
-        status: "pending",
+        is_paid: false, // NUEVO: Inicia como no pagado
         notes: orderData.notes || null,
       })
       .select()
@@ -71,6 +70,7 @@ export async function createOrder(
       quantity: item.quantity,
       unit_price: item.price,
       subtotal: item.price * item.quantity,
+      status: "pending" as OrderItemStatus, // NUEVO: Items inician pendientes
     }));
 
     const { error: itemsError } = await supabaseAdmin
@@ -196,22 +196,8 @@ export async function getTableOrders(
   return (data as OrderWithItems[]) || [];
 }
 
-// Actualizar estado del pedido
-export async function updateOrderStatus(
-  orderId: string,
-  status: OrderStatus,
-): Promise<Order> {
-  const { data, error } = await supabaseAdmin
-    .from("orders")
-    .update({ status })
-    .eq("id", orderId)
-    .select()
-    .single();
-
-  if (error)
-    throw new Error(`Error actualizando estado del pedido: ${error.message}`);
-  return data as Order;
-}
+// Función obsoleta - eliminada con el nuevo sistema de estados por item
+// Los estados ahora se manejan a nivel de item, no de orden
 
 // Obtener pedidos pendientes (para empleados)
 export async function getPendingOrders(): Promise<OrderWithItems[]> {
@@ -301,17 +287,24 @@ export async function getWaiterPendingOrders(
     `,
     )
     .in("table_id", tableIds)
-    .in("status", ["pending"])
+    .eq("is_paid", false)
     .order("created_at", { ascending: true });
 
   if (error)
     throw new Error(
       `Error obteniendo pedidos pendientes para mozo: ${error.message}`,
     );
-  return (data as OrderWithItems[]) || [];
+
+  // Filtrar órdenes que tengan al menos un item pendiente
+  const pendingOrders =
+    (data as OrderWithItems[])?.filter((order: any) => {
+      return order.order_items?.some((item: any) => item.status === "pending");
+    }) || [];
+
+  return pendingOrders;
 }
 
-// Obtener pedidos en proceso para un mozo específico (aceptados, preparando, listos)
+// Obtener pedidos en proceso para un mozo específico (con items aceptados, preparando, listos)
 export async function getWaiterActiveOrders(
   waiterId: string,
 ): Promise<OrderWithItems[]> {
@@ -332,6 +325,7 @@ export async function getWaiterActiveOrders(
 
   const tableIds = assignedTables.map(table => table.id);
 
+  // Obtener órdenes no pagadas que tengan items en estados activos
   const { data, error } = await supabaseAdmin
     .from("orders")
     .select(
@@ -361,14 +355,23 @@ export async function getWaiterActiveOrders(
     `,
     )
     .in("table_id", tableIds)
-    .in("status", ["accepted", "preparing", "ready"])
+    .eq("is_paid", false)
     .order("created_at", { ascending: true });
 
   if (error)
     throw new Error(
       `Error obteniendo pedidos activos para mozo: ${error.message}`,
     );
-  return (data as any) || [];
+
+  // Filtrar órdenes que tengan al menos un item en estado activo (no pending y no rejected)
+  const activeOrders =
+    (data as any)?.filter((order: any) => {
+      return order.order_items?.some((item: any) =>
+        ["accepted", "preparing", "ready", "delivered"].includes(item.status),
+      );
+    }) || [];
+
+  return activeOrders;
 }
 
 // Aceptar orden completa
@@ -626,6 +629,469 @@ export async function addItemsToPartialOrder(
     return updatedOrder;
   } catch (error) {
     console.error("❌ Error en addItemsToPartialOrder:", error);
+    throw error;
+  }
+}
+
+// Agregar items a un pedido existente (cualquier estado excepto delivered/cancelled)
+export async function addItemsToExistingOrder(
+  orderId: string,
+  newItems: Array<{
+    id: string;
+    name: string;
+    category: string;
+    price: number;
+    prepMinutes: number;
+    quantity: number;
+    image_url?: string | undefined;
+  }>,
+  userId: string,
+): Promise<OrderWithItems> {
+  try {
+    console.log(`📝 Agregando items a pedido existente ${orderId}`);
+
+    // 1. Verificar que la orden existe y pertenece al usuario
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from("orders")
+      .select("id, user_id, is_paid, total_amount, estimated_time")
+      .eq("id", orderId)
+      .eq("user_id", userId)
+      .single();
+
+    if (orderError)
+      throw new Error(`Error obteniendo orden: ${orderError.message}`);
+    if (!order) throw new Error("Orden no encontrada");
+
+    // 2. Verificar que la orden permite agregar items (no debe estar pagada)
+    if (order.is_paid) {
+      throw new Error(
+        `No se pueden agregar items a un pedido que ya está pagado`,
+      );
+    }
+
+    // 3. Validar que todos los productos nuevos existen y están activos
+    const menuItemIds = newItems.map(item => item.id);
+    const { data: menuItems, error: menuError } = await supabaseAdmin
+      .from("menu_items")
+      .select("id, name, price, prep_minutes")
+      .in("id", menuItemIds)
+      .eq("is_active", true);
+
+    if (menuError)
+      throw new Error(`Error obteniendo productos: ${menuError.message}`);
+    if (!menuItems || menuItems.length === 0)
+      throw new Error("No se encontraron productos válidos");
+
+    // 4. Verificar que todos los productos del frontend existen en la BD
+    for (const newItem of newItems) {
+      const menuItem = menuItems.find(mi => mi.id === newItem.id);
+      if (!menuItem)
+        throw new Error(`Producto con ID ${newItem.id} no encontrado`);
+
+      // Verificar precios (opcional - se podría usar precio de BD)
+      if (Math.abs(menuItem.price - newItem.price) > 0.01)
+        console.warn(
+          `⚠️ Precio discrepante para ${newItem.name}: BD=${menuItem.price}, Frontend=${newItem.price}`,
+        );
+    }
+
+    // 5. Insertar nuevos order_items con status 'pending'
+    const orderItemsToInsert = newItems.map(item => ({
+      order_id: orderId,
+      menu_item_id: item.id,
+      quantity: item.quantity,
+      unit_price: item.price,
+      subtotal: item.price * item.quantity,
+      status: "pending" as OrderItemStatus, // Los nuevos items siempre empiezan como pending
+    }));
+
+    const { error: insertError } = await supabaseAdmin
+      .from("order_items")
+      .insert(orderItemsToInsert);
+
+    if (insertError)
+      throw new Error(`Error insertando items: ${insertError.message}`);
+
+    // 6. Recalcular totales de la orden (solo items aceptados + pendientes)
+    const { data: allOrderItems, error: itemsError } = await supabaseAdmin
+      .from("order_items")
+      .select(
+        `
+        id,
+        quantity,
+        subtotal,
+        status,
+        menu_items!inner(prep_minutes)
+      `,
+      )
+      .eq("order_id", orderId)
+      .in("status", ["accepted", "pending"]); // Solo contar items no rechazados
+
+    if (itemsError)
+      throw new Error(`Error obteniendo items: ${itemsError.message}`);
+
+    // Calcular nuevo total y tiempo estimado
+    const newTotalAmount = allOrderItems.reduce(
+      (sum, item) => sum + item.subtotal,
+      0,
+    );
+    const newEstimatedTime = Math.max(
+      ...allOrderItems.map(item => (item.menu_items as any).prep_minutes),
+    );
+
+    console.log(`💰 Nuevo total: $${newTotalAmount}`);
+    console.log(`⏰ Nuevo tiempo estimado: ${newEstimatedTime} min`);
+
+    // 7. Actualizar orden - solo actualizar totales (los items nuevos van como pending)
+    const { error: updateError } = await supabaseAdmin
+      .from("orders")
+      .update({
+        total_amount: newTotalAmount,
+        estimated_time: newEstimatedTime,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
+
+    if (updateError)
+      throw new Error(`Error actualizando orden: ${updateError.message}`);
+
+    console.log(
+      `✅ Items agregados exitosamente a la orden ${orderId}. Nuevos items en estado 'pending'`,
+    );
+
+    // 8. Obtener orden actualizada completa
+    const updatedOrder = await getOrderById(orderId);
+    return updatedOrder;
+  } catch (error) {
+    console.error("❌ Error en addItemsToExistingOrder:", error);
+    throw error;
+  }
+}
+
+// FUNCIÓN OBSOLETA - Reemplazada por waiterItemsActionNew
+// Esta función usaba el sistema antiguo de estados a nivel de orden
+// El nuevo sistema maneja estados únicamente a nivel de item
+
+// NUEVA FUNCIÓN REFACTORIZADA: Obtener items pendientes de aprobación
+export async function getWaiterPendingItems(waiterId: string): Promise<any[]> {
+  // Obtener mesas asignadas al mozo
+  const { data: assignedTables, error: tablesError } = await supabaseAdmin
+    .from("tables")
+    .select("id")
+    .eq("id_waiter", waiterId);
+
+  if (tablesError) {
+    throw new Error(`Error obteniendo mesas asignadas: ${tablesError.message}`);
+  }
+
+  if (!assignedTables || assignedTables.length === 0) {
+    return [];
+  }
+
+  const tableIds = assignedTables.map(table => table.id);
+
+  // Obtener órdenes NO PAGADAS que tienen items pendientes
+  const { data, error } = await supabaseAdmin
+    .from("orders")
+    .select(
+      `
+      id,
+      user_id,
+      table_id,
+      is_paid,
+      total_amount,
+      estimated_time,
+      notes,
+      created_at,
+      updated_at,
+      order_items!inner (
+        id,
+        menu_item_id,
+        quantity,
+        unit_price,
+        subtotal,
+        status,
+        created_at,
+        menu_item:menu_items (
+          id,
+          name,
+          description,
+          prep_minutes,
+          price,
+          category
+        )
+      ),
+      table:tables (
+        id,
+        number
+      ),
+      user:users (
+        id,
+        first_name,
+        last_name,
+        profile_image
+      )
+    `,
+    )
+    .in("table_id", tableIds)
+    .eq("is_paid", false) // Solo órdenes no pagadas
+    .eq("order_items.status", "pending") // Solo items pendientes
+    .order("created_at", { ascending: true });
+
+  if (error)
+    throw new Error(`Error obteniendo items pendientes: ${error.message}`);
+
+  // Filtrar para que cada orden solo tenga los items pendientes
+  const ordersWithPendingItems = (data || [])
+    .map(order => ({
+      ...order,
+      order_items: order.order_items.filter(
+        (item: any) => item.status === "pending",
+      ),
+    }))
+    .filter(order => order.order_items.length > 0);
+
+  return ordersWithPendingItems;
+}
+
+// NUEVA FUNCIÓN REFACTORIZADA: Acción del mozo sobre items específicos
+export async function waiterItemsActionNew(
+  orderId: string,
+  action: "accept" | "reject",
+  itemIds: string[],
+  notes?: string,
+): Promise<{
+  order: any;
+  affectedItems: any[];
+}> {
+  try {
+    console.log(
+      `👨‍💼 Mozo ${action} items [${itemIds.join(", ")}] en orden ${orderId}`,
+    );
+
+    // 1. Verificar que la orden existe y no está pagada
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from("orders")
+      .select("*")
+      .eq("id", orderId)
+      .eq("is_paid", false) // Solo órdenes no pagadas
+      .single();
+
+    if (orderError || !order) {
+      throw new Error("Orden no encontrada o ya está pagada");
+    }
+
+    // 2. Verificar que todos los items existen y están pending
+    const { data: items, error: itemsError } = await supabaseAdmin
+      .from("order_items")
+      .select("*")
+      .eq("order_id", orderId)
+      .in("id", itemIds)
+      .eq("status", "pending");
+
+    if (itemsError || !items || items.length !== itemIds.length) {
+      throw new Error("Algunos items no existen o no están pendientes");
+    }
+
+    // 3. Actualizar status de los items
+    const newStatus = action === "accept" ? "accepted" : "rejected";
+
+    const { error: updateError } = await supabaseAdmin
+      .from("order_items")
+      .update({
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .in("id", itemIds);
+
+    if (updateError) {
+      throw new Error(`Error actualizando items: ${updateError.message}`);
+    }
+
+    // 4. Recalcular total de la orden (solo items aceptados + accepted)
+    const { data: acceptedItems, error: acceptedError } = await supabaseAdmin
+      .from("order_items")
+      .select("subtotal")
+      .eq("order_id", orderId)
+      .in("status", ["accepted"]);
+
+    if (acceptedError) {
+      throw new Error(
+        `Error obteniendo items aceptados: ${acceptedError.message}`,
+      );
+    }
+
+    // Calcular nuevo total
+    const newTotalAmount = (acceptedItems || []).reduce(
+      (sum, item) => sum + item.subtotal,
+      0,
+    );
+
+    // 5. Actualizar total de la orden
+    const { error: orderUpdateError } = await supabaseAdmin
+      .from("orders")
+      .update({
+        total_amount: newTotalAmount,
+        notes: notes || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
+
+    if (orderUpdateError) {
+      throw new Error(`Error actualizando orden: ${orderUpdateError.message}`);
+    }
+
+    console.log(
+      `✅ Acción ${action} completada en ${itemIds.length} items. Nuevo total: $${newTotalAmount}`,
+    );
+
+    // 6. Retornar orden actualizada
+    const updatedOrder = await getOrderById(orderId);
+
+    return {
+      order: updatedOrder,
+      affectedItems: items,
+    };
+  } catch (error) {
+    console.error("❌ Error en waiterItemsActionNew:", error);
+    throw error;
+  }
+}
+
+// Reemplazar items rechazados con nuevos items
+export async function replaceRejectedItems(
+  orderId: string,
+  userId: string,
+  rejectedItemIds: string[],
+  newItems: Array<{
+    menu_item_id: string;
+    quantity: number;
+    unit_price: number;
+  }>,
+): Promise<OrderWithItems> {
+  try {
+    console.log(`🔄 Reemplazando items rechazados en orden ${orderId}`);
+
+    // 1. Verificar que la orden existe y pertenece al usuario
+    const existingOrder = await getOrderById(orderId);
+    if (existingOrder.user_id !== userId) {
+      throw new Error("No tienes permisos para modificar esta orden");
+    }
+
+    if (existingOrder.is_paid) {
+      throw new Error("No se pueden modificar órdenes que ya están pagadas");
+    }
+
+    // 2. Verificar que los items están realmente rechazados
+    const { data: rejectedItems, error: rejectedError } = await supabaseAdmin
+      .from("order_items")
+      .select("*")
+      .eq("order_id", orderId)
+      .in("id", rejectedItemIds)
+      .eq("status", "rejected");
+
+    if (rejectedError) {
+      throw new Error(
+        `Error verificando items rechazados: ${rejectedError.message}`,
+      );
+    }
+
+    if (!rejectedItems || rejectedItems.length !== rejectedItemIds.length) {
+      throw new Error("Algunos items no están rechazados o no existen");
+    }
+
+    // 3. Eliminar items rechazados
+    const { error: deleteError } = await supabaseAdmin
+      .from("order_items")
+      .delete()
+      .in("id", rejectedItemIds);
+
+    if (deleteError) {
+      throw new Error(
+        `Error eliminando items rechazados: ${deleteError.message}`,
+      );
+    }
+
+    // 4. Validar que los nuevos productos existen
+    const menuItemIds = newItems.map(item => item.menu_item_id);
+    const { data: menuItems, error: menuError } = await supabaseAdmin
+      .from("menu_items")
+      .select("*")
+      .in("id", menuItemIds)
+      .eq("is_active", true);
+
+    if (menuError) {
+      throw new Error(`Error validando productos: ${menuError.message}`);
+    }
+
+    if (!menuItems || menuItems.length !== menuItemIds.length) {
+      throw new Error("Algunos productos no existen o no están disponibles");
+    }
+
+    // 5. Crear nuevos items (en estado pending)
+    const orderItemsToInsert = newItems.map(item => ({
+      order_id: orderId,
+      menu_item_id: item.menu_item_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      subtotal: item.unit_price * item.quantity,
+      status: "pending" as OrderItemStatus,
+      created_at: new Date().toISOString(),
+    }));
+
+    const { error: insertError } = await supabaseAdmin
+      .from("order_items")
+      .insert(orderItemsToInsert);
+
+    if (insertError) {
+      throw new Error(`Error insertando nuevos items: ${insertError.message}`);
+    }
+
+    // 6. Recalcular totales de la orden (solo items no rechazados)
+    const { data: allOrderItems, error: allItemsError } = await supabaseAdmin
+      .from("order_items")
+      .select("subtotal, menu_items!inner(prep_minutes)")
+      .eq("order_id", orderId)
+      .neq("status", "rejected");
+
+    if (allItemsError) {
+      throw new Error(`Error calculando totales: ${allItemsError.message}`);
+    }
+
+    const newTotalAmount = (allOrderItems || []).reduce(
+      (sum, item) => sum + item.subtotal,
+      0,
+    );
+
+    const newEstimatedTime = Math.max(
+      ...(allOrderItems || []).map(
+        item => (item.menu_items as any).prep_minutes,
+      ),
+    );
+
+    // 7. Actualizar totales de la orden
+    const { error: updateError } = await supabaseAdmin
+      .from("orders")
+      .update({
+        total_amount: newTotalAmount,
+        estimated_time: newEstimatedTime,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
+
+    if (updateError) {
+      throw new Error(`Error actualizando orden: ${updateError.message}`);
+    }
+
+    console.log(
+      `✅ Items rechazados reemplazados exitosamente en orden ${orderId}`,
+    );
+
+    // 8. Retornar orden actualizada
+    const updatedOrder = await getOrderById(orderId);
+    return updatedOrder;
+  } catch (error) {
+    console.error("❌ Error en replaceRejectedItems:", error);
     throw error;
   }
 }

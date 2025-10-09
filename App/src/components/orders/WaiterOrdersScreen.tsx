@@ -18,26 +18,20 @@ import {
   Users,
   RefreshCw,
   AlertCircle,
-  Minus,
 } from "lucide-react-native";
 import {
-  getWaiterPendingOrders,
   getWaiterActiveOrders,
-  waiterOrderAction,
+  getWaiterPendingItems,
+  waiterItemsAction,
 } from "../../api/orders";
 import type { Order } from "../../types/Order";
-import PartialRejectModal from "./PartialRejectModal";
 
 export default function WaiterOrdersScreen() {
-  const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
+  const [pendingItems, setPendingItems] = useState<Order[]>([]);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [partialRejectModal, setPartialRejectModal] = useState<{
-    visible: boolean;
-    order: Order | null;
-  }>({ visible: false, order: null });
 
   useEffect(() => {
     fetchOrders();
@@ -51,92 +45,75 @@ export default function WaiterOrdersScreen() {
         setLoading(true);
       }
 
-      const [pending, active] = await Promise.all([
-        getWaiterPendingOrders(),
+      const [pendingItemsResult, active] = await Promise.all([
+        getWaiterPendingItems(),
         getWaiterActiveOrders(),
       ]);
 
-      setPendingOrders(pending);
+      setPendingItems(pendingItemsResult);
       setActiveOrders(active);
     } catch (error: any) {
-      console.error("Error obteniendo órdenes pendientes:", error);
-      Alert.alert("Error", "No se pudieron cargar las órdenes pendientes");
+      console.error("Error obteniendo datos del mozo:", error);
+      Alert.alert("Error", "No se pudieron cargar los datos");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  const handleOrderAction = async (
+  const handleItemAction = async (
     orderId: string,
+    itemIds: string[],
     action: "accept" | "reject",
   ) => {
     try {
       setActionLoading(orderId);
-      const response = await waiterOrderAction(orderId, { action });
+      await waiterItemsAction(orderId, itemIds, action);
 
-      if (response.success) {
-        // Remover la orden de la lista de pendientes después de aceptar/rechazar
-        setPendingOrders(prevOrders =>
-          prevOrders.filter(order => order.id !== orderId),
-        );
-
-        // Refrescar las órdenes para actualizar la lista de activas
-        await fetchOrders();
-
-        const actionText = action === "accept" ? "aceptada" : "rechazada";
-        Alert.alert("Éxito", `Orden ${actionText} correctamente`);
-      }
-    } catch (error: any) {
-      console.error(`Error al ${action} orden:`, error);
-      Alert.alert("Error", error.message || `No se pudo ${action} la orden`);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handlePartialReject = async (rejectedItemIds: string[]) => {
-    if (!partialRejectModal.order) return;
-
-    try {
-      setActionLoading(partialRejectModal.order.id);
-      const response = await waiterOrderAction(partialRejectModal.order.id, {
-        action: "partial",
-        rejectedItemIds: rejectedItemIds,
-      });
-
-      if (response.success) {
-        // Remover la orden de la lista de pendientes (ahora está en estado partial)
-        setPendingOrders(prevOrders =>
-          prevOrders.filter(order => order.id !== partialRejectModal.order!.id),
-        );
-
-        setPartialRejectModal({ visible: false, order: null });
-        Alert.alert("Éxito", "Productos rechazados correctamente");
-      }
-    } catch (error: any) {
-      console.error("Error al rechazar productos:", error);
       Alert.alert(
-        "Error",
-        error.message || "No se pudieron rechazar los productos",
+        "Éxito",
+        `Items ${action === "accept" ? "aceptados" : "rechazados"} correctamente`,
       );
+
+      // Refrescar datos
+      await fetchOrders();
+    } catch (error: any) {
+      console.error("Error procesando acción del mozo:", error);
+      Alert.alert("Error", error.message || "Error procesando la acción");
     } finally {
       setActionLoading(null);
     }
   };
 
-  const openPartialRejectModal = (order: Order) => {
-    console.log("🔍 Abriendo modal para orden:", {
-      orderId: order.id,
-      orderItemsCount: order.order_items?.length || 0,
-      orderItems: order.order_items,
-    });
-    setPartialRejectModal({ visible: true, order });
+  const getTotalPendingItems = () => {
+    return pendingItems.reduce((total, order) => {
+      return (
+        total +
+        order.order_items.filter(item => item.status === "pending").length
+      );
+    }, 0);
   };
 
-  const closePartialRejectModal = () => {
-    setPartialRejectModal({ visible: false, order: null });
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat("es-AR", {
+      style: "currency",
+      currency: "ARS",
+    }).format(price);
   };
+
+  if (loading) {
+    return (
+      <LinearGradient
+        colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
+        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+      >
+        <RefreshCw size={32} color="#d4af37" />
+        <Text style={{ color: "white", marginTop: 16, fontSize: 16 }}>
+          Cargando pedidos...
+        </Text>
+      </LinearGradient>
+    );
+  }
 
   return (
     <LinearGradient
@@ -147,23 +124,74 @@ export default function WaiterOrdersScreen() {
         style={{
           paddingTop: 48,
           paddingHorizontal: 24,
-          paddingBottom: 16,
+          paddingBottom: 12,
           borderBottomWidth: 1,
           borderBottomColor: "rgba(255,255,255,0.1)",
         }}
       >
-        <Text
+        <View
           style={{
-            color: "white",
-            fontSize: 24,
-            fontWeight: "600",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 16,
           }}
         >
-          Órdenes del Mozo
-        </Text>
-        <Text style={{ color: "#d1d5db", fontSize: 14, marginTop: 4 }}>
-          {pendingOrders.length} pendientes • {activeOrders.length} activas
-        </Text>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <ChefHat size={24} color="#d4af37" />
+            <Text
+              style={{
+                color: "white",
+                fontSize: 24,
+                fontWeight: "bold",
+                marginLeft: 12,
+              }}
+            >
+              Panel del Mozo
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => fetchOrders(true)}
+            disabled={refreshing}
+            style={{
+              backgroundColor: "rgba(212,175,55,0.2)",
+              borderRadius: 12,
+              padding: 12,
+            }}
+          >
+            <RefreshCw
+              size={20}
+              color="#d4af37"
+              style={{
+                transform: refreshing ? [{ rotate: "360deg" }] : [],
+              }}
+            />
+          </TouchableOpacity>
+        </View>
+
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            backgroundColor: "rgba(212,175,55,0.1)",
+            borderRadius: 12,
+            padding: 12,
+          }}
+        >
+          <Users size={16} color="#d4af37" />
+          <Text
+            style={{
+              color: "#d4af37",
+              fontSize: 14,
+              fontWeight: "500",
+              marginLeft: 8,
+            }}
+          >
+            {getTotalPendingItems()} items pendientes • {activeOrders.length}{" "}
+            órdenes activas
+          </Text>
+        </View>
       </View>
 
       <ScrollView
@@ -177,54 +205,42 @@ export default function WaiterOrdersScreen() {
           />
         }
       >
-        {loading ? (
+        {getTotalPendingItems() === 0 && activeOrders.length === 0 ? (
           <View
             style={{
+              flex: 1,
               alignItems: "center",
               justifyContent: "center",
-              paddingVertical: 48,
+              paddingVertical: 60,
             }}
           >
-            <RefreshCw size={48} color="#d4af37" />
-            <Text style={{ color: "white", fontSize: 18, marginTop: 16 }}>
-              Cargando órdenes...
-            </Text>
-          </View>
-        ) : pendingOrders.length === 0 && activeOrders.length === 0 ? (
-          <View
-            style={{
-              alignItems: "center",
-              justifyContent: "center",
-              paddingVertical: 48,
-            }}
-          >
-            <CheckCircle size={64} color="#22c55e" />
+            <CheckCircle size={48} color="#22c55e" />
             <Text
               style={{
-                color: "#22c55e",
+                color: "white",
                 fontSize: 20,
                 fontWeight: "600",
                 marginTop: 16,
                 textAlign: "center",
               }}
             >
-              ¡Todas las órdenes procesadas!
+              ¡Todo al día!
             </Text>
             <Text
               style={{
-                color: "#9ca3af",
+                color: "#6b7280",
                 fontSize: 14,
                 marginTop: 4,
                 textAlign: "center",
               }}
             >
-              No hay órdenes pendientes por revisar
+              No hay items pendientes de aprobación
             </Text>
           </View>
         ) : (
           <>
-            {/* Sección de Órdenes Pendientes */}
-            {pendingOrders.length > 0 && (
+            {/* Sección de Items Pendientes de Aprobación */}
+            {pendingItems.length > 0 && (
               <>
                 <View
                   style={{
@@ -233,339 +249,314 @@ export default function WaiterOrdersScreen() {
                     marginBottom: 16,
                     paddingBottom: 8,
                     borderBottomWidth: 1,
-                    borderBottomColor: "rgba(255, 165, 0, 0.3)",
+                    borderBottomColor: "rgba(59, 130, 246, 0.3)",
                   }}
                 >
-                  <Clock size={20} color="#ffa500" />
+                  <AlertCircle size={20} color="#3b82f6" />
                   <Text
                     style={{
-                      color: "#ffa500",
+                      color: "#3b82f6",
                       fontSize: 18,
                       fontWeight: "600",
                       marginLeft: 8,
                     }}
                   >
-                    Órdenes Pendientes ({pendingOrders.length})
+                    Items Pendientes de Aprobación ({getTotalPendingItems()})
                   </Text>
                 </View>
 
-                {pendingOrders.map(order => (
-                  <View
-                    key={order.id}
-                    style={{
-                      backgroundColor: "rgba(255,255,255,0.05)",
-                      borderRadius: 16,
-                      padding: 20,
-                      marginBottom: 20,
-                      borderWidth: 1,
-                      borderColor: "rgba(212,175,55,0.3)",
-                    }}
-                  >
-                    {/* Header de la orden */}
+                {pendingItems.map(order => {
+                  const pendingOrderItems = order.order_items.filter(
+                    item => item.status === "pending",
+                  );
+
+                  if (pendingOrderItems.length === 0) return null;
+
+                  return (
                     <View
+                      key={`pending-items-${order.id}`}
                       style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        marginBottom: 16,
-                        paddingBottom: 12,
-                        borderBottomWidth: 1,
-                        borderBottomColor: "rgba(255,255,255,0.1)",
+                        backgroundColor: "rgba(59, 130, 246, 0.05)",
+                        borderRadius: 16,
+                        padding: 20,
+                        marginBottom: 20,
+                        borderWidth: 1,
+                        borderColor: "rgba(59, 130, 246, 0.3)",
                       }}
                     >
+                      {/* Header de la orden */}
                       <View
                         style={{
                           flexDirection: "row",
+                          justifyContent: "space-between",
                           alignItems: "center",
-                          flex: 1,
+                          marginBottom: 16,
+                          paddingBottom: 12,
+                          borderBottomWidth: 1,
+                          borderBottomColor: "rgba(255,255,255,0.1)",
                         }}
                       >
-                        {order.user?.profile_image ? (
-                          <Image
-                            source={{ uri: order.user.profile_image }}
-                            style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: 20,
-                              marginRight: 12,
-                            }}
-                          />
-                        ) : (
-                          <View
-                            style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: 20,
-                              backgroundColor: "#d4af37",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              marginRight: 12,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                color: "#1a1a1a",
-                                fontWeight: "600",
-                                fontSize: 16,
-                              }}
-                            >
-                              {order.user?.first_name
-                                ?.charAt(0)
-                                .toUpperCase() || "U"}
-                            </Text>
-                          </View>
-                        )}
-
-                        <View style={{ flex: 1 }}>
-                          <Text
-                            style={{
-                              color: "white",
-                              fontSize: 18,
-                              fontWeight: "600",
-                            }}
-                          >
-                            Mesa {order.table?.number || "Sin mesa"}
-                          </Text>
-                          <Text
-                            style={{
-                              color: "#d1d5db",
-                              fontSize: 14,
-                            }}
-                          >
-                            {order.user
-                              ? `${order.user.first_name} ${order.user.last_name}`
-                              : "Cliente"}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View style={{ alignItems: "flex-end" }}>
-                        <Text
-                          style={{
-                            color: "#d4af37",
-                            fontSize: 18,
-                            fontWeight: "600",
-                          }}
-                        >
-                          ${order.total_amount.toFixed(2)}
-                        </Text>
                         <View
-                          style={{ flexDirection: "row", alignItems: "center" }}
-                        >
-                          <Clock size={12} color="#d1d5db" />
-                          <Text
-                            style={{
-                              color: "#d1d5db",
-                              fontSize: 12,
-                              marginLeft: 4,
-                            }}
-                          >
-                            {new Date(order.created_at).toLocaleTimeString(
-                              "es-AR",
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              },
-                            )}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    {/* Items del pedido */}
-                    <View style={{ marginBottom: 16 }}>
-                      <Text
-                        style={{
-                          color: "#d1d5db",
-                          fontSize: 14,
-                          marginBottom: 8,
-                          fontWeight: "500",
-                        }}
-                      >
-                        Items del pedido:
-                      </Text>
-
-                      {order.order_items.map((item, index) => (
-                        <View
-                          key={`${item.id}-${index}`}
                           style={{
                             flexDirection: "row",
                             alignItems: "center",
-                            backgroundColor: "rgba(255,255,255,0.03)",
-                            borderRadius: 8,
-                            padding: 12,
-                            marginBottom: 8,
+                            flex: 1,
                           }}
                         >
-                          <View style={{ flex: 1 }}>
+                          {order.user?.profile_image ? (
+                            <Image
+                              source={{ uri: order.user.profile_image }}
+                              style={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: 20,
+                                marginRight: 12,
+                              }}
+                            />
+                          ) : (
                             <View
                               style={{
-                                flexDirection: "row",
+                                width: 40,
+                                height: 40,
+                                borderRadius: 20,
+                                backgroundColor: "#3b82f6",
                                 alignItems: "center",
-                                marginBottom: 2,
+                                justifyContent: "center",
+                                marginRight: 12,
                               }}
                             >
-                              <View
-                                style={{
-                                  backgroundColor:
-                                    item.menu_item?.category === "plato"
-                                      ? "#ef4444"
-                                      : "#3b82f6",
-                                  borderRadius: 4,
-                                  padding: 2,
-                                  marginRight: 6,
-                                }}
-                              >
-                                {item.menu_item?.category === "plato" ? (
-                                  <ChefHat size={10} color="white" />
-                                ) : (
-                                  <Coffee size={10} color="white" />
-                                )}
-                              </View>
                               <Text
                                 style={{
                                   color: "white",
-                                  fontSize: 15,
-                                  fontWeight: "500",
+                                  fontWeight: "600",
+                                  fontSize: 16,
                                 }}
                               >
-                                {item.menu_item?.name || "Producto"}
+                                {order.user?.first_name
+                                  ?.charAt(0)
+                                  .toUpperCase() || "U"}
                               </Text>
                             </View>
+                          )}
 
-                            <View
+                          <View style={{ flex: 1 }}>
+                            <Text
                               style={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                                gap: 8,
+                                color: "white",
+                                fontSize: 18,
+                                fontWeight: "600",
                               }}
                             >
-                              <Text style={{ color: "#9ca3af", fontSize: 12 }}>
-                                Cantidad: {item.quantity}
-                              </Text>
-                              <Text style={{ color: "#9ca3af", fontSize: 12 }}>
-                                {item.menu_item?.prep_minutes || 0} min
-                              </Text>
-                            </View>
+                              Mesa {order.table?.number || "Sin mesa"}
+                            </Text>
+                            <Text
+                              style={{
+                                color: "#d1d5db",
+                                fontSize: 14,
+                              }}
+                            >
+                              {order.user
+                                ? `${order.user.first_name} ${order.user.last_name}`
+                                : "Cliente"}
+                            </Text>
                           </View>
+                        </View>
 
+                        <View style={{ alignItems: "flex-end" }}>
                           <Text
                             style={{
-                              color: "#d4af37",
-                              fontSize: 14,
+                              color: "#3b82f6",
+                              fontSize: 16,
                               fontWeight: "600",
                             }}
                           >
-                            ${item.subtotal.toFixed(2)}
+                            {pendingOrderItems.length} item
+                            {pendingOrderItems.length > 1 ? "s" : ""} pendiente
+                            {pendingOrderItems.length > 1 ? "s" : ""}
                           </Text>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Clock size={12} color="#d1d5db" />
+                            <Text
+                              style={{
+                                color: "#d1d5db",
+                                fontSize: 12,
+                                marginLeft: 4,
+                              }}
+                            >
+                              {new Date(order.created_at).toLocaleTimeString(
+                                "es-AR",
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}
+                            </Text>
+                          </View>
                         </View>
-                      ))}
-                    </View>
+                      </View>
 
-                    {/* Tiempo estimado */}
-                    <View
-                      style={{
-                        backgroundColor: "rgba(212,175,55,0.1)",
-                        borderRadius: 8,
-                        padding: 12,
-                        marginBottom: 16,
-                        flexDirection: "row",
-                        alignItems: "center",
-                      }}
-                    >
-                      <AlertCircle size={16} color="#d4af37" />
-                      <Text
-                        style={{
-                          color: "#d4af37",
-                          fontSize: 14,
-                          marginLeft: 8,
-                          fontWeight: "500",
-                        }}
-                      >
-                        Tiempo estimado: {order.estimated_time} minutos
-                      </Text>
-                    </View>
-
-                    {/* Botones de acción */}
-                    <View style={{ flexDirection: "row", gap: 8 }}>
-                      <TouchableOpacity
-                        onPress={() => handleOrderAction(order.id, "accept")}
-                        disabled={actionLoading === order.id}
-                        style={{
-                          flex: 1,
-                          backgroundColor:
-                            actionLoading === order.id ? "#9ca3af" : "#22c55e",
-                          borderRadius: 10,
-                          padding: 14,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          opacity: actionLoading === order.id ? 0.7 : 1,
-                        }}
-                      >
-                        <CheckCircle size={18} color="white" />
+                      {/* Items pendientes */}
+                      <View style={{ marginBottom: 16 }}>
                         <Text
                           style={{
-                            color: "white",
+                            color: "#3b82f6",
                             fontSize: 14,
+                            marginBottom: 12,
                             fontWeight: "600",
-                            marginLeft: 6,
                           }}
                         >
-                          Aceptar
+                          Items esperando tu aprobación:
                         </Text>
-                      </TouchableOpacity>
 
-                      <TouchableOpacity
-                        onPress={() => openPartialRejectModal(order)}
-                        disabled={actionLoading === order.id}
+                        {pendingOrderItems.map((item, index) => (
+                          <View
+                            key={`${item.id}-${index}`}
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              backgroundColor: "rgba(59, 130, 246, 0.1)",
+                              borderRadius: 8,
+                              padding: 12,
+                              marginBottom: 8,
+                            }}
+                          >
+                            <View
+                              style={{
+                                backgroundColor:
+                                  item.menu_item?.category === "plato"
+                                    ? "#ef4444"
+                                    : "#3b82f6",
+                                borderRadius: 4,
+                                padding: 4,
+                                marginRight: 8,
+                              }}
+                            >
+                              {item.menu_item?.category === "plato" ? (
+                                <ChefHat size={12} color="white" />
+                              ) : (
+                                <Coffee size={12} color="white" />
+                              )}
+                            </View>
+
+                            <View style={{ flex: 1 }}>
+                              <Text
+                                style={{
+                                  color: "white",
+                                  fontSize: 16,
+                                  fontWeight: "500",
+                                }}
+                              >
+                                {item.menu_item?.name}
+                              </Text>
+                              <Text
+                                style={{
+                                  color: "#9ca3af",
+                                  fontSize: 12,
+                                }}
+                              >
+                                Cantidad: {item.quantity}
+                              </Text>
+                            </View>
+
+                            <Text
+                              style={{
+                                color: "#3b82f6",
+                                fontSize: 16,
+                                fontWeight: "600",
+                              }}
+                            >
+                              {formatPrice(item.subtotal)}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+
+                      {/* Botones de acción para los items pendientes */}
+                      <View
                         style={{
-                          backgroundColor: "#f59e0b",
-                          borderRadius: 10,
-                          padding: 14,
                           flexDirection: "row",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          opacity: actionLoading === order.id ? 0.7 : 1,
-                          minWidth: 60,
+                          justifyContent: "space-between",
+                          gap: 12,
                         }}
                       >
-                        <Minus size={18} color="white" />
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={() => handleOrderAction(order.id, "reject")}
-                        disabled={actionLoading === order.id}
-                        style={{
-                          flex: 1,
-                          backgroundColor: "#ef4444",
-                          borderRadius: 10,
-                          padding: 14,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          opacity: actionLoading === order.id ? 0.7 : 1,
-                        }}
-                      >
-                        <XCircle size={18} color="white" />
-                        <Text
+                        <TouchableOpacity
+                          onPress={() =>
+                            handleItemAction(
+                              order.id,
+                              pendingOrderItems.map(item => item.id),
+                              "accept",
+                            )
+                          }
+                          disabled={actionLoading === order.id}
                           style={{
-                            color: "white",
-                            fontSize: 14,
-                            fontWeight: "600",
-                            marginLeft: 6,
+                            flex: 1,
+                            backgroundColor: "#22c55e",
+                            borderRadius: 10,
+                            padding: 14,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            opacity: actionLoading === order.id ? 0.7 : 1,
                           }}
                         >
-                          Rechazar
-                        </Text>
-                      </TouchableOpacity>
+                          <CheckCircle size={18} color="white" />
+                          <Text
+                            style={{
+                              color: "white",
+                              fontSize: 14,
+                              fontWeight: "600",
+                              marginLeft: 6,
+                            }}
+                          >
+                            Aceptar Todos
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          onPress={() =>
+                            handleItemAction(
+                              order.id,
+                              pendingOrderItems.map(item => item.id),
+                              "reject",
+                            )
+                          }
+                          disabled={actionLoading === order.id}
+                          style={{
+                            flex: 1,
+                            backgroundColor: "#ef4444",
+                            borderRadius: 10,
+                            padding: 14,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            opacity: actionLoading === order.id ? 0.7 : 1,
+                          }}
+                        >
+                          <XCircle size={18} color="white" />
+                          <Text
+                            style={{
+                              color: "white",
+                              fontSize: 14,
+                              fontWeight: "600",
+                              marginLeft: 6,
+                            }}
+                          >
+                            Rechazar Todos
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </>
             )}
 
-            {/* Sección de Órdenes Activas */}
+            {/* Sección de Órdenes Activas (solo para información) */}
             {activeOrders.length > 0 && (
               <>
                 <View
@@ -573,7 +564,7 @@ export default function WaiterOrdersScreen() {
                     flexDirection: "row",
                     alignItems: "center",
                     marginBottom: 16,
-                    marginTop: pendingOrders.length > 0 ? 32 : 0,
+                    marginTop: pendingItems.length > 0 ? 32 : 0,
                     paddingBottom: 8,
                     borderBottomWidth: 1,
                     borderBottomColor: "rgba(34, 197, 94, 0.3)",
@@ -611,48 +602,26 @@ export default function WaiterOrdersScreen() {
                         alignItems: "center",
                         justifyContent: "space-between",
                         marginBottom: 16,
-                        paddingBottom: 12,
-                        borderBottomWidth: 1,
-                        borderBottomColor: "rgba(255,255,255,0.1)",
                       }}
                     >
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          flex: 1,
-                        }}
-                      >
-                        <View
+                      <View style={{ flex: 1 }}>
+                        <Text
                           style={{
-                            backgroundColor: "#22c55e",
-                            borderRadius: 8,
-                            padding: 8,
-                            marginRight: 12,
+                            color: "white",
+                            fontSize: 18,
+                            fontWeight: "600",
                           }}
                         >
-                          <Users size={20} color="white" />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text
-                            style={{
-                              color: "white",
-                              fontSize: 18,
-                              fontWeight: "600",
-                            }}
-                          >
-                            Mesa {(order as any).table?.number || "N/A"}
-                          </Text>
-                          <Text
-                            style={{
-                              color: "#22c55e",
-                              fontSize: 14,
-                              textTransform: "capitalize",
-                            }}
-                          >
-                            Estado: {order.status}
-                          </Text>
-                        </View>
+                          Mesa {order.table?.number || "Sin mesa"}
+                        </Text>
+                        <Text
+                          style={{
+                            color: "#22c55e",
+                            fontSize: 14,
+                          }}
+                        >
+                          {order.is_paid ? "Pagado" : "Por pagar"}
+                        </Text>
                       </View>
 
                       <View style={{ alignItems: "flex-end" }}>
@@ -663,118 +632,37 @@ export default function WaiterOrdersScreen() {
                             fontWeight: "600",
                           }}
                         >
-                          ${order.total_amount?.toFixed(2)}
+                          {formatPrice(order.total_amount)}
                         </Text>
-                        <View
+                        <Text
                           style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            marginTop: 4,
+                            color: "#d1d5db",
+                            fontSize: 12,
                           }}
                         >
-                          <Clock size={14} color="#9ca3af" />
-                          <Text
-                            style={{
-                              color: "#9ca3af",
-                              fontSize: 12,
-                              marginLeft: 4,
-                            }}
-                          >
-                            {new Date(order.created_at).toLocaleTimeString(
-                              "es",
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              },
-                            )}
-                          </Text>
-                        </View>
+                          {order.order_items.length} item
+                          {order.order_items.length > 1 ? "s" : ""}
+                        </Text>
                       </View>
                     </View>
 
-                    {/* Items de la orden activa */}
-                    <View style={{ marginBottom: 16 }}>
-                      {order.order_items.map((item: any, index: number) => (
-                        <View
-                          key={`${order.id}-item-${index}`}
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            paddingVertical: 8,
-                            borderBottomWidth:
-                              index < order.order_items.length - 1 ? 1 : 0,
-                            borderBottomColor: "rgba(255,255,255,0.1)",
-                          }}
-                        >
-                          {/* Removemos la imagen por ahora para evitar problemas */}
-
-                          <View
-                            style={{
-                              backgroundColor:
-                                item.menu_item?.category === "plato"
-                                  ? "#ef4444"
-                                  : "#3b82f6",
-                              borderRadius: 4,
-                              padding: 4,
-                              marginRight: 8,
-                            }}
-                          >
-                            {item.menu_item?.category === "plato" ? (
-                              <ChefHat size={12} color="white" />
-                            ) : (
-                              <Coffee size={12} color="white" />
-                            )}
-                          </View>
-
-                          <View style={{ flex: 1 }}>
-                            <Text
-                              style={{
-                                color: "white",
-                                fontSize: 14,
-                                fontWeight: "500",
-                              }}
-                            >
-                              {item.menu_item?.name || "Producto"}
-                            </Text>
-                            <Text style={{ color: "#9ca3af", fontSize: 12 }}>
-                              ${item.unit_price?.toFixed(2)} x {item.quantity}
-                            </Text>
-                          </View>
-
-                          <Text
-                            style={{
-                              color: "#22c55e",
-                              fontSize: 14,
-                              fontWeight: "600",
-                            }}
-                          >
-                            ${item.subtotal?.toFixed(2)}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-
-                    {/* Información adicional para órdenes activas */}
+                    {/* Info adicional */}
                     <View
                       style={{
-                        backgroundColor: "rgba(34, 197, 94, 0.2)",
-                        borderRadius: 12,
+                        backgroundColor: "rgba(34, 197, 94, 0.1)",
+                        borderRadius: 8,
                         padding: 12,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "center",
                       }}
                     >
-                      <CheckCircle size={16} color="#22c55e" />
                       <Text
                         style={{
                           color: "#22c55e",
-                          fontSize: 14,
-                          fontWeight: "600",
-                          marginLeft: 8,
+                          fontSize: 12,
+                          textAlign: "center",
                         }}
                       >
-                        Orden en proceso - Mesa asignada
+                        ℹ️ Esta orden está en proceso. Los cambios de estado se
+                        manejan desde la cocina.
                       </Text>
                     </View>
                   </View>
@@ -784,14 +672,6 @@ export default function WaiterOrdersScreen() {
           </>
         )}
       </ScrollView>
-
-      <PartialRejectModal
-        visible={partialRejectModal.visible}
-        orderItems={partialRejectModal.order?.order_items || []}
-        onClose={closePartialRejectModal}
-        onConfirm={handlePartialReject}
-        loading={actionLoading === partialRejectModal.order?.id}
-      />
     </LinearGradient>
   );
 }

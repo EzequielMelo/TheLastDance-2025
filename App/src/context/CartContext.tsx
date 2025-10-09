@@ -5,7 +5,11 @@ import React, {
   useEffect,
   ReactNode,
 } from "react";
-import { getUserOrders } from "../api/orders";
+import {
+  getUserOrders,
+  addItemsToPartialOrder,
+  addItemsToExistingOrder,
+} from "../api/orders";
 import type { Order } from "../types/Order";
 import { useAuth } from "../auth/useAuth";
 
@@ -31,7 +35,11 @@ export interface CartContextType {
 
   // Estado del pedido actual
   hasPendingOrder: boolean;
-  hasPartialOrder: boolean; // Funciones para items del carrito local
+  hasPartialOrder: boolean;
+  hasAcceptedOrder: boolean; // Nueva: órdenes aceptadas que pueden recibir más items
+  acceptedOrderItems: CartItem[]; // Items de la orden aceptada
+
+  // Funciones para items del carrito local
   addItem: (item: Omit<CartItem, "quantity">) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   removeItem: (itemId: string) => void;
@@ -47,6 +55,12 @@ export interface CartContextType {
   // Función para enviar carrito local a pedido parcial
   submitToPartialOrder: () => Promise<void>;
 
+  // Función para agregar items a pedido aceptado
+  addToAcceptedOrder: (item: Omit<CartItem, "quantity">) => Promise<void>;
+
+  // Función para enviar carrito local a pedido aceptado
+  submitToAcceptedOrder: () => Promise<void>;
+
   // Función para refrescar desde la BD
   refreshOrders: () => Promise<void>;
 
@@ -57,12 +71,15 @@ export interface CartContextType {
   cartAmount: number;
   pendingOrderAmount: number;
   partialOrderAmount: number;
+  acceptedOrderAmount: number;
   cartTime: number;
   pendingOrderTime: number;
   partialOrderTime: number;
+  acceptedOrderTime: number;
   cartCount: number;
   pendingOrderCount: number;
   partialOrderCount: number;
+  acceptedOrderCount: number;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -86,6 +103,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   const [userOrders, setUserOrders] = useState<Order[]>([]);
   const [hasPendingOrder, setHasPendingOrder] = useState(false);
   const [hasPartialOrder, setHasPartialOrder] = useState(false);
+  const [hasAcceptedOrder, setHasAcceptedOrder] = useState(false);
+  const [acceptedOrderItems, setAcceptedOrderItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
 
@@ -100,7 +119,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     image_url: orderItem.menu_item?.image_url,
   });
 
-  // Función para cargar pedidos desde la BD
+  // FUNCIÓN REFACTORIZADA: Cargar pedidos desde la BD
   const loadOrdersFromDatabase = async () => {
     if (!user) return;
 
@@ -111,41 +130,81 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       // Guardar todas las órdenes para mostrar estados
       setUserOrders(orders);
 
-      // Procesar pedidos con status "pending"
-      const pendingOrders = orders.filter(
-        (order: Order) => order.status === "pending",
-      );
-      // Procesar pedidos con status "partial"
-      const partialOrders = orders.filter(
-        (order: Order) => order.status === "partial",
+      // Filtrar solo órdenes NO PAGADAS (las pagadas ya no interesan para el carrito)
+      const unpaidOrders = orders.filter((order: Order) => !order.is_paid);
+
+      // Clasificar órdenes por el estado de sus items
+      const ordersWithPendingItems = unpaidOrders.filter((order: Order) =>
+        order.order_items.some(item => item.status === "pending"),
       );
 
-      // Manejar pedidos pending
-      if (pendingOrders.length > 0) {
+      const ordersWithAcceptedItems = unpaidOrders.filter(
+        (order: Order) =>
+          order.order_items.some(item => item.status === "accepted") &&
+          !order.order_items.some(item => item.status === "pending"), // Solo aceptados, sin pendientes
+      );
+
+      const ordersWithPartialItems = unpaidOrders.filter((order: Order) => {
+        const hasAccepted = order.order_items.some(
+          item => item.status === "accepted",
+        );
+        const hasRejected = order.order_items.some(
+          item => item.status === "rejected",
+        );
+        return hasAccepted && hasRejected;
+      });
+
+      // NUEVO: Manejar items pendientes
+      if (ordersWithPendingItems.length > 0) {
         setHasPendingOrder(true);
 
         const allPendingItems: CartItem[] = [];
-        pendingOrders.forEach((order: Order) => {
-          const cartItems = order.order_items.map(orderItemToCartItem);
-          allPendingItems.push(...cartItems);
+        ordersWithPendingItems.forEach((order: Order) => {
+          // Solo items pendientes de esta orden
+          const pendingItems = order.order_items
+            .filter(item => item.status === "pending")
+            .map(orderItemToCartItem);
+          allPendingItems.push(...pendingItems);
         });
 
         setPendingOrderItems(allPendingItems);
-        // Limpiar carrito local si hay pedidos pending
+        // Limpiar carrito local si hay items pendientes
         setCartItems([]);
       } else {
         setHasPendingOrder(false);
         setPendingOrderItems([]);
       }
 
-      // Manejar pedidos parciales
-      if (partialOrders.length > 0) {
+      // NUEVO: Manejar items aceptados (sin pendientes)
+      if (ordersWithAcceptedItems.length > 0) {
+        setHasAcceptedOrder(true);
+
+        const allAcceptedItems: CartItem[] = [];
+        ordersWithAcceptedItems.forEach((order: Order) => {
+          // Solo items aceptados de esta orden
+          const acceptedItems = order.order_items
+            .filter(item => item.status === "accepted")
+            .map(orderItemToCartItem);
+          allAcceptedItems.push(...acceptedItems);
+        });
+
+        setAcceptedOrderItems(allAcceptedItems);
+      } else {
+        setHasAcceptedOrder(false);
+        setAcceptedOrderItems([]);
+      }
+
+      // NUEVO: Manejar pedidos parciales (aceptados + rechazados)
+      if (ordersWithPartialItems.length > 0) {
         setHasPartialOrder(true);
 
         const allPartialItems: CartItem[] = [];
-        partialOrders.forEach((order: Order) => {
-          const cartItems = order.order_items.map(orderItemToCartItem);
-          allPartialItems.push(...cartItems);
+        ordersWithPartialItems.forEach((order: Order) => {
+          // Solo items aceptados del pedido parcial
+          const acceptedItems = order.order_items
+            .filter(item => item.status === "accepted")
+            .map(orderItemToCartItem);
+          allPartialItems.push(...acceptedItems);
         });
 
         setPartialOrderItems(allPartialItems);
@@ -218,9 +277,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     }
 
     try {
-      // Necesitamos obtener el ID del pedido parcial
+      // Obtener orden con items parciales (aceptados + rechazados)
       const orders = await getUserOrders();
-      const partialOrder = orders.find(order => order.status === "partial");
+      const partialOrder = orders.find(
+        order =>
+          !order.is_paid &&
+          order.order_items.some(item => item.status === "accepted") &&
+          order.order_items.some(item => item.status === "rejected"),
+      );
 
       if (!partialOrder) {
         throw new Error("No se encontró pedido parcial");
@@ -256,12 +320,105 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     }
   };
 
+  // ===== FUNCIONES PARA PEDIDOS ACEPTADOS =====
+  const addToAcceptedOrder = async (newItem: Omit<CartItem, "quantity">) => {
+    try {
+      // Obtener orden con items aceptados (sin pendientes)
+      const orders = await getUserOrders();
+      const acceptedOrder = orders.find(
+        order =>
+          !order.is_paid &&
+          order.order_items.some(item => item.status === "accepted") &&
+          !order.order_items.some(item => item.status === "pending"),
+      );
+
+      if (!acceptedOrder) {
+        throw new Error("No se encontró pedido aceptado");
+      }
+
+      // Convertir item al formato requerido
+      const itemToAdd = {
+        id: newItem.id,
+        name: newItem.name,
+        category: newItem.category,
+        price: newItem.price,
+        prepMinutes: newItem.prepMinutes,
+        quantity: 1,
+        image_url: newItem.image_url,
+      };
+
+      // Enviar item a la orden aceptada
+      await addItemsToExistingOrder(acceptedOrder.id, [itemToAdd]);
+
+      // Refrescar órdenes para obtener el estado actualizado
+      await refreshOrders();
+
+      console.log("✅ Item agregado exitosamente a pedido aceptado");
+    } catch (error) {
+      console.error("Error agregando item a pedido aceptado:", error);
+      throw error;
+    }
+  };
+
+  const submitToAcceptedOrder = async () => {
+    if (!hasAcceptedOrder || cartItems.length === 0) {
+      console.warn("No hay pedido aceptado o carrito está vacío");
+      return;
+    }
+
+    try {
+      // Obtener el ID de la orden aceptada
+      const orders = await getUserOrders();
+      const acceptedOrder = orders.find(
+        order =>
+          !order.is_paid &&
+          order.order_items.some(item => item.status === "accepted") &&
+          !order.order_items.some(item => item.status === "pending"),
+      );
+
+      if (!acceptedOrder) {
+        throw new Error("No se encontró pedido aceptado");
+      }
+
+      // Convertir items del carrito al formato requerido
+      const itemsToAdd = cartItems.map(item => ({
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        price: item.price,
+        prepMinutes: item.prepMinutes,
+        quantity: item.quantity,
+        image_url: item.image_url,
+      }));
+
+      // Enviar items a la orden aceptada
+      await addItemsToExistingOrder(acceptedOrder.id, itemsToAdd);
+
+      // Limpiar carrito local
+      setCartItems([]);
+
+      // Refrescar órdenes para obtener el estado actualizado
+      await refreshOrders();
+
+      console.log("✅ Items enviados exitosamente a pedido aceptado");
+    } catch (error) {
+      console.error("Error enviando items a pedido aceptado:", error);
+      throw error;
+    }
+  };
+
   const addItem = (newItem: Omit<CartItem, "quantity">) => {
     // Solo permitir agregar items si no hay pedido pending
     if (hasPendingOrder) {
       console.warn(
         "No se pueden agregar items mientras hay un pedido pendiente",
       );
+      return;
+    }
+
+    // Si hay pedido aceptado, usar addToAcceptedOrder
+    if (hasAcceptedOrder) {
+      addToAcceptedOrder(newItem);
       return;
     }
 
@@ -334,6 +491,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     (total, item) => total + item.quantity,
     0,
   );
+  const acceptedOrderCount = acceptedOrderItems.reduce(
+    (total, item) => total + item.quantity,
+    0,
+  );
 
   const cartAmount = cartItems.reduce(
     (total, item) => total + item.price * item.quantity,
@@ -344,6 +505,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     0,
   );
   const partialOrderAmount = partialOrderItems.reduce(
+    (total, item) => total + item.price * item.quantity,
+    0,
+  );
+  const acceptedOrderAmount = acceptedOrderItems.reduce(
     (total, item) => total + item.price * item.quantity,
     0,
   );
@@ -453,13 +618,50 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     return Math.max(tiempoPlatos, tiempoBebidas);
   })();
 
+  // Tiempo estimado para pedidos aceptados
+  const acceptedOrderTime = (() => {
+    if (acceptedOrderItems.length === 0) return 0;
+
+    const platos = acceptedOrderItems.filter(item => item.category === "plato");
+    const bebidas = acceptedOrderItems.filter(
+      item => item.category === "bebida",
+    );
+
+    const platosCount = platos.reduce((sum, item) => sum + item.quantity, 0);
+    const bebidasCount = bebidas.reduce((sum, item) => sum + item.quantity, 0);
+
+    let tiempoPlatos = 0;
+    let tiempoBebidas = 0;
+
+    // Calcular tiempo de platos
+    if (platosCount > 0) {
+      const maxTiempoPlato = Math.max(...platos.map(item => item.prepMinutes));
+      tiempoPlatos =
+        platosCount === 1 ? maxTiempoPlato : maxTiempoPlato + platosCount;
+    }
+
+    // Calcular tiempo de bebidas
+    if (bebidasCount > 0) {
+      const maxTiempoBebida = Math.max(
+        ...bebidas.map(item => item.prepMinutes),
+      );
+      tiempoBebidas =
+        bebidasCount === 1 ? maxTiempoBebida : maxTiempoBebida + bebidasCount;
+    }
+
+    // El tiempo total es el máximo entre platos y bebidas
+    return Math.max(tiempoPlatos, tiempoBebidas);
+  })();
+
   const value: CartContextType = {
     cartItems,
     pendingOrderItems,
     partialOrderItems,
+    acceptedOrderItems,
     userOrders,
     hasPendingOrder,
     hasPartialOrder,
+    hasAcceptedOrder,
     addItem,
     removeItem,
     updateQuantity,
@@ -468,17 +670,22 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     submitOrder,
     addToPartialOrder,
     submitToPartialOrder,
+    addToAcceptedOrder,
+    submitToAcceptedOrder,
     refreshOrders,
     isLoading,
     cartAmount,
     pendingOrderAmount,
     partialOrderAmount,
+    acceptedOrderAmount,
     cartTime,
     pendingOrderTime,
     partialOrderTime,
+    acceptedOrderTime,
     cartCount,
     pendingOrderCount,
     partialOrderCount,
+    acceptedOrderCount,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
