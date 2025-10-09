@@ -11,10 +11,12 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
 import { AuthContext } from "../auth/AuthContext";
 import api from "../api/axios";
-import { LogOut, Users, QrCode, User as UserIcon } from "lucide-react-native";
+import { Menu, User as UserIcon, Users, QrCode } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User";
 import ClientFlowNavigation from "../components/navigation/ClientFlowNavigation";
+import Sidebar from "../components/navigation/Sidebar";
+import CartModal from "../components/cart/CartModal";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
@@ -22,6 +24,8 @@ export default function HomeScreen({ navigation }: Props) {
   const { token, logout } = useContext(AuthContext);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [cartModalVisible, setCartModalVisible] = useState(false);
 
   // Cargar perfil desde backend (usa el Authorization del interceptor)
   useEffect(() => {
@@ -43,9 +47,21 @@ export default function HomeScreen({ navigation }: Props) {
     };
   }, [token]);
 
+  const handleNavigate = (screenName: string, params?: any) => {
+    navigation.navigate(screenName as any, params);
+  };
+
   const handleLogout = async () => {
     await logout();
   };
+
+  const handleOpenCart = () => {
+    setCartModalVisible(true);
+  };
+
+  const isCliente =
+    user?.profile_code === "cliente_registrado" ||
+    user?.profile_code === "cliente_anonimo";
 
   const getProfileLabel = (profileCode: string, positionCode?: string) => {
     const profileLabels: { [key: string]: string } = {
@@ -81,10 +97,6 @@ export default function HomeScreen({ navigation }: Props) {
     return colors[profileCode] || "#6b7280";
   };
 
-  const goCreate = (initialCategory: "plato" | "bebida") => {
-    navigation.navigate("CreateMenuItem", { initialCategory });
-  };
-
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-black">
@@ -93,256 +105,125 @@ export default function HomeScreen({ navigation }: Props) {
     );
   }
 
-  const isCocinero = user?.position_code === "cocinero";
-  const isBartender = user?.position_code === "bartender";
-  const isMaitre = user?.position_code === "maitre";
-  const isMozo = user?.position_code === "mozo";
-  const isDueno = user?.profile_code === "dueno";
-  const isSupervisor = user?.profile_code === "supervisor";
-  const isCliente =
-    user?.profile_code === "cliente_registrado" ||
-    user?.profile_code === "cliente_anonimo";
-
-  const IMGS = {
-    newStaff: require("../../assets/new-staff.png"),
-    churrasco: require("../../assets/churrasco.png"),
-    fernet: require("../../assets/fernet.png"),
-    mesa: require("../../assets/mesa-circular.png"),
-    user_pending: require("../../assets/user-pending.png"),
-    mozo: require("../../assets/mozo.png"),
-  };
-
   return (
     <LinearGradient
       colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
       className="flex-1"
     >
       <View className="px-6 pt-14 pb-8 flex-1">
-        {/* User Profile Card */}
-        <View className="mt-10 mb-8">
-          <LinearGradient
-            colors={["rgba(255,255,255,0.1)", "rgba(255,255,255,0.05)"]}
-            className="rounded-2xl p-4"
+        {/* Header con menú hamburguesa */}
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <View>
+            <Text style={{ color: "white", fontSize: 24, fontWeight: "600" }}>
+              TheLastDance
+            </Text>
+            <Text style={{ color: "#9ca3af", fontSize: 14 }}>
+              {user ? `¡Hola, ${user.first_name}!` : "Bienvenido"}
+            </Text>
+          </View>
+          
+          <TouchableOpacity
+            onPress={() => setSidebarVisible(true)}
             style={{
+              backgroundColor: "rgba(255,255,255,0.1)",
+              borderRadius: 12,
+              padding: 12,
               borderWidth: 1,
-              borderColor: "rgba(255,255,255,0.1)",
+              borderColor: "rgba(255,255,255,0.2)",
             }}
           >
-            <View className="flex-row items-center">
-              {/* Profile Image */}
-              <View className="relative">
-                {user?.photo_url ? (
-                  <Image
-                    source={{ uri: user.photo_url }}
-                    className="w-16 h-16 rounded-full"
-                    style={{ resizeMode: "cover" }}
-                  />
-                ) : (
-                  <View className="w-16 h-16 rounded-full bg-gray-600 items-center justify-center">
-                    <UserIcon size={32} color="#d1d5db" />
-                  </View>
-                )}
-                {/* Status Indicator */}
-                <View 
-                  className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-[#1a1a1a]"
-                  style={{ backgroundColor: getProfileColor(user?.profile_code || "") }}
-                />
-              </View>
+            <Menu size={24} color="#d4af37" />
+          </TouchableOpacity>
+        </View>
 
-              {/* User Info */}
-              <View className="ml-4 flex-1">
-                <Text className="text-white text-lg font-semibold">
-                  {user?.first_name} {user?.last_name}
-                </Text>
-                <View className="flex-row items-center mt-1">
-                  <View 
-                    className="px-2 py-1 rounded-md"
-                    style={{ backgroundColor: getProfileColor(user?.profile_code || "") }}
-                  >
-                    <Text className="text-white text-xs font-medium">
-                      {getProfileLabel(user?.profile_code || "", user?.position_code || undefined)}
-                    </Text>
-                  </View>
-                </View>
-                {user?.email && (
-                  <Text className="text-gray-400 text-sm mt-1">
-                    {user.email}
+        {/* Quick Stats Card */}
+        {user && (
+          <View style={{ marginBottom: 24 }}>
+            <LinearGradient
+              colors={["rgba(212, 175, 55, 0.2)", "rgba(212, 175, 55, 0.1)"]}
+              style={{
+                borderRadius: 16,
+                padding: 20,
+                borderWidth: 1,
+                borderColor: "rgba(212, 175, 55, 0.3)",
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View>
+                  <Text style={{ color: "#d4af37", fontSize: 16, fontWeight: "600" }}>
+                    Estado actual
                   </Text>
-                )}
+                  <Text style={{ color: "white", fontSize: 14, marginTop: 4 }}>
+                    {getProfileLabel(user.profile_code, user.position_code || undefined)}
+                  </Text>
+                </View>
+                
+                <View style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  backgroundColor: getProfileColor(user.profile_code),
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}>
+                  {user.photo_url ? (
+                    <Image
+                      source={{ uri: user.photo_url }}
+                      style={{ width: 48, height: 48, borderRadius: 24 }}
+                    />
+                  ) : (
+                    <UserIcon size={24} color="white" />
+                  )}
+                </View>
+              </View>
+            </LinearGradient>
+          </View>
+        )}
+
+        {/* Contenido principal basado en rol */}
+        <View style={{ flex: 1 }}>
+          {isCliente ? (
+            <View>
+              <ClientFlowNavigation />
+              
+              {/* Info sobre el sidebar para clientes */}
+              <View style={{
+                backgroundColor: "rgba(212, 175, 55, 0.1)",
+                borderRadius: 12,
+                padding: 16,
+                marginTop: 16,
+                borderWidth: 1,
+                borderColor: "rgba(212, 175, 55, 0.3)",
+              }}>
+                <Text style={{ color: "#d4af37", fontSize: 14, fontWeight: "600", marginBottom: 4 }}>
+                  💡 Consejo
+                </Text>
+                <Text style={{ color: "white", fontSize: 12, lineHeight: 16 }}>
+                  También puedes acceder a estas funciones desde el menú lateral (☰) según tu estado actual
+                </Text>
               </View>
             </View>
-          </LinearGradient>
-        </View>
-
-        {/* Acciones por rol */}
-        <View className="gap-4">
-          {isDueno && (
-            <ActionTile
-              title="Añadir empleado/supervisor"
-              subtitle="Crear nuevos perfiles del equipo"
-              onPress={() =>
-                navigation.navigate("AddStaff", { userRole: "dueno" })
-              }
-              icon={
-                <Image
-                  source={IMGS.newStaff}
-                  style={{ width: 26, height: 26 }}
-                />
-              }
-            />
-          )}
-
-          {isSupervisor && (
-            <ActionTile
-              title="Añadir empleado"
-              subtitle="Crear nuevos empleados del equipo"
-              onPress={() =>
-                navigation.navigate("AddStaff", { userRole: "supervisor" })
-              }
-              icon={
-                <Image
-                  source={IMGS.newStaff}
-                  style={{ width: 26, height: 26 }}
-                />
-              }
-            />
-          )}
-
-          {isCocinero && (
-            <ActionTile
-              title="Agregar plato"
-              subtitle="Publicá un nuevo plato en el menú"
-              onPress={() => goCreate("plato")}
-              icon={
-                <Image
-                  source={IMGS.churrasco}
-                  style={{ width: 26, height: 26 }}
-                />
-              }
-            />
-          )}
-
-          {isBartender && (
-            <ActionTile
-              title="Agregar bebida"
-              subtitle="Sumá una nueva bebida al menú"
-              onPress={() => goCreate("bebida")}
-              icon={
-                <Image source={IMGS.fernet} style={{ width: 26, height: 26 }} />
-              }
-            />
-          )}
-
-          {(isDueno || isSupervisor) && (
-            <ActionTile
-              title="Crear mesa"
-              subtitle="Agregá una nueva mesa al restaurante"
-              onPress={() => navigation.navigate("CreateTable")}
-              icon={<Image source={IMGS.mesa} style={{ width: 26, height: 26 }} />}
-            />
-          )}
-
-          {isMaitre && (
-            <>
-              <ActionTile
-                title="Gestionar Lista de Espera"
-                subtitle="Administrá las reservas y asignación de mesas"
-                onPress={() => navigation.navigate("ManageWaitingList")}
-                icon={<Users size={26} color="#1a1a1a" />}
-              />
-              <ActionTile
-                title="Generar Código QR"
-                subtitle="Crear QR para que clientes se unan a la lista"
-                onPress={() => navigation.navigate("GenerateWaitingListQR")}
-                icon={<QrCode size={26} color="#1a1a1a" />}
-              />
-            </>
-          )}
-
-          {isMozo && (
-            <ActionTile
-              title="Panel del Mesero"
-              subtitle="Gestioná tus mesas asignadas (máximo 3)"
-              onPress={() => navigation.navigate("WaiterDashboard")}
-              icon={<Image source={IMGS.mesa} style={{ width: 26, height: 26 }} />}
-            />
-          )}
-
-          {isCliente && <ClientFlowNavigation />}
-
-          {(isDueno || isSupervisor) && (
-            <>
-              <ActionTile
-                title="Gestionar Usuarios Pendientes"
-                subtitle="Administrá usuarios y solicitudes pendientes"
-                onPress={() => navigation.navigate("Clients")}
-                icon={<Image source={IMGS.user_pending} style={{ width: 26, height: 26 }} />}
-              />
-              <ActionTile
-                title="Gestión de Meseros"
-                subtitle="Ver y supervisar meseros y sus mesas asignadas"
-                onPress={() => navigation.navigate("AllWaiters")}
-                icon={<Image source={IMGS.mozo} style={{ width: 26, height: 26 }} />}
-              />
-            </>
+          ) : (
+            <View style={{ flex: 1 }} />
           )}
         </View>
-
-        {/* Spacer */}
-        <View className="flex-1" />
-
-        {/* Logout */}
-        <TouchableOpacity
-          onPress={handleLogout}
-          className="flex-row items-center justify-center rounded-xl h-12 bg-white/10 border border-white/20"
-        >
-          <LogOut size={18} color="#fff" />
-          <Text className="text-white ml-2">Cerrar sesión</Text>
-        </TouchableOpacity>
       </View>
-    </LinearGradient>
-  );
-}
 
-/** Tarjeta/CTA simple */
-function ActionTile({
-  title,
-  subtitle,
-  onPress,
-  icon,
-}: {
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-  icon: React.ReactNode;
-}) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      className="rounded-2xl overflow-hidden"
-      activeOpacity={0.92}
-    >
-      <LinearGradient
-        colors={["#d4af37", "#b8941f", "#d4af37"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        className="p-4"
-      >
-        <View className="flex-row items-center">
-          <View className="w-10 h-10 rounded-xl bg-[#1a1a1a] items-center justify-center">
-            {icon}
-          </View>
-          <View className="ml-3 flex-1">
-            <Text className="text-[#1a1a1a] text-base font-semibold">
-              {title}
-            </Text>
-            <Text className="text-[#1a1a1a] opacity-80 text-xs">
-              {subtitle}
-            </Text>
-          </View>
-          <Text className="text-[#1a1a1a] text-xl">›</Text>
-        </View>
-      </LinearGradient>
-    </TouchableOpacity>
+      {/* Sidebar */}
+      <Sidebar
+        visible={sidebarVisible}
+        onClose={() => setSidebarVisible(false)}
+        user={user}
+        onLogout={handleLogout}
+        onNavigate={handleNavigate}
+        onOpenCart={handleOpenCart}
+      />
+
+      {/* Cart Modal */}
+      <CartModal
+        visible={cartModalVisible}
+        onClose={() => setCartModalVisible(false)}
+      />
+    </LinearGradient>
   );
 }

@@ -14,7 +14,6 @@ restaurant-push-notifications-firebase-adminsdk-*.json
 google-services.json
 app.json
 eas.json
-src/api/config.ts
 
 # Credenciales de build
 *.keystore

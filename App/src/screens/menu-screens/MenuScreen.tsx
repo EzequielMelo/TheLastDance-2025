@@ -48,9 +48,6 @@ export default function MenuScreen() {
   const [selectedCategory, setSelectedCategory] = useState<"all" | "plato" | "bebida">("all");
   const [cartModalVisible, setCartModalVisible] = useState(false);
 
-  // Obtener tableId de los parámetros de ruta
-  const tableId = route.params?.tableId;
-
   useEffect(() => {
     loadMenuItems();
   }, [selectedCategory]);
@@ -486,7 +483,6 @@ export default function MenuScreen() {
       <CartModal
         visible={cartModalVisible}
         onClose={() => setCartModalVisible(false)}
-        tableId={tableId}
       />
     </LinearGradient>
   );

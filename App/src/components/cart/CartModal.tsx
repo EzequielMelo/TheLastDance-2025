@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -25,10 +25,9 @@ import api from "../../api/axios";
 interface CartModalProps {
   visible: boolean;
   onClose: () => void;
-  tableId?: string;
 }
 
-export default function CartModal({ visible, onClose, tableId }: CartModalProps) {
+export default function CartModal({ visible, onClose }: CartModalProps) {
   const { 
     pendingItems, 
     confirmedItems, 
@@ -44,6 +43,34 @@ export default function CartModal({ visible, onClose, tableId }: CartModalProps)
     removeItem, 
     confirmOrder
   } = useCart();
+
+  const [tableId, setTableId] = useState<string | null>(null);
+  const [loadingTable, setLoadingTable] = useState(false);
+
+  // Obtener el ID de la mesa del cliente logueado
+  useEffect(() => {
+    if (visible) {
+      fetchUserTable();
+    }
+  }, [visible]);
+
+  const fetchUserTable = async () => {
+    try {
+      setLoadingTable(true);
+      const response = await api.get('/tables/my-table');
+      
+      if (response.data.hasOccupiedTable && response.data.table) {
+        setTableId(response.data.table.id);
+      } else {
+        setTableId(null);
+      }
+    } catch (error) {
+      console.error("Error obteniendo mesa del usuario:", error);
+      setTableId(null);
+    } finally {
+      setLoadingTable(false);
+    }
+  };
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('es-AR', {
@@ -70,8 +97,20 @@ export default function CartModal({ visible, onClose, tableId }: CartModalProps)
       return;
     }
 
+    // Verificar que se haya obtenido el tableId
+    if (loadingTable) {
+      Alert.alert('Espera', 'Verificando tu mesa asignada...');
+      return;
+    }
+
     if (!tableId) {
-      Alert.alert('Error', 'No se pudo identificar la mesa. Por favor, inténtalo de nuevo.');
+      Alert.alert(
+        'Error', 
+        'No tienes una mesa asignada. Asegúrate de haber escaneado el código QR de tu mesa.',
+        [
+          { text: "OK", onPress: onClose }
+        ]
+      );
       return;
     }
 
@@ -503,13 +542,15 @@ export default function CartModal({ visible, onClose, tableId }: CartModalProps)
             {pendingItems.length > 0 && (
               <TouchableOpacity
                 onPress={handleConfirmOrder}
+                disabled={loadingTable}
                 style={{
-                  backgroundColor: "#d4af37",
+                  backgroundColor: loadingTable ? "#9ca3af" : "#d4af37",
                   borderRadius: 12,
                   padding: 16,
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "center",
+                  opacity: loadingTable ? 0.7 : 1,
                 }}
               >
                 <CheckCircle size={20} color="#1a1a1a" />
@@ -519,7 +560,10 @@ export default function CartModal({ visible, onClose, tableId }: CartModalProps)
                   fontWeight: "600",
                   marginLeft: 8,
                 }}>
-                  Confirmar Pedido • {formatPrice(pendingAmount)}
+                  {loadingTable 
+                    ? "Verificando mesa..." 
+                    : `Confirmar Pedido • ${formatPrice(pendingAmount)}`
+                  }
                 </Text>
               </TouchableOpacity>
             )}
