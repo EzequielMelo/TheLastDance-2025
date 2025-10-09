@@ -208,3 +208,43 @@ export const updatePushToken: RequestHandler = async (req, res) => {
     res.status(500).json({ error: "Error interno del servidor" });
   }
 };
+
+export const deleteAnonymousUser: RequestHandler = async (req, res) => {
+  try {
+    console.log('🗑️ Received deleteAnonymousUser request');
+    
+    const authHeader = req.headers.authorization || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      console.log('❌ No bearer token provided');
+      res.status(401).json({ error: "Token no proporcionado." });
+      return;
+    }
+
+    const token = authHeader.slice(7);
+
+    // Verificar que es un token anónimo
+    if (!token.startsWith("anon_")) {
+      console.log('❌ Not an anonymous token');
+      res.status(400).json({ error: "Solo usuarios anónimos pueden usar este endpoint." });
+      return;
+    }
+
+    const parts = token.split("_");
+    if (parts.length < 3 || !parts[1]) {
+      console.log('❌ Invalid anonymous token format');
+      res.status(401).json({ error: "Token anónimo inválido." });
+      return;
+    }
+
+    const userId = parts[1];
+    console.log('🔍 Deleting anonymous user:', userId);
+
+    const result = await authService.deleteAnonymousUser(userId);
+    
+    console.log('✅ Anonymous user deleted successfully');
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("❌ Error en deleteAnonymousUser:", error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+};

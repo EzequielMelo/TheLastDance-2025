@@ -2,6 +2,8 @@ import { supabase, supabaseAdmin } from "../config/supabase";
 import { CreateUserBody, LoginResult, AuthUser } from "./auth.types";
 import { sendPendingEmail } from "../lib/emails";
 import { uploadAvatar as uploadAvatarService } from "../lib/storage/avatarUpload";
+import { extractPathFromUrl, deleteFile } from "../lib/storage/uploadService";
+import { STORAGE_BUCKETS } from "../lib/storage/storageConfig";
 import {
   notifyNewClientRegistration,
   notifyClientAccountCreated,
@@ -283,4 +285,74 @@ export async function verifyToken(accessToken: string) {
   }
 
   return data.user;
+}
+
+export async function deleteAnonymousUser(userId: string) {
+  console.log('🗑️ Iniciando eliminación de usuario anónimo:', userId);
+  
+  // 1. Verificar que el usuario existe y es anónimo
+  const { data: user, error: getUserError } = await supabaseAdmin
+    .from("users")
+    .select("id, profile_code, profile_image")
+    .eq("id", userId)
+    .eq("profile_code", "cliente_anonimo")
+    .single();
+
+  if (getUserError || !user) {
+    throw new Error("Usuario anónimo no encontrado.");
+  }
+
+  console.log('👤 Usuario encontrado:', user);
+
+  // 2. Eliminar foto de perfil del storage si existe
+  if (user.profile_image) {
+    console.log('📸 Eliminando foto de perfil del storage:', user.profile_image);
+    
+    try {
+      // Extraer el path correcto de la URL usando la función utilitaria
+      const filePath = extractPathFromUrl(user.profile_image);
+      console.log('📁 Path extraído:', filePath);
+      
+      if (filePath) {
+        console.log('�️ Intentando eliminar archivo con path:', filePath);
+        await deleteFile(STORAGE_BUCKETS.PROFILE_IMAGES, filePath);
+        console.log('✅ Foto eliminada del storage exitosamente');
+      } else {
+        console.warn('⚠️ No se pudo extraer el path de la URL:', user.profile_image);
+        
+        // Intentar método alternativo: extraer todo después del bucket
+        const urlParts = user.profile_image.split('/');
+        const bucketIndex = urlParts.findIndex((part: string) => part === STORAGE_BUCKETS.PROFILE_IMAGES);
+        if (bucketIndex !== -1 && bucketIndex + 1 < urlParts.length) {
+          const alternativePath = urlParts.slice(bucketIndex + 1).join('/');
+          console.log('🔄 Intentando método alternativo con path:', alternativePath);
+          await deleteFile(STORAGE_BUCKETS.PROFILE_IMAGES, alternativePath);
+          console.log('✅ Foto eliminada con método alternativo');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error procesando eliminación de foto:', error);
+      // No hacer throw aquí - continuar con la eliminación del usuario
+    }
+  }
+
+  // 3. Eliminar usuario de la tabla users
+  console.log('🗑️ Eliminando usuario de la base de datos');
+  const { error: deleteError } = await supabaseAdmin
+    .from("users")
+    .delete()
+    .eq("id", userId)
+    .eq("profile_code", "cliente_anonimo");
+
+  if (deleteError) {
+    console.error('❌ Error eliminando usuario:', deleteError);
+    throw new Error("Error al eliminar usuario anónimo: " + deleteError.message);
+  }
+
+  console.log('✅ Usuario anónimo eliminado exitosamente');
+  
+  return {
+    message: "Usuario anónimo eliminado exitosamente.",
+    deleted_user_id: userId,
+  };
 }

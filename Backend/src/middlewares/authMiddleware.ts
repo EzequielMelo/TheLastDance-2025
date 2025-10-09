@@ -57,6 +57,7 @@ export const authenticateUser: RequestHandler = async (req, res, next) => {
           position_code: profile.position_code,
         };
 
+        console.log("🔐 Auth middleware - Usuario anónimo autenticado:", req.user);
         next();
         return;
       }
@@ -91,6 +92,7 @@ export const authenticateUser: RequestHandler = async (req, res, next) => {
       position_code: profile.position_code,
     };
 
+    console.log("🔐 Auth middleware - Usuario registrado autenticado:", req.user);
     next();
     return;
   } catch (e) {
