@@ -22,7 +22,16 @@ export interface Order {
   table_id?: string;
   total_amount: number;
   estimated_time: number;
-  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
+  status:
+    | "pending"
+    | "confirmed"
+    | "preparing"
+    | "ready"
+    | "delivered"
+    | "cancelled"
+    | "accepted"
+    | "rejected"
+    | "partial";
   notes?: string;
   created_at: string;
   updated_at: string;
@@ -30,6 +39,12 @@ export interface Order {
   table?: {
     id: string;
     number: string;
+  };
+  user?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    profile_image?: string;
   };
 }
 
@@ -42,7 +57,6 @@ export interface CreateOrderRequest {
     price: number;
     prepMinutes: number;
     quantity: number;
-    image_url?: string;
   }>;
   totalAmount: number;
   estimatedTime: number;

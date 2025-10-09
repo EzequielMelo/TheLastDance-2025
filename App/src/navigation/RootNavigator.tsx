@@ -23,6 +23,7 @@ import { CartProvider } from "../context/CartContext";
 import WaiterDashboardScreen from "../screens/waiter-screens/WaiterDashboardScreen";
 import AllWaitersScreen from "../screens/admin-screens/AllWaitersScreen";
 import TableChatScreen from "../screens/chat/TableChatScreen";
+import WaiterOrdersScreen from "../components/orders/WaiterOrdersScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -120,6 +121,11 @@ function NavigatorContent() {
             name="WaiterDashboard"
             component={WaiterDashboardScreen}
             options={{ title: "Panel del Mesero", headerBackTitle: "Volver" }}
+          />
+          <Stack.Screen
+            name="WaiterOrders"
+            component={WaiterOrdersScreen}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="AllWaiters"
