@@ -9,7 +9,8 @@ import {
   Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import {ChefHat,
+import {
+  ChefHat,
   Coffee,
   Clock,
   ShoppingCart,
@@ -30,20 +31,27 @@ interface CartModalProps {
 }
 
 export default function CartModal({ visible, onClose }: CartModalProps) {
-  const { 
-    cartItems, 
-    pendingOrderItems, 
+  const {
+    cartItems,
+    pendingOrderItems,
+    partialOrderItems,
+    userOrders,
     hasPendingOrder,
-    cartCount, 
+    hasPartialOrder,
+    cartCount,
     pendingOrderCount,
-    cartAmount, 
+    partialOrderCount,
+    cartAmount,
     pendingOrderAmount,
+    partialOrderAmount,
     cartTime,
     pendingOrderTime,
-    updateQuantity, 
-    removeItem, 
+    partialOrderTime,
+    updateQuantity,
+    removeItem,
     submitOrder,
-    refreshOrders
+    submitToPartialOrder,
+    refreshOrders,
   } = useCart();
 
   const [tableId, setTableId] = useState<string | null>(null);
@@ -61,8 +69,8 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
   const fetchUserTable = async () => {
     try {
       setLoadingTable(true);
-      const response = await api.get('/tables/my-table');
-      
+      const response = await api.get("/tables/my-table");
+
       if (response.data.hasOccupiedTable && response.data.table) {
         setTableId(response.data.table.id);
       } else {
@@ -77,10 +85,79 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS'
+    return new Intl.NumberFormat("es-AR", {
+      style: "currency",
+      currency: "ARS",
     }).format(price);
+  };
+
+  const getOrderStatusInfo = (status: string) => {
+    switch (status) {
+      case "pending":
+        return {
+          color: "#ffa500",
+          text: "Esperando confirmación",
+          bgColor: "rgba(255, 165, 0, 0.1)",
+          borderColor: "rgba(255, 165, 0, 0.2)",
+          icon: Clock,
+        };
+      case "partial":
+        return {
+          color: "#22c55e",
+          text: "Aprobado parcialmente",
+          bgColor: "rgba(34, 197, 94, 0.1)",
+          borderColor: "rgba(34, 197, 94, 0.2)",
+          icon: CheckCircle,
+        };
+      case "accepted":
+        return {
+          color: "#3b82f6",
+          text: "Confirmado por el mozo",
+          bgColor: "rgba(59, 130, 246, 0.1)",
+          borderColor: "rgba(59, 130, 246, 0.2)",
+          icon: CheckCircle,
+        };
+      case "preparing":
+        return {
+          color: "#f59e0b",
+          text: "En preparación",
+          bgColor: "rgba(245, 158, 11, 0.1)",
+          borderColor: "rgba(245, 158, 11, 0.2)",
+          icon: ChefHat,
+        };
+      case "ready":
+        return {
+          color: "#10b981",
+          text: "Listo para servir",
+          bgColor: "rgba(16, 185, 129, 0.1)",
+          borderColor: "rgba(16, 185, 129, 0.2)",
+          icon: CheckCircle,
+        };
+      case "delivered":
+        return {
+          color: "#6b7280",
+          text: "Entregado",
+          bgColor: "rgba(107, 114, 128, 0.1)",
+          borderColor: "rgba(107, 114, 128, 0.2)",
+          icon: CheckCircle,
+        };
+      case "rejected":
+        return {
+          color: "#ef4444",
+          text: "Rechazado",
+          bgColor: "rgba(239, 68, 68, 0.1)",
+          borderColor: "rgba(239, 68, 68, 0.2)",
+          icon: X,
+        };
+      default:
+        return {
+          color: "#9ca3af",
+          text: "Estado desconocido",
+          bgColor: "rgba(156, 163, 175, 0.1)",
+          borderColor: "rgba(156, 163, 175, 0.2)",
+          icon: Clock,
+        };
+    }
   };
 
   const getCategoryIcon = (category: "plato" | "bebida") => {
@@ -93,29 +170,52 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
 
   const handleConfirmOrder = async () => {
     if (cartItems.length === 0) {
-      Alert.alert('Error', 'No hay items en el carrito para enviar');
+      Alert.alert("Error", "No hay items en el carrito para enviar");
       return;
     }
 
     // Verificar si ya hay un pedido pending
     if (hasPendingOrder) {
-      Alert.alert('Error', 'Ya tienes un pedido pendiente. No puedes enviar otro hasta que sea procesado.');
+      Alert.alert(
+        "Error",
+        "Ya tienes un pedido pendiente. No puedes enviar otro hasta que sea procesado.",
+      );
       return;
+    }
+
+    // Si hay pedido parcial, usar submitToPartialOrder en lugar de submitOrder
+    if (hasPartialOrder) {
+      try {
+        await submitToPartialOrder();
+
+        Alert.alert(
+          "Items Agregados",
+          `Se agregaron ${cartCount} ${cartCount === 1 ? "producto" : "productos"} a tu pedido parcial. El pedido vuelve a estar pendiente de confirmación.`,
+          [{ text: "OK", onPress: onClose }],
+        );
+        return;
+      } catch (error: any) {
+        console.error("Error al agregar items a pedido parcial:", error);
+        Alert.alert(
+          "Error",
+          error.message ||
+            "No se pudieron agregar los items al pedido parcial. Intenta de nuevo.",
+        );
+        return;
+      }
     }
 
     // Verificar que se haya obtenido el tableId
     if (loadingTable) {
-      Alert.alert('Espera', 'Verificando tu mesa asignada...');
+      Alert.alert("Espera", "Verificando tu mesa asignada...");
       return;
     }
 
     if (!tableId) {
       Alert.alert(
-        'Error', 
-        'No tienes una mesa asignada. Asegúrate de haber escaneado el código QR de tu mesa.',
-        [
-          { text: "OK", onPress: onClose }
-        ]
+        "Error",
+        "No tienes una mesa asignada. Asegúrate de haber escaneado el código QR de tu mesa.",
+        [{ text: "OK", onPress: onClose }],
       );
       return;
     }
@@ -133,7 +233,7 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
           image_url: item.image_url,
         })),
         totalAmount: cartAmount,
-        estimatedTime: cartTime
+        estimatedTime: cartTime,
       };
 
       // Usar el nuevo API de orders
@@ -141,16 +241,18 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
 
       // Enviar el pedido (limpia carrito local y refresca desde BD)
       await submitOrder();
-      
+
       Alert.alert(
         "Pedido Enviado",
         `Tu pedido por ${formatPrice(cartAmount)} ha sido enviado. Espera a que sea confirmado por el personal.`,
-        [{ text: "OK", onPress: onClose }]
+        [{ text: "OK", onPress: onClose }],
       );
-      
     } catch (error: any) {
       console.error("Error al enviar pedido:", error);
-      Alert.alert("Error", error.message || "No se pudo enviar el pedido. Intenta de nuevo.");
+      Alert.alert(
+        "Error",
+        error.message || "No se pudo enviar el pedido. Intenta de nuevo.",
+      );
     }
   };
 
@@ -161,28 +263,47 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <LinearGradient colors={["#1a1a1a", "#2d1810", "#1a1a1a"]} style={{ flex: 1 }}>
+      <LinearGradient
+        colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
+        style={{ flex: 1 }}
+      >
         {/* Header */}
-        <View style={{
-          paddingTop: 48,
-          paddingHorizontal: 24,
-          paddingBottom: 16,
-          borderBottomWidth: 1,
-          borderBottomColor: "rgba(255,255,255,0.1)",
-        }}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+        <View
+          style={{
+            paddingTop: 48,
+            paddingHorizontal: 24,
+            paddingBottom: 16,
+            borderBottomWidth: 1,
+            borderBottomColor: "rgba(255,255,255,0.1)",
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <View
+              style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
+            >
               <ShoppingCart size={24} color="#d4af37" />
-              <Text style={{
-                color: "white",
-                fontSize: 24,
-                fontWeight: "600",
-                marginLeft: 8,
-              }}>
-                {hasPendingOrder ? "Pedido Enviado" : "Mi Carrito"}
+              <Text
+                style={{
+                  color: "white",
+                  fontSize: 24,
+                  fontWeight: "600",
+                  marginLeft: 8,
+                }}
+              >
+                {hasPendingOrder
+                  ? "Pedido Enviado"
+                  : hasPartialOrder
+                    ? "Pedido Parcial + Carrito"
+                    : "Mi Carrito"}
               </Text>
             </View>
-            
+
             <TouchableOpacity
               onPress={onClose}
               style={{
@@ -194,18 +315,23 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
               <X size={24} color="white" />
             </TouchableOpacity>
           </View>
-          
-          <Text style={{ 
-            color: "#d1d5db", 
-            fontSize: 14, 
-            marginTop: 4 
-          }}>
-            {hasPendingOrder 
-              ? `${pendingOrderCount} ${pendingOrderCount === 1 ? 'producto' : 'productos'} enviados • Esperando confirmación`
-              : cartCount > 0 
-                ? `${cartCount} ${cartCount === 1 ? 'producto' : 'productos'} • Tiempo estimado: ${cartTime} min`
-                : "Tu carrito está vacío"
-            }
+
+          <Text
+            style={{
+              color: "#d1d5db",
+              fontSize: 14,
+              marginTop: 4,
+            }}
+          >
+            {hasPendingOrder
+              ? `${pendingOrderCount} ${pendingOrderCount === 1 ? "producto" : "productos"} enviados • Esperando confirmación`
+              : hasPartialOrder && cartCount > 0
+                ? `Parcial: ${partialOrderCount} | Carrito: ${cartCount} • Tiempo: ${Math.max(partialOrderTime, cartTime)} min`
+                : hasPartialOrder
+                  ? `${partialOrderCount} ${partialOrderCount === 1 ? "producto" : "productos"} aprobados parcialmente • Puedes agregar más`
+                  : cartCount > 0
+                    ? `${cartCount} ${cartCount === 1 ? "producto" : "productos"} • Tiempo estimado: ${cartTime} min`
+                    : "Tu carrito está vacío"}
           </Text>
         </View>
 
@@ -213,36 +339,46 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
           {/* Pedido Enviado (Pendiente de Confirmación) */}
           {hasPendingOrder && pendingOrderItems.length > 0 && (
             <View style={{ marginBottom: 24 }}>
-              <View style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginBottom: 16,
-                paddingBottom: 8,
-                borderBottomWidth: 1,
-                borderBottomColor: "rgba(255, 165, 0, 0.3)",
-              }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 16,
+                  paddingBottom: 8,
+                  borderBottomWidth: 1,
+                  borderBottomColor: "rgba(255, 165, 0, 0.3)",
+                }}
+              >
                 <Clock size={20} color="#ffa500" />
-                <Text style={{
-                  color: "#ffa500",
-                  fontSize: 18,
-                  fontWeight: "600",
-                  marginLeft: 8,
-                }}>
+                <Text
+                  style={{
+                    color: "#ffa500",
+                    fontSize: 18,
+                    fontWeight: "600",
+                    marginLeft: 8,
+                  }}
+                >
                   Pedido Enviado ({pendingOrderCount} items)
                 </Text>
-                <Text style={{
-                  color: "#9ca3af",
-                  fontSize: 14,
-                  marginLeft: 8,
-                }}>
+                <Text
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: 14,
+                    marginLeft: 8,
+                  }}
+                >
                   - Esperando confirmación
                 </Text>
               </View>
 
               {pendingOrderItems.map((item, index) => {
-                const CategoryIcon = getCategoryIcon(item.category as "plato" | "bebida");
-                const categoryColor = getCategoryColor(item.category as "plato" | "bebida");
-                
+                const CategoryIcon = getCategoryIcon(
+                  item.category as "plato" | "bebida",
+                );
+                const categoryColor = getCategoryColor(
+                  item.category as "plato" | "bebida",
+                );
+
                 return (
                   <View
                     key={`pending-${item.id}-${index}`}
@@ -267,65 +403,291 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
                         }}
                       />
                     )}
-                    
+
                     <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
-                        <View style={{
-                          backgroundColor: categoryColor,
-                          borderRadius: 6,
-                          padding: 4,
-                          marginRight: 8,
-                        }}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          marginBottom: 4,
+                        }}
+                      >
+                        <View
+                          style={{
+                            backgroundColor: categoryColor,
+                            borderRadius: 6,
+                            padding: 4,
+                            marginRight: 8,
+                          }}
+                        >
                           <CategoryIcon size={12} color="white" />
                         </View>
-                        <Text style={{
-                          color: "#9ca3af",
-                          fontSize: 12,
-                          textTransform: "uppercase",
-                        }}>
+                        <Text
+                          style={{
+                            color: "#9ca3af",
+                            fontSize: 12,
+                            textTransform: "uppercase",
+                          }}
+                        >
                           {item.category === "plato" ? "Plato" : "Bebida"}
                         </Text>
                       </View>
-                      
-                      <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
+
+                      <Text
+                        style={{
+                          color: "white",
+                          fontSize: 16,
+                          fontWeight: "600",
+                        }}
+                      >
                         {item.name}
                       </Text>
-                      <Text style={{ color: "#9ca3af", fontSize: 14, marginTop: 2 }}>
+                      <Text
+                        style={{ color: "#9ca3af", fontSize: 14, marginTop: 2 }}
+                      >
                         {formatPrice(item.price)} x {item.quantity}
                       </Text>
-                      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          marginTop: 4,
+                        }}
+                      >
                         <Clock size={12} color="#ffa500" />
-                        <Text style={{ color: "#ffa500", fontSize: 12, marginLeft: 4 }}>
+                        <Text
+                          style={{
+                            color: "#ffa500",
+                            fontSize: 12,
+                            marginLeft: 4,
+                          }}
+                        >
                           {item.prepMinutes} min
                         </Text>
                       </View>
                     </View>
-                    
-                    <Text style={{
-                      color: "#ffa500",
-                      fontSize: 16,
-                      fontWeight: "600",
-                      alignSelf: "center",
-                    }}>
+
+                    <Text
+                      style={{
+                        color: "#ffa500",
+                        fontSize: 16,
+                        fontWeight: "600",
+                        alignSelf: "center",
+                      }}
+                    >
                       {formatPrice(item.price * item.quantity)}
                     </Text>
                   </View>
                 );
               })}
 
-              <View style={{
-                backgroundColor: "rgba(255, 165, 0, 0.1)",
-                borderRadius: 12,
-                padding: 16,
-                marginTop: 16,
-                borderWidth: 1,
-                borderColor: "rgba(255, 165, 0, 0.2)",
-              }}>
-                <Text style={{ color: "#ffa500", fontSize: 16, textAlign: "center" }}>
+              <View
+                style={{
+                  backgroundColor: "rgba(255, 165, 0, 0.1)",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginTop: 16,
+                  borderWidth: 1,
+                  borderColor: "rgba(255, 165, 0, 0.2)",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#ffa500",
+                    fontSize: 16,
+                    textAlign: "center",
+                  }}
+                >
                   Tu pedido está siendo revisado por el personal.
                 </Text>
-                <Text style={{ color: "#9ca3af", fontSize: 14, textAlign: "center", marginTop: 4 }}>
-                  No puedes agregar más items hasta que este pedido sea confirmado.
+                <Text
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: 14,
+                    textAlign: "center",
+                    marginTop: 4,
+                  }}
+                >
+                  No puedes agregar más items hasta que este pedido sea
+                  confirmado.
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Pedido Parcial (Aprobado Parcialmente) */}
+          {hasPartialOrder && partialOrderItems.length > 0 && (
+            <View style={{ marginBottom: 24 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 16,
+                  paddingBottom: 8,
+                  borderBottomWidth: 1,
+                  borderBottomColor: "rgba(34, 197, 94, 0.3)",
+                }}
+              >
+                <CheckCircle size={20} color="#22c55e" />
+                <Text
+                  style={{
+                    color: "#22c55e",
+                    fontSize: 18,
+                    fontWeight: "600",
+                    marginLeft: 8,
+                  }}
+                >
+                  Pedido Parcial ({partialOrderCount} items)
+                </Text>
+                <Text
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: 14,
+                    marginLeft: 8,
+                  }}
+                >
+                  - Aprobado parcialmente
+                </Text>
+              </View>
+
+              {partialOrderItems.map((item, index) => {
+                const CategoryIcon = getCategoryIcon(
+                  item.category as "plato" | "bebida",
+                );
+                const categoryColor = getCategoryColor(
+                  item.category as "plato" | "bebida",
+                );
+
+                return (
+                  <View
+                    key={`partial-${item.id}-${index}`}
+                    style={{
+                      flexDirection: "row",
+                      backgroundColor: "rgba(34, 197, 94, 0.1)",
+                      borderRadius: 12,
+                      marginBottom: 12,
+                      padding: 12,
+                      borderWidth: 1,
+                      borderColor: "rgba(34, 197, 94, 0.2)",
+                    }}
+                  >
+                    {item.image_url && (
+                      <Image
+                        source={{ uri: item.image_url }}
+                        style={{
+                          width: 60,
+                          height: 60,
+                          borderRadius: 8,
+                          marginRight: 12,
+                        }}
+                      />
+                    )}
+
+                    <View style={{ flex: 1 }}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          marginBottom: 4,
+                        }}
+                      >
+                        <View
+                          style={{
+                            backgroundColor: categoryColor,
+                            borderRadius: 6,
+                            padding: 4,
+                            marginRight: 8,
+                          }}
+                        >
+                          <CategoryIcon size={12} color="white" />
+                        </View>
+                        <Text
+                          style={{
+                            color: "#9ca3af",
+                            fontSize: 12,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {item.category === "plato" ? "Plato" : "Bebida"}
+                        </Text>
+                      </View>
+
+                      <Text
+                        style={{
+                          color: "white",
+                          fontSize: 16,
+                          fontWeight: "600",
+                        }}
+                      >
+                        {item.name}
+                      </Text>
+                      <Text
+                        style={{ color: "#9ca3af", fontSize: 14, marginTop: 2 }}
+                      >
+                        {formatPrice(item.price)} x {item.quantity}
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          marginTop: 4,
+                        }}
+                      >
+                        <Clock size={12} color="#22c55e" />
+                        <Text
+                          style={{
+                            color: "#22c55e",
+                            fontSize: 12,
+                            marginLeft: 4,
+                          }}
+                        >
+                          {item.prepMinutes} min
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text
+                      style={{
+                        color: "#22c55e",
+                        fontSize: 16,
+                        fontWeight: "600",
+                        alignSelf: "center",
+                      }}
+                    >
+                      {formatPrice(item.price * item.quantity)}
+                    </Text>
+                  </View>
+                );
+              })}
+
+              <View
+                style={{
+                  backgroundColor: "rgba(34, 197, 94, 0.1)",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginTop: 16,
+                  borderWidth: 1,
+                  borderColor: "rgba(34, 197, 94, 0.2)",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#22c55e",
+                    fontSize: 16,
+                    textAlign: "center",
+                  }}
+                >
+                  Estos productos fueron aprobados por el mozo.
+                </Text>
+                <Text
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: 14,
+                    textAlign: "center",
+                    marginTop: 4,
+                  }}
+                >
+                  Puedes agregar más productos al pedido desde el menú.
                 </Text>
               </View>
             </View>
@@ -334,36 +696,46 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
           {/* Carrito Local (Solo si no hay pedido pending) */}
           {!hasPendingOrder && cartItems.length > 0 && (
             <View>
-              <View style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginBottom: 16,
-                paddingBottom: 8,
-                borderBottomWidth: 1,
-                borderBottomColor: "rgba(212, 175, 55, 0.3)",
-              }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 16,
+                  paddingBottom: 8,
+                  borderBottomWidth: 1,
+                  borderBottomColor: "rgba(212, 175, 55, 0.3)",
+                }}
+              >
                 <ShoppingCart size={20} color="#d4af37" />
-                <Text style={{
-                  color: "#d4af37",
-                  fontSize: 18,
-                  fontWeight: "600",
-                  marginLeft: 8,
-                }}>
+                <Text
+                  style={{
+                    color: "#d4af37",
+                    fontSize: 18,
+                    fontWeight: "600",
+                    marginLeft: 8,
+                  }}
+                >
                   En el Carrito ({cartCount} items)
                 </Text>
-                <Text style={{
-                  color: "#9ca3af",
-                  fontSize: 14,
-                  marginLeft: 8,
-                }}>
+                <Text
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: 14,
+                    marginLeft: 8,
+                  }}
+                >
                   - Listo para enviar
                 </Text>
               </View>
 
-              {cartItems.map((item) => {
-                const CategoryIcon = getCategoryIcon(item.category as "plato" | "bebida");
-                const categoryColor = getCategoryColor(item.category as "plato" | "bebida");
-                
+              {cartItems.map(item => {
+                const CategoryIcon = getCategoryIcon(
+                  item.category as "plato" | "bebida",
+                );
+                const categoryColor = getCategoryColor(
+                  item.category as "plato" | "bebida",
+                );
+
                 return (
                   <View
                     key={item.id}
@@ -376,7 +748,9 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
                       borderColor: "rgba(255,255,255,0.1)",
                     }}
                   >
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
                       {/* Image */}
                       {item.image_url && (
                         <Image
@@ -389,58 +763,85 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
                           }}
                         />
                       )}
-                      
+
                       {/* Content */}
                       <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
-                          <View style={{
-                            backgroundColor: categoryColor,
-                            borderRadius: 6,
-                            padding: 4,
-                            marginRight: 8,
-                          }}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            marginBottom: 4,
+                          }}
+                        >
+                          <View
+                            style={{
+                              backgroundColor: categoryColor,
+                              borderRadius: 6,
+                              padding: 4,
+                              marginRight: 8,
+                            }}
+                          >
                             <CategoryIcon size={12} color="white" />
                           </View>
-                          <Text style={{
-                            color: "#9ca3af",
-                            fontSize: 12,
-                            textTransform: "uppercase",
-                          }}>
+                          <Text
+                            style={{
+                              color: "#9ca3af",
+                              fontSize: 12,
+                              textTransform: "uppercase",
+                            }}
+                          >
                             {item.category === "plato" ? "Plato" : "Bebida"}
                           </Text>
                         </View>
-                        
-                        <Text style={{
-                          color: "white",
-                          fontSize: 16,
-                          fontWeight: "600",
-                          marginBottom: 4,
-                        }}>
-                          {item.name}
-                        </Text>
-                        
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                          <Text style={{
-                            color: "#d4af37",
+
+                        <Text
+                          style={{
+                            color: "white",
                             fontSize: 16,
                             fontWeight: "600",
-                          }}>
+                            marginBottom: 4,
+                          }}
+                        >
+                          {item.name}
+                        </Text>
+
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 12,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: "#d4af37",
+                              fontSize: 16,
+                              fontWeight: "600",
+                            }}
+                          >
                             {formatPrice(item.price)}
                           </Text>
-                          
-                          <View style={{ flexDirection: "row", alignItems: "center" }}>
+
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                            }}
+                          >
                             <Clock size={12} color="#d1d5db" />
-                            <Text style={{
-                              color: "#d1d5db",
-                              fontSize: 12,
-                              marginLeft: 4,
-                            }}>
+                            <Text
+                              style={{
+                                color: "#d1d5db",
+                                fontSize: 12,
+                                marginLeft: 4,
+                              }}
+                            >
                               {item.prepMinutes} min
                             </Text>
                           </View>
                         </View>
                       </View>
-                      
+
                       {/* Controls */}
                       <View style={{ alignItems: "flex-end" }}>
                         <TouchableOpacity
@@ -454,32 +855,40 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
                         >
                           <Trash2 size={16} color="#ef4444" />
                         </TouchableOpacity>
-                        
-                        <View style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          backgroundColor: "#d4af37",
-                          borderRadius: 8,
-                          paddingHorizontal: 4,
-                        }}>
+
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            backgroundColor: "#d4af37",
+                            borderRadius: 8,
+                            paddingHorizontal: 4,
+                          }}
+                        >
                           <TouchableOpacity
-                            onPress={() => updateQuantity(item.id, item.quantity - 1)}
+                            onPress={() =>
+                              updateQuantity(item.id, item.quantity - 1)
+                            }
                             style={{ padding: 6 }}
                           >
                             <Minus size={14} color="#1a1a1a" />
                           </TouchableOpacity>
-                          
-                          <Text style={{
-                            color: "#1a1a1a",
-                            fontWeight: "600",
-                            fontSize: 16,
-                            marginHorizontal: 8,
-                          }}>
+
+                          <Text
+                            style={{
+                              color: "#1a1a1a",
+                              fontWeight: "600",
+                              fontSize: 16,
+                              marginHorizontal: 8,
+                            }}
+                          >
                             {item.quantity}
                           </Text>
-                          
+
                           <TouchableOpacity
-                            onPress={() => updateQuantity(item.id, item.quantity + 1)}
+                            onPress={() =>
+                              updateQuantity(item.id, item.quantity + 1)
+                            }
                             style={{ padding: 6 }}
                           >
                             <Plus size={14} color="#1a1a1a" />
@@ -494,74 +903,385 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
           )}
 
           {/* Estado vacío */}
-          {!hasPendingOrder && cartItems.length === 0 && (
-            <View style={{
-              alignItems: "center",
-              justifyContent: "center",
-              paddingVertical: 48,
-            }}>
+          {!hasPendingOrder && !hasPartialOrder && cartItems.length === 0 && (
+            <View
+              style={{
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: 48,
+              }}
+            >
               <ShoppingCart size={64} color="#6b7280" />
-              <Text style={{
-                color: "#9ca3af",
-                fontSize: 18,
-                marginTop: 16,
-                textAlign: "center",
-              }}>
+              <Text
+                style={{
+                  color: "#9ca3af",
+                  fontSize: 18,
+                  marginTop: 16,
+                  textAlign: "center",
+                }}
+              >
                 Tu carrito está vacío
               </Text>
-              <Text style={{
-                color: "#6b7280",
-                fontSize: 14,
-                marginTop: 4,
-                textAlign: "center",
-              }}>
+              <Text
+                style={{
+                  color: "#6b7280",
+                  fontSize: 14,
+                  marginTop: 4,
+                  textAlign: "center",
+                }}
+              >
                 Agrega algunos productos del menú
               </Text>
+            </View>
+          )}
+
+          {/* Historial de Pedidos */}
+          {userOrders.length > 0 && (
+            <View style={{ marginTop: 32 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 16,
+                  paddingBottom: 8,
+                  borderBottomWidth: 1,
+                  borderBottomColor: "rgba(255,255,255,0.2)",
+                }}
+              >
+                <Clock size={20} color="#9ca3af" />
+                <Text
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: 18,
+                    fontWeight: "600",
+                    marginLeft: 8,
+                  }}
+                >
+                  Historial de Pedidos
+                </Text>
+              </View>
+
+              {userOrders
+                .filter(
+                  order =>
+                    order.status !== "pending" && order.status !== "partial",
+                )
+                .sort(
+                  (a, b) =>
+                    new Date(b.created_at).getTime() -
+                    new Date(a.created_at).getTime(),
+                )
+                .slice(0, 3) // Mostrar solo los 3 más recientes
+                .map(order => {
+                  const statusInfo = getOrderStatusInfo(order.status);
+                  const StatusIcon = statusInfo.icon;
+
+                  return (
+                    <View
+                      key={`history-${order.id}`}
+                      style={{
+                        backgroundColor: statusInfo.bgColor,
+                        borderRadius: 12,
+                        padding: 16,
+                        marginBottom: 12,
+                        borderWidth: 1,
+                        borderColor: statusInfo.borderColor,
+                      }}
+                    >
+                      {/* Header del pedido */}
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginBottom: 12,
+                        }}
+                      >
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            flex: 1,
+                          }}
+                        >
+                          <StatusIcon size={16} color={statusInfo.color} />
+                          <Text
+                            style={{
+                              color: statusInfo.color,
+                              fontSize: 14,
+                              fontWeight: "600",
+                              marginLeft: 8,
+                            }}
+                          >
+                            {statusInfo.text}
+                          </Text>
+                        </View>
+
+                        <View style={{ alignItems: "flex-end" }}>
+                          <Text
+                            style={{
+                              color: statusInfo.color,
+                              fontSize: 16,
+                              fontWeight: "600",
+                            }}
+                          >
+                            {formatPrice(order.total_amount)}
+                          </Text>
+                          <Text
+                            style={{
+                              color: "#9ca3af",
+                              fontSize: 12,
+                            }}
+                          >
+                            {new Date(order.created_at).toLocaleDateString(
+                              "es",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              },
+                            )}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Items del pedido (solo los primeros 2) */}
+                      <View>
+                        {order.order_items
+                          .slice(0, 2)
+                          .map((item: any, index: number) => (
+                            <View
+                              key={`${order.id}-item-${index}`}
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                paddingVertical: 6,
+                              }}
+                            >
+                              <View
+                                style={{
+                                  backgroundColor:
+                                    item.menu_item?.category === "plato"
+                                      ? "#ef4444"
+                                      : "#3b82f6",
+                                  borderRadius: 4,
+                                  padding: 3,
+                                  marginRight: 8,
+                                }}
+                              >
+                                {item.menu_item?.category === "plato" ? (
+                                  <ChefHat size={10} color="white" />
+                                ) : (
+                                  <Coffee size={10} color="white" />
+                                )}
+                              </View>
+
+                              <Text
+                                style={{
+                                  color: "#d1d5db",
+                                  fontSize: 13,
+                                  flex: 1,
+                                }}
+                              >
+                                {item.menu_item?.name || "Producto"}
+                              </Text>
+
+                              <Text
+                                style={{
+                                  color: "#9ca3af",
+                                  fontSize: 12,
+                                }}
+                              >
+                                x{item.quantity}
+                              </Text>
+                            </View>
+                          ))}
+
+                        {order.order_items.length > 2 && (
+                          <Text
+                            style={{
+                              color: "#9ca3af",
+                              fontSize: 12,
+                              fontStyle: "italic",
+                              marginTop: 4,
+                            }}
+                          >
+                            +{order.order_items.length - 2} productos más
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+
+              {userOrders.filter(
+                order =>
+                  order.status !== "pending" && order.status !== "partial",
+              ).length === 0 && (
+                <Text
+                  style={{
+                    color: "#6b7280",
+                    fontSize: 14,
+                    textAlign: "center",
+                    fontStyle: "italic",
+                  }}
+                >
+                  No hay pedidos anteriores
+                </Text>
+              )}
             </View>
           )}
         </ScrollView>
 
         {/* Footer */}
-        {((cartItems.length > 0 && !hasPendingOrder) || (hasPendingOrder && pendingOrderItems.length > 0)) && (
-          <View style={{
-            padding: 24,
-            borderTopWidth: 1,
-            borderTopColor: "rgba(255,255,255,0.1)",
-          }}>
-            <View style={{
-              backgroundColor: "rgba(255,255,255,0.05)",
-              borderRadius: 12,
-              padding: 16,
-              marginBottom: 16,
-            }}>
+        {((cartItems.length > 0 && !hasPendingOrder) ||
+          (hasPendingOrder && pendingOrderItems.length > 0) ||
+          (hasPartialOrder && partialOrderItems.length > 0)) && (
+          <View
+            style={{
+              padding: 24,
+              borderTopWidth: 1,
+              borderTopColor: "rgba(255,255,255,0.1)",
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: "rgba(255,255,255,0.05)",
+                borderRadius: 12,
+                padding: 16,
+                marginBottom: 16,
+              }}
+            >
               {hasPendingOrder && (
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    marginBottom: 8,
+                  }}
+                >
                   <Text style={{ color: "#ffa500", fontSize: 16 }}>
                     Pedido Enviado ({pendingOrderCount} items)
                   </Text>
-                  <Text style={{ color: "#ffa500", fontSize: 16, fontWeight: "600" }}>
+                  <Text
+                    style={{
+                      color: "#ffa500",
+                      fontSize: 16,
+                      fontWeight: "600",
+                    }}
+                  >
                     {formatPrice(pendingOrderAmount)}
                   </Text>
                 </View>
               )}
-              
+
+              {hasPartialOrder && partialOrderItems.length > 0 && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    marginBottom: 8,
+                  }}
+                >
+                  <Text style={{ color: "#22c55e", fontSize: 16 }}>
+                    Pedido Parcial ({partialOrderCount} items)
+                  </Text>
+                  <Text
+                    style={{
+                      color: "#22c55e",
+                      fontSize: 16,
+                      fontWeight: "600",
+                    }}
+                  >
+                    {formatPrice(partialOrderAmount)}
+                  </Text>
+                </View>
+              )}
+
               {!hasPendingOrder && cartItems.length > 0 && (
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    marginBottom:
+                      cartItems.length > 0 && hasPartialOrder ? 8 : 0,
+                  }}
+                >
                   <Text style={{ color: "#d4af37", fontSize: 16 }}>
                     En Carrito ({cartCount} items)
                   </Text>
-                  <Text style={{ color: "#d4af37", fontSize: 16, fontWeight: "600" }}>
+                  <Text
+                    style={{
+                      color: "#d4af37",
+                      fontSize: 16,
+                      fontWeight: "600",
+                    }}
+                  >
                     {formatPrice(cartAmount)}
                   </Text>
                 </View>
               )}
-              
-              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+
+              {/* Total combinado si hay pedido parcial y carrito */}
+              {hasPartialOrder && cartItems.length > 0 && !hasPendingOrder && (
+                <>
+                  <View
+                    style={{
+                      height: 1,
+                      backgroundColor: "rgba(255,255,255,0.1)",
+                      marginVertical: 8,
+                    }}
+                  />
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "white",
+                        fontSize: 16,
+                        fontWeight: "600",
+                      }}
+                    >
+                      Total ({partialOrderCount + cartCount} items)
+                    </Text>
+                    <Text
+                      style={{
+                        color: "white",
+                        fontSize: 16,
+                        fontWeight: "600",
+                      }}
+                    >
+                      {formatPrice(partialOrderAmount + cartAmount)}
+                    </Text>
+                  </View>
+                </>
+              )}
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Text style={{ color: "#d1d5db", fontSize: 16 }}>
                   Tiempo estimado
                 </Text>
-                <Text style={{ color: "#d1d5db", fontSize: 16, fontWeight: "600" }}>
-                  {hasPendingOrder ? pendingOrderTime : cartTime} minutos
+                <Text
+                  style={{ color: "#d1d5db", fontSize: 16, fontWeight: "600" }}
+                >
+                  {hasPendingOrder
+                    ? pendingOrderTime
+                    : hasPartialOrder && cartItems.length > 0
+                      ? Math.max(partialOrderTime, cartTime)
+                      : hasPartialOrder
+                        ? partialOrderTime
+                        : cartTime}{" "}
+                  minutos
                 </Text>
               </View>
             </View>
@@ -581,33 +1301,85 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
                 }}
               >
                 <CheckCircle size={20} color="#1a1a1a" />
-                <Text style={{
-                  color: "#1a1a1a",
-                  fontSize: 18,
-                  fontWeight: "600",
-                  marginLeft: 8,
-                }}>
-                  {loadingTable 
-                    ? "Verificando mesa..." 
-                    : `Enviar Pedido • ${formatPrice(cartAmount)}`
-                  }
+                <Text
+                  style={{
+                    color: "#1a1a1a",
+                    fontSize: 18,
+                    fontWeight: "600",
+                    marginLeft: 8,
+                  }}
+                >
+                  {loadingTable
+                    ? "Verificando mesa..."
+                    : hasPartialOrder
+                      ? `Agregar al Pedido • ${formatPrice(cartAmount)}`
+                      : `Enviar Pedido • ${formatPrice(cartAmount)}`}
                 </Text>
               </TouchableOpacity>
             )}
 
             {hasPendingOrder && (
-              <View style={{
-                backgroundColor: "rgba(255, 165, 0, 0.1)",
-                borderRadius: 12,
-                padding: 16,
-                borderWidth: 1,
-                borderColor: "rgba(255, 165, 0, 0.2)",
-              }}>
-                <Text style={{ color: "#ffa500", fontSize: 16, textAlign: "center", fontWeight: "600" }}>
+              <View
+                style={{
+                  backgroundColor: "rgba(255, 165, 0, 0.1)",
+                  borderRadius: 12,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: "rgba(255, 165, 0, 0.2)",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#ffa500",
+                    fontSize: 16,
+                    textAlign: "center",
+                    fontWeight: "600",
+                  }}
+                >
                   Pedido en Revisión
                 </Text>
-                <Text style={{ color: "#9ca3af", fontSize: 14, textAlign: "center", marginTop: 4 }}>
+                <Text
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: 14,
+                    textAlign: "center",
+                    marginTop: 4,
+                  }}
+                >
                   El personal confirmará tu pedido pronto
+                </Text>
+              </View>
+            )}
+
+            {hasPartialOrder && cartItems.length === 0 && !hasPendingOrder && (
+              <View
+                style={{
+                  backgroundColor: "rgba(34, 197, 94, 0.1)",
+                  borderRadius: 12,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: "rgba(34, 197, 94, 0.2)",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#22c55e",
+                    fontSize: 16,
+                    textAlign: "center",
+                    fontWeight: "600",
+                  }}
+                >
+                  Pedido Parcialmente Aprobado
+                </Text>
+                <Text
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: 14,
+                    textAlign: "center",
+                    marginTop: 4,
+                  }}
+                >
+                  Agrega más productos desde el menú para completar tu pedido
                 </Text>
               </View>
             )}

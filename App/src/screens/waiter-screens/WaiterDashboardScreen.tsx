@@ -359,6 +359,16 @@ export default function WaiterDashboardScreen() {
               </View>
             )}
 
+            {/* Botón para ver órdenes pendientes */}
+            <TouchableOpacity
+              style={styles.ordersButton}
+              onPress={() => (navigation as any).navigate("WaiterOrders")}
+            >
+              <Text style={styles.ordersButtonText}>
+                📋 Ver Órdenes Pendientes
+              </Text>
+            </TouchableOpacity>
+
             {/* Mesas asignadas */}
             <Text style={styles.sectionTitle}>Mis Mesas Asignadas</Text>
             {waiterInfo && waiterInfo.assigned_tables.length > 0 ? (
@@ -583,5 +593,18 @@ const styles = StyleSheet.create({
     color: "#e53e3e",
     fontSize: 18,
     marginTop: 50,
+  },
+  ordersButton: {
+    backgroundColor: "#d4af37",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    marginVertical: 16,
+    marginHorizontal: 4,
+  },
+  ordersButtonText: {
+    color: "#1a1a1a",
+    fontWeight: "bold",
+    fontSize: 18,
   },
 });

@@ -1,4 +1,13 @@
-export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "preparing"
+  | "ready"
+  | "delivered"
+  | "cancelled"
+  | "accepted"
+  | "rejected"
+  | "partial";
 
 export interface CreateOrderDTO {
   table_id?: string | undefined;
@@ -64,5 +73,22 @@ export interface OrderWithItems extends Order {
     id: string;
     first_name: string;
     last_name: string;
+    profile_image?: string;
   };
+}
+
+// Tipos para acciones del mozo
+export type WaiterOrderAction = "accept" | "reject" | "partial";
+
+export interface WaiterOrderActionDTO {
+  action: WaiterOrderAction;
+  rejectedItemIds?: string[]; // IDs de items rechazados (solo para partial)
+  notes?: string; // Mensaje opcional del mozo
+}
+
+export interface OrderActionResponse {
+  success: boolean;
+  message: string;
+  order: OrderWithItems;
+  rejectedItems?: OrderItem[]; // Items que fueron rechazados
 }

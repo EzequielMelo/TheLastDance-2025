@@ -7,6 +7,10 @@ import {
   getTableOrdersHandler,
   updateOrderStatusHandler,
   getPendingOrdersHandler,
+  getWaiterPendingOrdersHandler,
+  getWaiterActiveOrdersHandler,
+  waiterOrderActionHandler,
+  addItemsToPartialOrderHandler,
 } from "./ordersController";
 
 const router = express.Router();
@@ -22,6 +26,14 @@ router.get("/my-orders", getUserOrdersHandler);
 
 // Obtener pedidos pendientes (para empleados)
 router.get("/pending", getPendingOrdersHandler);
+
+// Rutas específicas para mozos
+router.get("/waiter/pending", getWaiterPendingOrdersHandler);
+router.get("/waiter/active", getWaiterActiveOrdersHandler);
+router.put("/:orderId/waiter-action", waiterOrderActionHandler);
+
+// Agregar items a pedido parcial
+router.put("/:orderId/add-items", addItemsToPartialOrderHandler);
 
 // Obtener pedido específico por ID
 router.get("/:orderId", getOrderHandler);

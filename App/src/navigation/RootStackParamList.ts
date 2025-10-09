@@ -18,6 +18,7 @@ export type RootStackParamList = {
   ScanTableQR: undefined; // Escanear QR de mesa para confirmar llegada
   Menu: undefined; // Menú para clientes
   WaiterDashboard: undefined; // Panel del mesero
+  WaiterOrders: undefined; // Gestión de órdenes del mesero
   AllWaiters: undefined; // Gestión de meseros (admin/supervisor)
   TableChat: { tableId: string }; // Chat entre cliente y mesero
 };
