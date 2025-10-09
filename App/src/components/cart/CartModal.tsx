@@ -35,6 +35,7 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
     cartItems,
     pendingOrderItems,
     partialOrderItems,
+    userOrders,
     hasPendingOrder,
     hasPartialOrder,
     cartCount,
@@ -88,6 +89,75 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
       style: "currency",
       currency: "ARS",
     }).format(price);
+  };
+
+  const getOrderStatusInfo = (status: string) => {
+    switch (status) {
+      case "pending":
+        return {
+          color: "#ffa500",
+          text: "Esperando confirmación",
+          bgColor: "rgba(255, 165, 0, 0.1)",
+          borderColor: "rgba(255, 165, 0, 0.2)",
+          icon: Clock,
+        };
+      case "partial":
+        return {
+          color: "#22c55e",
+          text: "Aprobado parcialmente",
+          bgColor: "rgba(34, 197, 94, 0.1)",
+          borderColor: "rgba(34, 197, 94, 0.2)",
+          icon: CheckCircle,
+        };
+      case "accepted":
+        return {
+          color: "#3b82f6",
+          text: "Confirmado por el mozo",
+          bgColor: "rgba(59, 130, 246, 0.1)",
+          borderColor: "rgba(59, 130, 246, 0.2)",
+          icon: CheckCircle,
+        };
+      case "preparing":
+        return {
+          color: "#f59e0b",
+          text: "En preparación",
+          bgColor: "rgba(245, 158, 11, 0.1)",
+          borderColor: "rgba(245, 158, 11, 0.2)",
+          icon: ChefHat,
+        };
+      case "ready":
+        return {
+          color: "#10b981",
+          text: "Listo para servir",
+          bgColor: "rgba(16, 185, 129, 0.1)",
+          borderColor: "rgba(16, 185, 129, 0.2)",
+          icon: CheckCircle,
+        };
+      case "delivered":
+        return {
+          color: "#6b7280",
+          text: "Entregado",
+          bgColor: "rgba(107, 114, 128, 0.1)",
+          borderColor: "rgba(107, 114, 128, 0.2)",
+          icon: CheckCircle,
+        };
+      case "rejected":
+        return {
+          color: "#ef4444",
+          text: "Rechazado",
+          bgColor: "rgba(239, 68, 68, 0.1)",
+          borderColor: "rgba(239, 68, 68, 0.2)",
+          icon: X,
+        };
+      default:
+        return {
+          color: "#9ca3af",
+          text: "Estado desconocido",
+          bgColor: "rgba(156, 163, 175, 0.1)",
+          borderColor: "rgba(156, 163, 175, 0.2)",
+          icon: Clock,
+        };
+    }
   };
 
   const getCategoryIcon = (category: "plato" | "bebida") => {
@@ -862,6 +932,204 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
               >
                 Agrega algunos productos del menú
               </Text>
+            </View>
+          )}
+
+          {/* Historial de Pedidos */}
+          {userOrders.length > 0 && (
+            <View style={{ marginTop: 32 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 16,
+                  paddingBottom: 8,
+                  borderBottomWidth: 1,
+                  borderBottomColor: "rgba(255,255,255,0.2)",
+                }}
+              >
+                <Clock size={20} color="#9ca3af" />
+                <Text
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: 18,
+                    fontWeight: "600",
+                    marginLeft: 8,
+                  }}
+                >
+                  Historial de Pedidos
+                </Text>
+              </View>
+
+              {userOrders
+                .filter(
+                  order =>
+                    order.status !== "pending" && order.status !== "partial",
+                )
+                .sort(
+                  (a, b) =>
+                    new Date(b.created_at).getTime() -
+                    new Date(a.created_at).getTime(),
+                )
+                .slice(0, 3) // Mostrar solo los 3 más recientes
+                .map(order => {
+                  const statusInfo = getOrderStatusInfo(order.status);
+                  const StatusIcon = statusInfo.icon;
+
+                  return (
+                    <View
+                      key={`history-${order.id}`}
+                      style={{
+                        backgroundColor: statusInfo.bgColor,
+                        borderRadius: 12,
+                        padding: 16,
+                        marginBottom: 12,
+                        borderWidth: 1,
+                        borderColor: statusInfo.borderColor,
+                      }}
+                    >
+                      {/* Header del pedido */}
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginBottom: 12,
+                        }}
+                      >
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            flex: 1,
+                          }}
+                        >
+                          <StatusIcon size={16} color={statusInfo.color} />
+                          <Text
+                            style={{
+                              color: statusInfo.color,
+                              fontSize: 14,
+                              fontWeight: "600",
+                              marginLeft: 8,
+                            }}
+                          >
+                            {statusInfo.text}
+                          </Text>
+                        </View>
+
+                        <View style={{ alignItems: "flex-end" }}>
+                          <Text
+                            style={{
+                              color: statusInfo.color,
+                              fontSize: 16,
+                              fontWeight: "600",
+                            }}
+                          >
+                            {formatPrice(order.total_amount)}
+                          </Text>
+                          <Text
+                            style={{
+                              color: "#9ca3af",
+                              fontSize: 12,
+                            }}
+                          >
+                            {new Date(order.created_at).toLocaleDateString(
+                              "es",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              },
+                            )}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Items del pedido (solo los primeros 2) */}
+                      <View>
+                        {order.order_items
+                          .slice(0, 2)
+                          .map((item: any, index: number) => (
+                            <View
+                              key={`${order.id}-item-${index}`}
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                paddingVertical: 6,
+                              }}
+                            >
+                              <View
+                                style={{
+                                  backgroundColor:
+                                    item.menu_item?.category === "plato"
+                                      ? "#ef4444"
+                                      : "#3b82f6",
+                                  borderRadius: 4,
+                                  padding: 3,
+                                  marginRight: 8,
+                                }}
+                              >
+                                {item.menu_item?.category === "plato" ? (
+                                  <ChefHat size={10} color="white" />
+                                ) : (
+                                  <Coffee size={10} color="white" />
+                                )}
+                              </View>
+
+                              <Text
+                                style={{
+                                  color: "#d1d5db",
+                                  fontSize: 13,
+                                  flex: 1,
+                                }}
+                              >
+                                {item.menu_item?.name || "Producto"}
+                              </Text>
+
+                              <Text
+                                style={{
+                                  color: "#9ca3af",
+                                  fontSize: 12,
+                                }}
+                              >
+                                x{item.quantity}
+                              </Text>
+                            </View>
+                          ))}
+
+                        {order.order_items.length > 2 && (
+                          <Text
+                            style={{
+                              color: "#9ca3af",
+                              fontSize: 12,
+                              fontStyle: "italic",
+                              marginTop: 4,
+                            }}
+                          >
+                            +{order.order_items.length - 2} productos más
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+
+              {userOrders.filter(
+                order =>
+                  order.status !== "pending" && order.status !== "partial",
+              ).length === 0 && (
+                <Text
+                  style={{
+                    color: "#6b7280",
+                    fontSize: 14,
+                    textAlign: "center",
+                    fontStyle: "italic",
+                  }}
+                >
+                  No hay pedidos anteriores
+                </Text>
+              )}
             </View>
           )}
         </ScrollView>

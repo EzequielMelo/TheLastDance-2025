@@ -26,12 +26,12 @@ export interface CartContextType {
   pendingOrderItems: CartItem[];
   // Items de pedidos parcialmente aprobados que pueden ser modificados
   partialOrderItems: CartItem[];
+  // Todos los pedidos del usuario con sus estados
+  userOrders: Order[];
 
   // Estado del pedido actual
   hasPendingOrder: boolean;
-  hasPartialOrder: boolean;
-
-  // Funciones para items del carrito local
+  hasPartialOrder: boolean; // Funciones para items del carrito local
   addItem: (item: Omit<CartItem, "quantity">) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   removeItem: (itemId: string) => void;
@@ -83,6 +83,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [pendingOrderItems, setPendingOrderItems] = useState<CartItem[]>([]);
   const [partialOrderItems, setPartialOrderItems] = useState<CartItem[]>([]);
+  const [userOrders, setUserOrders] = useState<Order[]>([]);
   const [hasPendingOrder, setHasPendingOrder] = useState(false);
   const [hasPartialOrder, setHasPartialOrder] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -106,6 +107,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       const orders = await getUserOrders();
+
+      // Guardar todas las órdenes para mostrar estados
+      setUserOrders(orders);
 
       // Procesar pedidos con status "pending"
       const pendingOrders = orders.filter(
@@ -165,6 +169,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       setCartItems([]);
       setPendingOrderItems([]);
       setPartialOrderItems([]);
+      setUserOrders([]);
       setHasPendingOrder(false);
       setHasPartialOrder(false);
     }
@@ -452,6 +457,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     cartItems,
     pendingOrderItems,
     partialOrderItems,
+    userOrders,
     hasPendingOrder,
     hasPartialOrder,
     addItem,
