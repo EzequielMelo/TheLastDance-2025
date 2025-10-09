@@ -16,6 +16,7 @@ export interface WaitingListEntry {
     first_name: string;
     last_name: string;
     profile_image?: string;
+    profile_code: string;
   };
   waiting_minutes?: number;
   estimated_position?: number;
@@ -41,6 +42,7 @@ export interface TableStatus {
     first_name: string;
     last_name: string;
     profile_image?: string;
+    profile_code: string;
   };
 }
 

@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { User } from "../types/User";
+import api from "../api/axios";
 
 type AuthContextType = {
   user: User | null;
@@ -71,6 +72,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     try {
       setIsLoading(true);
+
+      // Si es un usuario anónimo, eliminar de la base de datos
+      if (user?.profile_code === "cliente_anonimo" && token) {
+        console.log('🗑️ Eliminando usuario anónimo del servidor...');
+        try {
+          await api.delete('/auth/anonymous', {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          console.log('✅ Usuario anónimo eliminado del servidor');
+        } catch (error) {
+          console.error('❌ Error eliminando usuario anónimo:', error);
+          // Continuar con el logout local aunque falle la eliminación remota
+        }
+      }
 
       // Limpiar ambos storages
       await Promise.all([

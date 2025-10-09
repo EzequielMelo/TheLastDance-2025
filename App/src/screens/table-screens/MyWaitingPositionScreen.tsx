@@ -90,13 +90,15 @@ export default function MyWaitingPositionScreen() {
           estimatedWait: statusResponse.data.estimatedWait,
         });
 
-        // Crear entrada simulada para mostrar la info
+        // Usar la información real del backend
         setMyEntry({
           id: statusResponse.data.waitingListId || "",
-          party_size: 0,
+          party_size: statusResponse.data.party_size || 1,
           status: "waiting",
-          priority: 0,
-          joined_at: new Date().toISOString(),
+          priority: statusResponse.data.entry?.priority || 0,
+          joined_at: statusResponse.data.entry?.joined_at || new Date().toISOString(),
+          preferred_table_type: statusResponse.data.preferred_table_type,
+          special_requests: statusResponse.data.special_requests,
         });
         return;
       }

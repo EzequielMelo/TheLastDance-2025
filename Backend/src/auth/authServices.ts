@@ -284,3 +284,66 @@ export async function verifyToken(accessToken: string) {
 
   return data.user;
 }
+
+export async function deleteAnonymousUser(userId: string) {
+  console.log('🗑️ Iniciando eliminación de usuario anónimo:', userId);
+  
+  // 1. Verificar que el usuario existe y es anónimo
+  const { data: user, error: getUserError } = await supabaseAdmin
+    .from("users")
+    .select("id, profile_code, profile_image")
+    .eq("id", userId)
+    .eq("profile_code", "cliente_anonimo")
+    .single();
+
+  if (getUserError || !user) {
+    throw new Error("Usuario anónimo no encontrado.");
+  }
+
+  console.log('👤 Usuario encontrado:', user);
+
+  // 2. Eliminar foto de perfil del storage si existe
+  if (user.profile_image) {
+    console.log('📸 Eliminando foto de perfil del storage:', user.profile_image);
+    
+    try {
+      // Extraer el nombre del archivo de la URL
+      const fileName = user.profile_image.split('/').pop();
+      if (fileName) {
+        const { error: storageError } = await supabaseAdmin.storage
+          .from('profile-images')
+          .remove([fileName]);
+        
+        if (storageError) {
+          console.error('❌ Error eliminando foto del storage:', storageError);
+          // No hacer throw aquí - continuar con la eliminación del usuario
+        } else {
+          console.log('✅ Foto eliminada del storage');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error procesando eliminación de foto:', error);
+      // No hacer throw aquí - continuar con la eliminación del usuario
+    }
+  }
+
+  // 3. Eliminar usuario de la tabla users
+  console.log('🗑️ Eliminando usuario de la base de datos');
+  const { error: deleteError } = await supabaseAdmin
+    .from("users")
+    .delete()
+    .eq("id", userId)
+    .eq("profile_code", "cliente_anonimo");
+
+  if (deleteError) {
+    console.error('❌ Error eliminando usuario:', deleteError);
+    throw new Error("Error al eliminar usuario anónimo: " + deleteError.message);
+  }
+
+  console.log('✅ Usuario anónimo eliminado exitosamente');
+  
+  return {
+    message: "Usuario anónimo eliminado exitosamente.",
+    deleted_user_id: userId,
+  };
+}

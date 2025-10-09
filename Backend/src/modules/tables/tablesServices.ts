@@ -21,7 +21,8 @@ export async function getWaitingList(): Promise<WaitingListResponse> {
       users!waiting_list_client_id_fkey(
         first_name,
         last_name,
-        profile_image
+        profile_image,
+        profile_code
       )
     `,
     )
@@ -184,7 +185,7 @@ export async function getTablesStatus(): Promise<TablesStatusResponse> {
 
     const { data: clients, error: clientsError } = await supabaseAdmin
       .from("users")
-      .select("id, first_name, last_name")
+      .select("id, first_name, last_name, profile_image, profile_code")
       .in("id", clientIds);
 
     console.log("Datos de clientes obtenidos:", clients);

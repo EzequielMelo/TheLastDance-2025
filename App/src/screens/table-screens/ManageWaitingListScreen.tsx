@@ -536,6 +536,11 @@ function ClientCard({
             >
               {client.users.first_name} {client.users.last_name}
             </Text>
+            {client.users.profile_code === "cliente_anonimo" && (
+              <View className="bg-orange-500/20 rounded-full px-2 py-1 ml-2">
+                <Text className="text-orange-400 text-xs font-medium">ANÓNIMO</Text>
+              </View>
+            )}
             {!isVip && position && (
               <View className="bg-gray-600 rounded-full px-2 py-1 ml-2">
                 <Text className="text-white text-xs">#{position}</Text>
@@ -634,9 +639,16 @@ function TableCard({
         {tableState === "occupied" ? (
           <>
             {table.client && (
-              <Text className="text-gray-300 text-xs mt-1 text-center">
-                {table.client.first_name} {table.client.last_name}
-              </Text>
+              <>
+                <Text className="text-gray-300 text-xs mt-1 text-center">
+                  {table.client.first_name} {table.client.last_name}
+                </Text>
+                {table.client.profile_code === "cliente_anonimo" && (
+                  <Text className="text-orange-400 text-xs text-center font-medium">
+                    ANÓNIMO
+                  </Text>
+                )}
+              </>
             )}
             <TouchableOpacity
               onPress={onFree}
@@ -655,9 +667,16 @@ function TableCard({
         ) : tableState === "assigned" ? (
           <>
             {table.client && (
-              <Text className="text-gray-300 text-xs mt-1 text-center">
-                {table.client.first_name} {table.client.last_name}
-              </Text>
+              <>
+                <Text className="text-gray-300 text-xs mt-1 text-center">
+                  {table.client.first_name} {table.client.last_name}
+                </Text>
+                {table.client.profile_code === "cliente_anonimo" && (
+                  <Text className="text-orange-400 text-xs text-center font-medium">
+                    ANÓNIMO
+                  </Text>
+                )}
+              </>
             )}
             <Text className="text-yellow-400 text-xs mt-1">Asignada</Text>
             <Text className="text-gray-400 text-xs">

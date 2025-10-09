@@ -19,6 +19,7 @@ export interface WaitingListWithUser extends WaitingListEntry {
     first_name: string;
     last_name: string;
     profile_image?: string;
+    profile_code: string;
   };
 }
 
@@ -52,6 +53,7 @@ export interface TableWithClient extends TableOccupancy {
     first_name: string;
     last_name: string;
     profile_image?: string;
+    profile_code: string;
   };
 }
 
