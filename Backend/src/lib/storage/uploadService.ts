@@ -58,15 +58,33 @@ export async function deleteFile(bucket: string, path: string): Promise<void> {
   }
 }
 
-// Función para extraer el path de una URL pública
+// Función para extraer el path de una URL pública de Supabase Storage
 export function extractPathFromUrl(url: string): string | null {
   try {
     const urlObj = new URL(url);
     const pathParts = urlObj.pathname.split("/");
-    // Remover los primeros elementos que son parte de la estructura de Supabase
-    const relevantParts = pathParts.slice(-2); // Tomar los últimos 2 elementos
-    return relevantParts.join("/");
-  } catch {
+    
+    // Formato típico: /storage/v1/object/public/[bucket]/[path]
+    // Encontrar el índice donde está el bucket
+    const bucketIndex = pathParts.findIndex((part, index) => 
+      part === 'public' && pathParts[index + 1] // 'public' seguido del bucket
+    );
+    
+    if (bucketIndex !== -1 && bucketIndex + 2 < pathParts.length) {
+      // Tomar todo lo que viene después del bucket
+      const pathAfterBucket = pathParts.slice(bucketIndex + 2);
+      return pathAfterBucket.join("/");
+    }
+    
+    // Fallback: tomar todo después de 'public/'
+    const publicIndex = pathParts.indexOf('public');
+    if (publicIndex !== -1 && publicIndex + 2 < pathParts.length) {
+      return pathParts.slice(publicIndex + 2).join("/");
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error extrayendo path de URL:', error);
     return null;
   }
 }

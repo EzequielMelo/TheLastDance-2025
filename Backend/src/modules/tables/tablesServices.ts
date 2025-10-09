@@ -13,28 +13,74 @@ import type {
 
 // Obtener lista de espera completa para el maitre
 export async function getWaitingList(): Promise<WaitingListResponse> {
-  const { data, error } = await supabaseAdmin
+  console.log('📋 getWaitingList - Iniciando consulta de lista de espera');
+  
+  // Primero obtenemos las entradas de waiting_list
+  const { data: waitingEntries, error: waitingError } = await supabaseAdmin
     .from("waiting_list")
-    .select(
-      `
-      *,
-      users!waiting_list_client_id_fkey(
-        first_name,
-        last_name,
-        profile_image,
-        profile_code
-      )
-    `,
-    )
+    .select("*")
     .eq("status", "waiting")
     .order("priority", { ascending: false })
     .order("joined_at", { ascending: true });
 
-  if (error) {
-    throw new Error(`Error obteniendo lista de espera: ${error.message}`);
+  console.log('📋 getWaitingList - Entradas waiting_list:', { 
+    dataLength: waitingEntries?.length, 
+    error: waitingError?.message 
+  });
+
+  if (waitingError) {
+    console.error('📋 getWaitingList - Error en waiting_list:', waitingError);
+    throw new Error(`Error obteniendo lista de espera: ${waitingError.message}`);
   }
 
-  const waitingList = (data || []) as WaitingListWithUser[];
+  if (!waitingEntries || waitingEntries.length === 0) {
+    console.log('📋 getWaitingList - No hay entradas en waiting_list');
+    return {
+      waiting_list: [],
+      total_waiting: 0,
+    };
+  }
+
+  // Obtener IDs de clientes únicos
+  const clientIds = [...new Set(waitingEntries.map(entry => entry.client_id))];
+  console.log('📋 getWaitingList - IDs de clientes:', clientIds);
+
+  // Consultar usuarios por separado
+  const { data: users, error: usersError } = await supabaseAdmin
+    .from("users")
+    .select("id, first_name, last_name, profile_image, profile_code")
+    .in("id", clientIds);
+
+  console.log('📋 getWaitingList - Usuarios obtenidos:', { 
+    usersLength: users?.length, 
+    error: usersError?.message,
+    users: users?.map(u => ({ id: u.id, name: `${u.first_name} ${u.last_name}`, profile_code: u.profile_code }))
+  });
+
+  if (usersError) {
+    console.error('📋 getWaitingList - Error obteniendo usuarios:', usersError);
+    throw new Error(`Error obteniendo usuarios: ${usersError.message}`);
+  }
+
+  // Combinar los datos
+  const waitingList: WaitingListWithUser[] = waitingEntries.map(entry => {
+    const user = users?.find(u => u.id === entry.client_id);
+    return {
+      ...entry,
+      users: user ? {
+        first_name: user.first_name,
+        last_name: user.last_name,
+        profile_image: user.profile_image,
+        profile_code: user.profile_code,
+      } : {
+        first_name: 'Usuario',
+        last_name: 'Desconocido',
+        profile_code: 'cliente_registrado',
+      }
+    };
+  });
+
+  console.log('📋 getWaitingList - Lista combinada:', waitingList.length, 'entradas');
 
   // Calcular tiempo promedio de espera para los que ya fueron asignados hoy
   const { data: seatedToday } = await supabaseAdmin
@@ -249,6 +295,7 @@ export async function assignClientToTable({
       .single();
 
     if (waitingError || !waitingEntry) {
+      console.log('❌ [assignClientToTable] Cliente no encontrado en lista de espera');
       return {
         success: false,
         message: "Cliente no encontrado en la lista de espera",
@@ -265,6 +312,7 @@ export async function assignClientToTable({
       .single();
 
     if (tableError || !table) {
+      console.log('❌ [assignClientToTable] Mesa no disponible');
       return {
         success: false,
         message: "Mesa no disponible o ya asignada a otro cliente",
@@ -273,13 +321,16 @@ export async function assignClientToTable({
 
     // 3. Verificar capacidad
     if (waitingEntry.party_size > table.capacity) {
+      console.log('❌ [assignClientToTable] Mesa muy pequeña', {
+        party_size: waitingEntry.party_size,
+        capacity: table.capacity
+      });
       return {
         success: false,
         message: `Mesa muy pequeña. Capacidad: ${table.capacity}, Grupo: ${waitingEntry.party_size}`,
       };
     }
 
-    // 4. Actualizar lista de espera
     const { error: updateWaitingError } = await supabaseAdmin
       .from("waiting_list")
       .update({
@@ -290,12 +341,12 @@ export async function assignClientToTable({
       .eq("id", waiting_list_id);
 
     if (updateWaitingError) {
+      console.log('❌ [assignClientToTable] Error actualizando waiting list');
       throw new Error(
         `Error actualizando lista de espera: ${updateWaitingError.message}`,
       );
     }
-
-    // 5. Asignar cliente a la mesa (sin ocuparla todavía)
+    
     const { error: updateTableError } = await supabaseAdmin
       .from("tables")
       .update({
@@ -324,6 +375,10 @@ export async function assignClientToTable({
         "Cliente asignado a la mesa exitosamente. El cliente debe escanear el QR de la mesa para activarla.",
     };
   } catch (error: any) {
+    console.log('💥 [assignClientToTable] Error en asignación:', {
+      error: error.message,
+      stack: error.stack
+    });
     return {
       success: false,
       message: error.message || "Error interno del servidor",

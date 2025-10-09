@@ -53,6 +53,10 @@ export const useClientState = (): ClientStateData => {
       const response = await api.get("/tables/my-status");
       const status = response.data.status;
 
+      console.log("🏠 useClientState - Estado del cliente:", status);
+      console.log("🏠 useClientState - Datos completos:", response.data);
+      console.log("🏠 useClientState - Usuario actual:", user.profile_code);
+
       // Limpiar estado anterior
       setWaitingPosition(undefined);
       setWaitingId(undefined);
@@ -74,6 +78,7 @@ export const useClientState = (): ClientStateData => {
           setWaitingPosition(response.data.position);
           setWaitingId(response.data.waitingListId);
           setState("in_queue");
+          console.log("🏠 useClientState - Establecido como in_queue, posición:", response.data.position);
           break;
 
         case "displaced":
@@ -84,10 +89,11 @@ export const useClientState = (): ClientStateData => {
         case "not_in_queue":
         default:
           setState("not_in_queue");
+          console.log("🏠 useClientState - Establecido como not_in_queue");
           break;
       }
     } catch (error) {
-      console.error("Error checking client state:", error);
+      console.error("🏠 useClientState - Error checking client state:", error);
       setState("error");
     }
   };

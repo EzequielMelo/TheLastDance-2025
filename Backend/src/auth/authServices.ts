@@ -2,6 +2,8 @@ import { supabase, supabaseAdmin } from "../config/supabase";
 import { CreateUserBody, LoginResult, AuthUser } from "./auth.types";
 import { sendPendingEmail } from "../lib/emails";
 import { uploadAvatar as uploadAvatarService } from "../lib/storage/avatarUpload";
+import { extractPathFromUrl, deleteFile } from "../lib/storage/uploadService";
+import { STORAGE_BUCKETS } from "../lib/storage/storageConfig";
 import {
   notifyNewClientRegistration,
   notifyClientAccountCreated,
@@ -307,18 +309,25 @@ export async function deleteAnonymousUser(userId: string) {
     console.log('📸 Eliminando foto de perfil del storage:', user.profile_image);
     
     try {
-      // Extraer el nombre del archivo de la URL
-      const fileName = user.profile_image.split('/').pop();
-      if (fileName) {
-        const { error: storageError } = await supabaseAdmin.storage
-          .from('profile-images')
-          .remove([fileName]);
+      // Extraer el path correcto de la URL usando la función utilitaria
+      const filePath = extractPathFromUrl(user.profile_image);
+      console.log('📁 Path extraído:', filePath);
+      
+      if (filePath) {
+        console.log('�️ Intentando eliminar archivo con path:', filePath);
+        await deleteFile(STORAGE_BUCKETS.PROFILE_IMAGES, filePath);
+        console.log('✅ Foto eliminada del storage exitosamente');
+      } else {
+        console.warn('⚠️ No se pudo extraer el path de la URL:', user.profile_image);
         
-        if (storageError) {
-          console.error('❌ Error eliminando foto del storage:', storageError);
-          // No hacer throw aquí - continuar con la eliminación del usuario
-        } else {
-          console.log('✅ Foto eliminada del storage');
+        // Intentar método alternativo: extraer todo después del bucket
+        const urlParts = user.profile_image.split('/');
+        const bucketIndex = urlParts.findIndex((part: string) => part === STORAGE_BUCKETS.PROFILE_IMAGES);
+        if (bucketIndex !== -1 && bucketIndex + 1 < urlParts.length) {
+          const alternativePath = urlParts.slice(bucketIndex + 1).join('/');
+          console.log('🔄 Intentando método alternativo con path:', alternativePath);
+          await deleteFile(STORAGE_BUCKETS.PROFILE_IMAGES, alternativePath);
+          console.log('✅ Foto eliminada con método alternativo');
         }
       }
     } catch (error) {
