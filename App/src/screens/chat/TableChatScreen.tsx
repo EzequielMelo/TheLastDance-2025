@@ -17,6 +17,7 @@ import { MessageCircle, Send, ArrowLeft, Users } from "lucide-react-native";
 import { useChat, ChatMessage } from "../../Hooks/useChat";
 import { useAuth } from "../../auth/useAuth";
 import { RootStackParamList } from "../../navigation/RootStackParamList";
+import Avatar from "../../components/chat/Avatar";
 
 type TableChatRouteProp = RouteProp<RootStackParamList, "TableChat">;
 
@@ -41,6 +42,7 @@ export default function TableChatScreen() {
     unreadCount,
     sendMessage,
     markAsRead,
+    refreshMessages,
     isClient,
     isWaiter,
   } = useChat({
@@ -100,6 +102,16 @@ export default function TableChatScreen() {
           isMyMessage ? styles.myMessage : styles.otherMessage,
         ]}
       >
+        {/* Avatar solo para mensajes de otros */}
+        {!isMyMessage && (
+          <Avatar
+            imageUrl={item.senderImage}
+            name={item.senderName}
+            size="small"
+            style={styles.messageAvatar}
+          />
+        )}
+
         <View
           style={[
             styles.messageBubble,
@@ -197,7 +209,18 @@ export default function TableChatScreen() {
           </View>
 
           <View style={styles.participantsInfo}>
-            <Users size={20} color="#d4af37" />
+            <Avatar
+              imageUrl={
+                isClient ? chatInfo?.waiter_image : chatInfo?.client_image
+              }
+              name={
+                isClient
+                  ? chatInfo?.waiter_name || ""
+                  : chatInfo?.client_name || ""
+              }
+              size="small"
+              style={styles.headerAvatar}
+            />
             <Text style={styles.participantsText}>
               {isClient ? chatInfo?.waiter_name : chatInfo?.client_name}
             </Text>
@@ -373,12 +396,14 @@ const styles = StyleSheet.create({
   },
   messageContainer: {
     marginBottom: 12,
+    paddingHorizontal: 16,
   },
   myMessage: {
     alignItems: "flex-end",
   },
   otherMessage: {
-    alignItems: "flex-start",
+    flexDirection: "row",
+    alignItems: "flex-end",
   },
   messageBubble: {
     maxWidth: "80%",
@@ -458,5 +483,12 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: "#555",
+  },
+  messageAvatar: {
+    marginRight: 8,
+    marginBottom: 4,
+  },
+  headerAvatar: {
+    marginRight: 8,
   },
 });

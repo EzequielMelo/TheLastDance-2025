@@ -63,8 +63,8 @@ export class ChatServices {
         .select(
           `
           *,
-          client:users!chats_client_id_fkey(first_name, last_name),
-          waiter:users!chats_waiter_id_fkey(first_name, last_name),
+          client:users!chats_client_id_fkey(first_name, last_name, profile_image),
+          waiter:users!chats_waiter_id_fkey(first_name, last_name, profile_image),
           table:tables!chats_table_id_fkey(number)
         `,
         )
@@ -82,6 +82,8 @@ export class ChatServices {
         ...data,
         client_name: `${data.client.first_name} ${data.client.last_name}`,
         waiter_name: `${data.waiter.first_name} ${data.waiter.last_name}`,
+        client_image: data.client.profile_image,
+        waiter_image: data.waiter.profile_image,
         table_number: data.table.number,
       };
     } catch (error) {
@@ -101,7 +103,7 @@ export class ChatServices {
         .select(
           `
           *,
-          sender:users!messages_sender_id_fkey(first_name, last_name)
+          sender:users!messages_sender_id_fkey(first_name, last_name, profile_image)
         `,
         )
         .eq("chat_id", chatId)
@@ -118,6 +120,7 @@ export class ChatServices {
           sender_name: `${msg.sender.first_name} ${msg.sender.last_name}`,
           sender_first_name: msg.sender.first_name,
           sender_last_name: msg.sender.last_name,
+          sender_image: msg.sender.profile_image,
         }))
         .reverse(); // Devolver en orden cronológico
     } catch (error) {

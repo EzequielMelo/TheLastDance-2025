@@ -34,6 +34,8 @@ export interface SendMessageRequest {
 export interface ChatWithDetails extends Chat {
   client_name: string;
   waiter_name: string;
+  client_image?: string;
+  waiter_image?: string;
   table_number: number;
   unread_count?: number;
 }
@@ -42,4 +44,5 @@ export interface MessageWithSender extends Message {
   sender_name: string;
   sender_first_name: string;
   sender_last_name: string;
+  sender_image?: string;
 }

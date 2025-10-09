@@ -9,6 +9,7 @@ interface SocketUser {
   position_code?: string;
   first_name: string;
   last_name: string;
+  profile_image?: string;
 }
 
 export const setupSocketIO = (httpServer: HttpServer) => {
@@ -43,7 +44,9 @@ export const setupSocketIO = (httpServer: HttpServer) => {
 
           const { data: profile, error } = await supabaseAdmin
             .from("users")
-            .select("id, profile_code, position_code, first_name, last_name")
+            .select(
+              "id, profile_code, position_code, first_name, last_name, profile_image",
+            )
             .eq("id", userId)
             .eq("profile_code", "cliente_anonimo")
             .single();
@@ -58,6 +61,7 @@ export const setupSocketIO = (httpServer: HttpServer) => {
             position_code: profile.position_code,
             first_name: profile.first_name,
             last_name: profile.last_name,
+            profile_image: profile.profile_image,
           };
         } else {
           return next(new Error("Token anónimo inválido"));
@@ -71,7 +75,9 @@ export const setupSocketIO = (httpServer: HttpServer) => {
 
         const { data: profile, error: dbErr } = await supabaseAdmin
           .from("users")
-          .select("id, profile_code, position_code, first_name, last_name")
+          .select(
+            "id, profile_code, position_code, first_name, last_name, profile_image",
+          )
           .eq("id", data.user.id)
           .single();
 
@@ -85,6 +91,7 @@ export const setupSocketIO = (httpServer: HttpServer) => {
           position_code: profile.position_code,
           first_name: profile.first_name,
           last_name: profile.last_name,
+          profile_image: profile.profile_image,
         };
       }
 
@@ -131,8 +138,20 @@ export const setupSocketIO = (httpServer: HttpServer) => {
         });
 
         console.log(
-          `Usuario ${user.first_name} se unió al chat de mesa ${tableId}`,
+          `✅ Usuario ${user.first_name} se unió al chat de mesa ${tableId} [Sala: ${roomName}] [Socket: ${socket.id}]`,
         );
+
+        // Debug: mostrar cuántos usuarios hay en la sala
+        const roomClients = io.sockets.adapter.rooms.get(roomName);
+        const userCount = roomClients?.size || 0;
+        console.log(`👥 Usuarios en sala ${roomName}: ${userCount}`);
+
+        // Confirmar al cliente que se unió exitosamente
+        socket.emit("joined_room", {
+          roomName,
+          userCount,
+          tableId,
+        });
       } catch (error) {
         console.error("Error al unirse al chat:", error);
         socket.emit("error", { message: "Error al unirse al chat" });
@@ -174,15 +193,29 @@ export const setupSocketIO = (httpServer: HttpServer) => {
             message: message.trim(),
             senderId: user.appUserId,
             senderName: `${user.first_name} ${user.last_name}`,
+            senderImage: user.profile_image,
             senderType,
             timestamp: new Date().toISOString(),
             isRead: false,
           };
 
-          io.to(`mesa_${tableId}`).emit("new_message", messageData);
+          // Emitir a la sala completa
+          const roomName = `mesa_${tableId}`;
+          io.to(roomName).emit("new_message", messageData);
 
+          // También confirmar al remitente
+          socket.emit("message_sent", {
+            messageId: newMessage.id,
+            success: true,
+          });
+
+          // Debug: verificar cuántos usuarios recibieron el mensaje
+          const roomClients = io.sockets.adapter.rooms.get(roomName);
           console.log(
-            `Mensaje enviado en mesa ${tableId} por ${user.first_name}`,
+            `📤 Mensaje enviado en mesa ${tableId} por ${user.first_name} a ${roomClients?.size || 0} usuarios`,
+          );
+          console.log(
+            `💬 Contenido: "${message.trim().substring(0, 50)}${message.trim().length > 50 ? "..." : ""}"`,
           );
         } catch (error) {
           console.error("Error al enviar mensaje:", error);
