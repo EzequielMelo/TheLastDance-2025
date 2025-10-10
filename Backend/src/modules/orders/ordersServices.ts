@@ -63,7 +63,11 @@ export async function createOrder(
     if (orderError)
       throw new Error(`Error creando pedido: ${orderError.message}`);
 
-    // 5. Crear los items del pedido usando los datos del frontend
+    // 5. Generar batch_id para la primera tanda
+    const initialBatchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log(`📦 Primera tanda con batch_id: ${initialBatchId}`);
+
+    // 6. Crear los items del pedido usando los datos del frontend
     const orderItemsData = orderData.items.map(item => ({
       order_id: newOrder.id,
       menu_item_id: item.id,
@@ -71,6 +75,7 @@ export async function createOrder(
       unit_price: item.price,
       subtotal: item.price * item.quantity,
       status: "pending" as OrderItemStatus, // NUEVO: Items inician pendientes
+      batch_id: initialBatchId, // Primera tanda del pedido
     }));
 
     const { error: itemsError } = await supabaseAdmin
@@ -80,7 +85,7 @@ export async function createOrder(
     if (itemsError)
       throw new Error(`Error creando items del pedido: ${itemsError.message}`);
 
-    // 6. Obtener el pedido completo con items
+    // 7. Obtener el pedido completo con items
     const fullOrder = await getOrderById(newOrder.id);
 
     console.log("✅ Pedido creado exitosamente:", newOrder.id);
@@ -131,6 +136,8 @@ export async function getOrderById(orderId: string): Promise<OrderWithItems> {
 
 // Obtener pedidos del usuario
 export async function getUserOrders(userId: string): Promise<OrderWithItems[]> {
+  console.log(`🔍 Getting orders for user: ${userId}`);
+
   const { data, error } = await supabaseAdmin
     .from("orders")
     .select(
@@ -156,8 +163,16 @@ export async function getUserOrders(userId: string): Promise<OrderWithItems[]> {
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
-  if (error)
+  if (error) {
+    console.error(`❌ Error getting user orders:`, error);
     throw new Error(`Error obteniendo pedidos del usuario: ${error.message}`);
+  }
+
+  console.log(`✅ Found ${data?.length || 0} orders for user ${userId}`);
+  if (data && data.length > 0) {
+    console.log(`📄 First order structure:`, JSON.stringify(data[0], null, 2));
+  }
+
   return (data as OrderWithItems[]) || [];
 }
 
@@ -505,6 +520,215 @@ export async function partialRejectOrder(
   }
 }
 
+// Nueva función: Rechazar items individuales de una tanda (sin eliminar, para que el cliente pueda reemplazar)
+export async function rejectIndividualItemsFromBatch(
+  orderId: string,
+  waiterId: string,
+  itemsToReject: string[], // IDs de items específicos a rechazar
+  reason?: string,
+): Promise<OrderWithItems> {
+  try {
+    console.log(`🔄 Rechazando items individuales de la orden ${orderId}`);
+    console.log(`Items a rechazar: ${itemsToReject.join(", ")}`);
+
+    // 1. Verificar que la orden existe
+    const currentOrder = await getOrderById(orderId);
+
+    // 2. Verificar que el mesero tiene permisos (mesa asignada)
+    const { data: table, error: tableError } = await supabaseAdmin
+      .from("tables")
+      .select("id")
+      .eq("id", currentOrder.table_id)
+      .eq("id_waiter", waiterId)
+      .single();
+
+    if (tableError || !table) {
+      throw new Error("No tienes permisos para gestionar esta orden");
+    }
+
+    // 3. Verificar que los items existen y están en estado 'pending'
+    const { data: itemsToCheck, error: itemsError } = await supabaseAdmin
+      .from("order_items")
+      .select("id, status, batch_id, menu_item_id, quantity")
+      .eq("order_id", orderId)
+      .in("id", itemsToReject);
+
+    if (itemsError) {
+      throw new Error(`Error verificando items: ${itemsError.message}`);
+    }
+
+    if (!itemsToCheck || itemsToCheck.length !== itemsToReject.length) {
+      throw new Error("Algunos items no existen");
+    }
+
+    // Verificar que todos están en estado 'pending'
+    const nonPendingItems = itemsToCheck.filter(
+      item => item.status !== "pending",
+    );
+    if (nonPendingItems.length > 0) {
+      throw new Error("Solo se pueden rechazar items en estado pendiente");
+    }
+
+    // 4. Obtener todos los batch_ids de los items rechazados
+    const batchIds = [...new Set(itemsToCheck.map(item => item.batch_id))];
+
+    // 5. Devolver TODA la tanda al cliente diferenciando disponibles vs no disponibles
+    // Marcar items específicamente rechazados como 'rejected'
+    const { error: rejectSpecificError } = await supabaseAdmin
+      .from("order_items")
+      .update({
+        status: "rejected" as OrderItemStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .in("id", itemsToReject);
+
+    if (rejectSpecificError) {
+      throw new Error(
+        `Error marcando items específicos como rechazados: ${rejectSpecificError.message}`,
+      );
+    }
+
+    // Marcar los OTROS items de las mismas tandas como 'needs_modification'
+    const { error: returnOthersError } = await supabaseAdmin
+      .from("order_items")
+      .update({
+        status: "needs_modification" as OrderItemStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("order_id", orderId)
+      .in("batch_id", batchIds)
+      .not("id", "in", `(${itemsToReject.join(",")})`);
+
+    if (returnOthersError) {
+      throw new Error(
+        `Error devolviendo otros items de la tanda: ${returnOthersError.message}`,
+      );
+    }
+
+    // 6. Actualizar notas de la orden explicando qué pasó y qué items no están disponibles
+    const unavailableItemsInfo = itemsToCheck
+      .map(item => `Item ID ${item.id}`)
+      .join(", ");
+    const noteText = reason
+      ? `⚠️ Items no disponibles: ${unavailableItemsInfo}. Razón: ${reason}. Toda la tanda devuelta para que puedas reorganizar tu pedido.`
+      : `⚠️ Items no disponibles: ${unavailableItemsInfo}. Toda la tanda devuelta para que puedas reorganizar tu pedido.`;
+
+    const { error: noteError } = await supabaseAdmin
+      .from("orders")
+      .update({
+        notes: noteText,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
+
+    if (noteError) {
+      console.warn(`⚠️ Error agregando notas a la orden: ${noteError.message}`);
+    }
+
+    // 7. Obtener la orden actualizada
+    const updatedOrder = await getOrderById(orderId);
+
+    console.log(
+      `✅ Tanda completa devuelta al cliente. Items no disponibles: ${itemsToReject.join(", ")}`,
+    );
+    return updatedOrder;
+  } catch (error) {
+    console.error("❌ Error en rejectIndividualItemsFromBatch:", error);
+    throw error;
+  }
+}
+
+// Función simplificada: Solo aprobar TODA la tanda completa
+export async function approveBatchCompletely(
+  orderId: string,
+  waiterId: string,
+  batchId: string,
+): Promise<OrderWithItems> {
+  try {
+    console.log(
+      `✅ Aprobando tanda completa ${batchId} de la orden ${orderId}`,
+    );
+
+    // 1. Verificar que la orden existe
+    const currentOrder = await getOrderById(orderId);
+
+    // 2. Verificar que el mesero tiene permisos (mesa asignada)
+    const { data: table, error: tableError } = await supabaseAdmin
+      .from("tables")
+      .select("id")
+      .eq("id", currentOrder.table_id)
+      .eq("id_waiter", waiterId)
+      .single();
+
+    if (tableError || !table) {
+      throw new Error("No tienes permisos para gestionar esta orden");
+    }
+
+    // 3. Obtener todos los items de la tanda
+    const { data: batchItems, error: itemsError } = await supabaseAdmin
+      .from("order_items")
+      .select("id, status")
+      .eq("order_id", orderId)
+      .eq("batch_id", batchId);
+
+    if (itemsError) {
+      throw new Error(
+        `Error obteniendo items de la tanda: ${itemsError.message}`,
+      );
+    }
+
+    if (!batchItems || batchItems.length === 0) {
+      throw new Error("No se encontraron items en esta tanda");
+    }
+
+    // Verificar que todos están en estado 'pending'
+    const nonPendingItems = batchItems.filter(
+      item => item.status !== "pending",
+    );
+    if (nonPendingItems.length > 0) {
+      throw new Error(
+        "Solo se pueden aprobar tandas con items en estado pendiente",
+      );
+    }
+
+    // 4. Aprobar TODA la tanda
+    const itemIds = batchItems.map(item => item.id);
+    const { error: approveError } = await supabaseAdmin
+      .from("order_items")
+      .update({
+        status: "approved" as OrderItemStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .in("id", itemIds);
+
+    if (approveError) {
+      throw new Error(`Error aprobando tanda: ${approveError.message}`);
+    }
+
+    // 5. Actualizar notas de la orden
+    const { error: noteError } = await supabaseAdmin
+      .from("orders")
+      .update({
+        notes: `✅ Tanda ${batchId} aprobada completamente por el mozo`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
+
+    if (noteError) {
+      console.warn(`⚠️ Error agregando notas a la orden: ${noteError.message}`);
+    }
+
+    // 6. Obtener la orden actualizada
+    const updatedOrder = await getOrderById(orderId);
+
+    console.log(`✅ Tanda ${batchId} aprobada completamente`);
+    return updatedOrder;
+  } catch (error) {
+    console.error("❌ Error en approveBatchCompletely:", error);
+    throw error;
+  }
+}
+
 // Agregar items a un pedido parcial y cambiar estado a pending
 export async function addItemsToPartialOrder(
   orderId: string,
@@ -695,7 +919,11 @@ export async function addItemsToExistingOrder(
         );
     }
 
-    // 5. Insertar nuevos order_items con status 'pending'
+    // 5. Generar un batch_id único para esta nueva tanda
+    const batchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log(`📦 Nueva tanda con batch_id: ${batchId}`);
+
+    // 6. Insertar nuevos order_items con status 'pending' y batch_id único
     const orderItemsToInsert = newItems.map(item => ({
       order_id: orderId,
       menu_item_id: item.id,
@@ -703,6 +931,7 @@ export async function addItemsToExistingOrder(
       unit_price: item.price,
       subtotal: item.price * item.quantity,
       status: "pending" as OrderItemStatus, // Los nuevos items siempre empiezan como pending
+      batch_id: batchId, // Identificador único para esta tanda
     }));
 
     const { error: insertError } = await supabaseAdmin
@@ -712,7 +941,7 @@ export async function addItemsToExistingOrder(
     if (insertError)
       throw new Error(`Error insertando items: ${insertError.message}`);
 
-    // 6. Recalcular totales de la orden (solo items aceptados + pendientes)
+    // 7. Recalcular totales de la orden (solo items aceptados + pendientes)
     const { data: allOrderItems, error: itemsError } = await supabaseAdmin
       .from("order_items")
       .select(
@@ -742,7 +971,7 @@ export async function addItemsToExistingOrder(
     console.log(`💰 Nuevo total: $${newTotalAmount}`);
     console.log(`⏰ Nuevo tiempo estimado: ${newEstimatedTime} min`);
 
-    // 7. Actualizar orden - solo actualizar totales (los items nuevos van como pending)
+    // 8. Actualizar orden - solo actualizar totales (los items nuevos van como pending)
     const { error: updateError } = await supabaseAdmin
       .from("orders")
       .update({
@@ -756,10 +985,10 @@ export async function addItemsToExistingOrder(
       throw new Error(`Error actualizando orden: ${updateError.message}`);
 
     console.log(
-      `✅ Items agregados exitosamente a la orden ${orderId}. Nuevos items en estado 'pending'`,
+      `✅ Items agregados exitosamente a la orden ${orderId}. Nuevos items en estado 'pending' con batch_id: ${batchId}`,
     );
 
-    // 8. Obtener orden actualizada completa
+    // 9. Obtener orden actualizada completa
     const updatedOrder = await getOrderById(orderId);
     return updatedOrder;
   } catch (error) {
@@ -811,6 +1040,7 @@ export async function getWaiterPendingItems(waiterId: string): Promise<any[]> {
         unit_price,
         subtotal,
         status,
+        batch_id,
         created_at,
         menu_item:menu_items (
           id,
@@ -854,6 +1084,134 @@ export async function getWaiterPendingItems(waiterId: string): Promise<any[]> {
   return ordersWithPendingItems;
 }
 
+// Nueva función para obtener tandas pendientes agrupadas por batch_id
+export async function getWaiterPendingBatches(
+  waiterId: string,
+): Promise<any[]> {
+  // Obtener mesas asignadas al mozo
+  const { data: assignedTables, error: tablesError } = await supabaseAdmin
+    .from("tables")
+    .select("id")
+    .eq("id_waiter", waiterId);
+
+  if (tablesError) {
+    throw new Error(`Error obteniendo mesas asignadas: ${tablesError.message}`);
+  }
+
+  if (!assignedTables || assignedTables.length === 0) {
+    return [];
+  }
+
+  const tableIds = assignedTables.map(table => table.id);
+
+  // Obtener items pendientes con información de orden y agrupados por batch_id
+  const { data, error } = await supabaseAdmin
+    .from("order_items")
+    .select(
+      `
+      id,
+      menu_item_id,
+      quantity,
+      unit_price,
+      subtotal,
+      status,
+      batch_id,
+      created_at,
+      order:orders!inner (
+        id,
+        user_id,
+        table_id,
+        is_paid,
+        total_amount,
+        estimated_time,
+        notes,
+        created_at,
+        table:tables (
+          id,
+          number
+        ),
+        user:users (
+          id,
+          first_name,
+          last_name,
+          profile_image
+        )
+      ),
+      menu_item:menu_items (
+        id,
+        name,
+        description,
+        prep_minutes,
+        price,
+        category
+      )
+    `,
+    )
+    .in("order.table_id", tableIds)
+    .eq("order.is_paid", false)
+    .eq("status", "pending")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(`Error obteniendo tandas pendientes: ${error.message}`);
+  }
+
+  if (!data || data.length === 0) {
+    return [];
+  }
+
+  // Agrupar items por orden y batch_id
+  const groupedBatches = data.reduce((acc: any, item: any) => {
+    const orderId = item.order.id;
+    const batchId = item.batch_id;
+    const key = `${orderId}_${batchId}`;
+
+    if (!acc[key]) {
+      acc[key] = {
+        order_id: orderId,
+        batch_id: batchId,
+        order: item.order,
+        items: [],
+        created_at: item.created_at,
+        total_items: 0,
+        total_amount: 0,
+        max_prep_time: 0,
+      };
+    }
+
+    acc[key].items.push({
+      id: item.id,
+      menu_item_id: item.menu_item_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      subtotal: item.subtotal,
+      status: item.status,
+      menu_item: item.menu_item,
+    });
+
+    acc[key].total_items += item.quantity;
+    acc[key].total_amount += item.subtotal;
+    acc[key].max_prep_time = Math.max(
+      acc[key].max_prep_time,
+      item.menu_item.prep_minutes,
+    );
+
+    return acc;
+  }, {});
+
+  // Convertir el objeto agrupado en array y ordenar por fecha de creación
+  const batchesArray = Object.values(groupedBatches).sort(
+    (a: any, b: any) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
+
+  console.log(
+    `📦 Encontradas ${batchesArray.length} tandas pendientes para mozo ${waiterId}`,
+  );
+
+  return batchesArray;
+}
+
 // NUEVA FUNCIÓN REFACTORIZADA: Acción del mozo sobre items específicos
 export async function waiterItemsActionNew(
   orderId: string,
@@ -893,19 +1251,92 @@ export async function waiterItemsActionNew(
       throw new Error("Algunos items no existen o no están pendientes");
     }
 
-    // 3. Actualizar status de los items
-    const newStatus = action === "accept" ? "accepted" : "rejected";
+    if (action === "reject" && itemIds.length > 0) {
+      // LÓGICA DE TANDAS: Si rechazamos al menos un item, identificar su tanda
+      // y devolver TODA la tanda a "pending" para que el cliente pueda modificar todo
 
-    const { error: updateError } = await supabaseAdmin
-      .from("order_items")
-      .update({
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      })
-      .in("id", itemIds);
+      console.log("🔄 Rechazando items - implementando lógica de tandas");
 
-    if (updateError) {
-      throw new Error(`Error actualizando items: ${updateError.message}`);
+      // 3a. Identificar las tandas: obtener batch_id de los items que se van a rechazar
+      const { data: itemsToReject, error: rejectError } = await supabaseAdmin
+        .from("order_items")
+        .select("id, batch_id")
+        .in("id", itemIds);
+
+      if (rejectError || !itemsToReject) {
+        throw new Error("Error obteniendo items a rechazar");
+      }
+
+      // 3b. Extraer todos los batch_ids únicos de los items rechazados
+      const batchIds = [...new Set(itemsToReject.map(item => item.batch_id))];
+      console.log(`📦 Batch IDs afectados: ${batchIds.join(", ")}`);
+
+      // 3c. Obtener TODOS los items de las tandas afectadas (mismo batch_id)
+      const { data: batchItems, error: batchError } = await supabaseAdmin
+        .from("order_items")
+        .select("id, batch_id, status")
+        .eq("order_id", orderId)
+        .in("batch_id", batchIds)
+        .in("status", ["pending", "accepted"]); // Items que pueden ser devueltos a pending
+
+      if (batchError || !batchItems) {
+        throw new Error("Error obteniendo items de la tanda");
+      }
+
+      console.log(
+        `📦 Tandas identificadas: ${batchItems.length} items total en ${batchIds.length} tanda(s)`,
+      );
+
+      // 3d. Devolver TODA las tandas afectadas a "pending"
+      const allBatchItemIds = batchItems.map(item => item.id);
+
+      const { error: revertError } = await supabaseAdmin
+        .from("order_items")
+        .update({
+          status: "pending",
+          updated_at: new Date().toISOString(),
+        })
+        .in("id", allBatchItemIds);
+
+      if (revertError) {
+        throw new Error(
+          `Error revirtiendo tanda a pending: ${revertError.message}`,
+        );
+      }
+
+      // 3e. Marcar específicamente los items rechazados
+      const { error: rejectUpdateError } = await supabaseAdmin
+        .from("order_items")
+        .update({
+          status: "rejected",
+          updated_at: new Date().toISOString(),
+        })
+        .in("id", itemIds);
+
+      if (rejectUpdateError) {
+        throw new Error(
+          `Error marcando items rechazados: ${rejectUpdateError.message}`,
+        );
+      }
+
+      console.log(
+        `✅ Tanda devuelta a pending. ${itemIds.length} items rechazados específicamente.`,
+      );
+    } else {
+      // 3. Lógica normal para aceptar (no requiere lógica de tandas)
+      const newStatus = action === "accept" ? "accepted" : "rejected";
+
+      const { error: updateError } = await supabaseAdmin
+        .from("order_items")
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .in("id", itemIds);
+
+      if (updateError) {
+        throw new Error(`Error actualizando items: ${updateError.message}`);
+      }
     }
 
     // 4. Recalcular total de la orden (solo items aceptados + accepted)
@@ -1028,7 +1459,11 @@ export async function replaceRejectedItems(
       throw new Error("Algunos productos no existen o no están disponibles");
     }
 
-    // 5. Crear nuevos items (en estado pending)
+    // 5. Generar batch_id para los items de reemplazo
+    const replacementBatchId = `replacement_${Date.now()}_${orderId}`;
+    console.log(`📦 Items de reemplazo con batch_id: ${replacementBatchId}`);
+
+    // 6. Crear nuevos items (en estado pending)
     const orderItemsToInsert = newItems.map(item => ({
       order_id: orderId,
       menu_item_id: item.menu_item_id,
@@ -1036,6 +1471,7 @@ export async function replaceRejectedItems(
       unit_price: item.unit_price,
       subtotal: item.unit_price * item.quantity,
       status: "pending" as OrderItemStatus,
+      batch_id: replacementBatchId, // Identificador único para este reemplazo
       created_at: new Date().toISOString(),
     }));
 
@@ -1047,7 +1483,7 @@ export async function replaceRejectedItems(
       throw new Error(`Error insertando nuevos items: ${insertError.message}`);
     }
 
-    // 6. Recalcular totales de la orden (solo items no rechazados)
+    // 7. Recalcular totales de la orden (solo items no rechazados)
     const { data: allOrderItems, error: allItemsError } = await supabaseAdmin
       .from("order_items")
       .select("subtotal, menu_items!inner(prep_minutes)")

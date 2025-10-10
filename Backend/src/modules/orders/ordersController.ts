@@ -15,12 +15,15 @@ import {
   addItemsToExistingOrder,
   waiterItemsActionNew,
   getWaiterPendingItems,
+  getWaiterPendingBatches,
   replaceRejectedItems,
   getKitchenPendingOrders,
   updateKitchenItemStatus,
   getBartenderPendingOrders,
   updateBartenderItemStatus,
   getTableOrdersStatus,
+  rejectIndividualItemsFromBatch,
+  approveBatchCompletely,
 } from "./ordersServices";
 import type { CreateOrderDTO, OrderItemStatus } from "./orders.types";
 
@@ -597,6 +600,58 @@ export async function waiterItemsActionHandler(
   }
 }
 
+// Obtener tandas pendientes agrupadas por batch_id (nueva versión)
+export async function getWaiterPendingBatchesHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    console.log(
+      "📦 Obteniendo tandas pendientes para mozo:",
+      req.user?.appUserId,
+    );
+
+    if (!req.user?.appUserId) {
+      res.status(401).json({
+        success: false,
+        message: "Usuario no autenticado",
+      });
+      return;
+    }
+
+    // Verificar que sea mozo
+    const userPosition = req.user.position_code;
+    const userProfile = req.user.profile_code;
+    const isWaiter =
+      userPosition === "mozo" ||
+      userProfile === "dueno" ||
+      userProfile === "supervisor";
+
+    if (!isWaiter) {
+      res.status(403).json({
+        success: false,
+        error: "Solo los mozos pueden acceder a esta función",
+      });
+      return;
+    }
+
+    const pendingBatches = await getWaiterPendingBatches(req.user.appUserId);
+
+    res.status(200).json({
+      success: true,
+      data: pendingBatches,
+      message: `${pendingBatches.length} tandas pendientes encontradas`,
+    });
+  } catch (error: any) {
+    console.error("❌ Error obteniendo tandas pendientes:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error interno del servidor",
+      error: error.message || "Error desconocido",
+    });
+  }
+}
+
 // Obtener items pendientes que necesitan revisión del mozo
 export async function getWaiterPendingItemsHandler(
   req: Request,
@@ -968,6 +1023,130 @@ export async function getTableOrdersStatusHandler(
     res.status(400).json({
       success: false,
       message: error.message || "Error al obtener estado de pedidos",
+    });
+  }
+}
+
+// Schema para rechazar/aprobar items individuales
+const individualItemsActionSchema = z.object({
+  itemIds: z.array(z.string().uuid()).min(1),
+  reason: z.string().optional(),
+});
+
+// Rechazar items individuales de una tanda
+export async function rejectIndividualItemsHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Usuario no autenticado" });
+      return;
+    }
+
+    // Verificar que sea mozo
+    const userPosition = req.user.position_code;
+    const userProfile = req.user.profile_code;
+    const isWaiter =
+      userPosition === "mozo" ||
+      userProfile === "dueno" ||
+      userProfile === "supervisor";
+
+    if (!isWaiter) {
+      res.status(403).json({
+        error: "Solo los mozos pueden realizar esta acción",
+      });
+      return;
+    }
+
+    const { orderId } = req.params;
+    const parsed = individualItemsActionSchema.parse(req.body);
+    const waiterId = req.user.appUserId;
+
+    if (!orderId) {
+      res.status(400).json({ error: "ID del pedido requerido" });
+      return;
+    }
+
+    console.log(
+      `❌ Rechazando items individuales en orden ${orderId} por mozo ${waiterId}`,
+    );
+
+    const updatedOrder = await rejectIndividualItemsFromBatch(
+      orderId,
+      waiterId,
+      parsed.itemIds,
+      parsed.reason,
+    );
+
+    res.json({
+      success: true,
+      message:
+        "Items rechazados individualmente. El cliente puede reemplazarlos.",
+      order: updatedOrder,
+    });
+  } catch (error: any) {
+    console.error("❌ Error rechazando items individuales:", error);
+    res.status(400).json({
+      error: error.message || "Error al rechazar items individuales",
+    });
+  }
+}
+
+// Aprobar items individuales de una tanda
+export async function approveBatchCompletelyHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Usuario no autenticado" });
+      return;
+    }
+
+    // Verificar que sea mozo
+    const userPosition = req.user.position_code;
+    const userProfile = req.user.profile_code;
+    const isWaiter =
+      userPosition === "mozo" ||
+      userProfile === "dueno" ||
+      userProfile === "supervisor";
+
+    if (!isWaiter) {
+      res.status(403).json({
+        error: "Solo los mozos pueden realizar esta acción",
+      });
+      return;
+    }
+
+    const { orderId } = req.params;
+    const { batchId } = req.body;
+    const waiterId = req.user.appUserId;
+
+    if (!orderId || !batchId) {
+      res.status(400).json({ error: "ID del pedido y batch ID requeridos" });
+      return;
+    }
+
+    console.log(
+      `✅ Aprobando tanda completa ${batchId} en orden ${orderId} por mozo ${waiterId}`,
+    );
+
+    const updatedOrder = await approveBatchCompletely(
+      orderId,
+      waiterId,
+      batchId,
+    );
+
+    res.json({
+      success: true,
+      message: "Tanda aprobada completamente",
+      order: updatedOrder,
+    });
+  } catch (error: any) {
+    console.error("❌ Error aprobando tanda completa:", error);
+    res.status(400).json({
+      error: error.message || "Error al aprobar tanda completa",
     });
   }
 }

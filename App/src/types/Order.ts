@@ -2,7 +2,8 @@
 export type OrderItemStatus =
   | "pending" // Item esperando aprobación del mozo
   | "accepted" // Item aceptado, va a cocina
-  | "rejected" // Item rechazado por el mozo
+  | "rejected" // Item rechazado por el mozo (SIN STOCK)
+  | "needs_modification" // Item disponible pero en tanda devuelta (CON STOCK)
   | "preparing" // Item en preparación (cocina)
   | "ready" // Item listo para servir
   | "delivered"; // Item entregado al cliente

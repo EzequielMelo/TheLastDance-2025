@@ -18,20 +18,43 @@ import {
   Users,
   RefreshCw,
   AlertCircle,
+  Package,
+  Settings,
+  Check,
+  Square,
 } from "lucide-react-native";
 import {
   getWaiterActiveOrders,
-  getWaiterPendingItems,
+  getWaiterPendingBatches,
   waiterItemsAction,
+  rejectIndividualItems,
+  approveIndividualItems,
 } from "../../api/orders";
 import type { Order } from "../../types/Order";
 
+interface PendingBatch {
+  order_id: string;
+  batch_id: string;
+  order: any;
+  items: any[];
+  created_at: string;
+  total_items: number;
+  total_amount: number;
+  max_prep_time: number;
+}
+
 export default function WaiterOrdersScreen() {
-  const [pendingItems, setPendingItems] = useState<Order[]>([]);
+  const [pendingBatches, setPendingBatches] = useState<PendingBatch[]>([]);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [selectedItems, setSelectedItems] = useState<{
+    [batchKey: string]: string[];
+  }>({});
+  const [individualMode, setIndividualMode] = useState<{
+    [batchKey: string]: boolean;
+  }>({});
 
   useEffect(() => {
     fetchOrders();
@@ -45,12 +68,12 @@ export default function WaiterOrdersScreen() {
         setLoading(true);
       }
 
-      const [pendingItemsResult, active] = await Promise.all([
-        getWaiterPendingItems(),
+      const [pendingBatchesResult, active] = await Promise.all([
+        getWaiterPendingBatches(),
         getWaiterActiveOrders(),
       ]);
 
-      setPendingItems(pendingItemsResult);
+      setPendingBatches(pendingBatchesResult);
       setActiveOrders(active);
     } catch (error: any) {
       console.error("Error obteniendo datos del mozo:", error);
@@ -61,18 +84,30 @@ export default function WaiterOrdersScreen() {
     }
   };
 
-  const handleItemAction = async (
+  const handleBatchAction = async (
     orderId: string,
-    itemIds: string[],
+    batchItems: any[],
     action: "accept" | "reject",
   ) => {
     try {
-      setActionLoading(orderId);
-      await waiterItemsAction(orderId, itemIds, action);
+      const batchKey = `${orderId}_${batchItems[0]?.batch_id}`;
+      setActionLoading(batchKey);
+
+      // Obtener IDs de todos los items de la tanda
+      const itemIds = batchItems.map(item => item.id);
+
+      await waiterItemsAction(
+        orderId,
+        itemIds,
+        action,
+        action === "reject"
+          ? "No disponemos de stock de algunos productos"
+          : undefined,
+      );
 
       Alert.alert(
         "Éxito",
-        `Items ${action === "accept" ? "aceptados" : "rechazados"} correctamente`,
+        `Tanda ${action === "accept" ? "aceptada" : "rechazada"} correctamente`,
       );
 
       // Refrescar datos
@@ -85,13 +120,81 @@ export default function WaiterOrdersScreen() {
     }
   };
 
+  const toggleIndividualMode = (batchKey: string) => {
+    setIndividualMode(prev => ({
+      ...prev,
+      [batchKey]: !prev[batchKey],
+    }));
+    // Limpiar selección cuando cambiamos de modo
+    setSelectedItems(prev => ({
+      ...prev,
+      [batchKey]: [],
+    }));
+  };
+
+  const toggleItemSelection = (batchKey: string, itemId: string) => {
+    setSelectedItems(prev => {
+      const currentSelection = prev[batchKey] || [];
+      const isSelected = currentSelection.includes(itemId);
+
+      return {
+        ...prev,
+        [batchKey]: isSelected
+          ? currentSelection.filter(id => id !== itemId)
+          : [...currentSelection, itemId],
+      };
+    });
+  };
+
+  const handleIndividualAction = async (
+    orderId: string,
+    batchKey: string,
+    action: "accept" | "reject",
+  ) => {
+    const selectedItemIds = selectedItems[batchKey] || [];
+
+    if (selectedItemIds.length === 0) {
+      Alert.alert("Error", "Selecciona al menos un item");
+      return;
+    }
+
+    try {
+      setActionLoading(batchKey);
+
+      if (action === "accept") {
+        await approveIndividualItems(orderId, selectedItemIds);
+        Alert.alert("Éxito", `${selectedItemIds.length} items aprobados`);
+      } else {
+        await rejectIndividualItems(
+          orderId,
+          selectedItemIds,
+          "Producto sin stock disponible",
+        );
+        Alert.alert(
+          "Éxito",
+          `${selectedItemIds.length} items rechazados. El cliente puede reemplazarlos.`,
+        );
+      }
+
+      // Limpiar selección y modo individual
+      setSelectedItems(prev => ({ ...prev, [batchKey]: [] }));
+      setIndividualMode(prev => ({ ...prev, [batchKey]: false }));
+
+      // Refrescar datos
+      await fetchOrders();
+    } catch (error: any) {
+      console.error("Error procesando acción individual:", error);
+      Alert.alert("Error", error.message || "Error procesando la acción");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const getTotalPendingItems = () => {
-    return pendingItems.reduce((total, order) => {
-      return (
-        total +
-        order.order_items.filter(item => item.status === "pending").length
-      );
-    }, 0);
+    return pendingBatches.reduce(
+      (total, batch) => total + batch.total_items,
+      0,
+    );
   };
 
   const formatPrice = (price: number) => {
@@ -99,6 +202,14 @@ export default function WaiterOrdersScreen() {
       style: "currency",
       currency: "ARS",
     }).format(price);
+  };
+
+  const getCategoryIcon = (category: string) => {
+    return category === "plato" ? ChefHat : Coffee;
+  };
+
+  const getCategoryColor = (category: string) => {
+    return category === "plato" ? "#ef4444" : "#3b82f6";
   };
 
   if (loading) {
@@ -109,7 +220,7 @@ export default function WaiterOrdersScreen() {
       >
         <RefreshCw size={32} color="#d4af37" />
         <Text style={{ color: "white", marginTop: 16, fontSize: 16 }}>
-          Cargando pedidos...
+          Cargando tandas...
         </Text>
       </LinearGradient>
     );
@@ -120,6 +231,7 @@ export default function WaiterOrdersScreen() {
       colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
       style={{ flex: 1 }}
     >
+      {/* Header */}
       <View
         style={{
           paddingTop: 48,
@@ -179,7 +291,7 @@ export default function WaiterOrdersScreen() {
             padding: 12,
           }}
         >
-          <Users size={16} color="#d4af37" />
+          <Package size={16} color="#d4af37" />
           <Text
             style={{
               color: "#d4af37",
@@ -188,8 +300,8 @@ export default function WaiterOrdersScreen() {
               marginLeft: 8,
             }}
           >
-            {getTotalPendingItems()} items pendientes • {activeOrders.length}{" "}
-            órdenes activas
+            {pendingBatches.length} tandas pendientes • {getTotalPendingItems()}{" "}
+            items • {activeOrders.length} órdenes activas
           </Text>
         </View>
       </View>
@@ -205,7 +317,7 @@ export default function WaiterOrdersScreen() {
           />
         }
       >
-        {getTotalPendingItems() === 0 && activeOrders.length === 0 ? (
+        {pendingBatches.length === 0 && activeOrders.length === 0 ? (
           <View
             style={{
               flex: 1,
@@ -234,13 +346,13 @@ export default function WaiterOrdersScreen() {
                 textAlign: "center",
               }}
             >
-              No hay items pendientes de aprobación
+              No hay tandas pendientes de aprobación
             </Text>
           </View>
         ) : (
           <>
-            {/* Sección de Items Pendientes de Aprobación */}
-            {pendingItems.length > 0 && (
+            {/* Sección de Tandas Pendientes */}
+            {pendingBatches.length > 0 && (
               <>
                 <View
                   style={{
@@ -252,7 +364,7 @@ export default function WaiterOrdersScreen() {
                     borderBottomColor: "rgba(59, 130, 246, 0.3)",
                   }}
                 >
-                  <AlertCircle size={20} color="#3b82f6" />
+                  <Package size={20} color="#3b82f6" />
                   <Text
                     style={{
                       color: "#3b82f6",
@@ -261,20 +373,17 @@ export default function WaiterOrdersScreen() {
                       marginLeft: 8,
                     }}
                   >
-                    Items Pendientes de Aprobación ({getTotalPendingItems()})
+                    Tandas Pendientes ({pendingBatches.length})
                   </Text>
                 </View>
 
-                {pendingItems.map(order => {
-                  const pendingOrderItems = order.order_items.filter(
-                    item => item.status === "pending",
-                  );
-
-                  if (pendingOrderItems.length === 0) return null;
+                {pendingBatches.map((batch, batchIndex) => {
+                  const batchKey = `${batch.order_id}_${batch.batch_id}`;
+                  const isProcessing = actionLoading === batchKey;
 
                   return (
                     <View
-                      key={`pending-items-${order.id}`}
+                      key={batchKey}
                       style={{
                         backgroundColor: "rgba(59, 130, 246, 0.05)",
                         borderRadius: 16,
@@ -284,7 +393,7 @@ export default function WaiterOrdersScreen() {
                         borderColor: "rgba(59, 130, 246, 0.3)",
                       }}
                     >
-                      {/* Header de la orden */}
+                      {/* Header de la tanda */}
                       <View
                         style={{
                           flexDirection: "row",
@@ -296,68 +405,94 @@ export default function WaiterOrdersScreen() {
                           borderBottomColor: "rgba(255,255,255,0.1)",
                         }}
                       >
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            flex: 1,
-                          }}
-                        >
-                          {order.user?.profile_image ? (
-                            <Image
-                              source={{ uri: order.user.profile_image }}
-                              style={{
-                                width: 40,
-                                height: 40,
-                                borderRadius: 20,
-                                marginRight: 12,
-                              }}
-                            />
-                          ) : (
-                            <View
-                              style={{
-                                width: 40,
-                                height: 40,
-                                borderRadius: 20,
-                                backgroundColor: "#3b82f6",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                marginRight: 12,
-                              }}
-                            >
+                        <View style={{ flex: 1 }}>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              marginBottom: 4,
+                            }}
+                          >
+                            {batch.order.user?.profile_image ? (
+                              <Image
+                                source={{ uri: batch.order.user.profile_image }}
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: 16,
+                                  marginRight: 8,
+                                }}
+                              />
+                            ) : (
+                              <View
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: 16,
+                                  backgroundColor: "#3b82f6",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  marginRight: 8,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    color: "white",
+                                    fontWeight: "600",
+                                    fontSize: 14,
+                                  }}
+                                >
+                                  {batch.order.user?.first_name
+                                    ?.charAt(0)
+                                    .toUpperCase() || "U"}
+                                </Text>
+                              </View>
+                            )}
+
+                            <View>
                               <Text
                                 style={{
                                   color: "white",
-                                  fontWeight: "600",
                                   fontSize: 16,
+                                  fontWeight: "600",
                                 }}
                               >
-                                {order.user?.first_name
-                                  ?.charAt(0)
-                                  .toUpperCase() || "U"}
+                                Mesa {batch.order.table?.number || "Sin mesa"}
+                              </Text>
+                              <Text
+                                style={{
+                                  color: "#d1d5db",
+                                  fontSize: 12,
+                                }}
+                              >
+                                {batch.order.user
+                                  ? `${batch.order.user.first_name} ${batch.order.user.last_name}`
+                                  : "Cliente"}
                               </Text>
                             </View>
-                          )}
+                          </View>
 
-                          <View style={{ flex: 1 }}>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              backgroundColor: "rgba(59, 130, 246, 0.1)",
+                              borderRadius: 6,
+                              paddingHorizontal: 8,
+                              paddingVertical: 4,
+                              alignSelf: "flex-start",
+                            }}
+                          >
+                            <Package size={12} color="#3b82f6" />
                             <Text
                               style={{
-                                color: "white",
-                                fontSize: 18,
-                                fontWeight: "600",
+                                color: "#3b82f6",
+                                fontSize: 12,
+                                fontWeight: "500",
+                                marginLeft: 4,
                               }}
                             >
-                              Mesa {order.table?.number || "Sin mesa"}
-                            </Text>
-                            <Text
-                              style={{
-                                color: "#d1d5db",
-                                fontSize: 14,
-                              }}
-                            >
-                              {order.user
-                                ? `${order.user.first_name} ${order.user.last_name}`
-                                : "Cliente"}
+                              Tanda #{batchIndex + 1}
                             </Text>
                           </View>
                         </View>
@@ -370,14 +505,13 @@ export default function WaiterOrdersScreen() {
                               fontWeight: "600",
                             }}
                           >
-                            {pendingOrderItems.length} item
-                            {pendingOrderItems.length > 1 ? "s" : ""} pendiente
-                            {pendingOrderItems.length > 1 ? "s" : ""}
+                            {formatPrice(batch.total_amount)}
                           </Text>
                           <View
                             style={{
                               flexDirection: "row",
                               alignItems: "center",
+                              marginTop: 2,
                             }}
                           >
                             <Clock size={12} color="#d1d5db" />
@@ -388,7 +522,7 @@ export default function WaiterOrdersScreen() {
                                 marginLeft: 4,
                               }}
                             >
-                              {new Date(order.created_at).toLocaleTimeString(
+                              {new Date(batch.created_at).toLocaleTimeString(
                                 "es-AR",
                                 {
                                   hour: "2-digit",
@@ -400,83 +534,159 @@ export default function WaiterOrdersScreen() {
                         </View>
                       </View>
 
-                      {/* Items pendientes */}
+                      {/* Items de la tanda */}
                       <View style={{ marginBottom: 16 }}>
-                        <Text
+                        <View
                           style={{
-                            color: "#3b82f6",
-                            fontSize: 14,
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "center",
                             marginBottom: 12,
-                            fontWeight: "600",
                           }}
                         >
-                          Items esperando tu aprobación:
-                        </Text>
-
-                        {pendingOrderItems.map((item, index) => (
-                          <View
-                            key={`${item.id}-${index}`}
+                          <Text
                             style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              backgroundColor: "rgba(59, 130, 246, 0.1)",
-                              borderRadius: 8,
-                              padding: 12,
-                              marginBottom: 8,
+                              color: "#3b82f6",
+                              fontSize: 14,
+                              fontWeight: "600",
                             }}
                           >
-                            <View
-                              style={{
-                                backgroundColor:
-                                  item.menu_item?.category === "plato"
-                                    ? "#ef4444"
-                                    : "#3b82f6",
-                                borderRadius: 4,
-                                padding: 4,
-                                marginRight: 8,
-                              }}
-                            >
-                              {item.menu_item?.category === "plato" ? (
-                                <ChefHat size={12} color="white" />
-                              ) : (
-                                <Coffee size={12} color="white" />
-                              )}
-                            </View>
+                            Items de la tanda ({batch.total_items}):
+                          </Text>
 
-                            <View style={{ flex: 1 }}>
-                              <Text
-                                style={{
-                                  color: "white",
-                                  fontSize: 16,
-                                  fontWeight: "500",
-                                }}
-                              >
-                                {item.menu_item?.name}
-                              </Text>
-                              <Text
-                                style={{
-                                  color: "#9ca3af",
-                                  fontSize: 12,
-                                }}
-                              >
-                                Cantidad: {item.quantity}
-                              </Text>
-                            </View>
-
+                          <TouchableOpacity
+                            onPress={() => toggleIndividualMode(batchKey)}
+                            style={{
+                              backgroundColor: individualMode[batchKey]
+                                ? "#d4af37"
+                                : "rgba(212, 175, 55, 0.2)",
+                              borderRadius: 6,
+                              paddingHorizontal: 8,
+                              paddingVertical: 4,
+                              flexDirection: "row",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Settings
+                              size={12}
+                              color={
+                                individualMode[batchKey] ? "#1a1a1a" : "#d4af37"
+                              }
+                            />
                             <Text
                               style={{
-                                color: "#3b82f6",
-                                fontSize: 16,
-                                fontWeight: "600",
+                                color: individualMode[batchKey]
+                                  ? "#1a1a1a"
+                                  : "#d4af37",
+                                fontSize: 12,
+                                fontWeight: "500",
+                                marginLeft: 4,
                               }}
                             >
-                              {formatPrice(item.subtotal)}
+                              Individual
                             </Text>
-                          </View>
-                        ))}
+                          </TouchableOpacity>
+                        </View>
+
+                        {batch.items.map((item, itemIndex) => {
+                          const CategoryIcon = getCategoryIcon(
+                            item.menu_item?.category,
+                          );
+                          const categoryColor = getCategoryColor(
+                            item.menu_item?.category,
+                          );
+                          const isSelected = (
+                            selectedItems[batchKey] || []
+                          ).includes(item.id);
+                          const isIndividualMode = individualMode[batchKey];
+
+                          return (
+                            <TouchableOpacity
+                              key={`${item.id}-${itemIndex}`}
+                              onPress={() =>
+                                isIndividualMode &&
+                                toggleItemSelection(batchKey, item.id)
+                              }
+                              disabled={!isIndividualMode}
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                backgroundColor: isSelected
+                                  ? "rgba(212, 175, 55, 0.2)"
+                                  : "rgba(59, 130, 246, 0.1)",
+                                borderRadius: 8,
+                                padding: 12,
+                                marginBottom: 8,
+                                borderWidth: isSelected ? 1 : 0,
+                                borderColor: "#d4af37",
+                              }}
+                            >
+                              {/* Checkbox en modo individual */}
+                              {isIndividualMode && (
+                                <View style={{ marginRight: 8 }}>
+                                  {isSelected ? (
+                                    <View
+                                      style={{
+                                        backgroundColor: "#d4af37",
+                                        borderRadius: 4,
+                                        padding: 2,
+                                      }}
+                                    >
+                                      <Check size={12} color="#1a1a1a" />
+                                    </View>
+                                  ) : (
+                                    <Square size={16} color="#6b7280" />
+                                  )}
+                                </View>
+                              )}
+
+                              <View
+                                style={{
+                                  backgroundColor: categoryColor,
+                                  borderRadius: 4,
+                                  padding: 4,
+                                  marginRight: 8,
+                                }}
+                              >
+                                <CategoryIcon size={12} color="white" />
+                              </View>
+
+                              <View style={{ flex: 1 }}>
+                                <Text
+                                  style={{
+                                    color: "white",
+                                    fontSize: 16,
+                                    fontWeight: "500",
+                                  }}
+                                >
+                                  {item.menu_item?.name}
+                                </Text>
+                                <Text
+                                  style={{
+                                    color: "#9ca3af",
+                                    fontSize: 12,
+                                  }}
+                                >
+                                  Cantidad: {item.quantity} •{" "}
+                                  {item.menu_item?.prep_minutes} min
+                                </Text>
+                              </View>
+
+                              <Text
+                                style={{
+                                  color: isSelected ? "#d4af37" : "#3b82f6",
+                                  fontSize: 16,
+                                  fontWeight: "600",
+                                }}
+                              >
+                                {formatPrice(item.subtotal)}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
                       </View>
 
-                      {/* Botones de acción para los items pendientes */}
+                      {/* Botones de acción para la tanda */}
                       <View
                         style={{
                           flexDirection: "row",
@@ -484,71 +694,159 @@ export default function WaiterOrdersScreen() {
                           gap: 12,
                         }}
                       >
-                        <TouchableOpacity
-                          onPress={() =>
-                            handleItemAction(
-                              order.id,
-                              pendingOrderItems.map(item => item.id),
-                              "accept",
-                            )
-                          }
-                          disabled={actionLoading === order.id}
-                          style={{
-                            flex: 1,
-                            backgroundColor: "#22c55e",
-                            borderRadius: 10,
-                            padding: 14,
-                            flexDirection: "row",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            opacity: actionLoading === order.id ? 0.7 : 1,
-                          }}
-                        >
-                          <CheckCircle size={18} color="white" />
-                          <Text
-                            style={{
-                              color: "white",
-                              fontSize: 14,
-                              fontWeight: "600",
-                              marginLeft: 6,
-                            }}
-                          >
-                            Aceptar Todos
-                          </Text>
-                        </TouchableOpacity>
+                        {individualMode ? (
+                          <>
+                            {/* Botones para modo individual */}
+                            <TouchableOpacity
+                              onPress={() =>
+                                handleIndividualAction(
+                                  batch.order_id,
+                                  batchKey,
+                                  "accept",
+                                )
+                              }
+                              disabled={
+                                isProcessing ||
+                                (selectedItems[batchKey] || []).length === 0
+                              }
+                              style={{
+                                flex: 1,
+                                backgroundColor:
+                                  (selectedItems[batchKey] || []).length === 0
+                                    ? "#374151"
+                                    : "#22c55e",
+                                borderRadius: 10,
+                                padding: 14,
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                opacity: isProcessing ? 0.7 : 1,
+                              }}
+                            >
+                              <Check size={18} color="white" />
+                              <Text
+                                style={{
+                                  color: "white",
+                                  fontSize: 14,
+                                  fontWeight: "600",
+                                  marginLeft: 6,
+                                }}
+                              >
+                                Aceptar (
+                                {(selectedItems[batchKey] || []).length})
+                              </Text>
+                            </TouchableOpacity>
 
-                        <TouchableOpacity
-                          onPress={() =>
-                            handleItemAction(
-                              order.id,
-                              pendingOrderItems.map(item => item.id),
-                              "reject",
-                            )
-                          }
-                          disabled={actionLoading === order.id}
-                          style={{
-                            flex: 1,
-                            backgroundColor: "#ef4444",
-                            borderRadius: 10,
-                            padding: 14,
-                            flexDirection: "row",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            opacity: actionLoading === order.id ? 0.7 : 1,
-                          }}
-                        >
-                          <XCircle size={18} color="white" />
-                          <Text
-                            style={{
-                              color: "white",
-                              fontSize: 14,
-                              fontWeight: "600",
-                              marginLeft: 6,
-                            }}
-                          >
-                            Rechazar Todos
-                          </Text>
-                        </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() =>
+                                handleIndividualAction(
+                                  batch.order_id,
+                                  batchKey,
+                                  "reject",
+                                )
+                              }
+                              disabled={
+                                isProcessing ||
+                                (selectedItems[batchKey] || []).length === 0
+                              }
+                              style={{
+                                flex: 1,
+                                backgroundColor:
+                                  (selectedItems[batchKey] || []).length === 0
+                                    ? "#374151"
+                                    : "#ef4444",
+                                borderRadius: 10,
+                                padding: 14,
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                opacity: isProcessing ? 0.7 : 1,
+                              }}
+                            >
+                              <XCircle size={18} color="white" />
+                              <Text
+                                style={{
+                                  color: "white",
+                                  fontSize: 14,
+                                  fontWeight: "600",
+                                  marginLeft: 6,
+                                }}
+                              >
+                                Rechazar (
+                                {(selectedItems[batchKey] || []).length})
+                              </Text>
+                            </TouchableOpacity>
+                          </>
+                        ) : (
+                          <>
+                            {/* Botones para modo batch (toda la tanda) */}
+                            <TouchableOpacity
+                              onPress={() =>
+                                handleBatchAction(
+                                  batch.order_id,
+                                  batch.items,
+                                  "accept",
+                                )
+                              }
+                              disabled={isProcessing}
+                              style={{
+                                flex: 1,
+                                backgroundColor: "#22c55e",
+                                borderRadius: 10,
+                                padding: 14,
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                opacity: isProcessing ? 0.7 : 1,
+                              }}
+                            >
+                              <CheckCircle size={18} color="white" />
+                              <Text
+                                style={{
+                                  color: "white",
+                                  fontSize: 14,
+                                  fontWeight: "600",
+                                  marginLeft: 6,
+                                }}
+                              >
+                                Aceptar Tanda
+                              </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              onPress={() =>
+                                handleBatchAction(
+                                  batch.order_id,
+                                  batch.items,
+                                  "reject",
+                                )
+                              }
+                              disabled={isProcessing}
+                              style={{
+                                flex: 1,
+                                backgroundColor: "#ef4444",
+                                borderRadius: 10,
+                                padding: 14,
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                opacity: isProcessing ? 0.7 : 1,
+                              }}
+                            >
+                              <XCircle size={18} color="white" />
+                              <Text
+                                style={{
+                                  color: "white",
+                                  fontSize: 14,
+                                  fontWeight: "600",
+                                  marginLeft: 6,
+                                }}
+                              >
+                                Rechazar Tanda
+                              </Text>
+                            </TouchableOpacity>
+                          </>
+                        )}
                       </View>
                     </View>
                   );
@@ -564,7 +862,7 @@ export default function WaiterOrdersScreen() {
                     flexDirection: "row",
                     alignItems: "center",
                     marginBottom: 16,
-                    marginTop: pendingItems.length > 0 ? 32 : 0,
+                    marginTop: pendingBatches.length > 0 ? 32 : 0,
                     paddingBottom: 8,
                     borderBottomWidth: 1,
                     borderBottomColor: "rgba(34, 197, 94, 0.3)",
@@ -595,7 +893,6 @@ export default function WaiterOrdersScreen() {
                       borderColor: "rgba(34, 197, 94, 0.3)",
                     }}
                   >
-                    {/* Header de la orden activa */}
                     <View
                       style={{
                         flexDirection: "row",
@@ -646,7 +943,6 @@ export default function WaiterOrdersScreen() {
                       </View>
                     </View>
 
-                    {/* Info adicional */}
                     <View
                       style={{
                         backgroundColor: "rgba(34, 197, 94, 0.1)",

@@ -26,6 +26,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
       pending: [],
       accepted: [],
       rejected: [],
+      needs_modification: [], // ¡AGREGADO!
       preparing: [],
       ready: [],
       delivered: [],
@@ -43,12 +44,16 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
   const getStatusInfo = (status: OrderItemStatus) => {
     switch (status) {
       case "pending":
+        // Si hay items rechazados, esto puede ser una tanda devuelta
+        const hasRejectedItems = groups.rejected.length > 0;
         return {
           color: "#ffa500",
           bgColor: "rgba(255, 165, 0, 0.1)",
           icon: Clock,
-          title: "Esperando Confirmación",
-          description: "El mozo está revisando estos productos",
+          title: hasRejectedItems ? "Tanda Devuelta" : "Esperando Confirmación",
+          description: hasRejectedItems
+            ? "Estos productos fueron devueltos para que puedas modificar tu selección"
+            : "El mozo está revisando estos productos",
         };
       case "accepted":
         return {
@@ -63,8 +68,17 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           color: "#ef4444",
           bgColor: "rgba(239, 68, 68, 0.1)",
           icon: X,
-          title: "Rechazados",
-          description: "Estos productos no están disponibles",
+          title: "No Disponibles",
+          description: "No disponemos de stock de estos productos",
+        };
+      case "needs_modification":
+        return {
+          color: "#f59e0b",
+          bgColor: "rgba(245, 158, 11, 0.1)",
+          icon: X,
+          title: "Requiere Modificación",
+          description:
+            "Estos productos necesitan ser modificados antes de continuar",
         };
       case "preparing":
         return {
@@ -98,7 +112,10 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
 
     const statusInfo = getStatusInfo(status);
     const StatusIcon = statusInfo.icon;
-    const canModify = status === "rejected" || status === "pending";
+    const canModify =
+      status === "rejected" ||
+      status === "needs_modification" ||
+      status === "pending";
 
     return (
       <View
@@ -187,37 +204,98 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           </View>
         ))}
 
-        {/* Botón de acción para items rechazados */}
-        {status === "rejected" && (
-          <TouchableOpacity
-            style={{
-              backgroundColor: statusInfo.color,
-              borderRadius: 8,
-              padding: 12,
-              marginTop: 12,
-              alignItems: "center",
-            }}
-            onPress={() => onModifyRejectedItems(items)}
-          >
-            <Text
+        {/* Botón de acción para items rechazados, que necesitan modificación o devueltos */}
+        {(status === "rejected" ||
+          status === "needs_modification" ||
+          (status === "pending" &&
+            (groups.rejected.length > 0 ||
+              groups.needs_modification.length > 0))) && (
+          <View>
+            {/* Mensaje explicativo para tandas devueltas */}
+            {status === "pending" &&
+              (groups.rejected.length > 0 ||
+                groups.needs_modification.length > 0) && (
+                <View
+                  style={{
+                    backgroundColor: "rgba(239, 68, 68, 0.1)",
+                    borderRadius: 6,
+                    padding: 8,
+                    marginTop: 8,
+                    borderWidth: 1,
+                    borderColor: "rgba(239, 68, 68, 0.3)",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#ef4444",
+                      textAlign: "center",
+                      fontWeight: "500",
+                    }}
+                  >
+                    ⚠️ Tanda devuelta por falta de stock
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: "#6b7280",
+                      textAlign: "center",
+                      marginTop: 2,
+                    }}
+                  >
+                    Algunos productos no están disponibles. Puedes modificar
+                    toda tu selección.
+                  </Text>
+                </View>
+              )}
+
+            <TouchableOpacity
               style={{
-                color: "white",
-                fontWeight: "600",
-                fontSize: 14,
+                backgroundColor:
+                  status === "rejected" ? statusInfo.color : "#ef4444",
+                borderRadius: 8,
+                padding: 12,
+                marginTop: 12,
+                alignItems: "center",
+              }}
+              onPress={() => {
+                // Si hay items pending y rejected/needs_modification, pasar todos los grupos para modificación
+                const itemsToModify =
+                  status === "rejected" || status === "needs_modification"
+                    ? items
+                    : [
+                        ...groups.pending,
+                        ...groups.rejected,
+                        ...groups.needs_modification,
+                      ];
+                onModifyRejectedItems(itemsToModify);
               }}
             >
-              Modificar Productos Rechazados
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={{
+                  color: "white",
+                  fontWeight: "600",
+                  fontSize: 14,
+                }}
+              >
+                {status === "rejected"
+                  ? "Modificar Productos Rechazados"
+                  : status === "needs_modification"
+                    ? "Modificar Productos"
+                    : "Modificar Toda la Tanda"}
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     );
   };
 
   const canAddMoreItems = () => {
-    // Solo se pueden agregar más items si no hay items pendientes
+    // Solo se pueden agregar más items si no hay items pendientes ni que necesiten modificación
     // y hay al menos algunos items aceptados (no todos rechazados)
-    const hasPendingItems = groups.pending.length > 0;
+    const hasPendingItems =
+      groups.pending.length > 0 || groups.needs_modification.length > 0;
     const hasAcceptedOrBetter =
       groups.accepted.length > 0 ||
       groups.preparing.length > 0 ||

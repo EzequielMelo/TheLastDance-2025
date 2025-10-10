@@ -144,6 +144,19 @@ export const getWaiterPendingItems = async (): Promise<Order[]> => {
   }
 };
 
+// Obtener tandas pendientes agrupadas por batch_id (para mozos)
+export const getWaiterPendingBatches = async (): Promise<any[]> => {
+  try {
+    const response = await api.get("/orders/waiter/pending-batches");
+    return response.data.data || [];
+  } catch (error: any) {
+    console.error("Error obteniendo tandas pendientes para mozo:", error);
+    throw new Error(
+      error.response?.data?.error || "Error obteniendo tandas pendientes",
+    );
+  }
+};
+
 // Acción del mozo sobre items específicos (aceptar/rechazar items individuales)
 export const waiterItemsAction = async (
   orderId: string,
@@ -296,6 +309,50 @@ export const updateBartenderItemStatus = async (
     console.error("Error actualizando status de item de bar:", error);
     throw new Error(
       error.response?.data?.error || "Error actualizando status de item de bar",
+    );
+  }
+};
+
+// Rechazar items individuales (sin eliminar, para que el cliente pueda reemplazar)
+export const rejectIndividualItems = async (
+  orderId: string,
+  itemIds: string[],
+  reason?: string,
+): Promise<Order> => {
+  try {
+    const response = await api.put(
+      `/orders/${orderId}/reject-individual-items`,
+      {
+        itemIds,
+        reason,
+      },
+    );
+    return response.data.order;
+  } catch (error: any) {
+    console.error("Error rechazando items individuales:", error);
+    throw new Error(
+      error.response?.data?.error || "Error rechazando items individuales",
+    );
+  }
+};
+
+// Aprobar items individuales
+export const approveIndividualItems = async (
+  orderId: string,
+  itemIds: string[],
+): Promise<Order> => {
+  try {
+    const response = await api.put(
+      `/orders/${orderId}/approve-individual-items`,
+      {
+        itemIds,
+      },
+    );
+    return response.data.order;
+  } catch (error: any) {
+    console.error("Error aprobando items individuales:", error);
+    throw new Error(
+      error.response?.data?.error || "Error aprobando items individuales",
     );
   }
 };
