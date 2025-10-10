@@ -29,9 +29,11 @@ export const useAuthActions = () => {
       const response = await loginUser(credentials);
 
       const token = response?.session?.access_token;
+      const refreshToken = response?.session?.refresh_token;
+
       if (!token) throw new Error("No se recibió un token válido");
 
-      await contextLogin(token, response.user);
+      await contextLogin(token, response.user, refreshToken);
 
       return { success: true };
     } catch (err: any) {

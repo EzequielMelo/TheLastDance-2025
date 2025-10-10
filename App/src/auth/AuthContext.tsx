@@ -3,31 +3,57 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { User } from "../types/User";
 import api from "../api/axios";
+import { authEventEmitter, AUTH_EVENTS } from "../utils/eventEmitter";
 
 type AuthContextType = {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
   isLoading: boolean;
   // eslint-disable-next-line no-unused-vars
-  login: (token: string, user: User) => Promise<void>; // Cambio a async
-  logout: () => Promise<void>; // Cambio a async
+  login: (token: string, user: User, refreshToken?: string) => Promise<void>;
+  logout: () => Promise<void>;
+  refreshAuthToken: () => Promise<string | null>;
 };
 
 export const AuthContext = createContext<AuthContextType>({
   user: null,
   token: null,
+  refreshToken: null,
   isLoading: true,
   login: async () => {},
   logout: async () => {},
+  refreshAuthToken: async () => null,
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadAuth();
+
+    // Escuchar eventos de autenticación
+    const handleSessionExpired = () => {
+      console.log("🚨 Sesión expirada - ejecutando logout automático");
+      logout();
+    };
+
+    const handleTokenRefreshed = (newToken: string) => {
+      console.log("✅ Token renovado - actualizando estado");
+      setToken(newToken);
+    };
+
+    authEventEmitter.on(AUTH_EVENTS.SESSION_EXPIRED, handleSessionExpired);
+    authEventEmitter.on(AUTH_EVENTS.TOKEN_REFRESHED, handleTokenRefreshed);
+
+    // Cleanup
+    return () => {
+      authEventEmitter.off(AUTH_EVENTS.SESSION_EXPIRED, handleSessionExpired);
+      authEventEmitter.off(AUTH_EVENTS.TOKEN_REFRESHED, handleTokenRefreshed);
+    };
   }, []);
 
   const loadAuth = async () => {
@@ -36,12 +62,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Token desde SecureStore (seguro)
       const storedToken = await SecureStore.getItemAsync("authToken");
+      const storedRefreshToken = await SecureStore.getItemAsync("refreshToken");
 
       // Usuario desde AsyncStorage (no sensible)
       const storedUser = await AsyncStorage.getItem("userData");
 
       if (storedToken && storedUser) {
         setToken(storedToken);
+        setRefreshToken(storedRefreshToken);
         setUser(JSON.parse(storedUser) as User);
       }
     } catch (error) {
@@ -53,15 +81,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const login = async (newToken: string, userData: User) => {
+  const login = async (
+    newToken: string,
+    userData: User,
+    newRefreshToken?: string,
+  ) => {
     try {
       // Token en SecureStore (seguro)
       await SecureStore.setItemAsync("authToken", newToken);
+
+      if (newRefreshToken) {
+        await SecureStore.setItemAsync("refreshToken", newRefreshToken);
+      }
 
       // Usuario en AsyncStorage (rápido acceso)
       await AsyncStorage.setItem("userData", JSON.stringify(userData));
 
       setToken(newToken);
+      setRefreshToken(newRefreshToken || null);
       setUser(userData);
     } catch (error) {
       console.error("Error saving auth data:", error);
@@ -75,16 +112,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Si es un usuario anónimo, eliminar de la base de datos
       if (user?.profile_code === "cliente_anonimo" && token) {
-        console.log('🗑️ Eliminando usuario anónimo del servidor...');
+        console.log("🗑️ Eliminando usuario anónimo del servidor...");
         try {
-          await api.delete('/auth/anonymous', {
+          await api.delete("/auth/anonymous", {
             headers: {
               Authorization: `Bearer ${token}`,
             },
           });
-          console.log('✅ Usuario anónimo eliminado del servidor');
+          console.log("✅ Usuario anónimo eliminado del servidor");
         } catch (error) {
-          console.error('❌ Error eliminando usuario anónimo:', error);
+          console.error("❌ Error eliminando usuario anónimo:", error);
           // Continuar con el logout local aunque falle la eliminación remota
         }
       }
@@ -92,10 +129,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Limpiar ambos storages
       await Promise.all([
         SecureStore.deleteItemAsync("authToken"),
+        SecureStore.deleteItemAsync("refreshToken"),
         AsyncStorage.removeItem("userData"),
       ]);
 
       setToken(null);
+      setRefreshToken(null);
       setUser(null);
     } catch (error) {
       console.error("Error during logout:", error);
@@ -104,11 +143,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Función para renovar el token usando el refresh token
+  const refreshAuthToken = async (): Promise<string | null> => {
+    try {
+      console.log("🔄 Intentando renovar token...");
+
+      // Si es usuario anónimo, no necesita renovar token
+      if (user?.profile_code === "cliente_anonimo") {
+        console.log("👤 Usuario anónimo - token no expira");
+        return token;
+      }
+
+      if (!refreshToken) {
+        console.log("❌ No hay refresh token disponible");
+        return null;
+      }
+
+      // Llamar al endpoint de refresh
+      const response = await api.post("/auth/refresh", {
+        refresh_token: refreshToken,
+      });
+
+      const { access_token, refresh_token: newRefreshToken } = response.data;
+
+      // Actualizar tokens en storage y estado
+      await SecureStore.setItemAsync("authToken", access_token);
+      if (newRefreshToken) {
+        await SecureStore.setItemAsync("refreshToken", newRefreshToken);
+        setRefreshToken(newRefreshToken);
+      }
+
+      setToken(access_token);
+      console.log("✅ Token renovado exitosamente");
+
+      return access_token;
+    } catch (error) {
+      console.error("❌ Error renovando token:", error);
+      return null;
+    }
+  };
+
   // Función helper para limpiar datos corruptos
   const clearAuthData = async () => {
     try {
       await Promise.all([
         SecureStore.deleteItemAsync("authToken").catch(() => {}),
+        SecureStore.deleteItemAsync("refreshToken").catch(() => {}),
         AsyncStorage.removeItem("userData").catch(() => {}),
       ]);
     } catch (error) {
@@ -117,7 +197,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        refreshToken,
+        isLoading,
+        login,
+        logout,
+        refreshAuthToken,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

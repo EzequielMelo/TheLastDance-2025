@@ -13,7 +13,10 @@ export async function registerUser(
   body: CreateUserBody,
   file?: Express.Multer.File,
 ) {
-  console.log("🔄 registerUser service called with:", { body, hasFile: !!file });
+  console.log("🔄 registerUser service called with:", {
+    body,
+    hasFile: !!file,
+  });
 
   const { profile_code } = body;
 
@@ -34,12 +37,17 @@ export async function registerUser(
     });
 
     if (authError) {
-      if (authError.message.includes('User already registered') || authError.message.includes('already registered')) {
-        throw new Error(`El email ${userEmail} ya está registrado. Por favor usa otro email.`);
+      if (
+        authError.message.includes("User already registered") ||
+        authError.message.includes("already registered")
+      ) {
+        throw new Error(
+          `El email ${userEmail} ya está registrado. Por favor usa otro email.`,
+        );
       }
       throw new Error("Error al crear usuario en Auth: " + authError.message);
     }
-    
+
     if (!authData.user) {
       throw new Error("Error al crear usuario en Auth");
     }
@@ -106,15 +114,21 @@ export async function registerUser(
   // Enviar notificación push si es un cliente registrado
   if (profile_code === "cliente_registrado") {
     const clientName = `${body.first_name} ${body.last_name}`;
-    
+
     // Notificar a supervisores/dueños
     notifyNewClientRegistration(clientName, userId!).catch(err =>
-      console.error("No se pudo enviar notificación push a supervisores:", err?.message || err),
+      console.error(
+        "No se pudo enviar notificación push a supervisores:",
+        err?.message || err,
+      ),
     );
-    
+
     // Notificar al cliente recién registrado
     notifyClientAccountCreated(userId!).catch(err =>
-      console.error("No se pudo enviar notificación push al cliente:", err?.message || err),
+      console.error(
+        "No se pudo enviar notificación push al cliente:",
+        err?.message || err,
+      ),
     );
   }
 
@@ -231,9 +245,9 @@ export async function registerAnonymousUser(
     throw new Error("Error al crear perfil anónimo: " + dbError.message);
   }
 
-  // Generar un token personalizado para el usuario anónimo
-  // Como no usa Supabase Auth, generamos un token simple
-  const token = `anon_${userId}_${Date.now()}`;
+  // Generar un token personalizado para el usuario anónimo que no expire
+  // Formato: anon_<userId>_<timestamp>_permanent
+  const token = `anon_${userId}_${Date.now()}_permanent`;
 
   return {
     message: "Usuario anónimo creado exitosamente.",
@@ -250,13 +264,56 @@ export async function registerAnonymousUser(
   };
 }
 
+export async function refreshToken(refreshToken: string) {
+  try {
+    console.log("🔄 Intentando renovar token con refresh token");
+
+    // Usar Supabase para renovar el token
+    const { data, error } = await supabase.auth.refreshSession({
+      refresh_token: refreshToken,
+    });
+
+    if (error || !data.session) {
+      throw new Error("Error renovando token: " + error?.message);
+    }
+
+    console.log("✅ Token renovado exitosamente");
+
+    return {
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      token_type: data.session.token_type,
+      expires_in: data.session.expires_in,
+    };
+  } catch (error) {
+    console.error("❌ Error en refreshToken service:", error);
+    throw error;
+  }
+}
+
 export async function verifyToken(accessToken: string) {
   // Verificar si es un token anónimo
   if (accessToken.startsWith("anon_")) {
     const parts = accessToken.split("_");
     if (parts.length >= 3) {
       const userId = parts[1];
-      
+
+      // Los tokens anónimos con "permanent" nunca expiran
+      const isPermanent = parts.length >= 4 && parts[3] === "permanent";
+
+      if (!isPermanent && parts[2]) {
+        // Verificar expiración para tokens anónimos antiguos (24 horas)
+        const timestamp = parseInt(parts[2]);
+        if (!isNaN(timestamp)) {
+          const now = Date.now();
+          const hoursPassed = (now - timestamp) / (1000 * 60 * 60);
+
+          if (hoursPassed > 24) {
+            throw new Error("Token anónimo expirado.");
+          }
+        }
+      }
+
       // Verificar que el usuario existe en la tabla
       const { data: profile, error } = await supabaseAdmin
         .from("users")
@@ -288,8 +345,8 @@ export async function verifyToken(accessToken: string) {
 }
 
 export async function deleteAnonymousUser(userId: string) {
-  console.log('🗑️ Iniciando eliminación de usuario anónimo:', userId);
-  
+  console.log("🗑️ Iniciando eliminación de usuario anónimo:", userId);
+
   // 1. Verificar que el usuario existe y es anónimo
   const { data: user, error: getUserError } = await supabaseAdmin
     .from("users")
@@ -302,42 +359,53 @@ export async function deleteAnonymousUser(userId: string) {
     throw new Error("Usuario anónimo no encontrado.");
   }
 
-  console.log('👤 Usuario encontrado:', user);
+  console.log("👤 Usuario encontrado:", user);
 
   // 2. Eliminar foto de perfil del storage si existe
   if (user.profile_image) {
-    console.log('📸 Eliminando foto de perfil del storage:', user.profile_image);
-    
+    console.log(
+      "📸 Eliminando foto de perfil del storage:",
+      user.profile_image,
+    );
+
     try {
       // Extraer el path correcto de la URL usando la función utilitaria
       const filePath = extractPathFromUrl(user.profile_image);
-      console.log('📁 Path extraído:', filePath);
-      
+      console.log("📁 Path extraído:", filePath);
+
       if (filePath) {
-        console.log('�️ Intentando eliminar archivo con path:', filePath);
+        console.log("�️ Intentando eliminar archivo con path:", filePath);
         await deleteFile(STORAGE_BUCKETS.PROFILE_IMAGES, filePath);
-        console.log('✅ Foto eliminada del storage exitosamente');
+        console.log("✅ Foto eliminada del storage exitosamente");
       } else {
-        console.warn('⚠️ No se pudo extraer el path de la URL:', user.profile_image);
-        
+        console.warn(
+          "⚠️ No se pudo extraer el path de la URL:",
+          user.profile_image,
+        );
+
         // Intentar método alternativo: extraer todo después del bucket
-        const urlParts = user.profile_image.split('/');
-        const bucketIndex = urlParts.findIndex((part: string) => part === STORAGE_BUCKETS.PROFILE_IMAGES);
+        const urlParts = user.profile_image.split("/");
+        const bucketIndex = urlParts.findIndex(
+          (part: string) => part === STORAGE_BUCKETS.PROFILE_IMAGES,
+        );
         if (bucketIndex !== -1 && bucketIndex + 1 < urlParts.length) {
-          const alternativePath = urlParts.slice(bucketIndex + 1).join('/');
-          console.log('🔄 Intentando método alternativo con path:', alternativePath);
+          const alternativePath = urlParts.slice(bucketIndex + 1).join("/");
+          console.log(
+            "🔄 Intentando método alternativo con path:",
+            alternativePath,
+          );
           await deleteFile(STORAGE_BUCKETS.PROFILE_IMAGES, alternativePath);
-          console.log('✅ Foto eliminada con método alternativo');
+          console.log("✅ Foto eliminada con método alternativo");
         }
       }
     } catch (error) {
-      console.error('❌ Error procesando eliminación de foto:', error);
+      console.error("❌ Error procesando eliminación de foto:", error);
       // No hacer throw aquí - continuar con la eliminación del usuario
     }
   }
 
   // 3. Eliminar usuario de la tabla users
-  console.log('🗑️ Eliminando usuario de la base de datos');
+  console.log("🗑️ Eliminando usuario de la base de datos");
   const { error: deleteError } = await supabaseAdmin
     .from("users")
     .delete()
@@ -345,12 +413,14 @@ export async function deleteAnonymousUser(userId: string) {
     .eq("profile_code", "cliente_anonimo");
 
   if (deleteError) {
-    console.error('❌ Error eliminando usuario:', deleteError);
-    throw new Error("Error al eliminar usuario anónimo: " + deleteError.message);
+    console.error("❌ Error eliminando usuario:", deleteError);
+    throw new Error(
+      "Error al eliminar usuario anónimo: " + deleteError.message,
+    );
   }
 
-  console.log('✅ Usuario anónimo eliminado exitosamente');
-  
+  console.log("✅ Usuario anónimo eliminado exitosamente");
+
   return {
     message: "Usuario anónimo eliminado exitosamente.",
     deleted_user_id: userId,
