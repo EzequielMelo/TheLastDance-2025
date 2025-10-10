@@ -56,6 +56,7 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingItems, setUpdatingItems] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<"accepted" | "preparing" | "ready">("accepted");
 
   const loadKitchenOrders = useCallback(async () => {
     try {
@@ -195,6 +196,123 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
     }
   };
 
+  // Renderizar item individual (nuevo)
+  const renderIndividualItem = ({ item }: { item: any }) => (
+    <View style={{
+      backgroundColor: "#1a1a1a",
+      marginHorizontal: 16,
+      marginVertical: 8,
+      borderRadius: 12,
+      padding: 16,
+      borderLeftWidth: 4,
+      borderLeftColor: getStatusColor(item.status),
+      elevation: 2,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    }}>
+      {/* Info de la mesa y cliente */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+        <View>
+          <Text style={{ fontSize: 16, fontWeight: "600", color: "#d4af37" }}>
+            Mesa #{item.table_number}
+          </Text>
+          <Text style={{ fontSize: 14, color: "#999" }}>
+            {item.customer_name}
+          </Text>
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            {getStatusIcon(item.status)}
+            <Text style={{ marginLeft: 6, color: getStatusColor(item.status), fontWeight: "600" }}>
+              {getStatusText(item.status)}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Info del plato */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 18, fontWeight: "600", color: "#ffffff", marginBottom: 4 }}>
+            {item.menu_item.name}
+          </Text>
+          <Text style={{ fontSize: 14, color: "#999", marginBottom: 8 }}>
+            {item.menu_item.description}
+          </Text>
+          <Text style={{ fontSize: 14, color: "#d4af37" }}>
+            Cantidad: {item.quantity}
+          </Text>
+        </View>
+        
+        <View style={{ alignItems: "flex-end", marginLeft: 16 }}>
+          <Clock size={16} color="#6b7280" />
+          <Text style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+            {item.menu_item.prep_minutes} min
+          </Text>
+        </View>
+      </View>
+
+      {/* Botones de acción */}
+      <View style={{ marginTop: 16, flexDirection: "row", gap: 8 }}>
+        {item.status === "accepted" && (
+          <TouchableOpacity
+            onPress={() => updateItemStatus(item.id, "preparing")}
+            style={{
+              backgroundColor: "#d4af37",
+              flex: 1,
+              paddingVertical: 12,
+              borderRadius: 8,
+              alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "center"
+            }}
+            disabled={updatingItems.has(item.id)}
+          >
+            {updatingItems.has(item.id) ? (
+              <ActivityIndicator size="small" color="#000" />
+            ) : (
+              <>
+                <Utensils size={16} color="#000" />
+                <Text style={{ color: "#000", fontWeight: "600", marginLeft: 8 }}>
+                  Empezar preparación
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+        
+        {item.status === "preparing" && (
+          <TouchableOpacity
+            onPress={() => updateItemStatus(item.id, "ready")}
+            style={{
+              backgroundColor: "#10b981",
+              flex: 1,
+              paddingVertical: 12,
+              borderRadius: 8,
+              alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "center"
+            }}
+            disabled={updatingItems.has(item.id)}
+          >
+            {updatingItems.has(item.id) ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <CheckCircle size={16} color="#fff" />
+                <Text style={{ color: "#fff", fontWeight: "600", marginLeft: 8 }}>
+                  Marcar como listo
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+
   const renderOrderItem = ({ item: order }: { item: KitchenOrder }) => (
     <View style={styles.orderCard}>
       {/* Header de la orden */}
@@ -268,6 +386,26 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
     </View>
   );
 
+  // Aplanar todos los items de todas las órdenes
+  const allItems = orders.flatMap(order => 
+    order.order_items.map(item => ({
+      ...item,
+      order_id: order.id,
+      table_number: order.table?.number || "N/A",
+      customer_name: order.user ? `${order.user.first_name} ${order.user.last_name}` : "Cliente"
+    }))
+  );
+
+  // Filtrar items por tab activo
+  const filteredItems = allItems.filter(item => item.status === activeTab);
+
+  // Estadísticas por tab
+  const stats = {
+    accepted: allItems.filter(item => item.status === "accepted").length,
+    preparing: allItems.filter(item => item.status === "preparing").length,
+    ready: allItems.filter(item => item.status === "ready").length,
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -295,7 +433,11 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
         <View style={styles.headerTextContainer}>
           <Text style={styles.headerTitle}>Cocina</Text>
           <Text style={styles.headerSubtitle}>
-            {orders.length} {orders.length === 1 ? "pedido pendiente" : "pedidos pendientes"}
+            {filteredItems.length} {filteredItems.length === 1 ? "plato" : "platos"} {
+              activeTab === "accepted" ? "pendiente" + (filteredItems.length === 1 ? "" : "s") :
+              activeTab === "preparing" ? "preparando" + (filteredItems.length === 1 ? "se" : "") :
+              "listo" + (filteredItems.length === 1 ? "" : "s")
+            }
           </Text>
         </View>
         <View style={styles.headerStats}>
@@ -303,19 +445,128 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
         </View>
       </LinearGradient>
 
-      {/* Lista de pedidos */}
-      {orders.length === 0 ? (
+      {/* Stats Card */}
+      <View style={{
+        margin: 16,
+        backgroundColor: "#1a1a1a",
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: "#333",
+      }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-around" }}>
+          <View style={{ alignItems: "center" }}>
+            <Text style={{ fontSize: 24, fontWeight: "700", color: "#d4af37" }}>
+              {stats.accepted}
+            </Text>
+            <Text style={{ fontSize: 12, color: "#999" }}>Pendientes</Text>
+          </View>
+          <View style={{ alignItems: "center" }}>
+            <Text style={{ fontSize: 24, fontWeight: "700", color: "#3b82f6" }}>
+              {stats.preparing}
+            </Text>
+            <Text style={{ fontSize: 12, color: "#999" }}>Preparando</Text>
+          </View>
+          <View style={{ alignItems: "center" }}>
+            <Text style={{ fontSize: 24, fontWeight: "700", color: "#10b981" }}>
+              {stats.ready}
+            </Text>
+            <Text style={{ fontSize: 12, color: "#999" }}>Listos</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Tabs */}
+      <View style={{
+        flexDirection: "row",
+        marginHorizontal: 16,
+        marginBottom: 16,
+        backgroundColor: "#1a1a1a",
+        borderRadius: 12,
+        padding: 4,
+        borderWidth: 1,
+        borderColor: "#333",
+      }}>
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            borderRadius: 8,
+            backgroundColor: activeTab === "accepted" ? "#d4af37" : "transparent",
+          }}
+          onPress={() => setActiveTab("accepted")}
+        >
+          <Text style={{
+            textAlign: "center",
+            fontWeight: "600",
+            fontSize: 14,
+            color: activeTab === "accepted" ? "#000" : "#999",
+          }}>
+            Pendientes ({stats.accepted})
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            borderRadius: 8,
+            backgroundColor: activeTab === "preparing" ? "#d4af37" : "transparent",
+          }}
+          onPress={() => setActiveTab("preparing")}
+        >
+          <Text style={{
+            textAlign: "center",
+            fontWeight: "600",
+            fontSize: 14,
+            color: activeTab === "preparing" ? "#000" : "#999",
+          }}>
+            Preparando ({stats.preparing})
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            borderRadius: 8,
+            backgroundColor: activeTab === "ready" ? "#d4af37" : "transparent",
+          }}
+          onPress={() => setActiveTab("ready")}
+        >
+          <Text style={{
+            textAlign: "center",
+            fontWeight: "600",
+            fontSize: 14,
+            color: activeTab === "ready" ? "#000" : "#999",
+          }}>
+            Listos ({stats.ready})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Lista de platos */}
+      {filteredItems.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Utensils size={64} color="#6b7280" />
-          <Text style={styles.emptyTitle}>No hay pedidos pendientes</Text>
+          <Text style={styles.emptyTitle}>
+            {activeTab === "accepted" ? "No hay platos pendientes" :
+             activeTab === "preparing" ? "No hay platos preparándose" :
+             "No hay platos listos"}
+          </Text>
           <Text style={styles.emptySubtitle}>
-            Los nuevos pedidos aparecerán aquí cuando los mozos los acepten
+            {activeTab === "accepted" ? "Los platos aparecerán aquí cuando los mozos los acepten" :
+             activeTab === "preparing" ? "Los platos en preparación aparecerán aquí" :
+             "Los platos terminados aparecerán aquí"}
           </Text>
         </View>
       ) : (
         <FlatList
-          data={orders}
-          renderItem={renderOrderItem}
+          data={filteredItems}
+          renderItem={renderIndividualItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
           refreshControl={

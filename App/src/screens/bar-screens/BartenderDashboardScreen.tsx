@@ -55,6 +55,7 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
   const [orders, setOrders] = useState<BartenderOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"accepted" | "preparing" | "ready">("accepted");
 
   const fetchBartenderOrders = useCallback(async () => {
     try {
@@ -112,14 +113,29 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
     }
   };
 
-  const renderOrderItem = ({ item: orderItem }: { item: BartenderOrderItem }) => (
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "accepted":
+        return <Clock size={20} color="#d4af37" />;
+      case "preparing":
+        return <Wine size={20} color="#8B4513" />;
+      case "ready":
+        return <CheckCircle size={20} color="#228B22" />;
+      default:
+        return <Clock size={20} color="#6b7280" />;
+    }
+  };
+
+  const renderOrderItem = ({ item: orderItem }: { item: any }) => (
     <View
       style={{
-        backgroundColor: "white",
+        backgroundColor: "#1a1a1a",
         marginHorizontal: 16,
         marginVertical: 8,
         borderRadius: 12,
         padding: 16,
+        borderLeftWidth: 4,
+        borderLeftColor: getStatusColor(orderItem.status),
         elevation: 2,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
@@ -127,40 +143,50 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
         shadowRadius: 4,
       }}
     >
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 18, fontWeight: "600", color: "#1F2937", marginBottom: 4 }}>
-            {orderItem.menu_item.name}
+      {/* Info de la mesa y cliente */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+        <View>
+          <Text style={{ fontSize: 16, fontWeight: "600", color: "#d4af37" }}>
+            Mesa #{orderItem.table_number}
           </Text>
-          <Text style={{ fontSize: 14, color: "#6B7280", marginBottom: 8 }}>
-            Cantidad: {orderItem.quantity}
+          <Text style={{ fontSize: 14, color: "#999" }}>
+            {orderItem.customer_name}
           </Text>
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <View
-              style={{
-                backgroundColor: getStatusColor(orderItem.status),
-                paddingHorizontal: 8,
-                paddingVertical: 4,
-                borderRadius: 8,
-              }}
-            >
-              <Text style={{ color: "white", fontSize: 12, fontWeight: "500" }}>
-                {getStatusText(orderItem.status)}
-              </Text>
-            </View>
+            {getStatusIcon(orderItem.status)}
+            <Text style={{ marginLeft: 6, color: getStatusColor(orderItem.status), fontWeight: "600" }}>
+              {getStatusText(orderItem.status)}
+            </Text>
           </View>
         </View>
+      </View>
+
+      {/* Info de la bebida */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 18, fontWeight: "600", color: "#ffffff", marginBottom: 4 }}>
+            {orderItem.menu_item.name}
+          </Text>
+          <Text style={{ fontSize: 14, color: "#999", marginBottom: 8 }}>
+            {orderItem.menu_item.description || "Bebida"}
+          </Text>
+          <Text style={{ fontSize: 14, color: "#d4af37" }}>
+            Cantidad: {orderItem.quantity}
+          </Text>
+        </View>
         
-        <View style={{ alignItems: "flex-end" }}>
-          <Clock size={16} color="#6B7280" />
-          <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
+        <View style={{ alignItems: "flex-end", marginLeft: 16 }}>
+          <Clock size={16} color="#6b7280" />
+          <Text style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
             {orderItem.menu_item.prep_minutes} min
           </Text>
         </View>
       </View>
 
       {/* Botones de acción */}
-      <View style={{ marginTop: 12, flexDirection: "row", gap: 8 }}>
+      <View style={{ marginTop: 16, flexDirection: "row", gap: 8 }}>
         {orderItem.status === "accepted" && (
           <TouchableOpacity
             onPress={() => updateItemStatus(orderItem.id, "preparing")}
@@ -170,9 +196,14 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
               paddingVertical: 12,
               borderRadius: 8,
               alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "center"
             }}
           >
-            <Text style={{ color: "white", fontWeight: "600" }}>Empezar preparación</Text>
+            <Wine size={16} color="#000" />
+            <Text style={{ color: "#000", fontWeight: "600", marginLeft: 8 }}>
+              Empezar preparación
+            </Text>
           </TouchableOpacity>
         )}
         
@@ -185,9 +216,14 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
               paddingVertical: 12,
               borderRadius: 8,
               alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "center"
             }}
           >
-            <Text style={{ color: "white", fontWeight: "600" }}>Marcar como lista</Text>
+            <CheckCircle size={16} color="#fff" />
+            <Text style={{ color: "#fff", fontWeight: "600", marginLeft: 8 }}>
+              Marcar como lista
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -203,6 +239,16 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
       customer_name: order.user ? `${order.user.first_name} ${order.user.last_name}` : "Cliente"
     }))
   );
+
+  // Filtrar items por tab activo
+  const filteredItems = allItems.filter(item => item.status === activeTab);
+
+  // Estadísticas por tab
+  const stats = {
+    accepted: allItems.filter(item => item.status === "accepted").length,
+    preparing: allItems.filter(item => item.status === "preparing").length,
+    ready: allItems.filter(item => item.status === "ready").length,
+  };
 
   if (loading) {
     return (
@@ -241,7 +287,11 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
             Bar
           </Text>
           <Text style={{ fontSize: 14, color: "#999", marginTop: 2 }}>
-            {allItems.length} {allItems.length === 1 ? "bebida pendiente" : "bebidas pendientes"}
+            {filteredItems.length} {filteredItems.length === 1 ? "bebida" : "bebidas"} {
+              activeTab === "accepted" ? "pendiente" + (filteredItems.length === 1 ? "" : "s") :
+              activeTab === "preparing" ? "preparando" + (filteredItems.length === 1 ? "se" : "") :
+              "lista" + (filteredItems.length === 1 ? "" : "s")
+            }
           </Text>
         </View>
         
@@ -264,28 +314,100 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
         <View style={{ flexDirection: "row", justifyContent: "space-around" }}>
           <View style={{ alignItems: "center" }}>
             <Text style={{ fontSize: 24, fontWeight: "700", color: "#d4af37" }}>
-              {allItems.filter(item => item.status === "accepted").length}
+              {stats.accepted}
             </Text>
             <Text style={{ fontSize: 12, color: "#999" }}>Pendientes</Text>
           </View>
           <View style={{ alignItems: "center" }}>
             <Text style={{ fontSize: 24, fontWeight: "700", color: "#8B4513" }}>
-              {allItems.filter(item => item.status === "preparing").length}
+              {stats.preparing}
             </Text>
             <Text style={{ fontSize: 12, color: "#999" }}>Preparando</Text>
           </View>
           <View style={{ alignItems: "center" }}>
             <Text style={{ fontSize: 24, fontWeight: "700", color: "#228B22" }}>
-              {allItems.filter(item => item.status === "ready").length}
+              {stats.ready}
             </Text>
             <Text style={{ fontSize: 12, color: "#999" }}>Listas</Text>
           </View>
         </View>
       </View>
 
+      {/* Tabs */}
+      <View style={{
+        flexDirection: "row",
+        marginHorizontal: 16,
+        marginBottom: 16,
+        backgroundColor: "#1a1a1a",
+        borderRadius: 12,
+        padding: 4,
+        borderWidth: 1,
+        borderColor: "#333",
+      }}>
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            borderRadius: 8,
+            backgroundColor: activeTab === "accepted" ? "#d4af37" : "transparent",
+          }}
+          onPress={() => setActiveTab("accepted")}
+        >
+          <Text style={{
+            textAlign: "center",
+            fontWeight: "600",
+            fontSize: 14,
+            color: activeTab === "accepted" ? "#000" : "#999",
+          }}>
+            Pendientes ({stats.accepted})
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            borderRadius: 8,
+            backgroundColor: activeTab === "preparing" ? "#d4af37" : "transparent",
+          }}
+          onPress={() => setActiveTab("preparing")}
+        >
+          <Text style={{
+            textAlign: "center",
+            fontWeight: "600",
+            fontSize: 14,
+            color: activeTab === "preparing" ? "#000" : "#999",
+          }}>
+            Preparando ({stats.preparing})
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            borderRadius: 8,
+            backgroundColor: activeTab === "ready" ? "#d4af37" : "transparent",
+          }}
+          onPress={() => setActiveTab("ready")}
+        >
+          <Text style={{
+            textAlign: "center",
+            fontWeight: "600",
+            fontSize: 14,
+            color: activeTab === "ready" ? "#000" : "#999",
+          }}>
+            Listas ({stats.ready})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Lista de items */}
       <FlatList
-        data={allItems}
+        data={filteredItems}
         keyExtractor={(item) => item.id}
         renderItem={renderOrderItem}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -293,10 +415,14 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
           <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 60 }}>
             <Wine size={64} color="#6b7280" />
             <Text style={{ fontSize: 20, fontWeight: "bold", color: "#ffffff", marginTop: 16, marginBottom: 8 }}>
-              No hay bebidas pendientes
+              {activeTab === "accepted" ? "No hay bebidas pendientes" :
+               activeTab === "preparing" ? "No hay bebidas preparándose" :
+               "No hay bebidas listas"}
             </Text>
             <Text style={{ fontSize: 16, color: "#999", textAlign: "center", lineHeight: 24 }}>
-              Las bebidas aparecerán aquí cuando los mozos las acepten
+              {activeTab === "accepted" ? "Las bebidas aparecerán aquí cuando los mozos las acepten" :
+               activeTab === "preparing" ? "Las bebidas en preparación aparecerán aquí" :
+               "Las bebidas terminadas aparecerán aquí"}
             </Text>
           </View>
         )}

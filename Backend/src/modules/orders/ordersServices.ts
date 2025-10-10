@@ -1534,12 +1534,12 @@ export async function replaceRejectedItems(
 
 // ============= FUNCIONES PARA COCINA =============
 
-// Obtener pedidos pendientes para cocina (items con category "plato" y status "accepted")
+// Obtener pedidos para cocina (items con category "plato" en estados activos)
 export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
   try {
-    console.log("👨‍🍳 Obteniendo pedidos pendientes para cocina...");
+    console.log("👨‍🍳 Obteniendo pedidos para cocina (todos los estados activos)...");
 
-    // Obtener todos los items aceptados que son platos
+    // Obtener todos los items activos que son platos
     const { data: kitchenItems, error: itemsError } = await supabaseAdmin
       .from("order_items")
       .select(`
@@ -1573,7 +1573,7 @@ export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
           users(id, first_name, last_name, profile_image)
         )
       `)
-      .eq("status", "accepted")
+      .in("status", ["accepted", "preparing", "ready"])
       .eq("menu_items.category", "plato")
       .order("created_at", { ascending: true });
 
@@ -1778,9 +1778,9 @@ export async function getTableOrdersStatus(
 // Obtener pedidos pendientes para bar (items con category "bebida" y status "accepted")
 export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
   try {
-    console.log("🍷 Obteniendo pedidos pendientes para bar...");
+    console.log("🍷 Obteniendo pedidos para bar (todos los estados activos)...");
 
-    // Obtener todos los items aceptados que son bebidas
+    // Obtener todos los items activos que son bebidas
     const { data: barItems, error: itemsError } = await supabaseAdmin
       .from("order_items")
       .select(`
@@ -1814,7 +1814,7 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
           users(id, first_name, last_name, profile_image)
         )
       `)
-      .eq("status", "accepted")
+      .in("status", ["accepted", "preparing", "ready"])
       .eq("menu_items.category", "bebida")
       .order("created_at", { ascending: true });
 
