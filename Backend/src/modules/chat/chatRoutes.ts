@@ -10,6 +10,9 @@ router.use(authenticateUser);
 // Obtener o crear chat por mesa
 router.get("/table/:tableId", ChatController.getOrCreateChat);
 
+// Enviar mensaje a una mesa
+router.post("/table/:tableId/message", ChatController.sendMessage);
+
 // Obtener mensajes de un chat
 router.get("/:chatId/messages", ChatController.getMessages);
 

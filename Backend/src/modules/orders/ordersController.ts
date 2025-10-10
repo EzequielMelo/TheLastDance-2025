@@ -16,8 +16,13 @@ import {
   waiterItemsActionNew,
   getWaiterPendingItems,
   replaceRejectedItems,
+  getKitchenPendingOrders,
+  updateKitchenItemStatus,
+  getBartenderPendingOrders,
+  updateBartenderItemStatus,
+  getTableOrdersStatus,
 } from "./ordersServices";
-import type { CreateOrderDTO } from "./orders.types";
+import type { CreateOrderDTO, OrderItemStatus } from "./orders.types";
 
 const createOrderSchema = z.object({
   table_id: z.string().uuid().optional(),
@@ -686,6 +691,283 @@ export async function replaceRejectedItemsHandler(
     console.error("❌ Error reemplazando items rechazados:", error);
     res.status(400).json({
       error: error.message || "Error al reemplazar items rechazados",
+    });
+  }
+}
+
+// ============= CONTROLADORES PARA COCINA =============
+
+// Obtener pedidos pendientes para cocina
+export async function getKitchenPendingOrdersHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Usuario no autenticado" });
+      return;
+    }
+
+    // Verificar que el usuario es cocinero
+    if (req.user.position_code !== "cocinero") {
+      res.status(403).json({ 
+        error: "Solo los cocineros pueden acceder a esta función" 
+      });
+      return;
+    }
+
+    console.log(`👨‍🍳 Obteniendo pedidos pendientes para cocinero ${req.user.appUserId}`);
+
+    const pendingOrders = await getKitchenPendingOrders();
+
+    res.json({
+      success: true,
+      data: pendingOrders,
+      message: `${pendingOrders.length} órdenes pendientes para cocina`,
+    });
+  } catch (error: any) {
+    console.error("❌ Error obteniendo pedidos para cocina:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error interno del servidor",
+      error: error.message || "Error desconocido",
+    });
+  }
+}
+
+// Actualizar status de item de cocina
+export async function updateKitchenItemStatusHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Usuario no autenticado" });
+      return;
+    }
+
+    // Verificar que el usuario es cocinero
+    if (req.user.position_code !== "cocinero") {
+      res.status(403).json({ 
+        error: "Solo los cocineros pueden actualizar items de cocina" 
+      });
+      return;
+    }
+
+    const { itemId } = req.params;
+    const { status } = req.body;
+
+    if (!itemId || !status) {
+      res.status(400).json({ 
+        error: "ID del item y status son requeridos" 
+      });
+      return;
+    }
+
+    // Validar status
+    const validStatuses: OrderItemStatus[] = ["preparing", "ready"];
+    if (!validStatuses.includes(status)) {
+      res.status(400).json({ 
+        error: "Status inválido. Use 'preparing' o 'ready'" 
+      });
+      return;
+    }
+
+    console.log(`👨‍🍳 Actualizando item ${itemId} a status ${status} por cocinero ${req.user.appUserId}`);
+
+    const result = await updateKitchenItemStatus(
+      itemId,
+      status,
+      req.user.appUserId
+    );
+
+    if (!result.success) {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error: any) {
+    console.error("❌ Error actualizando status de item:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error interno del servidor",
+      error: error.message || "Error desconocido",
+    });
+  }
+}
+
+// ============= CONTROLADORES PARA BAR =============
+
+// Obtener pedidos pendientes para bar (bebidas aceptadas)
+export async function getBartenderPendingOrdersHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    // Verificar autenticación
+    if (!req.user) {
+      res.status(401).json({ error: "No autenticado" });
+      return;
+    }
+
+    // Solo bartenders pueden acceder
+    if (req.user.position_code !== "bartender") {
+      res.status(403).json({
+        error: "Solo bartenders pueden acceder a esta función",
+      });
+      return;
+    }
+
+    console.log(`🍷 Obteniendo pedidos pendientes para bartender: ${req.user.appUserId}`);
+
+    const pendingOrders = await getBartenderPendingOrders();
+
+    res.json({
+      success: true,
+      data: pendingOrders,
+      message: `${pendingOrders.length} órdenes con bebidas encontradas`,
+    });
+  } catch (error: any) {
+    console.error("❌ Error obteniendo pedidos para bar:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error interno del servidor",
+      error: error.message || "Error desconocido",
+    });
+  }
+}
+
+// Actualizar status de items de bar
+export async function updateBartenderItemStatusHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    // Verificar autenticación
+    if (!req.user) {
+      res.status(401).json({ error: "No autenticado" });
+      return;
+    }
+
+    // Solo bartenders pueden acceder
+    if (req.user.position_code !== "bartender") {
+      res.status(403).json({
+        error: "Solo bartenders pueden actualizar items de bar",
+      });
+      return;
+    }
+
+    const { itemId } = req.params;
+    const { status } = req.body;
+
+    if (!itemId) {
+      res.status(400).json({ 
+        error: "ID del item es requerido" 
+      });
+      return;
+    }
+
+    if (!status || !["preparing", "ready"].includes(status)) {
+      res.status(400).json({ 
+        error: "Status inválido. Use 'preparing' o 'ready'" 
+      });
+      return;
+    }
+
+    console.log(`🍷 Actualizando item ${itemId} a status ${status} por bartender ${req.user.appUserId}`);
+
+    const result = await updateBartenderItemStatus(
+      itemId,
+      status,
+      req.user.appUserId
+    );
+
+    if (!result.success) {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error: any) {
+    console.error("❌ Error actualizando status de item de bar:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error interno del servidor",
+      error: error.message || "Error desconocido",
+    });
+  }
+}
+
+// Obtener estado de pedidos de una mesa (cliente escanea QR)
+export async function getTableOrdersStatusHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Usuario no autenticado" });
+      return;
+    }
+
+    const { tableId } = req.params;
+
+    if (!tableId) {
+      res.status(400).json({ 
+        error: "ID de mesa requerido" 
+      });
+      return;
+    }
+
+    console.log(`📱 Obteniendo estado de pedidos para mesa ${tableId} y usuario ${req.user.appUserId}`);
+
+    const orders = await getTableOrdersStatus(tableId, req.user.appUserId);
+
+    // Calcular estadísticas de los pedidos
+    const stats = {
+      totalOrders: orders.length,
+      totalItems: orders.reduce((sum, order) => sum + order.order_items.length, 0),
+      itemsByStatus: {
+        pending: 0,
+        accepted: 0,
+        rejected: 0,
+        preparing: 0,
+        ready: 0,
+        delivered: 0
+      }
+    };
+
+    orders.forEach(order => {
+      order.order_items.forEach(item => {
+        stats.itemsByStatus[item.status]++;
+      });
+    });
+
+    res.json({
+      success: true,
+      data: orders,
+      stats,
+      message: orders.length > 0 
+        ? `${orders.length} pedidos encontrados` 
+        : "No tienes pedidos en esta mesa",
+    });
+  } catch (error: any) {
+    console.error("❌ Error obteniendo estado de pedidos de mesa:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Error al obtener estado de pedidos",
     });
   }
 }

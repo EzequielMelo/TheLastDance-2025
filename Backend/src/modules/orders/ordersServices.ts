@@ -1095,3 +1095,428 @@ export async function replaceRejectedItems(
     throw error;
   }
 }
+
+// ============= FUNCIONES PARA COCINA =============
+
+// Obtener pedidos pendientes para cocina (items con category "plato" y status "accepted")
+export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
+  try {
+    console.log("👨‍🍳 Obteniendo pedidos pendientes para cocina...");
+
+    // Obtener todos los items aceptados que son platos
+    const { data: kitchenItems, error: itemsError } = await supabaseAdmin
+      .from("order_items")
+      .select(`
+        id,
+        order_id,
+        menu_item_id,
+        quantity,
+        unit_price,
+        subtotal,
+        status,
+        created_at,
+        menu_items!inner(
+          id,
+          name,
+          description,
+          prep_minutes,
+          price,
+          category
+        ),
+        orders!inner(
+          id,
+          user_id,
+          table_id,
+          total_amount,
+          estimated_time,
+          is_paid,
+          notes,
+          created_at,
+          updated_at,
+          tables(id, number),
+          users(id, first_name, last_name, profile_image)
+        )
+      `)
+      .eq("status", "accepted")
+      .eq("menu_items.category", "plato")
+      .order("created_at", { ascending: true });
+
+    if (itemsError) {
+      throw new Error(`Error obteniendo items de cocina: ${itemsError.message}`);
+    }
+
+    if (!kitchenItems || kitchenItems.length === 0) {
+      console.log("👨‍🍳 No hay items pendientes para cocina");
+      return [];
+    }
+
+    // Agrupar items por orden
+    const ordersMap = new Map<string, OrderWithItems>();
+
+    kitchenItems.forEach((item) => {
+      const order = (item as any).orders;
+      const menuItem = (item as any).menu_items;
+
+      if (!ordersMap.has(order.id)) {
+        ordersMap.set(order.id, {
+          ...order,
+          table: order.tables,
+          user: order.users,
+          order_items: []
+        });
+      }
+
+      const orderInMap = ordersMap.get(order.id)!;
+      orderInMap.order_items.push({
+        id: item.id,
+        order_id: item.order_id,
+        menu_item_id: item.menu_item_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        subtotal: item.subtotal,
+        status: item.status,
+        created_at: item.created_at,
+        menu_item: menuItem
+      });
+    });
+
+    const ordersArray = Array.from(ordersMap.values());
+    console.log(`👨‍🍳 Encontradas ${ordersArray.length} órdenes con items para cocina`);
+
+    return ordersArray;
+  } catch (error) {
+    console.error("❌ Error en getKitchenPendingOrders:", error);
+    throw error;
+  }
+}
+
+// Actualizar status de items de cocina
+export async function updateKitchenItemStatus(
+  itemId: string,
+  newStatus: OrderItemStatus,
+  cookId: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    console.log(`👨‍🍳 Actualizando item ${itemId} a status ${newStatus} por cocinero ${cookId}`);
+
+    // Validar que el nuevo status es válido para cocina
+    const validStatuses: OrderItemStatus[] = ["preparing", "ready"];
+    if (!validStatuses.includes(newStatus)) {
+      throw new Error(`Status inválido para cocina: ${newStatus}`);
+    }
+
+    // Verificar que el item existe y es un plato
+    const { data: item, error: itemError } = await supabaseAdmin
+      .from("order_items")
+      .select(`
+        id,
+        status,
+        menu_items!inner(category)
+      `)
+      .eq("id", itemId)
+      .single();
+
+    if (itemError || !item) {
+      throw new Error("Item no encontrado");
+    }
+
+    if ((item.menu_items as any).category !== "plato") {
+      throw new Error("Este item no corresponde a cocina");
+    }
+
+    if (item.status !== "accepted" && item.status !== "preparing") {
+      throw new Error(`No se puede cambiar el status desde ${item.status}`);
+    }
+
+    // Actualizar el status
+    const { error: updateError } = await supabaseAdmin
+      .from("order_items")
+      .update({
+        status: newStatus,
+      })
+      .eq("id", itemId);
+
+    if (updateError) {
+      throw new Error(`Error actualizando status: ${updateError.message}`);
+    }
+
+    console.log(`✅ Item ${itemId} actualizado a ${newStatus}`);
+
+    return {
+      success: true,
+      message: `Item actualizado a ${newStatus === "preparing" ? "preparando" : "listo"}`
+    };
+  } catch (error) {
+    console.error("❌ Error en updateKitchenItemStatus:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Error interno del servidor"
+    };
+  }
+}
+
+// Obtener estado de pedidos de una mesa específica (para cliente que escanea QR)
+export async function getTableOrdersStatus(
+  tableId: string,
+  userId: string
+): Promise<OrderWithItems[]> {
+  try {
+    console.log(`📱 Obteniendo estado de pedidos para mesa ${tableId} y usuario ${userId}`);
+
+    // Verificar que el usuario tiene acceso a esta mesa
+    const { data: tableData, error: tableError } = await supabaseAdmin
+      .from("tables")
+      .select("id_client")
+      .eq("id", tableId)
+      .eq("id_client", userId)
+      .single();
+
+    if (tableError || !tableData) {
+      throw new Error("No tienes acceso a esta mesa o la mesa no existe");
+    }
+
+    // Obtener todas las órdenes de la mesa del usuario
+    const { data: orders, error: ordersError } = await supabaseAdmin
+      .from("orders")
+      .select(`
+        id,
+        user_id,
+        table_id,
+        total_amount,
+        estimated_time,
+        is_paid,
+        notes,
+        created_at,
+        updated_at,
+        order_items(
+          id,
+          menu_item_id,
+          quantity,
+          unit_price,
+          subtotal,
+          status,
+          created_at,
+          menu_items(
+            id,
+            name,
+            description,
+            prep_minutes,
+            price,
+            category
+          )
+        ),
+        tables(id, number),
+        users(id, first_name, last_name, profile_image)
+      `)
+      .eq("table_id", tableId)
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (ordersError) {
+      throw new Error(`Error obteniendo pedidos: ${ordersError.message}`);
+    }
+
+    console.log(`📱 Encontradas ${orders?.length || 0} órdenes para la mesa`);
+
+    // Mapear los datos para que coincidan con el tipo OrderWithItems
+    const mappedOrders: OrderWithItems[] = (orders || []).map((order: any) => ({
+      ...order,
+      table: order.tables?.[0] || null,
+      user: order.users?.[0] || null,
+      order_items: order.order_items.map((item: any) => ({
+        ...item,
+        order_id: order.id,
+        menu_item: item.menu_items?.[0] || null
+      }))
+    }));
+
+    return mappedOrders;
+  } catch (error) {
+    console.error("❌ Error en getTableOrdersStatus:", error);
+    throw error;
+  }
+}
+
+// ============= FUNCIONES PARA BAR =============
+
+// Obtener pedidos pendientes para bar (items con category "bebida" y status "accepted")
+export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
+  try {
+    console.log("🍷 Obteniendo pedidos pendientes para bar...");
+
+    // Obtener todos los items aceptados que son bebidas
+    const { data: barItems, error: itemsError } = await supabaseAdmin
+      .from("order_items")
+      .select(`
+        id,
+        order_id,
+        menu_item_id,
+        quantity,
+        unit_price,
+        subtotal,
+        status,
+        created_at,
+        menu_items!inner(
+          id,
+          name,
+          description,
+          prep_minutes,
+          price,
+          category
+        ),
+        orders!inner(
+          id,
+          user_id,
+          table_id,
+          total_amount,
+          estimated_time,
+          is_paid,
+          notes,
+          created_at,
+          updated_at,
+          tables(id, number),
+          users(id, first_name, last_name, profile_image)
+        )
+      `)
+      .eq("status", "accepted")
+      .eq("menu_items.category", "bebida")
+      .order("created_at", { ascending: true });
+
+    if (itemsError) {
+      throw new Error(`Error obteniendo items de bar: ${itemsError.message}`);
+    }
+
+    if (!barItems || barItems.length === 0) {
+      console.log("🍷 No hay items pendientes para bar");
+      return [];
+    }
+
+    // Agrupar items por orden
+    const ordersMap = new Map<string, OrderWithItems>();
+
+    barItems.forEach((item) => {
+      const order = (item as any).orders;
+      const menuItem = (item as any).menu_items;
+
+      console.log("🍷 Procesando item de bar:", {
+        itemId: item.id,
+        orderId: order?.id,
+        menuItemName: menuItem?.name,
+        orderHasTables: !!order?.tables,
+        orderHasUsers: !!order?.users
+      });
+
+      if (!ordersMap.has(order.id)) {
+        ordersMap.set(order.id, {
+          ...order,
+          table: order.tables,
+          user: order.users,
+          order_items: []
+        });
+      }
+
+      const orderInMap = ordersMap.get(order.id)!;
+      orderInMap.order_items.push({
+        id: item.id,
+        order_id: item.order_id,
+        menu_item_id: item.menu_item_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        subtotal: item.subtotal,
+        status: item.status,
+        created_at: item.created_at,
+        menu_item: menuItem
+      });
+    });
+
+    const ordersArray = Array.from(ordersMap.values());
+    console.log(`🍷 Encontradas ${ordersArray.length} órdenes con items para bar`);
+    console.log("🍷 Estructura de primera orden:", JSON.stringify(ordersArray[0], null, 2));
+
+    return ordersArray;
+  } catch (error) {
+    console.error("❌ Error en getBartenderPendingOrders:", error);
+    throw error;
+  }
+}
+
+// Actualizar status de items de bar
+export async function updateBartenderItemStatus(
+  itemId: string,
+  newStatus: OrderItemStatus,
+  bartenderId: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    console.log(`🍷 Actualizando item ${itemId} a status ${newStatus} por bartender ${bartenderId}`);
+
+    // Validar que el nuevo status es válido para bar
+    const validStatuses: OrderItemStatus[] = ["preparing", "ready"];
+    if (!validStatuses.includes(newStatus)) {
+      throw new Error(`Status inválido para bar: ${newStatus}`);
+    }
+
+    // Verificar que el item existe y es una bebida
+    const { data: item, error: itemError } = await supabaseAdmin
+      .from("order_items")
+      .select(`
+        id,
+        status,
+        menu_items!inner(category)
+      `)
+      .eq("id", itemId)
+      .single();
+
+    if (itemError || !item) {
+      throw new Error(`Item no encontrado: ${itemError?.message || "Item inexistente"}`);
+    }
+
+    // Verificar que es una bebida
+    if ((item as any).menu_items.category !== "bebida") {
+      throw new Error("Este item no es una bebida");
+    }
+
+    // Verificar que el status actual permite la transición
+    const currentStatus = item.status as OrderItemStatus;
+    const validTransitions: Record<OrderItemStatus, OrderItemStatus[]> = {
+      pending: [],
+      accepted: ["preparing"],
+      rejected: [],
+      preparing: ["ready"],
+      ready: ["delivered"],
+      delivered: []
+    };
+
+    if (!validTransitions[currentStatus]?.includes(newStatus)) {
+      throw new Error(`No se puede cambiar de ${currentStatus} a ${newStatus}`);
+    }
+
+    // Actualizar status
+    const { error: updateError } = await supabaseAdmin
+      .from("order_items")
+      .update({
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", itemId);
+
+    if (updateError) {
+      throw new Error(`Error actualizando status: ${updateError.message}`);
+    }
+
+    const statusMessages: Record<"preparing" | "ready", string> = {
+      preparing: "Bebida marcada como en preparación",
+      ready: "Bebida marcada como lista"
+    };
+
+    console.log(`✅ ${statusMessages[newStatus as "preparing" | "ready"]} - Item: ${itemId}`);
+
+    return {
+      success: true,
+      message: statusMessages[newStatus as "preparing" | "ready"]
+    };
+
+  } catch (error) {
+    console.error("❌ Error en updateBartenderItemStatus:", error);
+    throw error;
+  }
+}

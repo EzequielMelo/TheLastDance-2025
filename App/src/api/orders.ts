@@ -192,3 +192,110 @@ export const replaceRejectedItems = async (
     );
   }
 };
+
+// ============= API PARA COCINA =============
+
+// Obtener pedidos pendientes para cocina
+export const getKitchenPendingOrders = async (): Promise<Order[]> => {
+  try {
+    const response = await api.get("/orders/kitchen/pending");
+    return response.data.data || [];
+  } catch (error: any) {
+    console.error("Error obteniendo pedidos para cocina:", error);
+    throw new Error(
+      error.response?.data?.error || "Error obteniendo pedidos para cocina",
+    );
+  }
+};
+
+// Actualizar status de item de cocina
+export const updateKitchenItemStatus = async (
+  itemId: string,
+  status: "preparing" | "ready",
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    const response = await api.put(`/orders/kitchen/item/${itemId}/status`, {
+      status,
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error("Error actualizando status de item:", error);
+    throw new Error(
+      error.response?.data?.error || "Error actualizando status de item",
+    );
+  }
+};
+
+// Obtener estado de pedidos de una mesa (cliente escanea QR)
+export const getTableOrdersStatus = async (tableId: string): Promise<{
+  orders: Order[];
+  stats: {
+    totalOrders: number;
+    totalItems: number;
+    itemsByStatus: {
+      pending: number;
+      accepted: number;
+      rejected: number;
+      preparing: number;
+      ready: number;
+      delivered: number;
+    };
+  };
+}> => {
+  try {
+    const response = await api.get(`/orders/table/${tableId}/status`);
+    return {
+      orders: response.data.data || [],
+      stats: response.data.stats || {
+        totalOrders: 0,
+        totalItems: 0,
+        itemsByStatus: {
+          pending: 0,
+          accepted: 0,
+          rejected: 0,
+          preparing: 0,
+          ready: 0,
+          delivered: 0,
+        },
+      },
+    };
+  } catch (error: any) {
+    console.error("Error obteniendo estado de pedidos de mesa:", error);
+    throw new Error(
+      error.response?.data?.error || "Error obteniendo estado de pedidos",
+    );
+  }
+};
+
+// ============= API PARA BAR =============
+
+// Obtener pedidos pendientes para bar
+export const getBartenderPendingOrders = async (): Promise<Order[]> => {
+  try {
+    const response = await api.get("/orders/bar/pending");
+    return response.data.data || [];
+  } catch (error: any) {
+    console.error("Error obteniendo pedidos para bar:", error);
+    throw new Error(
+      error.response?.data?.error || "Error obteniendo pedidos para bar",
+    );
+  }
+};
+
+// Actualizar status de item de bar
+export const updateBartenderItemStatus = async (
+  itemId: string,
+  status: "preparing" | "ready",
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    const response = await api.put(`/orders/bar/item/${itemId}/status`, {
+      status,
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error("Error actualizando status de item de bar:", error);
+    throw new Error(
+      error.response?.data?.error || "Error actualizando status de item de bar",
+    );
+  }
+};

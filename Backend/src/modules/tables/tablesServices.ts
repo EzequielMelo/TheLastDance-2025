@@ -155,6 +155,8 @@ export async function getClientPosition(clientId: string): Promise<{
   estimatedWait?: number;
   entry: WaitingListEntry;
 }> {
+  console.log('📍 getClientPosition - Calculando posición para cliente:', clientId);
+  
   const { data: clientEntry } = await supabaseAdmin
     .from("waiting_list")
     .select("*")
@@ -162,7 +164,10 @@ export async function getClientPosition(clientId: string): Promise<{
     .eq("status", "waiting")
     .single();
 
+  console.log('📍 getClientPosition - Entrada del cliente:', clientEntry);
+
   if (!clientEntry) {
+    console.log('📍 getClientPosition - Cliente no encontrado en waiting_list');
     throw new Error("Cliente no encontrado en la lista de espera");
   }
 
@@ -175,6 +180,7 @@ export async function getClientPosition(clientId: string): Promise<{
     );
 
   const position = (count || 0) + 1;
+  console.log('📍 getClientPosition - Posición calculada:', position);
 
   // Estimar tiempo de espera basado en promedio del día
   const { data: avgData } = await supabaseAdmin
@@ -199,6 +205,8 @@ export async function getClientPosition(clientId: string): Promise<{
 
     estimatedWait = Math.round((avgWaitTime / (1000 * 60)) * position); // minutos * posición
   }
+
+  console.log('📍 getClientPosition - Tiempo estimado:', estimatedWait);
 
   return {
     position,

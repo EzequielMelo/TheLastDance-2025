@@ -14,6 +14,11 @@ import {
   waiterItemsActionHandler,
   getWaiterPendingItemsHandler,
   replaceRejectedItemsHandler,
+  getKitchenPendingOrdersHandler,
+  updateKitchenItemStatusHandler,
+  getBartenderPendingOrdersHandler,
+  updateBartenderItemStatusHandler,
+  getTableOrdersStatusHandler,
 } from "./ordersController";
 
 const router = express.Router();
@@ -49,6 +54,23 @@ router.get("/:orderId", getOrderHandler);
 
 // Obtener pedidos de una mesa específica
 router.get("/table/:tableId", getTableOrdersHandler);
+
+// Obtener estado de pedidos de una mesa (cliente escanea QR)
+router.get("/table/:tableId/status", getTableOrdersStatusHandler);
+
+// ============= RUTAS PARA COCINA =============
+// Obtener pedidos pendientes para cocina (solo cocineros)
+router.get("/kitchen/pending", getKitchenPendingOrdersHandler);
+
+// Actualizar status de item de cocina
+router.put("/kitchen/item/:itemId/status", updateKitchenItemStatusHandler);
+
+// ============= RUTAS PARA BAR =============
+// Obtener pedidos pendientes para bar (solo bartenders)
+router.get("/bar/pending", getBartenderPendingOrdersHandler);
+
+// Actualizar status de item de bar
+router.put("/bar/item/:itemId/status", updateBartenderItemStatusHandler);
 
 // RUTA OBSOLETA - Eliminada con el nuevo sistema de estados por item
 // Los estados ahora se manejan únicamente a nivel de item individual

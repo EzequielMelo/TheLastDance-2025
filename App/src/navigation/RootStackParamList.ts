@@ -21,6 +21,8 @@ export type RootStackParamList = {
   WaiterOrders: undefined; // Gestión de órdenes del mesero
   AllWaiters: undefined; // Gestión de meseros (admin/supervisor)
   TableChat: { tableId: string }; // Chat entre cliente y mesero
+  KitchenDashboard: undefined; // Panel de cocina para cocineros
+  BartenderDashboard: undefined; // Panel de bar para bartenders
 };
 
 export type RootStackNavigationProp = StackNavigationProp<RootStackParamList>;

@@ -245,3 +245,178 @@ export async function updateUserPushToken(userId: string, pushToken: string) {
     throw error;
   }
 }
+
+// ========== NUEVAS FUNCIONES PARA WAITING LIST Y MESAS ==========
+
+// Función para obtener tokens de maîtres
+async function getMaitreTokens(): Promise<string[]> {
+  try {
+    const { data: users, error } = await supabaseAdmin
+      .from('users')
+      .select('push_token')
+      .eq('profile_code', 'empleado')
+      .eq('position', 'maitre')
+      .eq('state', 'aprobado')
+      .not('push_token', 'is', null);
+
+    if (error) {
+      console.error('Error fetching maitre tokens:', error);
+      return [];
+    }
+
+    return users
+      .map(user => user.push_token)
+      .filter(token => token && token.trim() !== '');
+  } catch (error) {
+    console.error('Error in getMaitreTokens:', error);
+    return [];
+  }
+}
+
+// Función para obtener tokens de mozos
+async function getWaiterTokens(): Promise<string[]> {
+  try {
+    const { data: users, error } = await supabaseAdmin
+      .from('users')
+      .select('push_token')
+      .eq('profile_code', 'empleado')
+      .eq('position', 'mozo')
+      .eq('state', 'aprobado')
+      .not('push_token', 'is', null);
+
+    if (error) {
+      console.error('Error fetching waiter tokens:', error);
+      return [];
+    }
+
+    return users
+      .map(user => user.push_token)
+      .filter(token => token && token.trim() !== '');
+  } catch (error) {
+    console.error('Error in getWaiterTokens:', error);
+    return [];
+  }
+}
+
+// Función para obtener token de un cliente específico
+async function getClientToken(clientId: string): Promise<string | null> {
+  try {
+    const { data: user, error } = await supabaseAdmin
+      .from('users')
+      .select('push_token')
+      .eq('id', clientId)
+      .eq('state', 'aprobado')
+      .not('push_token', 'is', null)
+      .single();
+
+    if (error || !user) {
+      console.log('Cliente no encontrado o sin push token:', clientId);
+      return null;
+    }
+
+    return user.push_token && user.push_token.trim() !== '' ? user.push_token : null;
+  } catch (error) {
+    console.error('Error in getClientToken:', error);
+    return null;
+  }
+}
+
+// Función para notificar al maître cuando un cliente se une a la lista de espera
+export async function notifyMaitreNewWaitingClient(clientName: string, partySize: number, tableType?: string) {
+  try {
+    console.log(`📋 Notificando al maître: nuevo cliente en lista de espera - ${clientName}`);
+    
+    const tokens = await getMaitreTokens();
+    
+    if (tokens.length === 0) {
+      console.log('No hay maîtres con push tokens para notificar');
+      return;
+    }
+
+    console.log(`Enviando notificación a ${tokens.length} maîtres`);
+
+    const notificationData: PushNotificationData = {
+      title: 'Nuevo cliente en lista de espera',
+      body: `${clientName} (${partySize} personas) se unió a la lista${tableType ? ` - Prefiere: ${tableType}` : ''}`,
+      data: {
+        type: 'new_waiting_client',
+        clientName,
+        partySize,
+        tableType,
+        screen: 'ManageWaitingList'
+      },
+    };
+
+    await sendExpoPushNotification(tokens, notificationData);
+    console.log('✅ Notificación enviada al maître exitosamente');
+  } catch (error) {
+    console.error('❌ Error al enviar notificación al maître:', error);
+  }
+}
+
+// Función para notificar al cliente cuando se le asigna una mesa
+export async function notifyClientTableAssigned(clientId: string, tableNumber: string) {
+  try {
+    console.log(`🏷️ Notificando al cliente: mesa asignada - Mesa #${tableNumber}`);
+    
+    const token = await getClientToken(clientId);
+    
+    if (!token) {
+      console.log('Cliente no tiene push token para notificar');
+      return;
+    }
+
+    console.log(`Enviando notificación de mesa asignada al cliente: ${clientId}`);
+
+    const notificationData: PushNotificationData = {
+      title: '¡Tu mesa está lista!',
+      body: `Se te ha asignado la mesa #${tableNumber}. Ve al restaurante y escanea el código QR para confirmar tu llegada.`,
+      data: {
+        type: 'table_assigned',
+        tableNumber,
+        screen: 'ScanTableQR'
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+    console.log('✅ Notificación de mesa asignada enviada exitosamente');
+  } catch (error) {
+    console.error('❌ Error al enviar notificación de mesa asignada:', error);
+  }
+}
+
+// Función para notificar a todos los mozos sobre una nueva consulta de cliente (solo el primer mensaje)
+export async function notifyWaitersNewClientMessage(clientName: string, tableNumber: string, message: string) {
+  try {
+    console.log(`💬 Notificando a mozos: nueva consulta de cliente - Mesa #${tableNumber}`);
+    
+    const tokens = await getWaiterTokens();
+    
+    if (tokens.length === 0) {
+      console.log('No hay mozos con push tokens para notificar');
+      return;
+    }
+
+    console.log(`Enviando notificación a ${tokens.length} mozos`);
+
+    // Truncar mensaje si es muy largo
+    const truncatedMessage = message.length > 50 ? message.substring(0, 47) + '...' : message;
+
+    const notificationData: PushNotificationData = {
+      title: `Consulta - Mesa #${tableNumber}`,
+      body: `${clientName}: ${truncatedMessage}`,
+      data: {
+        type: 'client_message',
+        tableNumber,
+        clientName,
+        message,
+        screen: 'TableChat'
+      },
+    };
+
+    await sendExpoPushNotification(tokens, notificationData);
+    console.log('✅ Notificación de consulta enviada a mozos exitosamente');
+  } catch (error) {
+    console.error('❌ Error al enviar notificación de consulta a mozos:', error);
+  }
+}
