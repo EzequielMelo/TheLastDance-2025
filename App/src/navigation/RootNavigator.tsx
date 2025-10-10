@@ -112,7 +112,7 @@ function NavigatorContent() {
           <Stack.Screen
             name="MyWaitingPosition"
             component={MyWaitingPositionScreen}
-            options={{ title: "Mi Posición", headerBackTitle: "Volver" }}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="Menu"

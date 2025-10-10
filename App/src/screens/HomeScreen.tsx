@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState, useContext, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,26 +6,49 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   ToastAndroid,
+  Modal,
+  FlatList,
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
 import { AuthContext } from "../auth/AuthContext";
+import { useFocusEffect } from "@react-navigation/native";
 import api from "../api/axios";
-import { Menu, User as UserIcon, Users, QrCode, UtensilsCrossed, Wine } from "lucide-react-native";
+import { Menu, User as UserIcon, Users, QrCode, UtensilsCrossed, Wine, BookOpen } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User";
 import ClientFlowNavigation from "../components/navigation/ClientFlowNavigation";
 import Sidebar from "../components/navigation/Sidebar";
 import CartModal from "../components/cart/CartModal";
+import ActionCard from "../components/common/ActionCard";
+import { getDishesForKitchen, getDrinksForBar, MenuItem } from "../services/menuService";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
-export default function HomeScreen({ navigation }: Props) {
+export default function HomeScreen({ navigation, route }: Props) {
   const { token, logout } = useContext(AuthContext);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [cartModalVisible, setCartModalVisible] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [menuType, setMenuType] = useState<"platos" | "bebidas">("platos");
+  // Estado para el status en la lista de espera
+  const [waitingListStatus, setWaitingListStatus] = useState<string | null>(null);
+
+  // Función para verificar el estado en la lista de espera
+  const checkWaitingListStatus = useCallback(async () => {
+    if (!token || !user) return;
+    
+    try {
+      const response = await api.get("/tables/my-status");
+      setWaitingListStatus(response.data.status);
+    } catch (error) {
+      // Si hay error, asumimos que no está en la lista
+      setWaitingListStatus("not_in_queue");
+    }
+  }, [token, user]);
 
   // Cargar perfil desde backend (usa el Authorization del interceptor)
   useEffect(() => {
@@ -47,6 +70,15 @@ export default function HomeScreen({ navigation }: Props) {
     };
   }, [token]);
 
+  // Escuchar parámetros de navegación para refrescar cuando sea necesario
+  useEffect(() => {
+    if (route.params?.refresh && user && token) {
+      setTimeout(() => {
+        checkWaitingListStatus();
+      }, 300);
+    }
+  }, [route.params?.refresh, user, token, checkWaitingListStatus]);
+
   const handleNavigate = (screenName: string, params?: any) => {
     navigation.navigate(screenName as any, params);
   };
@@ -57,6 +89,30 @@ export default function HomeScreen({ navigation }: Props) {
 
   const handleOpenCart = () => {
     setCartModalVisible(true);
+  };
+
+  const loadDishesMenu = async () => {
+    try {
+      const dishes = await getDishesForKitchen();
+      setMenuItems(dishes);
+      setMenuType("platos");
+      setShowMenu(true);
+    } catch (error) {
+      console.error("Error loading dishes:", error);
+      ToastAndroid.show("Error al cargar el menú de platos", ToastAndroid.SHORT);
+    }
+  };
+
+  const loadDrinksMenu = async () => {
+    try {
+      const drinks = await getDrinksForBar();
+      setMenuItems(drinks);
+      setMenuType("bebidas");
+      setShowMenu(true);
+    } catch (error) {
+      console.error("Error loading drinks:", error);
+      ToastAndroid.show("Error al cargar el menú de bebidas", ToastAndroid.SHORT);
+    }
   };
 
   const isCliente =
@@ -206,62 +262,29 @@ export default function HomeScreen({ navigation }: Props) {
           ) : user?.position_code === "cocinero" ? (
             <View>
               {/* Panel de acceso rápido para cocinero */}
-              <TouchableOpacity
+              <ActionCard
+                title="🍳 Panel de Cocina"
+                description="Ver pedidos pendientes y actualizar el estado de preparación"
+                icon={UtensilsCrossed}
+                variant="primary"
                 onPress={() => handleNavigate("KitchenDashboard")}
-                style={{
-                  backgroundColor: "rgba(212, 175, 55, 0.15)",
-                  borderRadius: 16,
-                  padding: 20,
-                  marginBottom: 16,
-                  borderWidth: 1,
-                  borderColor: "rgba(212, 175, 55, 0.3)",
-                }}
-              >
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: "#d4af37", fontSize: 18, fontWeight: "700", marginBottom: 4 }}>
-                      🍳 Panel de Cocina
-                    </Text>
-                    <Text style={{ color: "white", fontSize: 14, lineHeight: 20 }}>
-                      Ver pedidos pendientes y actualizar el estado de preparación
-                    </Text>
-                  </View>
-                  <View style={{
-                    backgroundColor: "rgba(212, 175, 55, 0.2)",
-                    borderRadius: 12,
-                    padding: 12,
-                    marginLeft: 16,
-                  }}>
-                    <UtensilsCrossed size={24} color="#d4af37" />
-                  </View>
-                </View>
-              </TouchableOpacity>
+              />
 
               {/* Acceso a crear platos */}
-              <TouchableOpacity
+              <ActionCard
+                title="Agregar plato al menú"
+                description="Crear nuevos platos para el restaurante"
+                icon={QrCode}
                 onPress={() => handleNavigate("CreateMenuItem", { initialCategory: "plato" })}
-                style={{
-                  backgroundColor: "rgba(255, 255, 255, 0.05)",
-                  borderRadius: 12,
-                  padding: 16,
-                  borderWidth: 1,
-                  borderColor: "rgba(255, 255, 255, 0.1)",
-                }}
-              >
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: "white", fontSize: 16, fontWeight: "600", marginBottom: 2 }}>
-                      Agregar plato al menú
-                    </Text>
-                    <Text style={{ color: "#9ca3af", fontSize: 12 }}>
-                      Crear nuevos platos para el restaurante
-                    </Text>
-                  </View>
-                  <View style={{ marginLeft: 16 }}>
-                    <QrCode size={20} color="#9ca3af" />
-                  </View>
-                </View>
-              </TouchableOpacity>
+              />
+
+              {/* Ver menú de platos */}
+              <ActionCard
+                title="Ver menú de platos"
+                description="Consultar todos los platos del menú"
+                icon={BookOpen}
+                onPress={loadDishesMenu}
+              />
 
               {/* Info adicional para cocineros */}
               <View style={{
@@ -283,62 +306,32 @@ export default function HomeScreen({ navigation }: Props) {
           ) : user?.position_code === "bartender" ? (
             <View>
               {/* Panel de acceso rápido para bartender */}
-              <TouchableOpacity
+              <ActionCard
+                title="🍷 Panel de Bar"
+                description="Ver bebidas pendientes y actualizar el estado de preparación"
+                icon={Wine}
+                variant="primary"
                 onPress={() => handleNavigate("BartenderDashboard")}
-                style={{
-                  backgroundColor: "rgba(212, 175, 55, 0.15)",
-                  borderRadius: 16,
-                  padding: 20,
-                  marginBottom: 16,
-                  borderWidth: 1,
-                  borderColor: "rgba(212, 175, 55, 0.3)",
-                }}
-              >
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: "#d4af37", fontSize: 18, fontWeight: "700", marginBottom: 4 }}>
-                      🍷 Panel de Bar
-                    </Text>
-                    <Text style={{ color: "white", fontSize: 14, lineHeight: 20 }}>
-                      Ver bebidas pendientes y actualizar el estado de preparación
-                    </Text>
-                  </View>
-                  <View style={{
-                    backgroundColor: "rgba(212, 175, 55, 0.2)",
-                    borderRadius: 12,
-                    padding: 12,
-                    marginLeft: 16,
-                  }}>
-                    <Wine size={24} color="#d4af37" />
-                  </View>
-                </View>
-              </TouchableOpacity>
+              />
 
               {/* Acceso a crear bebidas */}
-              <TouchableOpacity
+              <ActionCard
+                variant="secondary"
+                title="Agregar bebida al menú"
+                description="Crear nuevas bebidas para el restaurante"
+                icon={QrCode}
                 onPress={() => handleNavigate("CreateMenuItem", { initialCategory: "bebida" })}
-                style={{
-                  backgroundColor: "rgba(255, 255, 255, 0.05)",
-                  borderRadius: 12,
-                  padding: 16,
-                  borderWidth: 1,
-                  borderColor: "rgba(255, 255, 255, 0.1)",
-                }}
-              >
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: "white", fontSize: 16, fontWeight: "600", marginBottom: 2 }}>
-                      Agregar bebida al menú
-                    </Text>
-                    <Text style={{ color: "#9ca3af", fontSize: 12 }}>
-                      Crear nuevas bebidas para el restaurante
-                    </Text>
-                  </View>
-                  <View style={{ marginLeft: 16 }}>
-                    <QrCode size={20} color="#9ca3af" />
-                  </View>
-                </View>
-              </TouchableOpacity>
+                style={{ marginBottom: 12 }}
+              />
+
+              {/* Ver menú de bebidas */}
+              <ActionCard
+                variant="secondary"
+                title="Ver menú de bebidas"
+                description="Consultar todas las bebidas del menú"
+                icon={BookOpen}
+                onPress={loadDrinksMenu}
+              />
 
               {/* Info adicional para bartenders */}
               <View style={{
@@ -378,6 +371,126 @@ export default function HomeScreen({ navigation }: Props) {
         visible={cartModalVisible}
         onClose={() => setCartModalVisible(false)}
       />
+
+      {/* Modal del Menú */}
+      <Modal
+        visible={showMenu}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.8)",
+          justifyContent: "center",
+          alignItems: "center",
+        }}>
+          <View style={{
+            width: "90%",
+            maxHeight: "80%",
+            backgroundColor: "#1a1a1a",
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: "#333",
+          }}>
+            {/* Header del Modal */}
+            <View style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: 20,
+              borderBottomWidth: 1,
+              borderBottomColor: "#333",
+            }}>
+              <Text style={{
+                fontSize: 20,
+                fontWeight: "bold",
+                color: "#ffffff",
+              }}>
+                Menú de {menuType === "platos" ? "Platos" : "Bebidas"}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowMenu(false)}
+                style={{
+                  padding: 8,
+                  borderRadius: 8,
+                  backgroundColor: "#333",
+                }}
+              >
+                <Text style={{ color: "#ffffff", fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Lista del Menú */}
+            <FlatList
+              data={menuItems}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <View style={{
+                  padding: 16,
+                  borderBottomWidth: 1,
+                  borderBottomColor: "#333",
+                }}>
+                  <Text style={{
+                    fontSize: 16,
+                    fontWeight: "600",
+                    color: "#ffffff",
+                    marginBottom: 4,
+                  }}>
+                    {item.name}
+                  </Text>
+                  <Text style={{
+                    fontSize: 14,
+                    color: "#999",
+                    marginBottom: 8,
+                  }}>
+                    {item.description}
+                  </Text>
+                  <View style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}>
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: "bold",
+                      color: "#d4af37",
+                    }}>
+                      ${item.price}
+                    </Text>
+                    <Text style={{
+                      fontSize: 12,
+                      color: "#666",
+                      backgroundColor: "#333",
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 4,
+                    }}>
+                      {item.category}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              style={{ maxHeight: 400 }}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={() => (
+                <View style={{ 
+                  padding: 40, 
+                  alignItems: "center" 
+                }}>
+                  <Text style={{ 
+                    color: "#999", 
+                    fontSize: 16,
+                    textAlign: "center" 
+                  }}>
+                    No hay {menuType} disponibles en el menú
+                  </Text>
+                </View>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </LinearGradient>
   );
 }

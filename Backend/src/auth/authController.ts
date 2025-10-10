@@ -171,8 +171,6 @@ export const checkTokenValidity: RequestHandler = async (req, res) => {
 
 export const updatePushToken: RequestHandler = async (req, res) => {
   try {
-    console.log("📱 Received updatePushToken request");
-
     const authHeader = req.headers.authorization || "";
     if (!authHeader.startsWith("Bearer ")) {
       console.log("❌ No bearer token provided");
@@ -185,7 +183,6 @@ export const updatePushToken: RequestHandler = async (req, res) => {
 
     // Verificar si es un token anónimo o normal
     if (token.startsWith("anon_")) {
-      console.log("🔍 Processing anonymous token");
       const parts = token.split("_");
       if (parts.length >= 3 && parts[1]) {
         // Verificar expiración solo para tokens no permanentes
@@ -206,7 +203,6 @@ export const updatePushToken: RequestHandler = async (req, res) => {
         }
 
         userId = parts[1];
-        console.log("✅ Anonymous user ID extracted:", userId);
       } else {
         console.log("❌ Invalid anonymous token format");
         res.status(401).json({ error: "Token anónimo inválido." });
@@ -214,7 +210,6 @@ export const updatePushToken: RequestHandler = async (req, res) => {
       }
     } else {
       // Token normal de Supabase Auth
-      console.log("🔍 Processing Supabase auth token");
       const authUser = await authService.verifyToken(token);
       if (!authUser.id) {
         console.log("❌ No user ID found in token");
@@ -222,11 +217,9 @@ export const updatePushToken: RequestHandler = async (req, res) => {
         return;
       }
       userId = authUser.id;
-      console.log("✅ Supabase user ID extracted:", userId);
     }
 
     const { pushToken } = req.body;
-    console.log("📱 Push token received:", pushToken);
 
     if (!pushToken) {
       console.log("❌ No push token provided in request body");
@@ -235,9 +228,7 @@ export const updatePushToken: RequestHandler = async (req, res) => {
     }
 
     // Actualizar el push token usando el servicio
-    console.log("🔄 Updating push token for user:", userId);
     await updateUserPushToken(userId, pushToken);
-    console.log("✅ Push token updated successfully");
 
     res.status(200).json({ message: "Push token actualizado exitosamente" });
   } catch (error) {
@@ -248,8 +239,6 @@ export const updatePushToken: RequestHandler = async (req, res) => {
 
 export const refreshToken: RequestHandler = async (req, res) => {
   try {
-    console.log("🔄 Received refresh token request");
-
     const { refresh_token } = req.body;
 
     if (!refresh_token) {
@@ -258,10 +247,7 @@ export const refreshToken: RequestHandler = async (req, res) => {
       return;
     }
 
-    console.log("🔍 Processing refresh token request");
     const result = await authService.refreshToken(refresh_token);
-
-    console.log("✅ Token refreshed successfully");
     res.status(200).json(result);
   } catch (error) {
     console.error("❌ Error en refreshToken:", error);

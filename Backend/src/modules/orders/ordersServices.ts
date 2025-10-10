@@ -136,8 +136,6 @@ export async function getOrderById(orderId: string): Promise<OrderWithItems> {
 
 // Obtener pedidos del usuario
 export async function getUserOrders(userId: string): Promise<OrderWithItems[]> {
-  console.log(`🔍 Getting orders for user: ${userId}`);
-
   const { data, error } = await supabaseAdmin
     .from("orders")
     .select(
@@ -166,11 +164,6 @@ export async function getUserOrders(userId: string): Promise<OrderWithItems[]> {
   if (error) {
     console.error(`❌ Error getting user orders:`, error);
     throw new Error(`Error obteniendo pedidos del usuario: ${error.message}`);
-  }
-
-  console.log(`✅ Found ${data?.length || 0} orders for user ${userId}`);
-  if (data && data.length > 0) {
-    console.log(`📄 First order structure:`, JSON.stringify(data[0], null, 2));
   }
 
   return (data as OrderWithItems[]) || [];

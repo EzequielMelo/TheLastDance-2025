@@ -408,12 +408,6 @@ export async function getMyStatusHandler(req: Request, res: Response) {
     }
 
     const clientId = req.user.appUserId;
-    const isAnonymous = req.user.profile_code === "cliente_anonimo";
-    console.log("🔍 getMyStatusHandler - Cliente ID:", clientId);
-    console.log("🔍 getMyStatusHandler - Usuario:", req.user.profile_code);
-    if (isAnonymous) {
-      console.log("🔍 getMyStatusHandler - Usuario anónimo detectado:", clientId);
-    }
 
     // 1. Verificar mesa ocupada
     const { data: occupiedTable, error: occupiedError } = await supabaseAdmin
@@ -423,14 +417,11 @@ export async function getMyStatusHandler(req: Request, res: Response) {
       .eq("is_occupied", true)
       .maybeSingle();
 
-    console.log("🔍 getMyStatusHandler - Mesa ocupada:", occupiedTable, occupiedError?.message);
-
     if (occupiedTable && !occupiedError) {
       const result = {
         status: "seated",
         table: occupiedTable,
       };
-      console.log("🔍 getMyStatusHandler - Retornando seated:", result);
       return res.json(result);
     }
 
@@ -442,14 +433,11 @@ export async function getMyStatusHandler(req: Request, res: Response) {
       .eq("is_occupied", false)
       .maybeSingle();
 
-    console.log("🔍 getMyStatusHandler - Mesa asignada:", assignedTable, assignedError?.message);
-
     if (assignedTable && !assignedError) {
       const result = {
         status: "assigned",
         table: assignedTable,
       };
-      console.log("🔍 getMyStatusHandler - Retornando assigned:", result);
       return res.json(result);
     }
 
@@ -462,27 +450,16 @@ export async function getMyStatusHandler(req: Request, res: Response) {
       .limit(1)
       .maybeSingle();
 
-    console.log("🔍 getMyStatusHandler - Entrada en waiting_list:", waitingEntry, waitingError?.message);
-    if (isAnonymous) {
-      console.log("🔍 getMyStatusHandler - Búsqueda waiting_list para anónimo:", {
-        client_id: clientId,
-        found: !!waitingEntry,
-        status: waitingEntry?.status
-      });
-    }
-
     if (waitingEntry && !waitingError) {
       if (waitingEntry.status === "displaced") {
         const result = {
           status: "displaced",
           waitingListId: waitingEntry.id,
         };
-        console.log("🔍 getMyStatusHandler - Retornando displaced:", result);
         return res.json(result);
       } else if (waitingEntry.status === "waiting") {
         // Calcular posición solo si está waiting
         try {
-          console.log("🔍 getMyStatusHandler - Calculando posición para cliente waiting");
           const positionData = await getClientPosition(clientId);
           const result = {
             status: "in_queue",
@@ -494,7 +471,6 @@ export async function getMyStatusHandler(req: Request, res: Response) {
             special_requests: waitingEntry.special_requests,
             entry: positionData.entry,
           };
-          console.log("🔍 getMyStatusHandler - Retornando in_queue:", result);
           return res.json(result);
         } catch (error) {
           console.error("🔍 getMyStatusHandler - Error calculando posición:", error);
@@ -506,7 +482,6 @@ export async function getMyStatusHandler(req: Request, res: Response) {
             preferred_table_type: waitingEntry.preferred_table_type,
             special_requests: waitingEntry.special_requests,
           };
-          console.log("🔍 getMyStatusHandler - Retornando in_queue (fallback):", result);
           return res.json(result);
         }
       }
@@ -516,7 +491,6 @@ export async function getMyStatusHandler(req: Request, res: Response) {
     const result = {
       status: "not_in_queue",
     };
-    console.log("🔍 getMyStatusHandler - Retornando not_in_queue:", result);
     return res.json(result);
   } catch (e: any) {
     console.error("Error obteniendo estado del cliente:", e.message);

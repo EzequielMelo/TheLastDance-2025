@@ -21,7 +21,6 @@ declare module "express-serve-static-core" {
 export const authenticateUser: RequestHandler = async (req, res, next) => {
   try {
     const hdr = (req.headers.authorization || "").trim();
-    console.log("AUTH HDR (first 30):", hdr.slice(0, 30)); // 🔍
 
     if (!hdr.startsWith("Bearer ")) {
       res.status(401).json({ error: "Token no proporcionado." });
@@ -29,7 +28,6 @@ export const authenticateUser: RequestHandler = async (req, res, next) => {
     }
 
     const token = hdr.slice(7).trim();
-    console.log("TOKEN LEN:", token.length);
 
     // Verificar si es un token anónimo
     if (token.startsWith("anon_")) {
@@ -57,7 +55,6 @@ export const authenticateUser: RequestHandler = async (req, res, next) => {
           position_code: profile.position_code,
         };
 
-        console.log("🔐 Auth middleware - Usuario anónimo autenticado:", req.user);
         next();
         return;
       }
@@ -92,7 +89,6 @@ export const authenticateUser: RequestHandler = async (req, res, next) => {
       position_code: profile.position_code,
     };
 
-    console.log("🔐 Auth middleware - Usuario registrado autenticado:", req.user);
     next();
     return;
   } catch (e) {

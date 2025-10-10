@@ -119,7 +119,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   // Función para convertir OrderItem a CartItem
   const orderItemToCartItem = (orderItem: any): CartItem => {
     try {
-      console.log("Converting orderItem to cartItem:", orderItem);
       return {
         id: orderItem.menu_item_id,
         name: orderItem.menu_item?.name || "Producto",
@@ -154,23 +153,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
   // FUNCIÓN REFACTORIZADA: Cargar pedidos desde la BD
   const loadOrdersFromDatabase = async () => {
-    console.log("🚀 Starting loadOrdersFromDatabase");
     if (!user) {
-      console.log("❌ No user, returning early");
       return;
     }
 
     try {
-      console.log("📡 Setting loading to true");
       setIsLoading(true);
 
-      console.log("📞 Calling getUserOrders API");
       const orders = await getUserOrders();
-      console.log("✅ getUserOrders completed");
-
-      console.log("Orders received from API:", orders);
-      console.log("Orders type:", typeof orders);
-      console.log("Orders is array:", Array.isArray(orders));
 
       // Debug detallado de items status
       if (orders && orders.length > 0) {
@@ -179,14 +169,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
             console.warn(`Order ${index} (${order.id}) has no order_items`);
             return;
           }
-          console.log(
-            `Order ${index} items status:`,
-            order.order_items.map((item: any) => ({
-              id: item.id,
-              status: item.status,
-              name: item.menu_item?.name,
-            })),
-          );
         });
       }
 
@@ -203,8 +185,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         setRejectedOrderItems([]);
         return;
       }
-
-      console.log("First order structure:", orders[0]);
 
       // Guardar todas las órdenes para mostrar estados
       setUserOrders(orders);
@@ -223,19 +203,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       setRejectedOrderItems([]);
 
       // Clasificar órdenes por el estado de sus items
-      console.log("🔍 Clasificando órdenes...");
-      console.log("📊 Total unpaid orders:", unpaidOrders.length);
-
       const ordersWithPendingItems = unpaidOrders.filter((order: Order) => {
         if (!order.order_items || !Array.isArray(order.order_items)) {
           return false;
         }
         return order.order_items.some(item => item.status === "pending");
       });
-      console.log(
-        "📋 Orders with PENDING items:",
-        ordersWithPendingItems.length,
-      );
 
       const ordersWithAcceptedItems = unpaidOrders.filter(
         (order: Order) =>
@@ -250,13 +223,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
               item.status === "needs_modification",
           ),
       );
-      console.log(
-        "✅ Orders with ACCEPTED items:",
-        ordersWithAcceptedItems.length,
-      );
 
       // Debug específico para la orden problemática
-      console.log("🔍 DEBUGGING ORDER CLASSIFICATION:");
       unpaidOrders.forEach((order: Order, index) => {
         if (order.order_items && Array.isArray(order.order_items)) {
           const hasPending = order.order_items.some(
@@ -271,28 +239,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
           const hasNeedsModification = order.order_items.some(
             item => item.status === "needs_modification",
           );
-
-          console.log(`Order ${index} (ID: ${order.id}):`, {
-            totalItems: order.order_items.length,
-            hasPending,
-            hasAccepted,
-            hasRejected,
-            hasNeedsModification,
-            statusCounts: {
-              pending: order.order_items.filter(
-                item => item.status === "pending",
-              ).length,
-              accepted: order.order_items.filter(
-                item => item.status === "accepted",
-              ).length,
-              rejected: order.order_items.filter(
-                item => item.status === "rejected",
-              ).length,
-              needs_modification: order.order_items.filter(
-                item => item.status === "needs_modification",
-              ).length,
-            },
-          });
         }
       });
 
@@ -319,16 +265,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         const isCompletelyRejected =
           (hasRejected || hasNeedsModification) && !hasAccepted && !hasPending;
 
-        if (isCompletelyRejected) {
-          console.log("🔄 Order completely rejected:", order.id);
-        }
-
         return isCompletelyRejected;
       });
-      console.log(
-        "❌ Orders with REJECTED items:",
-        ordersWithRejectedItems.length,
-      );
 
       const ordersWithPartialItems = unpaidOrders.filter((order: Order) => {
         if (!order.order_items || !Array.isArray(order.order_items))
@@ -347,20 +285,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         // Orden parcial: tiene accepted Y (rejected O needs_modification)
         const isPartial = hasAccepted && (hasRejected || hasNeedsModification);
 
-        if (isPartial) {
-          console.log("📋 Order is PARTIAL:", order.id, {
-            hasAccepted,
-            hasRejected,
-            hasNeedsModification,
-          });
-        }
-
         return isPartial;
       });
-      console.log(
-        "⚡ Orders with PARTIAL items:",
-        ordersWithPartialItems.length,
-      );
 
       // NUEVO: Manejar items pendientes
       if (ordersWithPendingItems.length > 0) {
@@ -369,24 +295,16 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         let allPendingItems: CartItem[] = [];
         try {
           ordersWithPendingItems.forEach((order: Order, orderIndex) => {
-            console.log(`Processing pending order ${orderIndex}:`, order);
             // Solo items pendientes de esta orden
             if (order.order_items && Array.isArray(order.order_items)) {
               try {
                 const filteredItems = order.order_items.filter(item => {
-                  console.log(`Filtering item:`, item);
                   return item && item.status === "pending";
                 });
 
-                console.log(`Filtered items:`, filteredItems);
-
                 const pendingItems = filteredItems.map((item, itemIndex) => {
-                  console.log(`Mapping item ${itemIndex}:`, item);
                   return orderItemToCartItem(item);
                 });
-
-                console.log(`Pending items to add:`, pendingItems);
-                console.log(`allPendingItems before push:`, allPendingItems);
 
                 if (
                   Array.isArray(pendingItems) &&
@@ -395,7 +313,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
                 ) {
                   try {
                     allPendingItems.push(...pendingItems);
-                    console.log("✅ Successfully pushed pending items");
                   } catch (pushError) {
                     console.error("❌ Error pushing pending items:", pushError);
                     // Fallback seguro
@@ -454,7 +371,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
                 ) {
                   try {
                     allAcceptedItems.push(...acceptedItems);
-                    console.log("✅ Successfully pushed accepted items");
                   } catch (pushError) {
                     console.error(
                       "❌ Error pushing accepted items:",
@@ -492,50 +408,27 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
       // NUEVO: Manejar pedidos parciales (aceptados + rechazados)
       if (ordersWithPartialItems.length > 0) {
-        console.log(
-          "🔥 PROCESSING PARTIAL ORDERS:",
-          ordersWithPartialItems.length,
-        );
         setHasPartialOrder(true);
 
         let allPartialItems: CartItem[] = [];
-        console.log("🔥 Initial allPartialItems:", allPartialItems);
 
         try {
           ordersWithPartialItems.forEach((order: Order, orderIndex) => {
-            console.log(`🔥 Processing partial order ${orderIndex}:`, order.id);
             // Solo items aceptados del pedido parcial
             if (order.order_items && Array.isArray(order.order_items)) {
-              console.log(`🔥 Order has ${order.order_items.length} items`);
               try {
                 const acceptedItems = order.order_items
                   .filter(item => item && item.status === "accepted")
                   .map(orderItemToCartItem)
                   .filter(cartItem => cartItem != null); // Filtrar items null/undefined
 
-                console.log(
-                  `🔥 Filtered ${acceptedItems.length} accepted items`,
-                );
-                console.log(
-                  `🔥 Before push - allPartialItems length:`,
-                  allPartialItems.length,
-                );
-
                 if (
                   Array.isArray(acceptedItems) &&
                   Array.isArray(allPartialItems) &&
                   acceptedItems.length > 0
                 ) {
-                  console.log(
-                    "🔥 About to push accepted items to allPartialItems",
-                  );
                   try {
                     allPartialItems.push(...acceptedItems);
-                    console.log(
-                      `🔥 After push - allPartialItems length:`,
-                      allPartialItems.length,
-                    );
-                    console.log("✅ Successfully pushed partial items");
                   } catch (pushError) {
                     console.error("❌ Error pushing partial items:", pushError);
                     // Fallback seguro
@@ -594,7 +487,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
                 ) {
                   try {
                     allRejectedItems.push(...rejectedItems);
-                    console.log("✅ Successfully pushed rejected items");
                   } catch (pushError) {
                     console.error(
                       "❌ Error pushing rejected items:",
@@ -732,7 +624,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       // Refrescar órdenes para obtener el estado actualizado
       await refreshOrders();
 
-      console.log("✅ Items enviados exitosamente al pedido parcial");
     } catch (error) {
       console.error("Error enviando items a pedido parcial:", error);
       throw error;
@@ -771,8 +662,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
       // Refrescar órdenes para obtener el estado actualizado
       await refreshOrders();
-
-      console.log("✅ Item agregado exitosamente a pedido aceptado");
     } catch (error) {
       console.error("Error agregando item a pedido aceptado:", error);
       throw error;
@@ -819,7 +708,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       // Refrescar órdenes para obtener el estado actualizado
       await refreshOrders();
 
-      console.log("✅ Items enviados exitosamente a pedido aceptado");
     } catch (error) {
       console.error("Error enviando items a pedido aceptado:", error);
       throw error;
