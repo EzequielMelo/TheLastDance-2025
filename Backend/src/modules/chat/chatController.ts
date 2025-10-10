@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { ChatServices } from "./chatServices";
 import { supabaseAdmin } from "../../config/supabase";
+import { notifyWaitersNewClientMessage } from "../../services/pushNotificationService";
 
 export class ChatController {
   // Obtener o crear chat para una mesa
@@ -147,6 +148,112 @@ export class ChatController {
       });
     } catch (error) {
       console.error("Error en getWaiterChats:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Error interno del servidor",
+      });
+    }
+  }
+
+  // Enviar mensaje
+  static async sendMessage(req: Request, res: Response): Promise<Response> {
+    try {
+      const { tableId } = req.params;
+      const { message } = req.body;
+      const userId = req.user?.appUserId;
+
+      if (!userId || !tableId || !message) {
+        return res.status(400).json({
+          success: false,
+          message: "Datos incompletos",
+        });
+      }
+
+      // Obtener información de la mesa
+      const { data: tableData, error: tableError } = await supabaseAdmin
+        .from("tables")
+        .select("id_client, id_waiter, number")
+        .eq("id", tableId)
+        .single();
+
+      if (tableError || !tableData.id_client || !tableData.id_waiter) {
+        return res.status(400).json({
+          success: false,
+          message: "Mesa no válida o sin cliente/mesero asignado",
+        });
+      }
+
+      // Verificar que el usuario es el cliente o el mesero de esta mesa
+      if (userId !== tableData.id_client && userId !== tableData.id_waiter) {
+        return res.status(403).json({
+          success: false,
+          message: "No tienes acceso a este chat",
+        });
+      }
+
+      // Determinar tipo de remitente
+      const senderType = userId === tableData.id_client ? 'client' : 'waiter';
+
+      // Obtener o crear el chat
+      const chat = await ChatServices.getOrCreateChat(
+        tableId,
+        tableData.id_client,
+        tableData.id_waiter,
+      );
+
+      // Verificar si es el primer mensaje del cliente para enviar notificación a mozos
+      const isFirstClientMessage = senderType === 'client';
+      
+      if (isFirstClientMessage) {
+        // Verificar si hay mensajes previos del cliente en este chat
+        const { data: previousMessages } = await supabaseAdmin
+          .from("messages")
+          .select("id")
+          .eq("chat_id", chat.id)
+          .eq("sender_type", "client")
+          .limit(1);
+
+        const isFirstMessage = !previousMessages || previousMessages.length === 0;
+
+        if (isFirstMessage) {
+          // Obtener nombre del cliente para la notificación
+          const { data: clientData } = await supabaseAdmin
+            .from("users")
+            .select("name")
+            .eq("id", tableData.id_client)
+            .single();
+
+          const clientName = clientData?.name || "Cliente";
+
+          // Enviar notificación a todos los mozos (solo el primer mensaje)
+          try {
+            await notifyWaitersNewClientMessage(
+              clientName,
+              tableData.number.toString(),
+              message
+            );
+          } catch (notifyError) {
+            console.error("Error enviando notificación a mozos:", notifyError);
+            // No bloqueamos el envío del mensaje por error de notificación
+          }
+        }
+      }
+
+      // Crear el mensaje
+      const newMessage = await ChatServices.createMessage(
+        chat.id,
+        userId,
+        senderType,
+        message
+      );
+
+      return res.json({
+        success: true,
+        data: newMessage,
+        message: "Mensaje enviado exitosamente",
+      });
+    } catch (error) {
+      console.error("Error en sendMessage:", error);
       return res.status(500).json({
         success: false,
         message: "Error interno del servidor",

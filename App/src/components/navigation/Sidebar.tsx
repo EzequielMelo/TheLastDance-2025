@@ -23,6 +23,7 @@ import {
   AlertCircle,
   MessageCircle,
   UtensilsCrossed,
+  Wine,
   ShoppingCart,
 } from "lucide-react-native";
 import { User } from "../../types/User";
@@ -152,6 +153,15 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
 
     // Cocinero
     {
+      id: "kitchen-dashboard",
+      title: "Panel de Cocina",
+      subtitle: "Ver pedidos pendientes para preparar",
+      icon: <UtensilsCrossed size={20} color="#374151" />,
+      onPress: () => onNavigate("KitchenDashboard"),
+      roles: ["empleado"],
+      positions: ["cocinero"],
+    },
+    {
       id: "add-plato",
       title: "Agregar plato",
       subtitle: "Publicá un nuevo plato en el menú",
@@ -162,6 +172,15 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
     },
 
     // Bartender
+    {
+      id: "bar-dashboard",
+      title: "Panel de Bar",
+      subtitle: "Ver bebidas pendientes para preparar",
+      icon: <Wine size={20} color="#374151" />,
+      onPress: () => onNavigate("BartenderDashboard"),
+      roles: ["empleado"],
+      positions: ["bartender"],
+    },
     {
       id: "add-bebida",
       title: "Agregar bebida",
@@ -187,7 +206,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
       id: "manage-waiting-list",
       title: "Gestionar Lista de Espera",
       subtitle: "Administrá las reservas y asignación de mesas",
-      icon: <Users size={20} color="#d4af37" />,
+      icon: <Users size={20} color="#374151" />,
       onPress: () => onNavigate("ManageWaitingList"),
       roles: ["empleado"],
       positions: ["maitre"],
@@ -196,7 +215,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
       id: "generate-qr",
       title: "Generar Código QR",
       subtitle: "Crear QR para que clientes se unan a la lista",
-      icon: <QrCode size={20} color="#d4af37" />,
+      icon: <QrCode size={20} color="#374151" />,
       onPress: () => onNavigate("GenerateWaitingListQR"),
       roles: ["empleado"],
       positions: ["maitre"],
@@ -266,7 +285,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
           id: "join-queue",
           title: "Unirse a Lista de Espera",
           subtitle: "Escanea el QR para reservar una mesa",
-          icon: <Users size={20} color="#d4af37" />,
+          icon: <Users size={20} color="#374151" />,
           onPress: () => onNavigate("ScanQR"),
           roles: ["cliente_registrado", "cliente_anonimo"],
         });
@@ -278,7 +297,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
             id: "view-position",
             title: "Ver Mi Posición",
             subtitle: `Posición actual: #${waitingPosition || "..."}`,
-            icon: <Clock size={20} color="#d4af37" />,
+            icon: <Clock size={20} color="#374151" />,
             onPress: () => onNavigate("MyWaitingPosition"),
             roles: ["cliente_registrado", "cliente_anonimo"],
           },
@@ -286,7 +305,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
             id: "refresh-queue",
             title: "Actualizar Estado",
             subtitle: "Verificar cambios en la lista",
-            icon: <RefreshCcw size={20} color="#d4af37" />,
+            icon: <RefreshCcw size={20} color="#374151" />,
             onPress: () => {
               refresh();
               onClose();
@@ -301,7 +320,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
           id: "confirm-table",
           title: "Confirmar Llegada",
           subtitle: `Mesa #${assignedTable?.number || "..."} asignada`,
-          icon: <QrCode size={20} color="#d4af37" />,
+          icon: <QrCode size={20} color="#374151" />,
           onPress: () => onNavigate("ScanTableQR"),
           roles: ["cliente_registrado", "cliente_anonimo"],
         });
@@ -313,7 +332,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
             id: "view-menu",
             title: "Ver Menú",
             subtitle: "Explora nuestra carta y haz tu pedido",
-            icon: <UtensilsCrossed size={20} color="#d4af37" />,
+            icon: <UtensilsCrossed size={20} color="#374151" />,
             onPress: () => onNavigate("Menu"),
             roles: ["cliente_registrado", "cliente_anonimo"],
           }
@@ -339,7 +358,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
             id: "view-cart",
             title: "Ver Mi Carrito",
             subtitle: cartSubtitle,
-            icon: <ShoppingCart size={20} color="#d4af37" />,
+            icon: <ShoppingCart size={20} color="#374151" />,
             onPress: () => {
               onOpenCart();
               onClose();
@@ -353,7 +372,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
             id: "table-chat",
             title: "Chat con Mesero",
             subtitle: `Mesa #${occupiedTable.number} - Comunícate con tu mesero`,
-            icon: <MessageCircle size={20} color="#d4af37" />,
+            icon: <MessageCircle size={20} color="#374151" />,
             onPress: () => onNavigate("TableChat", { tableId: occupiedTable.id }),
             roles: ["cliente_registrado", "cliente_anonimo"],
           });
@@ -366,7 +385,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
             id: "new-reservation",
             title: "Nueva Reserva",
             subtitle: "Tu mesa fue liberada, únete nuevamente",
-            icon: <Users size={20} color="#d4af37" />,
+            icon: <Users size={20} color="#374151" />,
             onPress: () => onNavigate("ScanQR"),
             roles: ["cliente_registrado", "cliente_anonimo"],
           },
@@ -374,7 +393,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
             id: "refresh-displaced",
             title: "Actualizar Estado",
             subtitle: "Verificar tu situación actual",
-            icon: <RefreshCcw size={20} color="#d4af37" />,
+            icon: <RefreshCcw size={20} color="#374151" />,
             onPress: () => {
               refresh();
               onClose();
@@ -409,7 +428,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
       switch (state) {
         case "loading":
           return {
-            icon: <RefreshCcw size={20} color="#d4af37" />,
+            icon: <RefreshCcw size={20} color="#374151" />,
             title: "Verificando estado...",
             subtitle: "Conectando con el servidor",
             color: "#d4af37"
@@ -423,7 +442,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
           };
         case "in_queue":
           return {
-            icon: <Clock size={20} color="#d4af37" />,
+            icon: <Clock size={20} color="#374151" />,
             title: `Posición #${waitingPosition || "..."}`,
             subtitle: "En lista de espera",
             color: "#d4af37"

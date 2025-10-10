@@ -15,6 +15,7 @@ import type {
   CreateWaitingListEntry,
   AssignTableRequest,
 } from "./tables.types";
+import { notifyMaitreNewWaitingClient, notifyClientTableAssigned } from "../../services/pushNotificationService";
 
 // ========== CONTROLADORES PARA LISTA DE ESPERA ==========
 
@@ -59,6 +60,27 @@ export async function addToWaitingListHandler(req: Request, res: Response) {
     }
 
     const result = await addToWaitingList(entryData);
+    
+    // Notificar al maître sobre el nuevo cliente en lista de espera
+    try {
+      // Obtener el nombre del cliente para la notificación
+      const { data: clientData } = await supabaseAdmin
+        .from("users")
+        .select("name")
+        .eq("id", entryData.client_id)
+        .single();
+      
+      const clientName = clientData?.name || "Cliente";
+      await notifyMaitreNewWaitingClient(
+        clientName, 
+        entryData.party_size, 
+        entryData.preferred_table_type
+      );
+    } catch (notifyError) {
+      console.error("Error enviando notificación al maître:", notifyError);
+      // No bloqueamos la respuesta por error de notificación
+    }
+    
     return res.status(201).json({
       message: "Agregado a la lista de espera exitosamente",
       data: result,
@@ -231,6 +253,29 @@ export async function assignTableHandler(req: Request, res: Response) {
       return res.status(400).json({ error: result.message });
     }
 
+    // Notificar al cliente sobre la mesa asignada
+    try {
+      // Obtener datos del cliente y la mesa para la notificación
+      const { data: waitingEntry } = await supabaseAdmin
+        .from("waiting_list")
+        .select("client_id")
+        .eq("id", assignData.waiting_list_id)
+        .single();
+
+      const { data: tableData } = await supabaseAdmin
+        .from("tables")
+        .select("number")
+        .eq("id", assignData.table_id)
+        .single();
+
+      if (waitingEntry && tableData) {
+        await notifyClientTableAssigned(waitingEntry.client_id, tableData.number.toString());
+      }
+    } catch (notifyError) {
+      console.error("Error enviando notificación al cliente:", notifyError);
+      // No bloqueamos la respuesta por error de notificación
+    }
+
     return res.json({ message: result.message });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
@@ -363,8 +408,12 @@ export async function getMyStatusHandler(req: Request, res: Response) {
     }
 
     const clientId = req.user.appUserId;
+    const isAnonymous = req.user.profile_code === "cliente_anonimo";
     console.log("🔍 getMyStatusHandler - Cliente ID:", clientId);
     console.log("🔍 getMyStatusHandler - Usuario:", req.user.profile_code);
+    if (isAnonymous) {
+      console.log("🔍 getMyStatusHandler - Usuario anónimo detectado:", clientId);
+    }
 
     // 1. Verificar mesa ocupada
     const { data: occupiedTable, error: occupiedError } = await supabaseAdmin
@@ -372,7 +421,7 @@ export async function getMyStatusHandler(req: Request, res: Response) {
       .select("id, number")
       .eq("id_client", clientId)
       .eq("is_occupied", true)
-      .single();
+      .maybeSingle();
 
     console.log("🔍 getMyStatusHandler - Mesa ocupada:", occupiedTable, occupiedError?.message);
 
@@ -391,7 +440,7 @@ export async function getMyStatusHandler(req: Request, res: Response) {
       .select("id, number")
       .eq("id_client", clientId)
       .eq("is_occupied", false)
-      .single();
+      .maybeSingle();
 
     console.log("🔍 getMyStatusHandler - Mesa asignada:", assignedTable, assignedError?.message);
 
@@ -411,9 +460,16 @@ export async function getMyStatusHandler(req: Request, res: Response) {
       .eq("client_id", clientId)
       .order("seated_at", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     console.log("🔍 getMyStatusHandler - Entrada en waiting_list:", waitingEntry, waitingError?.message);
+    if (isAnonymous) {
+      console.log("🔍 getMyStatusHandler - Búsqueda waiting_list para anónimo:", {
+        client_id: clientId,
+        found: !!waitingEntry,
+        status: waitingEntry?.status
+      });
+    }
 
     if (waitingEntry && !waitingError) {
       if (waitingEntry.status === "displaced") {

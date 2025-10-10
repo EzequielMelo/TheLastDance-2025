@@ -24,6 +24,8 @@ import WaiterDashboardScreen from "../screens/waiter-screens/WaiterDashboardScre
 import AllWaitersScreen from "../screens/admin-screens/AllWaitersScreen";
 import TableChatScreen from "../screens/chat/TableChatScreen";
 import WaiterOrdersScreen from "../components/orders/WaiterOrdersScreen";
+import KitchenDashboardScreen from "../screens/kitchen-screens/KitchenDashboardScreen";
+import BartenderDashboardScreen from "../screens/bar-screens/BartenderDashboardScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -135,6 +137,16 @@ function NavigatorContent() {
           <Stack.Screen
             name="TableChat"
             component={TableChatScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="KitchenDashboard"
+            component={KitchenDashboardScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="BartenderDashboard"
+            component={BartenderDashboardScreen}
             options={{ headerShown: false }}
           />
         </>

@@ -50,8 +50,8 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
     <li>[x] Listado de usuarios en estado pendiente desde usuario Dueño</li>
     <li>[x] Deploy del backend en Render</li>
     <li>[x] Sistema de Mesas y listas de espera</li>
-    <li>[ ] Chat cliente - mecero</li>
-    <li>[ ] Sistema de meceros - </li>
+    <li>[ ] Chat cliente - mesero</li>
+    <li>[ ] Sistema de meseros - </li>
   </ul>
 </details>
 

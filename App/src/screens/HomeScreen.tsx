@@ -11,7 +11,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
 import { AuthContext } from "../auth/AuthContext";
 import api from "../api/axios";
-import { Menu, User as UserIcon, Users, QrCode } from "lucide-react-native";
+import { Menu, User as UserIcon, Users, QrCode, UtensilsCrossed, Wine } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User";
 import ClientFlowNavigation from "../components/navigation/ClientFlowNavigation";
@@ -200,6 +200,160 @@ export default function HomeScreen({ navigation }: Props) {
                 </Text>
                 <Text style={{ color: "white", fontSize: 12, lineHeight: 16 }}>
                   También puedes acceder a estas funciones desde el menú lateral (☰) según tu estado actual
+                </Text>
+              </View>
+            </View>
+          ) : user?.position_code === "cocinero" ? (
+            <View>
+              {/* Panel de acceso rápido para cocinero */}
+              <TouchableOpacity
+                onPress={() => handleNavigate("KitchenDashboard")}
+                style={{
+                  backgroundColor: "rgba(212, 175, 55, 0.15)",
+                  borderRadius: 16,
+                  padding: 20,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: "rgba(212, 175, 55, 0.3)",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: "#d4af37", fontSize: 18, fontWeight: "700", marginBottom: 4 }}>
+                      🍳 Panel de Cocina
+                    </Text>
+                    <Text style={{ color: "white", fontSize: 14, lineHeight: 20 }}>
+                      Ver pedidos pendientes y actualizar el estado de preparación
+                    </Text>
+                  </View>
+                  <View style={{
+                    backgroundColor: "rgba(212, 175, 55, 0.2)",
+                    borderRadius: 12,
+                    padding: 12,
+                    marginLeft: 16,
+                  }}>
+                    <UtensilsCrossed size={24} color="#d4af37" />
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              {/* Acceso a crear platos */}
+              <TouchableOpacity
+                onPress={() => handleNavigate("CreateMenuItem", { initialCategory: "plato" })}
+                style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  borderRadius: 12,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: "rgba(255, 255, 255, 0.1)",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: "white", fontSize: 16, fontWeight: "600", marginBottom: 2 }}>
+                      Agregar plato al menú
+                    </Text>
+                    <Text style={{ color: "#9ca3af", fontSize: 12 }}>
+                      Crear nuevos platos para el restaurante
+                    </Text>
+                  </View>
+                  <View style={{ marginLeft: 16 }}>
+                    <QrCode size={20} color="#9ca3af" />
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              {/* Info adicional para cocineros */}
+              <View style={{
+                backgroundColor: "rgba(59, 130, 246, 0.1)",
+                borderRadius: 12,
+                padding: 16,
+                marginTop: 16,
+                borderWidth: 1,
+                borderColor: "rgba(59, 130, 246, 0.3)",
+              }}>
+                <Text style={{ color: "#3b82f6", fontSize: 14, fontWeight: "600", marginBottom: 4 }}>
+                  ℹ️ Información
+                </Text>
+                <Text style={{ color: "white", fontSize: 12, lineHeight: 16 }}>
+                  Los pedidos aparecen aquí cuando los mozos los aprueban. Solo verás productos de categoría "plato"
+                </Text>
+              </View>
+            </View>
+          ) : user?.position_code === "bartender" ? (
+            <View>
+              {/* Panel de acceso rápido para bartender */}
+              <TouchableOpacity
+                onPress={() => handleNavigate("BartenderDashboard")}
+                style={{
+                  backgroundColor: "rgba(212, 175, 55, 0.15)",
+                  borderRadius: 16,
+                  padding: 20,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: "rgba(212, 175, 55, 0.3)",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: "#d4af37", fontSize: 18, fontWeight: "700", marginBottom: 4 }}>
+                      🍷 Panel de Bar
+                    </Text>
+                    <Text style={{ color: "white", fontSize: 14, lineHeight: 20 }}>
+                      Ver bebidas pendientes y actualizar el estado de preparación
+                    </Text>
+                  </View>
+                  <View style={{
+                    backgroundColor: "rgba(212, 175, 55, 0.2)",
+                    borderRadius: 12,
+                    padding: 12,
+                    marginLeft: 16,
+                  }}>
+                    <Wine size={24} color="#d4af37" />
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              {/* Acceso a crear bebidas */}
+              <TouchableOpacity
+                onPress={() => handleNavigate("CreateMenuItem", { initialCategory: "bebida" })}
+                style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  borderRadius: 12,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: "rgba(255, 255, 255, 0.1)",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: "white", fontSize: 16, fontWeight: "600", marginBottom: 2 }}>
+                      Agregar bebida al menú
+                    </Text>
+                    <Text style={{ color: "#9ca3af", fontSize: 12 }}>
+                      Crear nuevas bebidas para el restaurante
+                    </Text>
+                  </View>
+                  <View style={{ marginLeft: 16 }}>
+                    <QrCode size={20} color="#9ca3af" />
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              {/* Info adicional para bartenders */}
+              <View style={{
+                backgroundColor: "rgba(59, 130, 246, 0.1)",
+                borderRadius: 12,
+                padding: 16,
+                marginTop: 16,
+                borderWidth: 1,
+                borderColor: "rgba(59, 130, 246, 0.3)",
+              }}>
+                <Text style={{ color: "#3b82f6", fontSize: 14, fontWeight: "600", marginBottom: 4 }}>
+                  ℹ️ Información
+                </Text>
+                <Text style={{ color: "white", fontSize: 12, lineHeight: 16 }}>
+                  Los pedidos aparecen aquí cuando los mozos los aprueban. Solo verás productos de categoría "bebida"
                 </Text>
               </View>
             </View>
