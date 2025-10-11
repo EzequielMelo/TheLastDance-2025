@@ -85,7 +85,26 @@ export async function createOrder(
     if (itemsError)
       throw new Error(`Error creando items del pedido: ${itemsError.message}`);
 
-    // 7. Obtener el pedido completo con items
+    // 7. Si hay table_id, resetear el table_status a 'pending'
+    if (orderData.table_id) {
+      console.log(`🔄 Reseteando table_status para mesa ${orderData.table_id} a 'pending'`);
+      
+      const { error: tableUpdateError } = await supabaseAdmin
+        .from("tables")
+        .update({
+          table_status: 'pending'
+        })
+        .eq("id", orderData.table_id);
+
+      if (tableUpdateError) {
+        console.warn("⚠️ Error actualizando table_status:", tableUpdateError.message);
+        // No falla el pedido por esto, solo es un warning
+      } else {
+        console.log(`✅ table_status reseteado a 'pending' para mesa ${orderData.table_id}`);
+      }
+    }
+
+    // 8. Obtener el pedido completo con items
     const fullOrder = await getOrderById(newOrder.id);
 
     console.log("✅ Pedido creado exitosamente:", newOrder.id);
@@ -1671,6 +1690,41 @@ export async function updateKitchenItemStatus(
 
     console.log(`✅ Item ${itemId} actualizado a ${newStatus}`);
 
+    // Si el item fue marcado como "ready", verificar si todos los items de la mesa están listos para delivery
+    if (newStatus === "ready") {
+      console.log(`🔍 Item marcado como ready, verificando si se debe actualizar mesa status...`);
+      
+      // Obtener información de la orden y mesa para este item
+      const { data: itemInfo, error: itemInfoError } = await supabaseAdmin
+        .from("order_items")
+        .select(`
+          orders!inner(
+            table_id,
+            user_id
+          )
+        `)
+        .eq("id", itemId)
+        .single();
+
+      if (!itemInfoError && itemInfo) {
+        const tableId = (itemInfo.orders as any).table_id;
+        const userId = (itemInfo.orders as any).user_id;
+        
+        if (tableId && userId) {
+          console.log(`🔄 Verificando delivery status para mesa ${tableId} y usuario ${userId}`);
+          
+          try {
+            // Usar la función existente para verificar y actualizar automáticamente
+            const deliveryCheck = await checkAllItemsDelivered(tableId, userId);
+            console.log(`📊 Resultado verificación entrega:`, deliveryCheck);
+          } catch (error) {
+            console.warn(`⚠️ Error verificando delivery status:`, error);
+            // No fallar la actualización del item por esto
+          }
+        }
+      }
+    }
+
     return {
       success: true,
       message: `Item actualizado a ${newStatus === "preparing" ? "preparando" : "listo"}`
@@ -1939,6 +1993,41 @@ export async function updateBartenderItemStatus(
 
     console.log(`✅ ${statusMessages[newStatus as "preparing" | "ready"]} - Item: ${itemId}`);
 
+    // Si el item fue marcado como "ready", verificar si todos los items de la mesa están listos para delivery
+    if (newStatus === "ready") {
+      console.log(`🔍 Bebida marcada como ready, verificando si se debe actualizar mesa status...`);
+      
+      // Obtener información de la orden y mesa para este item
+      const { data: itemInfo, error: itemInfoError } = await supabaseAdmin
+        .from("order_items")
+        .select(`
+          orders!inner(
+            table_id,
+            user_id
+          )
+        `)
+        .eq("id", itemId)
+        .single();
+
+      if (!itemInfoError && itemInfo) {
+        const tableId = (itemInfo.orders as any).table_id;
+        const userId = (itemInfo.orders as any).user_id;
+        
+        if (tableId && userId) {
+          console.log(`🔄 Verificando delivery status para mesa ${tableId} y usuario ${userId}`);
+          
+          try {
+            // Usar la función existente para verificar y actualizar automáticamente
+            const deliveryCheck = await checkAllItemsDelivered(tableId, userId);
+            console.log(`📊 Resultado verificación entrega:`, deliveryCheck);
+          } catch (error) {
+            console.warn(`⚠️ Error verificando delivery status:`, error);
+            // No fallar la actualización del item por esto
+          }
+        }
+      }
+    }
+
     return {
       success: true,
       message: statusMessages[newStatus as "preparing" | "ready"]
@@ -1946,6 +2035,113 @@ export async function updateBartenderItemStatus(
 
   } catch (error) {
     console.error("❌ Error en updateBartenderItemStatus:", error);
+    throw error;
+  }
+}
+
+// Verificar si todos los order_items de una mesa están en estado 'delivered'
+export async function checkAllItemsDelivered(
+  tableId: string,
+  userId: string
+): Promise<{
+  allDelivered: boolean;
+  totalItems: number;
+  deliveredItems: number;
+  pendingItems: Array<{
+    id: string;
+    name: string;
+    status: OrderItemStatus;
+  }>;
+}> {
+  try {
+
+    // Verificar que el usuario tiene acceso a esta mesa
+    const { data: tableData, error: tableError } = await supabaseAdmin
+      .from("tables")
+      .select("id_client")
+      .eq("id", tableId)
+      .eq("id_client", userId)
+      .single();
+
+    if (tableError || !tableData) {
+      throw new Error("No tienes acceso a esta mesa o la mesa no existe");
+    }
+
+    // Primero obtener todas las órdenes de esta mesa
+    const { data: orders, error: ordersError } = await supabaseAdmin
+      .from("orders")
+      .select("id")
+      .eq("table_id", tableId)
+      .eq("user_id", userId);
+
+    if (ordersError) {
+      throw new Error(`Error obteniendo órdenes: ${ordersError.message}`);
+    }
+
+    if (!orders || orders.length === 0) {
+      return {
+        allDelivered: true, // Si no hay órdenes, consideramos que todo está "entregado"
+        totalItems: 0,
+        deliveredItems: 0,
+        pendingItems: []
+      };
+    }
+
+    // Extraer los IDs de las órdenes
+    const orderIds = orders.map(order => order.id);
+
+    // Obtener todos los order_items de estas órdenes
+    const { data: orderItems, error: itemsError } = await supabaseAdmin
+      .from("order_items")
+      .select(`
+        id,
+        status,
+        menu_items(
+          id,
+          name
+        )
+      `)
+      .in('order_id', orderIds);
+
+    if (itemsError) {
+      throw new Error(`Error obteniendo items: ${itemsError.message}`);
+    }
+
+    if (!orderItems || orderItems.length === 0) {
+      return {
+        allDelivered: true, // Si no hay items, consideramos que todo está "entregado"
+        totalItems: 0,
+        deliveredItems: 0,
+        pendingItems: []
+      };
+    }
+
+    const deliveredItems = orderItems.filter(item => item.status === 'delivered');
+    const pendingItems = orderItems
+      .filter(item => item.status !== 'delivered')
+      .map(item => ({
+        id: item.id,
+        name: (item as any).menu_items?.name || 'Item desconocido',
+        status: item.status as OrderItemStatus
+      }));
+
+    const allDelivered = deliveredItems.length === orderItems.length;
+
+
+    // El table_status se mantiene en 'pending' hasta que el cliente escanee el QR
+    // Solo registramos en el log que todos están entregados, pero NO cambiamos el estado de la mesa automáticamente
+    if (allDelivered && orderItems.length > 0) {
+    }
+
+    return {
+      allDelivered,
+      totalItems: orderItems.length,
+      deliveredItems: deliveredItems.length,
+      pendingItems
+    };
+
+  } catch (error) {
+    console.error("❌ Error en checkAllItemsDelivered:", error);
     throw error;
   }
 }

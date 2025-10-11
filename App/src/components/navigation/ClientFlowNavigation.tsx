@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import {
@@ -9,8 +9,13 @@ import {
   MapPin,
   RefreshCcw,
   AlertCircle,
+  Package,
+  Gamepad2,
+  FileText,
+  Receipt,
 } from "lucide-react-native";
 import { useClientState, ClientState } from "../../Hooks/useClientState";
+import { confirmTableDelivery, checkTableDeliveryStatus } from "../../api/orders";
 import type { RootStackNavigationProp } from "../../navigation/RootStackParamList";
 
 interface ClientFlowNavigationProps {
@@ -20,14 +25,64 @@ interface ClientFlowNavigationProps {
 const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
   onRefresh,
 }) => {
-  const { state, waitingPosition, assignedTable, occupiedTable, refresh } =
+  const { state, waitingPosition, assignedTable, occupiedTable, deliveryConfirmationStatus, refresh } =
     useClientState();
   const navigation = useNavigation<RootStackNavigationProp>();
+  const [deliveryStatus, setDeliveryStatus] = useState<{
+    allDelivered: boolean;
+    totalItems: number;
+    deliveredItems: number;
+  } | null>(null);
+  const [checkingDelivery, setCheckingDelivery] = useState(false);
 
   const handleRefresh = async () => {
     await refresh();
     onRefresh?.();
   };
+
+  // Verificar estado de entrega cuando el usuario está sentado
+  useEffect(() => {
+    const checkDelivery = async () => {
+      if (state === "seated" && occupiedTable?.id && !checkingDelivery) {
+        console.log("🔍 Checking delivery status for table:", occupiedTable.id);
+        try {
+          setCheckingDelivery(true);
+          const status = await checkTableDeliveryStatus(occupiedTable.id);
+          console.log("📦 Delivery status received:", status);
+          setDeliveryStatus(status);
+        } catch (error) {
+          console.error("❌ Error checking delivery status:", error);
+          // No mostrar error al usuario, solo log
+        } finally {
+          setCheckingDelivery(false);
+        }
+      } else {
+        console.log("⏭️ Skipping delivery check:", { 
+          state, 
+          hasTable: !!occupiedTable?.id, 
+          checking: checkingDelivery 
+        });
+      }
+    };
+
+    checkDelivery();
+  }, [state, occupiedTable?.id]);
+
+  // Refresh delivery status cada 30 segundos si está sentado
+  useEffect(() => {
+    if (state === "seated" && occupiedTable?.id) {
+      const interval = setInterval(async () => {
+        try {
+          const status = await checkTableDeliveryStatus(occupiedTable.id);
+          setDeliveryStatus(status);
+        } catch (error) {
+          console.error("Error in delivery status refresh:", error);
+        }
+      }, 30000); // 30 segundos
+
+      return () => clearInterval(interval);
+    }
+  }, [state, occupiedTable?.id]);
 
   const renderStateContent = () => {
     switch (state) {
@@ -129,44 +184,186 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
         );
 
       case "seated":
+        
         return (
           <View className="items-center">
-            <CheckCircle size={64} color="#22c55e" />
-            <Text className="text-white text-xl font-bold mt-4 mb-2">
-              ¡Mesa Confirmada!
-            </Text>
-            <Text className="text-gray-300 text-center mb-2">
-              Estás sentado en la mesa
-            </Text>
-            <Text className="text-green-400 text-4xl font-bold mb-4">
-              #{occupiedTable?.number}
-            </Text>
-            <Text className="text-gray-300 text-center mb-6">
-              ¡Disfruta tu experiencia! Aquí puedes ver el menú y hacer tu
-              pedido.
-            </Text>
-            <View className="flex-row gap-4">
-              <TouchableOpacity
-                onPress={() => navigation.navigate("Menu")}
-                className="bg-yellow-600 px-6 py-3 rounded-lg"
-              >
-                <Text className="text-white font-semibold">Ver Menú</Text>
-              </TouchableOpacity>
-              {occupiedTable && (
+            {/* Si el table_status es 'bill_requested', mostrar solo botón para pagar cuenta */}
+            {deliveryConfirmationStatus === 'bill_requested' ? (
+              <>
+                <Receipt size={64} color="#f59e0b" />
+                <Text className="text-white text-xl font-bold mt-4 mb-2">
+                  Pagar la Cuenta
+                </Text>
+                <Text className="text-gray-300 text-center mb-2">
+                  Mesa {occupiedTable?.number}
+                </Text>
+                <Text className="text-amber-400 text-lg font-semibold mb-4">
+                  Lista para pagar
+                </Text>
+                <Text className="text-gray-300 text-center mb-6">
+                  Escanea el código QR de tu mesa para proceder con el pago o responde la encuesta de satisfacción.
+                </Text>
+                
+                {/* Botones para pagar cuenta y encuesta */}
+                <View className="flex-col gap-3 w-full items-center">
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate("ScanOrderQR")}
+                    className="bg-amber-600 px-8 py-4 rounded-lg flex-row items-center w-64"
+                  >
+                    <QrCode size={20} color="white" className="mr-2" />
+                    <Text className="text-white font-semibold text-lg ml-2">
+                      Escanear QR
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate("Survey")}
+                    className="bg-blue-600 px-8 py-4 rounded-lg flex-row items-center w-64"
+                  >
+                    <FileText size={20} color="white" className="mr-2" />
+                    <Text className="text-white font-semibold text-lg ml-2">
+                      Encuesta
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : /* Si el table_status es 'confirmed', mostrar acceso directo a juegos/encuestas */
+            deliveryConfirmationStatus === 'confirmed' ? (
+              <>
+                {console.log("🎉 Showing confirmed state - Acceso directo a opciones!")}
+                <CheckCircle size={64} color="#10b981" />
+                <Text className="text-white text-xl font-bold mt-4 mb-2">
+                  ¡Pedido Confirmado!
+                </Text>
+                <Text className="text-gray-300 text-center mb-2">
+                  Mesa {occupiedTable?.number}
+                </Text>
+                <Text className="text-green-400 text-lg font-semibold mb-4">
+                  Acceso completo desbloqueado
+                </Text>
+                <Text className="text-gray-300 text-center mb-6">
+                  ¡Perfecto! Ahora puedes acceder a todas las opciones disponibles.
+                </Text>
+                
+                {/* Botones para acceder a las opciones post-confirmación */}
+                <View className="flex-row gap-2 mb-4">
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate("Games")}
+                    className="bg-purple-600 px-6 py-3 rounded-lg flex-row items-center"
+                  >
+                    <Gamepad2 size={16} color="white" className="mr-1" />
+                    <Text className="text-white font-semibold">Juegos</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate("Survey")}
+                    className="bg-blue-600 px-6 py-3 rounded-lg flex-row items-center"
+                  >
+                    <FileText size={16} color="white" className="mr-1" />
+                    <Text className="text-white font-semibold">Encuesta</Text>
+                  </TouchableOpacity>
+                </View>
                 <TouchableOpacity
-                  onPress={() =>
-                    navigation.navigate("TableChat", {
-                      tableId: occupiedTable.id,
-                    })
-                  }
-                  className="bg-blue-600 px-6 py-3 rounded-lg"
+                  onPress={() => {
+                    if (occupiedTable) {
+                      navigation.navigate("TableChat", {
+                        tableId: occupiedTable.id,
+                        autoMessage: "Pedir la cuenta."
+                      });
+                    }
+                  }}
+                  className="bg-green-600 px-8 py-3 rounded-lg flex-row items-center mb-4"
                 >
-                  <Text className="text-white font-semibold">
-                    Chat con Mesero
-                  </Text>
+                  <Receipt size={16} color="white" className="mr-2" />
+                  <Text className="text-white font-semibold">Pedir la Cuenta</Text>
                 </TouchableOpacity>
-              )}
-            </View>
+              </>
+            ) : (
+              <>
+                {/* Si table_status es 'confirmed', NO mostrar "Pedido en Mesa" */}
+                {/* Si todos los items están 'delivered' pero aún no confirmado, mostrar botón de confirmación */}
+                {deliveryStatus?.allDelivered && deliveryStatus.totalItems > 0 && deliveryConfirmationStatus === 'pending' ? (
+                  <>
+                    {console.log("✅ Showing delivered state - Pedido en Mesa!")}
+                    <Package size={64} color="#22c55e" />
+                    <Text className="text-white text-xl font-bold mt-4 mb-2">
+                      ¡Pedido en Mesa!
+                    </Text>
+                    <Text className="text-gray-300 text-center mb-2">
+                      Mesa {occupiedTable?.number}
+                    </Text>
+                    <Text className="text-green-400 text-lg font-semibold mb-4">
+                      {deliveryStatus.totalItems} items entregados
+                    </Text>
+                    <Text className="text-gray-300 text-center mb-6">
+                      Tu pedido está completo. Confirma que has recibido todo para desbloquear juegos y encuestas.
+                    </Text>
+                    
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate("ScanOrderQR")}
+                      className="bg-green-600 px-8 py-4 rounded-lg flex-row items-center mb-4"
+                    >
+                      <QrCode size={20} color="white" className="mr-2" />
+                      <Text className="text-white font-semibold text-lg">
+                        Confirmar Recepción
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    {console.log("⚠️ Showing default seated view - Mesa Confirmada")}
+                    <CheckCircle size={64} color="#22c55e" />
+                    <Text className="text-white text-xl font-bold mt-4 mb-2">
+                      ¡Mesa Confirmada!
+                    </Text>
+                    <Text className="text-gray-300 text-center mb-2">
+                      Estás sentado en la mesa
+                    </Text>
+                    <Text className="text-green-400 text-4xl font-bold mb-4">
+                      #{occupiedTable?.number}
+                    </Text>
+                    
+                    {/* Mostrar estado de entrega si hay pedidos */}
+                    {deliveryStatus && deliveryStatus.totalItems > 0 ? (
+                      <View className="mb-4">
+                        <Text className="text-yellow-400 text-center mb-6">
+                          📦 {deliveryStatus.deliveredItems}/{deliveryStatus.totalItems} items entregados
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text className="text-gray-300 text-center mb-6">
+                        ¡Disfruta tu experiencia! Aquí puedes ver el menú y hacer tu pedido.
+                      </Text>
+                    )}
+                  </>
+                )}
+                
+                {/* Solo mostrar estos botones si NO está en estado bill_requested */}
+                <View className="flex-row gap-4">
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate("Menu")}
+                    className="bg-yellow-600 px-6 py-3 rounded-lg"
+                  >
+                    <Text className="text-white font-semibold">
+                      Ver Menú
+                    </Text>
+                  </TouchableOpacity>
+                  {occupiedTable && (
+                    <TouchableOpacity
+                      onPress={() =>
+                        navigation.navigate("TableChat", {
+                          tableId: occupiedTable.id,
+                        })
+                      }
+                      className="bg-blue-600 px-6 py-3 rounded-lg"
+                    >
+                      <Text className="text-white font-semibold">
+                        Chat con Mesero
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </>
+            )}
           </View>
         );
 

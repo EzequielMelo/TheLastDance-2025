@@ -280,6 +280,47 @@ export const getTableOrdersStatus = async (tableId: string): Promise<{
   }
 };
 
+// Verificar si todos los items de una mesa están entregados
+export const checkTableDeliveryStatus = async (tableId: string): Promise<{
+  allDelivered: boolean;
+  totalItems: number;
+  deliveredItems: number;
+  pendingItems: Array<{
+    id: string;
+    name: string;
+    status: string;
+  }>;
+}> => {
+  try {
+    const response = await api.get(`/orders/table/${tableId}/delivery-status`);
+    return response.data.data;
+  } catch (error: any) {
+    console.error("❌ API: Error verificando estado de entrega:", error);
+    throw new Error(
+      error.response?.data?.message || "Error verificando estado de entrega",
+    );
+  }
+};
+
+// Confirmar que se ha recibido el pedido completo (persistente)
+export const confirmTableDelivery = async (tableId: string): Promise<{
+  success: boolean;
+  message: string;
+  table?: any;
+}> => {
+  try {
+    console.log("✅ API: Confirming delivery for table:", tableId);
+    const response = await api.post(`/tables/${tableId}/confirm-delivery`);
+    console.log("📦 API: Confirm delivery response:", response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error("❌ API: Error confirmando entrega:", error);
+    throw new Error(
+      error.response?.data?.error || "Error confirmando entrega",
+    );
+  }
+};
+
 // ============= API PARA BAR =============
 
 // Obtener pedidos pendientes para bar

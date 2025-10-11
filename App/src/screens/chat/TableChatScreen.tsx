@@ -25,12 +25,13 @@ export default function TableChatScreen() {
   const route = useRoute<TableChatRouteProp>();
   const navigation = useNavigation();
   const { user } = useAuth();
-  const { tableId } = route.params;
+  const { tableId, autoMessage } = route.params;
 
   const [inputMessage, setInputMessage] = useState("");
   const [userJoinedMessage, setUserJoinedMessage] = useState<string | null>(
     null,
   );
+  const [autoMessageSent, setAutoMessageSent] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   const {
@@ -76,6 +77,17 @@ export default function TableChatScreen() {
 
     return unsubscribe;
   }, [navigation, markAsRead]);
+
+  // Enviar mensaje automático si se proporciona
+  useEffect(() => {
+    if (autoMessage && !autoMessageSent && isConnected && !isLoading) {
+      console.log("🤖 Enviando mensaje automático:", autoMessage);
+      const success = sendMessage(autoMessage);
+      if (success) {
+        setAutoMessageSent(true);
+      }
+    }
+  }, [autoMessage, autoMessageSent, isConnected, isLoading, sendMessage]);
 
   const handleSendMessage = () => {
     if (!inputMessage.trim()) return;

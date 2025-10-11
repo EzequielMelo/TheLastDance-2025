@@ -165,7 +165,16 @@ export const setupSocketIO = (httpServer: HttpServer) => {
         try {
           const { chatId, message, tableId } = data;
 
+          console.log("🔍 Datos recibidos para enviar mensaje:", {
+            chatId,
+            message: message.substring(0, 50),
+            tableId,
+            userId: user.appUserId,
+            userName: `${user.first_name} ${user.last_name}`,
+          });
+
           if (!message.trim()) {
+            console.log("❌ Mensaje vacío rechazado");
             socket.emit("error", {
               message: "El mensaje no puede estar vacío",
             });
@@ -179,13 +188,39 @@ export const setupSocketIO = (httpServer: HttpServer) => {
               ? ("client" as const)
               : ("waiter" as const);
 
+          console.log("👤 Tipo de usuario emisor:", senderType);
+
+          // Verificar que el chat existe
+          const { data: chatExists, error: chatError } = await supabaseAdmin
+            .from("chats")
+            .select("id, table_id, is_active")
+            .eq("id", chatId)
+            .single();
+
+          if (chatError) {
+            console.error("❌ Error verificando chat:", chatError);
+            socket.emit("error", { message: "Chat no encontrado" });
+            return;
+          }
+
+          if (!chatExists.is_active) {
+            console.log("❌ Chat inactivo");
+            socket.emit("error", { message: "Chat no está activo" });
+            return;
+          }
+
+          console.log("✅ Chat verificado:", chatExists);
+
           // Guardar mensaje en base de datos
+          console.log("💾 Intentando guardar mensaje en BD...");
           const newMessage = await ChatServices.createMessage(
             chatId,
             user.appUserId,
             senderType,
             message.trim(),
           );
+
+          console.log("✅ Mensaje guardado en BD:", newMessage.id);
 
           // Enviar mensaje a todos en la sala
           const messageData = {
@@ -201,6 +236,7 @@ export const setupSocketIO = (httpServer: HttpServer) => {
 
           // Emitir a la sala completa
           const roomName = `mesa_${tableId}`;
+          console.log("📡 Emitiendo mensaje a sala:", roomName);
           io.to(roomName).emit("new_message", messageData);
 
           // También confirmar al remitente
@@ -218,7 +254,8 @@ export const setupSocketIO = (httpServer: HttpServer) => {
             `💬 Contenido: "${message.trim().substring(0, 50)}${message.trim().length > 50 ? "..." : ""}"`,
           );
         } catch (error) {
-          console.error("Error al enviar mensaje:", error);
+          console.error("💥 Error completo al enviar mensaje:", error);
+          console.error("Stack trace:", error instanceof Error ? error.stack : "Sin stack");
           socket.emit("error", { message: "Error al enviar mensaje" });
         }
       },

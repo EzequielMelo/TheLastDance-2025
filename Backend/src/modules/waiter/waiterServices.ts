@@ -218,3 +218,101 @@ export async function canUnassignTable(tableId: string): Promise<boolean> {
   // Solo se puede desasignar si no está ocupada y no tiene cliente asignado
   return !table.is_occupied && !table.id_client;
 }
+
+// Marcar items como entregados (para meseros)
+export async function markItemsAsDelivered(
+  itemIds: string[],
+  waiterId: string
+): Promise<{ success: boolean; message: string; checkedTables: string[] }> {
+  try {
+    console.log(`📦 Mozo ${waiterId} marcando items como entregados:`, itemIds);
+
+    if (!itemIds || itemIds.length === 0) {
+      throw new Error("Se requiere al menos un item");
+    }
+
+    // Verificar que todos los items están en estado 'ready'
+    const { data: items, error: itemsError } = await supabaseAdmin
+      .from("order_items")
+      .select(`
+        id,
+        status,
+        orders!inner(
+          table_id,
+          user_id
+        )
+      `)
+      .in("id", itemIds)
+      .eq("status", "ready");
+
+    if (itemsError) {
+      throw new Error(`Error verificando items: ${itemsError.message}`);
+    }
+
+    if (!items || items.length !== itemIds.length) {
+      throw new Error("Algunos items no están listos para entrega o no existen");
+    }
+
+    // Actualizar todos los items a 'delivered'
+    const { error: updateError } = await supabaseAdmin
+      .from("order_items")
+      .update({
+        status: "delivered",
+        updated_at: new Date().toISOString()
+      })
+      .in("id", itemIds);
+
+    if (updateError) {
+      throw new Error(`Error actualizando items: ${updateError.message}`);
+    }
+
+    console.log(`✅ Items marcados como entregados:`, itemIds);
+
+    // Obtener las mesas únicas afectadas y verificar su estado de entrega
+    const uniqueTables = new Map<string, { tableId: string; userId: string }>();
+    
+    items.forEach(item => {
+      const orders = item.orders as any;
+      if (orders.table_id && orders.user_id) {
+        uniqueTables.set(orders.table_id, {
+          tableId: orders.table_id,
+          userId: orders.user_id
+        });
+      }
+    });
+
+    const checkedTables: string[] = [];
+
+    // Verificar cada mesa para actualizar su table_status si es necesario
+    for (const [, {tableId, userId}] of uniqueTables) {
+      try {
+        console.log(`🔍 Verificando entrega completa para mesa ${tableId} y usuario ${userId}`);
+        
+        // Importar aquí para evitar dependencias circulares
+        const { checkAllItemsDelivered } = await import("../orders/ordersServices");
+        const deliveryCheck = await checkAllItemsDelivered(tableId, userId);
+        
+        console.log(`📊 Resultado verificación mesa ${tableId}:`, deliveryCheck);
+        checkedTables.push(tableId);
+        
+      } catch (error) {
+        console.warn(`⚠️ Error verificando mesa ${tableId}:`, error);
+        // No fallar la operación completa por esto
+      }
+    }
+
+    return {
+      success: true,
+      message: `${itemIds.length} items marcados como entregados`,
+      checkedTables
+    };
+
+  } catch (error) {
+    console.error("❌ Error en markItemsAsDelivered:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Error interno del servidor",
+      checkedTables: []
+    };
+  }
+}

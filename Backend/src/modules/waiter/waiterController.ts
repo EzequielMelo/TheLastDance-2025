@@ -6,6 +6,7 @@ import {
   unassignTableFromWaiter,
   getAllWaitersWithTables,
   canUnassignTable,
+  markItemsAsDelivered,
 } from "./waiterServices";
 
 // GET /api/waiter/me - Información del mesero logueado
@@ -259,6 +260,63 @@ export async function checkCanUnassignTable(
     });
   } catch (error) {
     console.error("Error en checkCanUnassignTable:", error);
+    return res.status(500).json({
+      error: "Error interno del servidor",
+      message: error instanceof Error ? error.message : "Error desconocido",
+    });
+  }
+}
+
+// POST /api/waiter/mark-delivered - Marcar items como entregados
+export async function markItemsAsDeliveredHandler(
+  req: Request,
+  res: Response,
+): Promise<Response> {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        error: "No autenticado",
+        message: "Usuario no autenticado",
+      });
+    }
+
+    // Solo meseros pueden marcar items como entregados
+    if (req.user.position_code !== "mozo") {
+      return res.status(403).json({
+        error: "Acceso denegado",
+        message: "Solo los meseros pueden marcar items como entregados",
+      });
+    }
+
+    const { itemIds } = req.body;
+
+    if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
+      return res.status(400).json({
+        error: "Datos inválidos",
+        message: "Se requiere un array de IDs de items",
+      });
+    }
+
+    const waiterId = req.user.appUserId;
+    const result = await markItemsAsDelivered(itemIds, waiterId);
+
+    if (!result.success) {
+      return res.status(400).json({
+        error: "Error en entrega",
+        message: result.message,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: result.message,
+      data: {
+        deliveredItems: itemIds.length,
+        checkedTables: result.checkedTables,
+      },
+    });
+  } catch (error) {
+    console.error("Error en markItemsAsDeliveredHandler:", error);
     return res.status(500).json({
       error: "Error interno del servidor",
       message: error instanceof Error ? error.message : "Error desconocido",

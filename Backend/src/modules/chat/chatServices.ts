@@ -138,6 +138,14 @@ export class ChatServices {
     messageType: "text" | "image" | "notification" = "text",
   ): Promise<Message> {
     try {
+      console.log("💾 ChatServices.createMessage - Inicio:", {
+        chatId,
+        senderId,
+        senderType,
+        messageText: messageText.substring(0, 50),
+        messageType,
+      });
+
       const { data, error } = await supabaseAdmin
         .from("messages")
         .insert({
@@ -152,18 +160,31 @@ export class ChatServices {
         .single();
 
       if (error) {
+        console.error("❌ Error al insertar mensaje en BD:", error);
         throw error;
       }
 
+      console.log("✅ Mensaje insertado en BD exitosamente:", data.id);
+
       // Actualizar timestamp del chat
-      await supabaseAdmin
+      console.log("🕒 Actualizando timestamp del chat...");
+      const { error: updateError } = await supabaseAdmin
         .from("chats")
         .update({ updated_at: new Date().toISOString() })
         .eq("id", chatId);
 
+      if (updateError) {
+        console.warn("⚠️ Error actualizando timestamp del chat:", updateError);
+        // No lanzamos error por esto, solo warning
+      } else {
+        console.log("✅ Timestamp del chat actualizado");
+      }
+
+      console.log("✅ ChatServices.createMessage - Completado exitosamente");
       return data;
     } catch (error) {
-      console.error("Error en createMessage:", error);
+      console.error("💥 Error completo en createMessage:", error);
+      console.error("Stack trace:", error instanceof Error ? error.stack : "Sin stack");
       throw new Error("Error al crear mensaje");
     }
   }

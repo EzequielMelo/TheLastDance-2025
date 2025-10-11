@@ -15,6 +15,8 @@ import {
   getMyTableHandler,
   getMyAssignedTableHandler,
   getMyStatusHandler,
+  confirmDeliveryHandler,
+  getBillData,
 } from "./tablesController";
 
 const router = express.Router();
@@ -95,5 +97,11 @@ router.post(
   roleGuard(["dueno", "supervisor", "maitre", "mozo"]),
   freeTableHandler,
 );
+
+// POST /api/tables/:id/confirm-delivery - Confirmar entrega de pedido (solo clientes)
+router.post("/:id/confirm-delivery", authenticateUser, confirmDeliveryHandler);
+
+// GET /api/tables/:tableId/bill - Obtener datos de la cuenta para pagar (solo clientes)
+router.get("/:tableId/bill", authenticateUser, getBillData);
 
 export default router;

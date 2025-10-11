@@ -23,6 +23,7 @@ export interface ClientStateData {
     id: string;
     number: number;
   };
+  deliveryConfirmationStatus?: 'pending' | 'confirmed' | 'bill_requested';
   refresh: () => Promise<void>;
 }
 
@@ -38,6 +39,7 @@ export const useClientState = (): ClientStateData => {
     id: string;
     number: number;
   }>();
+  const [deliveryConfirmationStatus, setDeliveryConfirmationStatus] = useState<'pending' | 'confirmed' | 'bill_requested'>();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { user } = useAuth();
 
@@ -60,10 +62,12 @@ export const useClientState = (): ClientStateData => {
       setWaitingId(undefined);
       setAssignedTable(undefined);
       setOccupiedTable(undefined);
+      setDeliveryConfirmationStatus(undefined);
 
       switch (status) {
         case "seated":
           setOccupiedTable(response.data.table);
+          setDeliveryConfirmationStatus(response.data.table_status);
           setState("seated");
           break;
 
@@ -108,6 +112,7 @@ export const useClientState = (): ClientStateData => {
     waitingId,
     assignedTable,
     occupiedTable,
+    deliveryConfirmationStatus,
     refresh: checkClientState,
   };
 };

@@ -16,6 +16,9 @@ export type RootStackParamList = {
   JoinWaitingList: { qrData?: any }; // Formulario con datos del QR
   MyWaitingPosition: undefined; // Ver posición en lista de espera
   ScanTableQR: undefined; // Escanear QR de mesa para confirmar llegada
+  ScanOrderQR: undefined; // Escanear QR para confirmar pedido entregado
+  Games: undefined; // Pantalla de juegos
+  Survey: undefined; // Pantalla de encuesta
   Menu:
     | {
         mode?: "normal" | "modify-rejected";
@@ -26,7 +29,8 @@ export type RootStackParamList = {
   WaiterDashboard: undefined; // Panel del mesero
   WaiterOrders: undefined; // Gestión de órdenes del mesero
   AllWaiters: undefined; // Gestión de meseros (admin/supervisor)
-  TableChat: { tableId: string }; // Chat entre cliente y mesero
+  TableChat: { tableId: string; autoMessage?: string }; // Chat entre cliente y mesero
+  BillPayment: { tableNumber?: number; tableId?: string }; // Pantalla de pago de cuenta
   KitchenDashboard: undefined; // Panel de cocina para cocineros
   BartenderDashboard: undefined; // Panel de bar para bartenders
 };

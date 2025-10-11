@@ -10,7 +10,9 @@ import {
   freeTable,
   cancelWaitingListEntry,
   markAsNoShow,
+  confirmTableDelivery,
 } from "./tablesServices";
+import { getBillData } from "./billController";
 import type {
   CreateWaitingListEntry,
   AssignTableRequest,
@@ -412,7 +414,7 @@ export async function getMyStatusHandler(req: Request, res: Response) {
     // 1. Verificar mesa ocupada
     const { data: occupiedTable, error: occupiedError } = await supabaseAdmin
       .from("tables")
-      .select("id, number")
+      .select("id, number, table_status")
       .eq("id_client", clientId)
       .eq("is_occupied", true)
       .maybeSingle();
@@ -421,6 +423,7 @@ export async function getMyStatusHandler(req: Request, res: Response) {
       const result = {
         status: "seated",
         table: occupiedTable,
+        table_status: occupiedTable.table_status || 'pending',
       };
       return res.json(result);
     }
@@ -497,3 +500,42 @@ export async function getMyStatusHandler(req: Request, res: Response) {
     return res.status(500).json({ error: "Error interno del servidor" });
   }
 }
+
+// POST /api/tables/:id/confirm-delivery - Confirmar entrega de pedido
+export async function confirmDeliveryHandler(req: Request, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    const tableIdOrNumber = req.params["id"];
+    if (!tableIdOrNumber) {
+      return res.status(400).json({ error: "ID o número de mesa requerido" });
+    }
+
+    // El cliente debe estar autenticado y ser un cliente (registrado o anónimo)
+    const allowedProfiles = ["cliente_registrado", "cliente_anonimo"];
+    if (!allowedProfiles.includes(req.user.profile_code)) {
+      return res
+        .status(403)
+        .json({ error: "Solo clientes pueden confirmar entrega" });
+    }
+
+    const result = await confirmTableDelivery(tableIdOrNumber, req.user.appUserId);
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.message });
+    }
+
+    return res.json({
+      success: true,
+      message: "Entrega confirmada exitosamente",
+      table: result.table,
+    });
+  } catch (e: any) {
+    console.error("Error confirmando entrega:", e.message);
+    return res.status(500).json({ error: "Error interno del servidor" });
+  }
+}
+
+export { getBillData };

@@ -19,6 +19,7 @@ import {
   replaceRejectedItems,
   getKitchenPendingOrders,
   updateKitchenItemStatus,
+  checkAllItemsDelivered,
   getBartenderPendingOrders,
   updateBartenderItemStatus,
   getTableOrdersStatus,
@@ -1147,6 +1148,43 @@ export async function approveBatchCompletelyHandler(
     console.error("❌ Error aprobando tanda completa:", error);
     res.status(400).json({
       error: error.message || "Error al aprobar tanda completa",
+    });
+  }
+}
+
+// Verificar si todos los items de una mesa están entregados
+export async function checkTableDeliveryStatusHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Usuario no autenticado" });
+      return;
+    }
+
+    const tableId = req.params['tableId'];
+    const userId = req.user.appUserId;
+
+    if (!tableId) {
+      res.status(400).json({ error: "ID de mesa requerido" });
+      return;
+    }
+
+    const deliveryStatus = await checkAllItemsDelivered(tableId, userId);
+
+    res.json({
+      success: true,
+      data: deliveryStatus,
+      message: deliveryStatus.allDelivered 
+        ? "Todos los items han sido entregados" 
+        : `${deliveryStatus.pendingItems.length} items pendientes de entrega`,
+    });
+  } catch (error: any) {
+    console.error("❌ Error verificando estado de entrega:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Error al verificar estado de entrega",
     });
   }
 }

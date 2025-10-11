@@ -16,13 +16,17 @@ import ManageWaitingListScreen from "../screens/table-screens/ManageWaitingListS
 import GenerateWaitingListQRScreen from "../screens/table-screens/GenerateWaitingListQRScreen";
 import ScanQRScreen from "../screens/table-screens/ScanQRScreen";
 import ScanTableQRScreen from "../screens/table-screens/ScanTableQRScreen";
+import ScanOrderQRScreen from "../screens/table-screens/ScanOrderQRScreen";
 import JoinWaitingListScreen from "../screens/table-screens/JoinWaitingListScreen";
 import MyWaitingPositionScreen from "../screens/table-screens/MyWaitingPositionScreen";
 import MenuScreen from "../screens/menu-screens/MenuScreen";
+import GamesScreen from "../screens/GamesScreen";
+import SurveyScreen from "../screens/SurveyScreen";
 import { CartProvider } from "../context/CartContext";
 import WaiterDashboardScreen from "../screens/waiter-screens/WaiterDashboardScreen";
 import AllWaitersScreen from "../screens/admin-screens/AllWaitersScreen";
 import TableChatScreen from "../screens/chat/TableChatScreen";
+import BillPaymentScreen from "../screens/table-screens/BillPaymentScreen";
 import WaiterOrdersScreen from "../components/orders/WaiterOrdersScreen";
 import KitchenDashboardScreen from "../screens/kitchen-screens/KitchenDashboardScreen";
 import BartenderDashboardScreen from "../screens/bar-screens/BartenderDashboardScreen";
@@ -105,6 +109,21 @@ function NavigatorContent() {
             options={{ title: "Confirmar Mesa", headerBackTitle: "Volver" }}
           />
           <Stack.Screen
+            name="ScanOrderQR"
+            component={ScanOrderQRScreen}
+            options={{ title: "Confirmar Pedido", headerBackTitle: "Volver" }}
+          />
+          <Stack.Screen
+            name="Games"
+            component={GamesScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Survey"
+            component={SurveyScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="JoinWaitingList"
             component={JoinWaitingListScreen}
             options={{ title: "Unirse a Lista", headerBackTitle: "Volver" }}
@@ -138,6 +157,11 @@ function NavigatorContent() {
             name="TableChat"
             component={TableChatScreen}
             options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="BillPayment"
+            component={BillPaymentScreen}
+            options={{ title: "Pagar Cuenta", headerBackTitle: "Volver" }}
           />
           <Stack.Screen
             name="KitchenDashboard"

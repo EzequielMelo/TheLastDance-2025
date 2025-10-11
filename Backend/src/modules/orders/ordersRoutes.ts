@@ -19,6 +19,7 @@ import {
   updateKitchenItemStatusHandler,
   getBartenderPendingOrdersHandler,
   updateBartenderItemStatusHandler,
+  checkTableDeliveryStatusHandler,
   getTableOrdersStatusHandler,
   rejectIndividualItemsHandler,
   approveBatchCompletelyHandler,
@@ -65,6 +66,9 @@ router.get("/table/:tableId", getTableOrdersHandler);
 
 // Obtener estado de pedidos de una mesa (cliente escanea QR)
 router.get("/table/:tableId/status", getTableOrdersStatusHandler);
+
+// Verificar si todos los items de una mesa están entregados
+router.get("/table/:tableId/delivery-status", checkTableDeliveryStatusHandler);
 
 // ============= RUTAS PARA COCINA =============
 // Obtener pedidos pendientes para cocina (solo cocineros)

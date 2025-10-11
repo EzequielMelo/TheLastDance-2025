@@ -7,6 +7,7 @@ import {
   unassignTable,
   getAllWaiters,
   checkCanUnassignTable,
+  markItemsAsDeliveredHandler,
 } from "./waiterController";
 
 const router = Router();
@@ -20,6 +21,7 @@ router.get("/available-tables", getAvailableTables); // GET /api/waiter/availabl
 router.post("/assign-table", assignTable); // POST /api/waiter/assign-table
 router.delete("/unassign-table/:tableId", unassignTable); // DELETE /api/waiter/unassign-table/:tableId
 router.get("/can-unassign/:tableId", checkCanUnassignTable); // GET /api/waiter/can-unassign/:tableId
+router.post("/mark-delivered", markItemsAsDeliveredHandler); // POST /api/waiter/mark-delivered
 
 // Rutas administrativas (solo para dueno/supervisor)
 router.get("/all", getAllWaiters); // GET /api/waiter/all

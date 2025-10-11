@@ -717,3 +717,106 @@ export async function markAsNoShow(
     };
   }
 }
+
+// Confirmar entrega de pedido de una mesa
+export async function confirmTableDelivery(
+  tableIdOrNumber: string,
+  clientId: string,
+): Promise<{ success: boolean; message: string; table?: any }> {
+  try {
+    console.log('📦 confirmTableDelivery - Confirmando entrega para mesa:', tableIdOrNumber, 'cliente:', clientId);
+
+    // Intentar buscar la mesa por ID (UUID) o por número
+    let table: any = null;
+    let tableError: any = null;
+
+    // Primero intentar como UUID (si tiene formato de UUID)
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tableIdOrNumber);
+    
+    if (isUUID) {
+      const { data: tableById, error: errorById } = await supabaseAdmin
+        .from("tables")
+        .select("id, number, id_client, is_occupied, table_status")
+        .eq("id", tableIdOrNumber)
+        .eq("id_client", clientId)
+        .eq("is_occupied", true)
+        .single();
+
+      table = tableById;
+      tableError = errorById;
+    } else {
+      // Si no es UUID, buscar por número de mesa
+      const { data: tableByNumber, error: errorByNumber } = await supabaseAdmin
+        .from("tables")
+        .select("id, number, id_client, is_occupied, table_status")
+        .eq("number", parseInt(tableIdOrNumber))
+        .eq("id_client", clientId)
+        .eq("is_occupied", true)
+        .single();
+
+      table = tableByNumber;
+      tableError = errorByNumber;
+    }
+
+    if (tableError || !table) {
+      console.log('❌ confirmTableDelivery - Mesa no encontrada o no pertenece al cliente');
+      return {
+        success: false,
+        message: "Mesa no encontrada o no tienes permisos para confirmar entrega en esta mesa",
+      };
+    }
+
+    // 2. Verificar que el status actual sea 'pending' (no 'delivered' como antes)
+    if (table.table_status !== 'pending') {
+      console.log('❌ confirmTableDelivery - Mesa no está en estado pending, estado actual:', table.table_status);
+      return {
+        success: false,
+        message: "Esta mesa ya tiene el pedido confirmado",
+      };
+    }
+
+    // 3. Verificar que todos los items estén realmente entregados antes de confirmar
+    console.log('🔍 Verificando que todos los items estén entregados antes de confirmar...');
+    
+    // Usar la función existente para verificar el estado de entrega
+    const { checkAllItemsDelivered } = await import("../orders/ordersServices");
+    const deliveryCheck = await checkAllItemsDelivered(table.id, clientId);
+    
+    if (!deliveryCheck.allDelivered) {
+      console.log('❌ confirmTableDelivery - No todos los items están entregados');
+      return {
+        success: false,
+        message: `Aún tienes ${deliveryCheck.pendingItems.length} items pendientes de entrega. Espera a que el mozo entregue todo antes de confirmar.`,
+      };
+    }
+
+    // 4. Actualizar el status a 'confirmed'
+    const { data: updatedTable, error: updateError } = await supabaseAdmin
+      .from("tables")
+      .update({
+        table_status: 'confirmed',
+      })
+      .eq("id", table.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('❌ confirmTableDelivery - Error actualizando status:', updateError);
+      throw new Error(`Error confirmando entrega: ${updateError.message}`);
+    }
+
+    console.log('✅ confirmTableDelivery - Entrega confirmada exitosamente para mesa:', table.number);
+
+    return {
+      success: true,
+      message: `Entrega confirmada para la mesa ${table.number}`,
+      table: updatedTable,
+    };
+  } catch (error: any) {
+    console.error('💥 confirmTableDelivery - Error:', error);
+    return {
+      success: false,
+      message: error.message || "Error interno del servidor",
+    };
+  }
+}
