@@ -88,20 +88,36 @@ export async function approveClientById(
 export async function rejectClientById(
   id: string,
 ): Promise<ClientApprovalData> {
-  // Actualizar estado a 'rechazado'
-  const { data, error } = await supabaseAdmin
-    .from("users")
-    .update({ state: "rechazado" })
-    .eq("id", id)
-    .eq("profile_code", "cliente_registrado")
-    .select("id, first_name, last_name")
-    .single();
+  try {
+    console.log("🔄 Iniciando rejectClientById:", { id });
+    
+    // Actualizar estado a 'rechazado'
+    console.log("🔄 Ejecutando query de actualización en Supabase...");
+    const { data, error } = await supabaseAdmin
+      .from("users")
+      .update({ state: "rechazado" })
+      .eq("id", id)
+      .eq("profile_code", "cliente_registrado")
+      .select("id, first_name, last_name")
+      .single();
 
-  if (error || !data) {
-    throw new Error("Usuario no encontrado o no se pudo actualizar");
+    if (error) {
+      console.error("❌ Error de Supabase:", error);
+      throw new Error(`Error en base de datos: ${error.message}`);
+    }
+    
+    if (!data) {
+      console.error("❌ No se encontró el usuario o no se pudo actualizar");
+      throw new Error("Usuario no encontrado o no se pudo actualizar");
+    }
+
+    console.log("✅ Cliente rechazado exitosamente en BD:", data);
+    return data;
+    
+  } catch (error) {
+    console.error("❌ Error en rejectClientById:", error);
+    throw error;
   }
-
-  return data;
 }
 
 // Enviar email de aprobación
@@ -123,12 +139,26 @@ export async function sendClientRejectionEmail(
   firstName: string,
   reason: string = "",
 ): Promise<void> {
-  const email = await getAuthEmailById(id);
-  if (!email) {
-    throw new Error("Email no encontrado en Auth");
+  try {
+    console.log("🔄 Iniciando sendClientRejectionEmail:", { id, firstName, reason });
+    
+    console.log("🔄 Obteniendo email de Supabase Auth...");
+    const email = await getAuthEmailById(id);
+    if (!email) {
+      console.error("❌ Email no encontrado en Auth para ID:", id);
+      throw new Error("Email no encontrado en Auth");
+    }
+    
+    console.log("📧 Email obtenido:", email);
+    console.log("🔄 Enviando email de rechazo...");
+    
+    await sendRejectedEmail(email, firstName, reason);
+    console.log("✅ Email de rechazo enviado exitosamente");
+    
+  } catch (error) {
+    console.error("❌ Error en sendClientRejectionEmail:", error);
+    throw error;
   }
-
-  await sendRejectedEmail(email, firstName, reason);
 }
 
 // Servicio completo para aprobar cliente (actualizar estado + enviar email)
@@ -142,8 +172,30 @@ export async function processClientRejection(
   id: string,
   reason: string = "",
 ): Promise<void> {
-  const clientData = await rejectClientById(id);
-  await sendClientRejectionEmail(id, clientData.first_name, reason);
+  try {
+    console.log("🔄 Iniciando processClientRejection:", { id, reason });
+    
+    // Paso 1: Actualizar estado en base de datos
+    console.log("🔄 Paso 1: Rechazando cliente en BD...");
+    const clientData = await rejectClientById(id);
+    console.log("✅ Cliente rechazado en BD:", clientData);
+    
+    // Paso 2: Enviar email de notificación
+    console.log("🔄 Paso 2: Enviando email de rechazo...");
+    await sendClientRejectionEmail(id, clientData.first_name, reason);
+    console.log("✅ Email de rechazo enviado exitosamente");
+    
+  } catch (error) {
+    console.error("❌ Error en processClientRejection:", error);
+    console.error("❌ Stack trace:", error instanceof Error ? error.stack : "No stack");
+    
+    // Re-lanzar el error con más contexto
+    if (error instanceof Error) {
+      throw new Error(`Error rechazando cliente: ${error.message}`);
+    } else {
+      throw new Error("Error desconocido rechazando cliente");
+    }
+  }
 }
 
 export async function createStaff(

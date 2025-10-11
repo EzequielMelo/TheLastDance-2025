@@ -45,20 +45,40 @@ export async function approveClient(req: Request, res: Response) {
 // POST /api/admin/clients/:id/reject
 export async function rejectClient(req: Request, res: Response) {
   try {
+    console.log("🔄 Iniciando rechazo de cliente - Controller");
+    console.log("📥 Request params:", req.params);
+    console.log("📥 Request body:", req.body);
+    
     const id = req.params["id"];
     if (!id) {
+      console.log("❌ ID faltante en params");
       res.status(400).json({ error: "id requerido en params" });
       return;
     }
 
     const reason = (req.body?.reason as string) || "";
+    console.log("🔄 Procesando rechazo:", { id, reason });
+    
     await processClientRejection(id, reason);
+    
+    console.log("✅ Cliente rechazado exitosamente");
     res.json({ ok: true });
     return;
   } catch (e: any) {
+    console.error("❌ Error en rejectClient controller:", e);
+    console.error("❌ Stack trace:", e.stack);
+    
     // Determinar el código de estado basado en el mensaje de error
     const statusCode = e.message.includes("no encontrado") ? 404 : 400;
-    res.status(statusCode).json({ error: e.message });
+    
+    // Enviar mensaje de error más descriptivo
+    const errorMessage = e.message || "Error rechazando cliente";
+    console.log("📤 Enviando respuesta de error:", { statusCode, errorMessage });
+    
+    res.status(statusCode).json({ 
+      error: errorMessage,
+      details: process.env["NODE_ENV"] === "development" ? e.stack : undefined
+    });
     return;
   }
 }

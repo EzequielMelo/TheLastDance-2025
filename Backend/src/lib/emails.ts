@@ -23,8 +23,21 @@ export async function sendApprovedEmail(to: string, name: string) {
 }
 
 export async function sendRejectedEmail(to: string, name: string, reason?: string) {
-  const subject = "Tu registro fue rechazado";
-  const html = tplRejected(name || "Cliente", reason);
-  const text = htmlToText(html);
-  return sendMail({ to, subject, html, text });
+  try {
+    console.log("📧 Iniciando sendRejectedEmail:", { to, name, reason });
+    
+    const subject = "Tu registro fue rechazado";
+    const html = tplRejected(name || "Cliente", reason);
+    const text = htmlToText(html);
+    
+    console.log("📧 Template generado, enviando email...");
+    const result = await sendMail({ to, subject, html, text });
+    
+    console.log("✅ sendRejectedEmail completado exitosamente");
+    return result;
+    
+  } catch (error) {
+    console.error("❌ Error en sendRejectedEmail:", error);
+    throw error;
+  }
 }
