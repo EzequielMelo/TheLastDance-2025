@@ -6,6 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
   ToastAndroid,
+  ScrollView,
 } from "react-native";
 import { useEffect, useState } from "react";
 import { ChefHat, Lock, Eye, EyeOff, Mail } from "lucide-react-native";
@@ -57,85 +58,155 @@ export const LoginScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <FormLayout
-      title="Bienvenido"
-      subtitle="Inicia sesión en Last Dance"
-      icon={<ChefHat size={60} color="#d4af37" strokeWidth={1.5} />}
-      submitLabel="Iniciar Sesión"
-      onSubmit={handleLogin}
-      loading={actionLoading}
-      bottomText="¿No tienes cuenta?"
-      bottomLinkText="Regístrate"
-      onBottomLinkPress={() => navigation.push("Registro")}
-      footerContent={
-        <TouchableOpacity
-          onPress={() => navigation.push("RegistroAnonimo")}
-          className="px-4 py-2 rounded-full bg-white/10 border border-white/20"
-        >
-          <Text className="text-white">Continuar sin cuenta</Text>
-        </TouchableOpacity>
-      }
+    <ScrollView 
+      style={{ flex: 1 }}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}
+      keyboardShouldPersistTaps="handled"
     >
-      {/* Email */}
-      <View className="mb-5">
-        <View
-          className={`flex-row items-center rounded-xl border px-4 h-14 bg-white/10 border-white/20 ${emailFocused ? "border-[#d4af37] bg-[#d4af371a]" : ""}`}
-        >
-          <Mail size={20} color={emailFocused ? "#d4af37" : "#888"} />
-          <TextInput
-            className="flex-1 ml-2 text-white text-base p-0"
-            placeholder="Correo electrónico"
-            placeholderTextColor="#888"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            onFocus={() => setEmailFocused(true)}
-            onBlur={() => setEmailFocused(false)}
-          />
-        </View>
-        {!!emailError && (
-          <Text className="text-red-500 text-sm mt-1">{emailError}</Text>
-        )}
-      </View>
-
-      {/* Password */}
-      <View className="mb-5">
-        <View
-          className={`flex-row items-center rounded-xl border px-4 h-14 bg-white/10 border-white/20 ${passwordFocused ? "border-[#d4af37] bg-[#d4af371a]" : ""}`}
-        >
-          <Lock size={20} color={passwordFocused ? "#d4af37" : "#888"} />
-          <TextInput
-            className="flex-1 ml-2 text-white text-base p-0 pr-10"
-            placeholder="Contraseña"
-            placeholderTextColor="#888"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPassword}
-            onFocus={() => setPasswordFocused(true)}
-            onBlur={() => setPasswordFocused(false)}
-          />
+      <FormLayout
+        title="Bienvenido"
+        subtitle="Inicia sesión en Last Dance"
+        icon={<ChefHat size={60} color="#d4af37" strokeWidth={1.5} />}
+        submitLabel="Iniciar Sesión"
+        onSubmit={handleLogin}
+        loading={actionLoading}
+        bottomText="¿No tienes cuenta?"
+        bottomLinkText="Regístrate"
+        onBottomLinkPress={() => navigation.push("Registro")}
+        footerContent={
           <TouchableOpacity
-            onPress={() => setShowPassword(!showPassword)}
-            className="absolute right-4 p-1"
+            onPress={() => navigation.push("RegistroAnonimo")}
+            className="px-4 py-2 rounded-full bg-white/10 border border-white/20"
           >
-            {showPassword ? (
-              <EyeOff size={20} color="#888" />
-            ) : (
-              <Eye size={20} color="#888" />
-            )}
+            <Text className="text-white">Continuar sin cuenta</Text>
           </TouchableOpacity>
+        }
+      >
+        {/* Email */}
+        <View className="mb-5">
+          <View
+            className={`flex-row items-center rounded-xl border px-4 h-14 bg-white/10 border-white/20 ${emailFocused ? "border-[#d4af37] bg-[#d4af371a]" : ""}`}
+          >
+            <Mail size={20} color={emailFocused ? "#d4af37" : "#888"} />
+            <TextInput
+              className="flex-1 ml-2 text-white text-base p-0"
+              placeholder="Correo electrónico"
+              placeholderTextColor="#888"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              onFocus={() => setEmailFocused(true)}
+              onBlur={() => setEmailFocused(false)}
+            />
+          </View>
+          {!!emailError && (
+            <Text className="text-red-500 text-sm mt-1">{emailError}</Text>
+          )}
         </View>
-        {!!passwordError && (
-          <Text className="text-red-500 text-sm mt-1">{passwordError}</Text>
-        )}
-      </View>
 
-      <TouchableOpacity className="self-end mb-2">
-        <Text className="text-[#d4af37] text-sm">
-          ¿Olvidaste tu contraseña?
-        </Text>
-      </TouchableOpacity>
-    </FormLayout>
+        {/* Password */}
+        <View className="mb-5">
+          <View
+            className={`flex-row items-center rounded-xl border px-4 h-14 bg-white/10 border-white/20 ${passwordFocused ? "border-[#d4af37] bg-[#d4af371a]" : ""}`}
+          >
+            <Lock size={20} color={passwordFocused ? "#d4af37" : "#888"} />
+            <TextInput
+              className="flex-1 ml-2 text-white text-base p-0 pr-10"
+              placeholder="Contraseña"
+              placeholderTextColor="#888"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              onFocus={() => setPasswordFocused(true)}
+              onBlur={() => setPasswordFocused(false)}
+            />
+            <TouchableOpacity
+              onPress={() => setShowPassword(!showPassword)}
+              className="absolute right-4 p-1"
+            >
+              {showPassword ? (
+                <EyeOff size={20} color="#888" />
+              ) : (
+                <Eye size={20} color="#888" />
+              )}
+            </TouchableOpacity>
+          </View>
+          {!!passwordError && (
+            <Text className="text-red-500 text-sm mt-1">{passwordError}</Text>
+          )}
+        </View>
+
+        <TouchableOpacity className="self-end mb-2">
+          <Text className="text-[#d4af37] text-sm">
+            ¿Olvidaste tu contraseña?
+          </Text>
+        </TouchableOpacity>
+
+        {/* Ingresos Rápidos */}
+        <View className="mb-6">
+          <Text className="text-white text-center mb-3 text-sm opacity-70">
+            Ingresos Rápidos
+          </Text>
+          <View className="space-y-2">
+            <TouchableOpacity
+              onPress={() => {
+                setEmail("julian9@gmail.com");
+                setPassword("123456");
+                login({ email: "julian9@gmail.com", password: "123456" });
+              }}
+              className="px-3 py-2 rounded-lg bg-blue-600/20 border border-blue-500/30"
+            >
+              <Text className="text-blue-300 text-center text-sm">👤 Cliente registrado</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={() => {
+                setEmail("momo@gmail.com");
+                setPassword("123456");
+                login({ email: "momo@gmail.com", password: "123456" });
+              }}
+              className="px-3 py-2 rounded-lg bg-orange-600/20 border border-orange-500/30"
+            >
+              <Text className="text-orange-300 text-center text-sm">👨‍🍳 Cocinero</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={() => {
+                setEmail("messi10@gmail.com");
+                setPassword("123456");
+                login({ email: "messi10@gmail.com", password: "123456" });
+              }}
+              className="px-3 py-2 rounded-lg bg-purple-600/20 border border-purple-500/30"
+            >
+              <Text className="text-purple-300 text-center text-sm">🍷 Bartender</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={() => {
+                setEmail("coscu@gmail.com");
+                setPassword("123456");
+                login({ email: "coscu@gmail.com", password: "123456" });
+              }}
+              className="px-3 py-2 rounded-lg bg-green-600/20 border border-green-500/30"
+            >
+              <Text className="text-green-300 text-center text-sm">👔 Supervisor</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={() => {
+                setEmail("admin@example.com");
+                setPassword("123456");
+                login({ email: "admin@example.com", password: "123456" });
+              }}
+              className="px-3 py-2 rounded-lg bg-red-600/20 border border-red-500/30"
+            >
+              <Text className="text-red-300 text-center text-sm">👑 Dueño</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </FormLayout>
+    </ScrollView>
   );
 };

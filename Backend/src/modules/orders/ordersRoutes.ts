@@ -26,6 +26,7 @@ import {
   payOrderHandler,
   getWaiterReadyItemsHandler,
   markItemAsDeliveredHandler,
+  submitTandaModificationsHandler,
 } from "./ordersController";
 
 const router = express.Router();
@@ -62,6 +63,9 @@ router.put("/:orderId/add-items", addItemsToPartialOrderHandler);
 router.put("/:orderId/add-items-to-existing", addItemsToExistingOrderHandler);
 // Reemplazar items rechazados con nuevos items
 router.put("/:orderId/replace-rejected-items", replaceRejectedItemsHandler);
+
+// Reenviar modificaciones de tanda (cambiar items 'needs_modification' a 'pending')
+router.put("/:orderId/submit-tanda-modifications", submitTandaModificationsHandler);
 
 // Procesar pago de todas las órdenes de una mesa (usando orderId como tableId)
 router.put("/:orderId/pay", payOrderHandler);

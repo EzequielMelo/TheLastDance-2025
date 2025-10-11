@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
+import { supabaseAdmin } from "../../config/supabase";
 import {
   createOrder,
   getOrderById,
@@ -28,8 +29,16 @@ import {
   payOrder,
   getWaiterReadyItems,
   markItemAsDelivered,
+  submitTandaModifications,
 } from "./ordersServices";
 import type { CreateOrderDTO, OrderItemStatus } from "./orders.types";
+import { 
+  notifyWaiterNewOrder,
+  notifyClientOrderRejectedForModification,
+  notifyKitchenNewItems,
+  notifyBartenderNewItems,
+  notifyManagementPaymentReceived,
+} from "../../services/pushNotificationService";
 
 const createOrderSchema = z.object({
   table_id: z.string().uuid().optional(),
@@ -118,6 +127,41 @@ export async function createOrderHandler(
     const order = await createOrder(orderData, userId);
 
     console.log("✅ Pedido creado exitosamente:", order.id);
+
+    // Enviar notificación push al mozo si hay mesa asignada
+    if (parsed.table_id) {
+      try {
+        // Obtener información de la mesa y el mozo
+        const { data: tableData, error: tableError } = await supabaseAdmin
+          .from("tables")
+          .select(`
+            number,
+            id_waiter,
+            users!tables_id_client_fkey(first_name, last_name)
+          `)
+          .eq("id", parsed.table_id)
+          .single();
+
+        if (!tableError && tableData?.id_waiter) {
+          const clientData = (tableData as any).users;
+          const clientName = clientData 
+            ? `${clientData.first_name} ${clientData.last_name}`.trim()
+            : "Cliente";
+
+          await notifyWaiterNewOrder(
+            tableData.id_waiter,
+            clientName,
+            tableData.number.toString(),
+            parsed.items.length,
+            parsed.totalAmount
+          );
+        }
+      } catch (notifyError) {
+        console.error("Error enviando notificación al mozo:", notifyError);
+        // No bloqueamos la creación del pedido por error de notificación
+      }
+    }
+
     res.status(201).json({
       success: true,
       message: "Pedido creado exitosamente",
@@ -376,6 +420,85 @@ export async function waiterOrderActionHandler(
     switch (action) {
       case "accept":
         result = await acceptOrder(orderId, notes);
+        
+        // Enviar notificaciones push a cocina y bartender
+        try {
+          // Obtener información de la orden y mesa
+          const { data: orderData, error: orderError } = await supabaseAdmin
+            .from("orders")
+            .select(`
+              id_client,
+              table_id,
+              order_items!inner(
+                menu_item_id,
+                quantity,
+                unit_price,
+                status,
+                menu_items!inner(
+                  name,
+                  category
+                )
+              ),
+              tables!inner(
+                number,
+                users!tables_id_client_fkey(first_name, last_name)
+              )
+            `)
+            .eq("id", orderId)
+            .single();
+
+          if (!orderError && orderData) {
+            const tableData = (orderData as any).tables;
+            const clientData = tableData?.users;
+            const clientName = clientData 
+              ? `${clientData.first_name} ${clientData.last_name}`.trim()
+              : "Cliente";
+
+            // Separar items por categoría (platos vs bebidas)
+            const orderItems = (orderData as any).order_items;
+            const dishItems: Array<{ name: string; quantity: number }> = [];
+            const drinkItems: Array<{ name: string; quantity: number }> = [];
+
+            orderItems.forEach((item: any) => {
+              const menuItem = item.menu_items;
+              const itemData = {
+                name: menuItem.name,
+                quantity: item.quantity
+              };
+
+              // Categorías que van a cocina
+              if (['platos', 'entradas', 'postres', 'ensaladas'].includes(menuItem.category.toLowerCase())) {
+                dishItems.push(itemData);
+              } 
+              // Categorías que van a bar
+              else if (['bebidas', 'tragos', 'cervezas', 'vinos', 'aguas'].includes(menuItem.category.toLowerCase())) {
+                drinkItems.push(itemData);
+              }
+            });
+
+            // Notificar a cocina si hay platos
+            if (dishItems.length > 0) {
+              await notifyKitchenNewItems(
+                tableData.number.toString(),
+                dishItems,
+                clientName
+              );
+            }
+
+            // Notificar a bartender si hay bebidas
+            if (drinkItems.length > 0) {
+              await notifyBartenderNewItems(
+                tableData.number.toString(),
+                drinkItems,
+                clientName
+              );
+            }
+          }
+        } catch (notifyError) {
+          console.error("Error enviando notificaciones a cocina/bar:", notifyError);
+          // No bloqueamos la respuesta por error de notificación
+        }
+
         res.json({
           success: true,
           message: "Orden aceptada exitosamente",
@@ -401,6 +524,44 @@ export async function waiterOrderActionHandler(
         }
 
         result = await partialRejectOrder(orderId, rejectedItemIds, notes);
+        
+        // Enviar notificación push al cliente sobre el rechazo
+        try {
+          // Obtener información de la orden y mesa
+          const { data: orderData, error: orderError } = await supabaseAdmin
+            .from("orders")
+            .select(`
+              id_client,
+              table_id,
+              tables!inner(
+                number,
+                id_waiter,
+                users!tables_id_waiter_fkey(first_name, last_name)
+              )
+            `)
+            .eq("id", orderId)
+            .single();
+
+          if (!orderError && orderData?.table_id) {
+            const tableData = (orderData as any).tables;
+            const waiterData = tableData?.users;
+            const waiterName = waiterData 
+              ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
+              : "Mozo";
+
+            await notifyClientOrderRejectedForModification(
+              orderData.id_client,
+              waiterName,
+              tableData.number.toString(),
+              rejectedItemIds.length,
+              result.order.order_items.length
+            );
+          }
+        } catch (notifyError) {
+          console.error("Error enviando notificación de rechazo:", notifyError);
+          // No bloqueamos la respuesta por error de notificación
+        }
+
         res.json({
           success: true,
           message: "Rechazo parcial procesado exitosamente",
@@ -1213,6 +1374,48 @@ export async function payOrderHandler(
 
     const result = await payOrder(tableId, clientId);
 
+    // Enviar notificación push a dueño y supervisor sobre el pago recibido
+    try {
+      // Obtener información de la mesa, cliente y mozo
+      const { data: tableData, error: tableError } = await supabaseAdmin
+        .from("tables")
+        .select(`
+          number,
+          users!tables_id_client_fkey(first_name, last_name),
+          waiter:users!tables_id_waiter_fkey(first_name, last_name)
+        `)
+        .eq("id", tableId)
+        .single();
+
+      if (!tableError && tableData) {
+        const clientData = (tableData as any).users;
+        const waiterData = (tableData as any).waiter;
+        
+        const clientName = clientData 
+          ? `${clientData.first_name} ${clientData.last_name}`.trim()
+          : "Cliente";
+        
+        const waiterName = waiterData 
+          ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
+          : "Mozo";
+
+        // Calcular el monto total pagado
+        const totalAmount = result.paidOrders.reduce(
+          (sum, order) => sum + order.total_amount, 0
+        );
+
+        await notifyManagementPaymentReceived(
+          clientName,
+          tableData.number.toString(),
+          totalAmount,
+          waiterName
+        );
+      }
+    } catch (notifyError) {
+      console.error("Error enviando notificación a gerencia:", notifyError);
+      // No bloqueamos la respuesta por error de notificación
+    }
+
     res.json(result);
   } catch (error: any) {
     console.error("❌ Error procesando pago:", error);
@@ -1300,6 +1503,92 @@ export async function markItemAsDeliveredHandler(
     res.status(400).json({
       success: false,
       error: error.message || "Error al marcar item como entregado",
+    });
+  }
+}
+
+// PUT /api/orders/:orderId/submit-tanda-modifications - Reenviar modificaciones de tanda
+export async function submitTandaModificationsHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    // Validar que el usuario esté autenticado
+    if (!req.user) {
+      res.status(401).json({ error: "No autenticado" });
+      return;
+    }
+
+    // Solo clientes pueden reenviar modificaciones
+    const allowedProfiles = ["cliente_registrado", "cliente_anonimo"];
+    if (!allowedProfiles.includes(req.user.profile_code)) {
+      res.status(403).json({
+        error: "Solo clientes pueden reenviar modificaciones de tanda",
+      });
+      return;
+    }
+
+    const { orderId } = req.params;
+    const clientId = req.user.appUserId;
+
+    if (!orderId) {
+      res.status(400).json({ error: "ID de orden requerido" });
+      return;
+    }
+
+    await submitTandaModifications(orderId, clientId);
+
+    // Enviar notificación push al mozo sobre la resubmisión
+    try {
+      // Obtener información de la orden y mesa
+      const { data: orderData, error: orderError } = await supabaseAdmin
+        .from("orders")
+        .select(`
+          table_id,
+          order_items(id),
+          tables!inner(
+            number,
+            id_waiter,
+            users!tables_id_client_fkey(first_name, last_name)
+          )
+        `)
+        .eq("id", orderId)
+        .single();
+
+      if (!orderError && orderData?.table_id) {
+        const tableData = (orderData as any).tables;
+        const clientData = tableData?.users;
+        const clientName = clientData 
+          ? `${clientData.first_name} ${clientData.last_name}`.trim()
+          : "Cliente";
+
+        const itemsCount = (orderData as any).order_items.length;
+
+        // Calcular total aproximado (esto se podría mejorar obteniendo el precio real)
+        const estimatedTotal = itemsCount * 1500; // Estimación básica
+
+        await notifyWaiterNewOrder(
+          tableData.id_waiter,
+          clientName,
+          tableData.number.toString(),
+          itemsCount,
+          estimatedTotal
+        );
+      }
+    } catch (notifyError) {
+      console.error("Error enviando notificación de resubmisión:", notifyError);
+      // No bloqueamos la respuesta por error de notificación
+    }
+
+    res.json({
+      success: true,
+      message: "Modificaciones de tanda reenviadas exitosamente",
+    });
+  } catch (error: any) {
+    console.error("❌ Error reenviando modificaciones de tanda:", error);
+    res.status(400).json({
+      success: false,
+      error: error.message || "Error al reenviar modificaciones de tanda",
     });
   }
 }

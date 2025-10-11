@@ -228,7 +228,7 @@ async function getMaitreTokens(): Promise<string[]> {
       .from("users")
       .select("push_token")
       .eq("profile_code", "empleado")
-      .eq("position", "maitre")
+      .eq("position_code", "maitre")
       .eq("state", "aprobado")
       .not("push_token", "is", null);
 
@@ -253,7 +253,7 @@ async function getWaiterTokens(): Promise<string[]> {
       .from("users")
       .select("push_token")
       .eq("profile_code", "empleado")
-      .eq("position", "mozo")
+      .eq("position_code", "mozo")
       .eq("state", "aprobado")
       .not("push_token", "is", null);
 
@@ -291,6 +291,57 @@ async function getClientToken(clientId: string): Promise<string | null> {
       : null;
   } catch (error) {
     console.error("Error in getClientToken:", error);
+    return null;
+  }
+}
+
+// Función genérica para obtener tokens por position_code
+async function getRoleTokens(positionCode: string): Promise<string[]> {
+  try {
+    const { data: users, error } = await supabaseAdmin
+      .from("users")
+      .select("push_token")
+      .eq("profile_code", "empleado")
+      .eq("position_code", positionCode)
+      .eq("state", "aprobado")
+      .not("push_token", "is", null);
+
+    if (error) {
+      console.error(`Error fetching ${positionCode} tokens:`, error);
+      return [];
+    }
+
+    return users
+      .map(user => user.push_token)
+      .filter(token => token && token.trim() !== "");
+  } catch (error) {
+    console.error(`Error in getRoleTokens for ${positionCode}:`, error);
+    return [];
+  }
+}
+
+// Función para obtener token de un mozo específico
+async function getWaiterToken(waiterId: string): Promise<string | null> {
+  try {
+    const { data: user, error } = await supabaseAdmin
+      .from("users")
+      .select("push_token")
+      .eq("id", waiterId)
+      .eq("profile_code", "empleado")
+      .eq("position_code", "mozo")
+      .eq("state", "aprobado")
+      .not("push_token", "is", null)
+      .single();
+
+    if (error || !user) {
+      return null;
+    }
+
+    return user.push_token && user.push_token.trim() !== ""
+      ? user.push_token
+      : null;
+  } catch (error) {
+    console.error("Error in getWaiterToken:", error);
     return null;
   }
 }
@@ -387,6 +438,313 @@ export async function notifyWaitersNewClientMessage(
   } catch (error) {
     console.error(
       "❌ Error al enviar notificación de consulta a mozos:",
+      error,
+    );
+  }
+}
+
+// Función para notificar al cliente cuando un mozo responde su consulta
+export async function notifyClientWaiterResponse(
+  clientId: string,
+  waiterName: string,
+  tableNumber: string,
+  message: string,
+) {
+  try {
+    const token = await getClientToken(clientId);
+
+    if (!token) {
+      return;
+    }
+
+    // Truncar mensaje si es muy largo
+    const truncatedMessage =
+      message.length > 50 ? message.substring(0, 47) + "..." : message;
+
+    const notificationData: PushNotificationData = {
+      title: `Respuesta del mesero - Mesa #${tableNumber}`,
+      body: `${waiterName}: ${truncatedMessage}`,
+      data: {
+        type: "waiter_response",
+        tableNumber,
+        waiterName,
+        message,
+        screen: "TableChat",
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación de respuesta de mozo:",
+      error,
+    );
+  }
+}
+
+// Función para notificar al mozo cuando un cliente realiza un nuevo pedido
+export async function notifyWaiterNewOrder(
+  waiterId: string,
+  clientName: string,
+  tableNumber: string,
+  itemsCount: number,
+  totalAmount: number,
+) {
+  try {
+    // Obtener token del mozo específico
+    const { data: waiter, error } = await supabaseAdmin
+      .from("users")
+      .select("push_token")
+      .eq("id", waiterId)
+      .eq("state", "aprobado")
+      .not("push_token", "is", null)
+      .single();
+
+    if (error || !waiter?.push_token) {
+      return;
+    }
+
+    const notificationData: PushNotificationData = {
+      title: `Nuevo pedido - Mesa #${tableNumber}`,
+      body: `${clientName} realizó un pedido (${itemsCount} items - $${totalAmount.toFixed(2)})`,
+      data: {
+        type: "new_order",
+        tableNumber,
+        clientName,
+        itemsCount,
+        totalAmount,
+        screen: "WaiterPendingOrders",
+      },
+    };
+
+    await sendExpoPushNotification([waiter.push_token], notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación de nuevo pedido al mozo:",
+      error,
+    );
+  }
+}
+
+// Función para notificar al cliente cuando el mozo rechaza su pedido para modificación
+export async function notifyClientOrderRejectedForModification(
+  clientId: string,
+  waiterName: string,
+  tableNumber: string,
+  rejectedItemsCount: number,
+  totalItemsCount: number,
+) {
+  try {
+    const token = await getClientToken(clientId);
+
+    if (!token) {
+      return;
+    }
+
+    const notificationData: PushNotificationData = {
+      title: `Pedido devuelto - Mesa #${tableNumber}`,
+      body: `${waiterName} devolvió ${rejectedItemsCount} de ${totalItemsCount} items para modificación`,
+      data: {
+        type: "order_rejected_for_modification",
+        tableNumber,
+        waiterName,
+        rejectedItemsCount,
+        totalItemsCount,
+        screen: "ModifyOrder",
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación de pedido rechazado:",
+      error,
+    );
+  }
+}
+
+// Función para notificar a la cocina cuando hay nuevos platos
+export async function notifyKitchenNewItems(
+  tableNumber: string,
+  dishItems: Array<{ name: string; quantity: number }>,
+  clientName?: string,
+) {
+  try {
+    const tokens = await getRoleTokens("cocinero");
+
+    if (!tokens.length) {
+      return;
+    }
+
+    const totalItems = dishItems.reduce((sum, item) => sum + item.quantity, 0);
+    const itemsText = dishItems.map(item => `${item.quantity}x ${item.name}`).join(", ");
+
+    const notificationData: PushNotificationData = {
+      title: `Nuevo pedido - Mesa #${tableNumber}`,
+      body: `${totalItems} platos: ${itemsText}`,
+      data: {
+        type: "kitchen_new_items",
+        tableNumber,
+        clientName,
+        itemsCount: totalItems,
+        items: dishItems,
+        screen: "KitchenOrders",
+      },
+    };
+
+    await sendExpoPushNotification(tokens, notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación a la cocina:",
+      error,
+    );
+  }
+}
+
+// Función para notificar al bartender cuando hay nuevas bebidas
+export async function notifyBartenderNewItems(
+  tableNumber: string,
+  drinkItems: Array<{ name: string; quantity: number }>,
+  clientName?: string,
+) {
+  try {
+    const tokens = await getRoleTokens("bartender");
+
+    if (!tokens.length) {
+      return;
+    }
+
+    const totalItems = drinkItems.reduce((sum, item) => sum + item.quantity, 0);
+    const itemsText = drinkItems.map(item => `${item.quantity}x ${item.name}`).join(", ");
+
+    const notificationData: PushNotificationData = {
+      title: `Nuevo pedido - Mesa #${tableNumber}`,
+      body: `${totalItems} bebidas: ${itemsText}`,
+      data: {
+        type: "bartender_new_items",
+        tableNumber,
+        clientName,
+        itemsCount: totalItems,
+        items: drinkItems,
+        screen: "BartenderOrders",
+      },
+    };
+
+    await sendExpoPushNotification(tokens, notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación al bartender:",
+      error,
+    );
+  }
+}
+
+// Función para notificar al mozo cuando el cliente solicita la cuenta
+export async function notifyWaiterPaymentRequest(
+  waiterId: string,
+  clientName: string,
+  tableNumber: string,
+  totalAmount: number,
+) {
+  try {
+    const token = await getWaiterToken(waiterId);
+
+    if (!token) {
+      return;
+    }
+
+    const notificationData: PushNotificationData = {
+      title: `💳 Solicitud de cuenta - Mesa #${tableNumber}`,
+      body: `${clientName} solicita la cuenta: $${totalAmount.toLocaleString()}`,
+      data: {
+        type: "payment_request",
+        tableNumber,
+        clientName,
+        totalAmount,
+        waiterId,
+        screen: "WaiterPayments",
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación de solicitud de cuenta:",
+      error,
+    );
+  }
+}
+
+// Función para notificar al cliente cuando el mozo confirma el pago
+export async function notifyClientPaymentConfirmation(
+  clientId: string,
+  waiterName: string,
+  tableNumber: string,
+  totalAmount: number,
+) {
+  try {
+    const token = await getClientToken(clientId);
+
+    if (!token) {
+      return;
+    }
+
+    const notificationData: PushNotificationData = {
+      title: `✅ Pago confirmado - Mesa #${tableNumber}`,
+      body: `${waiterName} confirmó tu pago de $${totalAmount.toLocaleString()}. ¡Gracias por tu visita!`,
+      data: {
+        type: "payment_confirmed",
+        tableNumber,
+        waiterName,
+        totalAmount,
+        screen: "PaymentSuccess",
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación de confirmación de pago:",
+      error,
+    );
+  }
+}
+
+// Función para notificar al dueño y supervisor cuando se realiza un pago
+export async function notifyManagementPaymentReceived(
+  clientName: string,
+  tableNumber: string,
+  totalAmount: number,
+  waiterName: string,
+  paymentMethod?: string,
+) {
+  try {
+    const tokens = await getSupervisorAndOwnerTokens();
+
+    if (!tokens.length) {
+      return;
+    }
+
+    const paymentInfo = paymentMethod ? ` (${paymentMethod})` : '';
+    
+    const notificationData: PushNotificationData = {
+      title: `💰 Pago recibido - Mesa #${tableNumber}`,
+      body: `${clientName} pagó $${totalAmount.toLocaleString()}${paymentInfo} - Atendido por ${waiterName}`,
+      data: {
+        type: "payment_received",
+        tableNumber,
+        clientName,
+        totalAmount,
+        waiterName,
+        paymentMethod,
+        screen: "PaymentReports",
+      },
+    };
+
+    await sendExpoPushNotification(tokens, notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación de pago a gerencia:",
       error,
     );
   }

@@ -474,6 +474,36 @@ export async function activateTableByClient(
       throw new Error(`Error activando mesa: ${updateError.message}`);
     }
 
+    // 6. Actualizar el client_id en la tabla chats si existe un chat activo para esta mesa
+    try {
+      const { data: existingChat, error: chatError } = await supabaseAdmin
+        .from("chats")
+        .select("id, client_id")
+        .eq("table_id", table.id)
+        .eq("is_active", true)
+        .single();
+
+      if (!chatError && existingChat) {
+        // Si existe un chat activo y no tiene client_id o es diferente, actualizarlo
+        if (!existingChat.client_id || existingChat.client_id !== clientId) {
+          const { error: updateChatError } = await supabaseAdmin
+            .from("chats")
+            .update({ client_id: clientId })
+            .eq("id", existingChat.id);
+
+          if (updateChatError) {
+            console.error("Error actualizando client_id en chat:", updateChatError);
+            // No lanzar error porque la mesa se activó correctamente
+          } else {
+            console.log(`✅ Chat actualizado con client_id para mesa ${table.number}`);
+          }
+        }
+      }
+    } catch (chatUpdateError) {
+      console.error("Error buscando/actualizando chat:", chatUpdateError);
+      // No lanzar error porque la mesa se activó correctamente
+    }
+
     return {
       success: true,
       message: `Mesa ${table.number} activada exitosamente. ¡Bienvenido a The Last Dance!`,

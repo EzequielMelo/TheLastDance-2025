@@ -440,11 +440,12 @@ export async function getMyStatusHandler(req: Request, res: Response) {
       return res.json(result);
     }
 
-    // 3. Verificar estado en waiting_list (cualquier estado)
+    // 3. Verificar estado en waiting_list (solo estados activos)
     const { data: waitingEntry, error: waitingError } = await supabaseAdmin
       .from("waiting_list")
       .select("id, status, party_size, preferred_table_type, special_requests")
       .eq("client_id", clientId)
+      .in("status", ["waiting", "displaced"]) // Solo considerar estados activos
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -456,20 +457,8 @@ export async function getMyStatusHandler(req: Request, res: Response) {
           waitingListId: waitingEntry.id,
         };
         return res.json(result);
-      } else if (waitingEntry.status === "completed") {
-        const result = {
-          status: "completed",
-          waitingListId: waitingEntry.id,
-        };
-        return res.json(result);
       } else if (waitingEntry.status === "waiting") {
-        const result = {
-          status: "completed",
-          waitingListId: waitingEntry.id,
-        };
-        return res.json(result);
-      } else if (waitingEntry.status === "waiting") {
-        // Calcular posición solo si está waiting
+        // Calcular posición para usuarios en espera
         try {
           const positionData = await getClientPosition(clientId);
           const result = {

@@ -1,7 +1,10 @@
 import { Request, Response } from "express";
 import { ChatServices } from "./chatServices";
 import { supabaseAdmin } from "../../config/supabase";
-import { notifyWaitersNewClientMessage } from "../../services/pushNotificationService";
+import { 
+  notifyWaitersNewClientMessage,
+  notifyClientWaiterResponse 
+} from "../../services/pushNotificationService";
 
 export class ChatController {
   // Obtener o crear chat para una mesa
@@ -236,6 +239,35 @@ export class ChatController {
             console.error("Error enviando notificación a mozos:", notifyError);
             // No bloqueamos el envío del mensaje por error de notificación
           }
+        }
+      }
+
+      // Verificar si es un mensaje del mozo para enviar notificación al cliente
+      const isWaiterMessage = senderType === 'waiter';
+      
+      if (isWaiterMessage) {
+        try {
+          // Obtener nombre del mozo para la notificación
+          const { data: waiterData } = await supabaseAdmin
+            .from("users")
+            .select("first_name, last_name")
+            .eq("id", userId)
+            .single();
+
+          const waiterName = waiterData 
+            ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
+            : "Mesero";
+
+          // Enviar notificación al cliente
+          await notifyClientWaiterResponse(
+            tableData.id_client,
+            waiterName,
+            tableData.number.toString(),
+            message
+          );
+        } catch (notifyError) {
+          console.error("Error enviando notificación al cliente:", notifyError);
+          // No bloqueamos el envío del mensaje por error de notificación
         }
       }
 

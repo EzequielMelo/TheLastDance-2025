@@ -2075,8 +2075,10 @@ export async function checkAllItemsDelivered(
       };
     }
 
-    const deliveredItems = orderItems.filter(item => item.status === 'delivered');
-    const pendingItems = orderItems
+    // Filtrar items que NO son 'rejected' (solo considerar items válidos para entrega)
+    const validItems = orderItems.filter(item => item.status !== 'rejected');
+    const deliveredItems = validItems.filter(item => item.status === 'delivered');
+    const pendingItems = validItems
       .filter(item => item.status !== 'delivered')
       .map(item => ({
         id: item.id,
@@ -2084,10 +2086,13 @@ export async function checkAllItemsDelivered(
         status: item.status as OrderItemStatus
       }));
 
-    const allDelivered = deliveredItems.length === orderItems.length;
+    // Considerar "todo entregado" si todos los items válidos (no rejected) están delivered
+    const allDelivered = validItems.length === 0 || deliveredItems.length === validItems.length;
 
-    // Si todos los items están entregados, actualizar el table_status de la mesa
-    if (allDelivered && orderItems.length > 0) {
+    console.log(`📊 Verificación de entrega - Total items: ${orderItems.length}, Items válidos (no rejected): ${validItems.length}, Entregados: ${deliveredItems.length}, Pendientes: ${pendingItems.length}`);
+
+    // Si todos los items válidos están entregados, actualizar el table_status de la mesa
+    if (allDelivered && validItems.length > 0) {
       const { error: tableUpdateError } = await supabaseAdmin
         .from("tables")
         .update({
@@ -2103,7 +2108,7 @@ export async function checkAllItemsDelivered(
 
     return {
       allDelivered,
-      totalItems: orderItems.length,
+      totalItems: validItems.length, // Solo contar items válidos (no rejected)
       deliveredItems: deliveredItems.length,
       pendingItems
     };
@@ -2389,6 +2394,55 @@ export async function markItemAsDelivered(itemId: string, waiterId: string): Pro
 
   } catch (error) {
     console.error("❌ Error en markItemAsDelivered:", error);
+    throw error;
+  }
+}
+
+export async function submitTandaModifications(orderId: string, clientId: string): Promise<void> {
+  try {
+    console.log(`🔄 Reenviando modificaciones de tanda para orden ${orderId} del cliente ${clientId}`);
+
+    // 1. Verificar que la orden pertenece al cliente
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from("orders")
+      .select("id, user_id")
+      .eq("id", orderId)
+      .eq("user_id", clientId)
+      .single();
+
+    if (orderError || !order) {
+      throw new Error("Orden no encontrada o no pertenece al cliente");
+    }
+
+    // 2. Cambiar todos los items con status 'needs_modification' a 'pending'
+    const { data: modifiedItems, error: updateError } = await supabaseAdmin
+      .from("order_items")
+      .update({ 
+        status: "pending",
+        updated_at: new Date().toISOString()
+      })
+      .eq("order_id", orderId)
+      .eq("status", "needs_modification")
+      .select("id, menu_items(name)");
+
+    if (updateError) {
+      throw new Error(`Error actualizando items: ${updateError.message}`);
+    }
+
+    // 3. Los items 'rejected' se mantienen como están (no se modifican)
+    
+    if (modifiedItems && modifiedItems.length > 0) {
+      const itemNames = modifiedItems.map(item => 
+        (item as any).menu_items?.name || 'Item desconocido'
+      ).join(', ');
+      
+      console.log(`✅ ${modifiedItems.length} items reenviados al mozo: ${itemNames}`);
+    } else {
+      console.log("⚠️ No se encontraron items con status 'needs_modification' para reenviar");
+    }
+
+  } catch (error) {
+    console.error("❌ Error en submitTandaModifications:", error);
     throw error;
   }
 }
