@@ -137,7 +137,6 @@ export async function getOrderById(orderId: string): Promise<OrderWithItems> {
 
 // Obtener pedidos del usuario
 export async function getUserOrders(userId: string): Promise<OrderWithItems[]> {
-
   const { data, error } = await supabaseAdmin
     .from("orders")
     .select(
@@ -767,7 +766,9 @@ export async function addItemsToPartialOrder(
         throw new Error(`Producto con ID ${newItem.id} no encontrado`);
 
       // Verificar precios (opcional - se podría usar precio de BD)
-      if (Math.abs(menuItem.price - newItem.price) > 0.01)
+      if (Math.abs(menuItem.price - newItem.price) > 0.01) {
+        // Precio no coincide - usando precio de BD por seguridad
+      }
     }
 
     // 4. Insertar nuevos order_items
@@ -886,7 +887,9 @@ export async function addItemsToExistingOrder(
         throw new Error(`Producto con ID ${newItem.id} no encontrado`);
 
       // Verificar precios (opcional - se podría usar precio de BD)
-      if (Math.abs(menuItem.price - newItem.price) > 0.01)
+      if (Math.abs(menuItem.price - newItem.price) > 0.01) {
+        // Precio no coincide - usando precio de BD por seguridad
+      }
     }
 
     // 5. Generar un batch_id único para esta nueva tanda
@@ -1177,7 +1180,6 @@ export async function waiterItemsActionNew(
   affectedItems: any[];
 }> {
   try {
-    
     // 1. Verificar que la orden existe y no está pagada
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
@@ -1461,7 +1463,6 @@ export async function replaceRejectedItems(
 // Obtener pedidos para cocina (items con category "plato" en estados activos)
 export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
   try {
-    
     // Obtener todos los items activos que son platos
     const { data: kitchenItems, error: itemsError } = await supabaseAdmin
       .from("order_items")
@@ -1554,7 +1555,6 @@ export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
 export async function updateKitchenItemStatus(
   itemId: string,
   newStatus: OrderItemStatus,
-  cookId: string,
 ): Promise<{ success: boolean; message: string }> {
   try {
     // Validar que el nuevo status es válido para cocina
@@ -1697,7 +1697,6 @@ export async function getTableOrdersStatus(
 // Obtener pedidos pendientes para bar (items con category "bebida" y status "accepted")
 export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
   try {
-    
     // Obtener todos los items activos que son bebidas
     const { data: barItems, error: itemsError } = await supabaseAdmin
       .from("order_items")
@@ -1776,7 +1775,7 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
     });
 
     const ordersArray = Array.from(ordersMap.values());
-    
+
     return ordersArray;
   } catch (error) {
     console.error("❌ Error en getBartenderPendingOrders:", error);
@@ -1788,7 +1787,6 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
 export async function updateBartenderItemStatus(
   itemId: string,
   newStatus: OrderItemStatus,
-  bartenderId: string,
 ): Promise<{ success: boolean; message: string }> {
   try {
     // Validar que el nuevo status es válido para bar

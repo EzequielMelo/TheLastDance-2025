@@ -100,7 +100,7 @@ export async function createOrderHandler(
 
     const parsed = createOrderSchema.parse(req.body);
     const userId = req.user.appUserId;
-    
+
     const orderData: CreateOrderDTO = {
       table_id: parsed.table_id,
       items: parsed.items as any,
@@ -441,7 +441,7 @@ export async function addItemsToPartialOrderHandler(
 
     const parsed = addItemToPartialOrderSchema.parse(req.body);
     const userId = req.user.appUserId;
-    
+
     const result = await addItemsToPartialOrder(orderId, parsed.items, userId);
     res.json({
       success: true,
@@ -485,7 +485,7 @@ export async function addItemsToExistingOrderHandler(
 
     const parsed = addItemToPartialOrderSchema.parse(req.body);
     const userId = req.user.appUserId;
-    
+
     const result = await addItemsToExistingOrder(orderId, parsed.items, userId);
     res.json({
       success: true,
@@ -783,11 +783,7 @@ export async function updateKitchenItemStatusHandler(
       });
       return;
     }
-    const result = await updateKitchenItemStatus(
-      itemId,
-      status,
-      req.user.appUserId,
-    );
+    const result = await updateKitchenItemStatus(itemId, status);
 
     if (!result.success) {
       res.status(400).json({
@@ -885,11 +881,7 @@ export async function updateBartenderItemStatusHandler(
       });
       return;
     }
-    const result = await updateBartenderItemStatus(
-      itemId,
-      status,
-      req.user.appUserId,
-    );
+    const result = await updateBartenderItemStatus(itemId, status);
 
     if (!result.success) {
       res.status(400).json({
