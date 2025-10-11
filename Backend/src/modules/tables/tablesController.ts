@@ -15,7 +15,10 @@ import type {
   CreateWaitingListEntry,
   AssignTableRequest,
 } from "./tables.types";
-import { notifyMaitreNewWaitingClient, notifyClientTableAssigned } from "../../services/pushNotificationService";
+import {
+  notifyMaitreNewWaitingClient,
+  notifyClientTableAssigned,
+} from "../../services/pushNotificationService";
 
 // ========== CONTROLADORES PARA LISTA DE ESPERA ==========
 
@@ -25,7 +28,7 @@ export async function getWaitingListHandler(_req: Request, res: Response) {
     const result = await getWaitingList();
     return res.json(result);
   } catch (e: any) {
-    console.error('📋 getWaitingListHandler - Error:', e.message);
+    console.error("📋 getWaitingListHandler - Error:", e.message);
     return res.status(400).json({ error: e.message });
   }
 }
@@ -58,7 +61,7 @@ export async function addToWaitingListHandler(req: Request, res: Response) {
     }
 
     const result = await addToWaitingList(entryData);
-    
+
     // Notificar al maître sobre el nuevo cliente en lista de espera
     try {
       // Obtener el nombre del cliente para la notificación
@@ -67,18 +70,18 @@ export async function addToWaitingListHandler(req: Request, res: Response) {
         .select("name")
         .eq("id", entryData.client_id)
         .single();
-      
+
       const clientName = clientData?.name || "Cliente";
       await notifyMaitreNewWaitingClient(
-        clientName, 
-        entryData.party_size, 
-        entryData.preferred_table_type
+        clientName,
+        entryData.party_size,
+        entryData.preferred_table_type,
       );
     } catch (notifyError) {
       console.error("Error enviando notificación al maître:", notifyError);
       // No bloqueamos la respuesta por error de notificación
     }
-    
+
     return res.status(201).json({
       message: "Agregado a la lista de espera exitosamente",
       data: result,
@@ -259,7 +262,10 @@ export async function assignTableHandler(req: Request, res: Response) {
         .single();
 
       if (waitingEntry && tableData) {
-        await notifyClientTableAssigned(waitingEntry.client_id, tableData.number.toString());
+        await notifyClientTableAssigned(
+          waitingEntry.client_id,
+          tableData.number.toString(),
+        );
       }
     } catch (notifyError) {
       console.error("Error enviando notificación al cliente:", notifyError);
@@ -398,9 +404,6 @@ export async function getMyStatusHandler(req: Request, res: Response) {
     }
 
     const clientId = req.user.appUserId;
-    const isAnonymous = req.user.profile_code === "cliente_anonimo";
-    if (isAnonymous) {
-    }
 
     // 1. Verificar mesa ocupada
     const { data: occupiedTable, error: occupiedError } = await supabaseAdmin
@@ -443,14 +446,6 @@ export async function getMyStatusHandler(req: Request, res: Response) {
       .limit(1)
       .maybeSingle();
 
-    if (isAnonymous) {
-      console.log("🔍 getMyStatusHandler - Búsqueda waiting_list para anónimo:", {
-        client_id: clientId,
-        found: !!waitingEntry,
-        status: waitingEntry?.status
-      });
-    }
-
     if (waitingEntry && !waitingError) {
       if (waitingEntry.status === "displaced") {
         const result = {
@@ -474,7 +469,10 @@ export async function getMyStatusHandler(req: Request, res: Response) {
           };
           return res.json(result);
         } catch (error) {
-          console.error("🔍 getMyStatusHandler - Error calculando posición:", error);
+          console.error(
+            "🔍 getMyStatusHandler - Error calculando posición:",
+            error,
+          );
           // Si falla el cálculo de posición, aún está en waiting
           const result = {
             status: "in_queue",

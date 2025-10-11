@@ -7,9 +7,11 @@ import {
   ScrollView,
   Alert,
   ToastAndroid,
+  BackHandler,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
 import {
@@ -21,6 +23,7 @@ import {
   User,
   Crown,
   AlertCircle,
+  ArrowLeft,
 } from "lucide-react-native";
 import { useAuth } from "../../auth/AuthContext";
 import api from "../../api/axios";
@@ -50,6 +53,26 @@ export default function MyWaitingPositionScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Función para navegar al Home
+  const navigateToHome = useCallback(() => {
+    // Pasar un parámetro para indicar que debe refrescar
+    navigation.navigate("Home", { refresh: Date.now() });
+  }, [navigation]);
+
+  // Interceptar el botón de hardware de Android
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        navigateToHome();
+        return true; // Previene el comportamiento por defecto
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => subscription.remove();
+    }, [navigateToHome])
+  );
 
   const loadData = useCallback(async () => {
     if (!user?.id) return;
@@ -164,8 +187,8 @@ export default function MyWaitingPositionScreen() {
                 ToastAndroid.SHORT,
               );
 
-              // Navegar de vuelta al home
-              navigation.navigate("Home");
+              // Navegar de vuelta al home con refresh
+              navigateToHome();
             } catch (error: any) {
               console.error("Error al cancelar reserva:", error);
               const errorMessage =
@@ -236,7 +259,7 @@ export default function MyWaitingPositionScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => navigation.navigate("Home")}
+            onPress={navigateToHome}
             className="bg-white/20 px-6 py-3 rounded-xl"
           >
             <Text className="text-white font-semibold">Volver</Text>
@@ -247,11 +270,40 @@ export default function MyWaitingPositionScreen() {
   }
 
   return (
-    <LinearGradient
-      colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
-      className="flex-1"
-    >
-      <ScrollView
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#1a1a1a" }}>
+      <LinearGradient
+        colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
+        className="flex-1"
+      >
+        {/* Header manual */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 16,
+            paddingVertical: 16,
+            borderBottomWidth: 1,
+            borderBottomColor: "#333",
+          }}
+        >
+          <TouchableOpacity
+            style={{ marginRight: 16 }}
+            onPress={navigateToHome}
+          >
+            <ArrowLeft size={24} color="#d4af37" />
+          </TouchableOpacity>
+          
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 20, fontWeight: "bold", color: "#ffffff" }}>
+              Mi Posición
+            </Text>
+            <Text style={{ fontSize: 14, color: "#999", marginTop: 2 }}>
+              The Last Dance
+            </Text>
+          </View>
+        </View>
+
+        <ScrollView
         className="flex-1 px-6 pt-6"
         refreshControl={
           <RefreshControl
@@ -401,5 +453,6 @@ export default function MyWaitingPositionScreen() {
         </View>
       </ScrollView>
     </LinearGradient>
+    </SafeAreaView>
   );
 }

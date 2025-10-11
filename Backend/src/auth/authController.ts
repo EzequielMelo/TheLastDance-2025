@@ -170,7 +170,6 @@ export const checkTokenValidity: RequestHandler = async (req, res) => {
 
 export const updatePushToken: RequestHandler = async (req, res) => {
   try {
-
     const authHeader = req.headers.authorization || "";
     if (!authHeader.startsWith("Bearer ")) {
       res.status(401).json({ error: "Token no proporcionado." });
@@ -234,7 +233,6 @@ export const updatePushToken: RequestHandler = async (req, res) => {
 
 export const refreshToken: RequestHandler = async (req, res) => {
   try {
-
     const { refresh_token } = req.body;
 
     if (!refresh_token) {
@@ -253,7 +251,6 @@ export const refreshToken: RequestHandler = async (req, res) => {
 
 export const deleteAnonymousUser: RequestHandler = async (req, res) => {
   try {
-
     const authHeader = req.headers.authorization || "";
     if (!authHeader.startsWith("Bearer ")) {
       res.status(401).json({ error: "Token no proporcionado." });
