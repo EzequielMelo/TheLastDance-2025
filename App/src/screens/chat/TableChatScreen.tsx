@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RouteProp, useRoute, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MessageCircle, Send, ArrowLeft, Users } from "lucide-react-native";
 import { useChat, ChatMessage } from "../../Hooks/useChat";
 import { useAuth } from "../../auth/useAuth";
@@ -20,10 +21,11 @@ import { RootStackParamList } from "../../navigation/RootStackParamList";
 import Avatar from "../../components/chat/Avatar";
 
 type TableChatRouteProp = RouteProp<RootStackParamList, "TableChat">;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function TableChatScreen() {
   const route = useRoute<TableChatRouteProp>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp>();
   const { user } = useAuth();
   const { tableId, autoMessage } = route.params;
 
@@ -198,7 +200,16 @@ export default function TableChatScreen() {
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              // Si se envió un mensaje automático (como "Pedir la cuenta"), 
+              // navegar al Home con refresh para actualizar el estado
+              if (autoMessageSent && autoMessage) {
+                // Usar navigate para ir al Home con refresh
+                navigation.navigate("Home", { refresh: Date.now() });
+              } else {
+                navigation.goBack();
+              }
+            }}
           >
             <ArrowLeft size={24} color="#d4af37" />
           </TouchableOpacity>

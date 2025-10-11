@@ -188,7 +188,7 @@ export default function ScanOrderQRScreen() {
           {
             text: "Volver",
             style: "cancel",
-            onPress: () => navigation.navigate("Home"),
+            onPress: () => navigation.navigate("Home", { refresh: Date.now() }),
           },
         ],
       );

@@ -135,6 +135,15 @@ export default function MyWaitingPositionScreen() {
         return;
       }
 
+      if (status === "completed") {
+        setPosition(null);
+        setMyEntry(null);
+        setError(
+          "¡Gracias por visitarnos! Has completado tu experiencia en The Last Dance. ¡Esperamos verte pronto de nuevo!",
+        );
+        return;
+      }
+
       // No está en ninguna lista
       console.log(
         "Usuario no está en la lista de espera - mostrando pantalla informativa",

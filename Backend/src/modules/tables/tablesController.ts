@@ -445,7 +445,7 @@ export async function getMyStatusHandler(req: Request, res: Response) {
       .from("waiting_list")
       .select("id, status, party_size, preferred_table_type, special_requests")
       .eq("client_id", clientId)
-      .order("seated_at", { ascending: false })
+      .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -453,6 +453,18 @@ export async function getMyStatusHandler(req: Request, res: Response) {
       if (waitingEntry.status === "displaced") {
         const result = {
           status: "displaced",
+          waitingListId: waitingEntry.id,
+        };
+        return res.json(result);
+      } else if (waitingEntry.status === "completed") {
+        const result = {
+          status: "completed",
+          waitingListId: waitingEntry.id,
+        };
+        return res.json(result);
+      } else if (waitingEntry.status === "waiting") {
+        const result = {
+          status: "completed",
           waitingListId: waitingEntry.id,
         };
         return res.json(result);

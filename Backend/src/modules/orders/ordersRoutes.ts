@@ -1,5 +1,3 @@
-import { payOrderHandler } from "./ordersController";
-
 import express from "express";
 import { authenticateUser } from "../../middlewares/authMiddleware";
 import {
@@ -25,13 +23,12 @@ import {
   getTableOrdersStatusHandler,
   rejectIndividualItemsHandler,
   approveBatchCompletelyHandler,
-  submitTandaModificationsHandler,
+  payOrderHandler,
+  getWaiterReadyItemsHandler,
+  markItemAsDeliveredHandler,
 } from "./ordersController";
 
 const router = express.Router();
-
-// Procesar pago de una orden
-router.put("/:orderId/pay", authenticateUser, payOrderHandler);
 
 // Rutas protegidas - requieren autenticación
 router.use(authenticateUser);
@@ -50,8 +47,10 @@ router.get("/waiter/pending", getWaiterPendingOrdersHandler);
 router.get("/waiter/active", getWaiterActiveOrdersHandler);
 router.get("/waiter/pending-items", getWaiterPendingItemsHandler); // Solo items pendientes (legacy)
 router.get("/waiter/pending-batches", getWaiterPendingBatchesHandler); // Tandas pendientes agrupadas por batch_id
+router.get("/waiter/ready-items", getWaiterReadyItemsHandler); // Items listos para entregar
 router.put("/:orderId/waiter-action", waiterOrderActionHandler);
 router.put("/:orderId/waiter-items-action", waiterItemsActionHandler); // Acción sobre items específicos
+router.put("/waiter/item/:itemId/delivered", markItemAsDeliveredHandler); // Marcar item como entregado
 
 // Nuevas rutas para rechazar/aprobar items individuales
 router.put("/:orderId/reject-individual-items", rejectIndividualItemsHandler); // Marcar items como no disponibles - devuelve toda la tanda
@@ -63,11 +62,9 @@ router.put("/:orderId/add-items", addItemsToPartialOrderHandler);
 router.put("/:orderId/add-items-to-existing", addItemsToExistingOrderHandler);
 // Reemplazar items rechazados con nuevos items
 router.put("/:orderId/replace-rejected-items", replaceRejectedItemsHandler);
-// Enviar modificaciones de tanda (mantiene rejected como auxiliares)
-router.put(
-  "/:orderId/submit-tanda-modifications",
-  submitTandaModificationsHandler,
-);
+
+// Procesar pago de todas las órdenes de una mesa (usando orderId como tableId)
+router.put("/:orderId/pay", payOrderHandler);
 
 // Obtener pedido específico por ID
 router.get("/:orderId", getOrderHandler);

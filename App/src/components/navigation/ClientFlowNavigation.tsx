@@ -20,10 +20,12 @@ import type { RootStackNavigationProp } from "../../navigation/RootStackParamLis
 
 interface ClientFlowNavigationProps {
   onRefresh?: () => void;
+  refreshTrigger?: number;
 }
 
 const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
   onRefresh,
+  refreshTrigger,
 }) => {
   const { state, waitingPosition, assignedTable, occupiedTable, deliveryConfirmationStatus, refresh } =
     useClientState();
@@ -68,21 +70,13 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
     checkDelivery();
   }, [state, occupiedTable?.id]);
 
-  // Refresh delivery status cada 30 segundos si está sentado
+  // Actualizar estado cuando se dispara el refresh trigger desde HomeScreen
   useEffect(() => {
-    if (state === "seated" && occupiedTable?.id) {
-      const interval = setInterval(async () => {
-        try {
-          const status = await checkTableDeliveryStatus(occupiedTable.id);
-          setDeliveryStatus(status);
-        } catch (error) {
-          console.error("Error in delivery status refresh:", error);
-        }
-      }, 30000); // 30 segundos
-
-      return () => clearInterval(interval);
+    if (refreshTrigger && refreshTrigger > 0) {
+      console.log("🔄 Refresh trigger activated:", refreshTrigger);
+      refresh();
     }
-  }, [state, occupiedTable?.id]);
+  }, [refreshTrigger]); // Quitar refresh de las dependencias para evitar bucles
 
   const renderStateContent = () => {
     switch (state) {

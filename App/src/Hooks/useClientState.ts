@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import api from "../api/axios";
 import { useAuth } from "../auth/useAuth";
 
@@ -43,7 +43,7 @@ export const useClientState = (): ClientStateData => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { user } = useAuth();
 
-  const checkClientState = async () => {
+  const checkClientState = useCallback(async () => {
     if (!user?.id || isRefreshing) {
       if (!user?.id) setState("error");
       return;
@@ -98,7 +98,7 @@ export const useClientState = (): ClientStateData => {
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [user?.id, isRefreshing]);
 
   useEffect(() => {
     if (user?.id) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,13 +8,15 @@ import {
   ToastAndroid,
   Modal,
   FlatList,
+  Alert,
+  ScrollView,
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
-import { AuthContext } from "../auth/AuthContext";
+import { useAuth } from "../auth/useAuth";
 import { useFocusEffect } from "@react-navigation/native";
 import api from "../api/axios";
-import { Menu, User as UserIcon, Users, QrCode, UtensilsCrossed, Wine, BookOpen } from "lucide-react-native";
+import { Menu, User as UserIcon, Users, QrCode, UtensilsCrossed, Wine, BookOpen, CheckCircle, Clock } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User";
 import ClientFlowNavigation from "../components/navigation/ClientFlowNavigation";
@@ -26,9 +28,7 @@ import { getDishesForKitchen, getDrinksForBar, MenuItem } from "../services/menu
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
 export default function HomeScreen({ navigation, route }: Props) {
-  const { token, logout } = useContext(AuthContext);
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, token, logout, isLoading } = useAuth();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [cartModalVisible, setCartModalVisible] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -36,6 +36,12 @@ export default function HomeScreen({ navigation, route }: Props) {
   const [menuType, setMenuType] = useState<"platos" | "bebidas">("platos");
   // Estado para el status en la lista de espera
   const [waitingListStatus, setWaitingListStatus] = useState<string | null>(null);
+  // Estados para items listos para entregar (mozos)
+  const [readyItems, setReadyItems] = useState<any[]>([]);
+  const [loadingReadyItems, setLoadingReadyItems] = useState(false);
+  const [deliveringItems, setDeliveringItems] = useState<Set<string>>(new Set());
+  // Estado para manejar refresh del cliente
+  const [clientRefreshTrigger, setClientRefreshTrigger] = useState(0);
 
   // Función para verificar el estado en la lista de espera
   const checkWaitingListStatus = useCallback(async () => {
@@ -50,34 +56,55 @@ export default function HomeScreen({ navigation, route }: Props) {
     }
   }, [token, user]);
 
-  // Cargar perfil desde backend (usa el Authorization del interceptor)
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        if (!token) return;
-        const { data } = await api.get("/auth/validate-token");
-        const u: User = data?.user ?? data;
-        if (mounted) setUser(u);
-      } catch (err: any) {
-        ToastAndroid.show("No se pudo cargar tu perfil", ToastAndroid.SHORT);
-      } finally {
-        if (mounted) setLoading(false);
+  // Función para cargar items listos para entregar (solo para mozos)
+  const loadReadyItems = useCallback(async () => {
+    if (!user || user.position_code !== "mozo") {
+      return;
+    }
+    
+    try {
+      setLoadingReadyItems(true);
+      const response = await api.get("/orders/waiter/ready-items");
+      
+      if (response.data.success) {
+        setReadyItems(response.data.data || []);
       }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [token]);
+    } catch (error: any) {
+      console.error("Error loading ready items:", error);
+      ToastAndroid.show(
+        error.response?.data?.error || "Error al cargar items listos", 
+        ToastAndroid.SHORT
+      );
+    } finally {
+      setLoadingReadyItems(false);
+    }
+  }, [user]);
+
+  // Cargar items listos para mozos
+  useEffect(() => {
+    if (user && user.position_code === "mozo") {
+      loadReadyItems();
+    }
+  }, [user, loadReadyItems]);
 
   // Escuchar parámetros de navegación para refrescar cuando sea necesario
   useEffect(() => {
     if (route.params?.refresh && user && token) {
       setTimeout(() => {
         checkWaitingListStatus();
+        // Triggear refresh del cliente
+        setClientRefreshTrigger(prev => prev + 1);
       }, 300);
     }
   }, [route.params?.refresh, user, token, checkWaitingListStatus]);
+
+  // Refrescar items ready cada 30 segundos para mozos
+  useEffect(() => {
+    if (user?.position_code !== "mozo") return;
+    
+    const interval = setInterval(loadReadyItems, 30000);
+    return () => clearInterval(interval);
+  }, [user, loadReadyItems]);
 
   const handleNavigate = (screenName: string, params?: any) => {
     navigation.navigate(screenName as any, params);
@@ -89,6 +116,10 @@ export default function HomeScreen({ navigation, route }: Props) {
 
   const handleOpenCart = () => {
     setCartModalVisible(true);
+  };
+
+  const handleClientRefresh = () => {
+    setClientRefreshTrigger(prev => prev + 1);
   };
 
   const loadDishesMenu = async () => {
@@ -113,6 +144,45 @@ export default function HomeScreen({ navigation, route }: Props) {
       console.error("Error loading drinks:", error);
       ToastAndroid.show("Error al cargar el menú de bebidas", ToastAndroid.SHORT);
     }
+  };
+
+  // Función para marcar item como entregado
+  const handleDeliverItem = async (itemId: string, itemName: string) => {
+    Alert.alert(
+      "Confirmar entrega",
+      `¿Confirmas que entregaste "${itemName}"?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Confirmar",
+          onPress: async () => {
+            try {
+              setDeliveringItems(prev => new Set([...prev, itemId]));
+              
+              await api.put(`/orders/waiter/item/${itemId}/delivered`);
+              
+              ToastAndroid.show("Item marcado como entregado", ToastAndroid.SHORT);
+              
+              // Recargar la lista de items listos
+              await loadReadyItems();
+              
+            } catch (error: any) {
+              console.error("Error delivering item:", error);
+              ToastAndroid.show(
+                error.response?.data?.error || "Error al marcar como entregado",
+                ToastAndroid.SHORT
+              );
+            } finally {
+              setDeliveringItems(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(itemId);
+                return newSet;
+              });
+            }
+          }
+        }
+      ]
+    );
   };
 
   const isCliente =
@@ -153,7 +223,7 @@ export default function HomeScreen({ navigation, route }: Props) {
     return colors[profileCode] || "#6b7280";
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-black">
         <ActivityIndicator />
@@ -237,10 +307,17 @@ export default function HomeScreen({ navigation, route }: Props) {
         )}
 
         {/* Contenido principal basado en rol */}
-        <View style={{ flex: 1 }}>
+        <ScrollView 
+          style={{ flex: 1 }}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 20 }}
+        >
           {isCliente ? (
             <View>
-              <ClientFlowNavigation />
+              <ClientFlowNavigation 
+                onRefresh={handleClientRefresh} 
+                refreshTrigger={clientRefreshTrigger}
+              />
               
               {/* Info sobre el sidebar para clientes */}
               <View style={{
@@ -350,10 +427,179 @@ export default function HomeScreen({ navigation, route }: Props) {
                 </Text>
               </View>
             </View>
+          ) : user?.position_code === "mozo" ? (
+            <View>
+              {/* Lista de mesas con items ready */}
+              {readyItems.length > 0 && (
+                <View style={{
+                  backgroundColor: "rgba(16, 185, 129, 0.1)",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: "rgba(16, 185, 129, 0.3)",
+                }}>
+                  <Text style={{ 
+                    color: "#10b981", 
+                    fontSize: 16, 
+                    fontWeight: "600", 
+                    marginBottom: 12 
+                  }}>
+                    � Mesas con pedidos listos
+                  </Text>
+                  
+                  <View>
+                    {readyItems.map((table) => (
+                      <View key={table.table_id} style={{
+                        backgroundColor: "#1a1a1a",
+                        borderRadius: 8,
+                        padding: 16,
+                        marginBottom: 12,
+                        borderLeftWidth: 4,
+                        borderLeftColor: "#10b981",
+                      }}>
+                        {/* Header de la mesa */}
+                        <View style={{ 
+                          flexDirection: "row", 
+                          justifyContent: "space-between", 
+                          alignItems: "center", 
+                          marginBottom: 12 
+                        }}>
+                          <Text style={{ 
+                            color: "#d4af37", 
+                            fontSize: 18, 
+                            fontWeight: "700" 
+                          }}>
+                            Mesa #{table.table_number}
+                          </Text>
+                          <View style={{ alignItems: "flex-end" }}>
+                            <Text style={{ color: "#999", fontSize: 14 }}>
+                              {table.customer_name}
+                            </Text>
+                            <Text style={{ color: "#10b981", fontSize: 12 }}>
+                              {table.items.length} item{table.items.length === 1 ? '' : 's'} listo{table.items.length === 1 ? '' : 's'}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Lista de items de la mesa */}
+                        {table.items.map((item: any, index: number) => (
+                          <View key={item.id} style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            paddingVertical: 12,
+                            borderTopWidth: index > 0 ? 1 : 0,
+                            borderTopColor: "#333",
+                          }}>
+                            <View style={{ flex: 1, marginRight: 12 }}>
+                              <Text style={{ 
+                                color: "white", 
+                                fontSize: 15, 
+                                fontWeight: "600",
+                                marginBottom: 4
+                              }}>
+                                {item.menu_item.name}
+                              </Text>
+                              <Text style={{ 
+                                color: "#999", 
+                                fontSize: 13,
+                                marginBottom: 2
+                              }}>
+                                {item.menu_item.description}
+                              </Text>
+                              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                                <Text style={{ 
+                                  color: "#d4af37", 
+                                  fontSize: 12,
+                                  fontWeight: "600"
+                                }}>
+                                  Cantidad: {item.quantity}
+                                </Text>
+                                <Text style={{ 
+                                  color: "#666", 
+                                  fontSize: 11,
+                                  marginLeft: 8,
+                                  backgroundColor: "#333",
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 2,
+                                  borderRadius: 4
+                                }}>
+                                  {item.menu_item.category}
+                                </Text>
+                              </View>
+                            </View>
+                            
+                            {/* Botón entregar */}
+                            <TouchableOpacity
+                              onPress={() => handleDeliverItem(item.id, item.menu_item.name)}
+                              disabled={deliveringItems.has(item.id)}
+                              style={{
+                                backgroundColor: "#10b981",
+                                paddingHorizontal: 16,
+                                paddingVertical: 10,
+                                borderRadius: 8,
+                                flexDirection: "row",
+                                alignItems: "center",
+                                opacity: deliveringItems.has(item.id) ? 0.7 : 1,
+                                minWidth: 90,
+                                justifyContent: "center"
+                              }}
+                            >
+                              {deliveringItems.has(item.id) ? (
+                                <ActivityIndicator size="small" color="white" />
+                              ) : (
+                                <>
+                                  <CheckCircle size={16} color="white" />
+                                  <Text style={{ 
+                                    color: "white", 
+                                    fontSize: 13, 
+                                    marginLeft: 6, 
+                                    fontWeight: "600" 
+                                  }}>
+                                    Entregar
+                                  </Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Otros accesos del mozo */}
+              <ActionCard
+                title="📋 Ver pedidos pendientes"
+                description="Gestionar pedidos que esperan aprobación"
+                icon={Clock}
+                onPress={() => handleNavigate("WaiterDashboard")}
+              />
+
+              {/* Info para mozos */}
+              <View style={{
+                backgroundColor: "rgba(16, 185, 129, 0.1)",
+                borderRadius: 12,
+                padding: 16,
+                marginTop: 16,
+                borderWidth: 1,
+                borderColor: "rgba(16, 185, 129, 0.3)",
+              }}>
+                <Text style={{ color: "#10b981", fontSize: 14, fontWeight: "600", marginBottom: 4 }}>
+                  ℹ️ Información
+                </Text>
+                <Text style={{ color: "white", fontSize: 12, lineHeight: 16 }}>
+                  Los items aparecen aquí cuando la cocina/bar los marca como "listos". 
+                  Solo verás items de tus mesas asignadas. Presiona "Entregar" cuando le des el plato al cliente.
+                </Text>
+              </View>
+            </View>
           ) : (
             <View style={{ flex: 1 }} />
           )}
-        </View>
+        </ScrollView>
       </View>
 
       {/* Sidebar */}
