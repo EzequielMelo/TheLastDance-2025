@@ -39,7 +39,7 @@ async function sendExpoPushNotification(
       "data" in result &&
       Array.isArray(result.data)
     ) {
-      result.data.forEach((item: any, index: number) => {
+      result.data.forEach((item: any) => {
         if (item.status === "error") {
         } else {
         }
