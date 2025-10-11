@@ -17,19 +17,20 @@ import type {
   CreateWaitingListEntry,
   AssignTableRequest,
 } from "./tables.types";
-import { notifyMaitreNewWaitingClient, notifyClientTableAssigned } from "../../services/pushNotificationService";
+import {
+  notifyMaitreNewWaitingClient,
+  notifyClientTableAssigned,
+} from "../../services/pushNotificationService";
 
 // ========== CONTROLADORES PARA LISTA DE ESPERA ==========
 
 // GET /api/tables/waiting-list - Obtener lista de espera (para maitre)
 export async function getWaitingListHandler(_req: Request, res: Response) {
   try {
-    console.log('📋 getWaitingListHandler - Iniciando...');
     const result = await getWaitingList();
-    console.log('📋 getWaitingListHandler - Éxito, retornando', result.waiting_list.length, 'entradas');
     return res.json(result);
   } catch (e: any) {
-    console.error('📋 getWaitingListHandler - Error:', e.message);
+    console.error("📋 getWaitingListHandler - Error:", e.message);
     return res.status(400).json({ error: e.message });
   }
 }
@@ -62,7 +63,7 @@ export async function addToWaitingListHandler(req: Request, res: Response) {
     }
 
     const result = await addToWaitingList(entryData);
-    
+
     // Notificar al maître sobre el nuevo cliente en lista de espera
     try {
       // Obtener el nombre del cliente para la notificación
@@ -71,18 +72,18 @@ export async function addToWaitingListHandler(req: Request, res: Response) {
         .select("name")
         .eq("id", entryData.client_id)
         .single();
-      
+
       const clientName = clientData?.name || "Cliente";
       await notifyMaitreNewWaitingClient(
-        clientName, 
-        entryData.party_size, 
-        entryData.preferred_table_type
+        clientName,
+        entryData.party_size,
+        entryData.preferred_table_type,
       );
     } catch (notifyError) {
       console.error("Error enviando notificación al maître:", notifyError);
       // No bloqueamos la respuesta por error de notificación
     }
-    
+
     return res.status(201).json({
       message: "Agregado a la lista de espera exitosamente",
       data: result,
@@ -136,7 +137,6 @@ export async function getClientPositionHandler(req: Request, res: Response) {
 // PUT /api/tables/waiting-list/:id/cancel - Cancelar entrada en lista de espera
 export async function cancelWaitingListHandler(req: Request, res: Response) {
   try {
-    console.log("=== CANCELAR RESERVA ===");
     console.log(
       "User:",
       req.user
@@ -154,10 +154,6 @@ export async function cancelWaitingListHandler(req: Request, res: Response) {
     const waitingListId = req.params["id"];
     const reason = req.body?.reason;
 
-    console.log("Waiting List ID:", waitingListId);
-    console.log("Reason:", reason);
-    console.log("Request body:", req.body);
-
     if (!waitingListId) {
       return res.status(400).json({ error: "ID de entrada requerido" });
     }
@@ -167,7 +163,6 @@ export async function cancelWaitingListHandler(req: Request, res: Response) {
       req.user.profile_code,
     );
 
-    console.log("Is Staff:", isStaff);
     console.log("Calling cancelWaitingListEntry with:", {
       waitingListId,
       reason,
@@ -181,8 +176,6 @@ export async function cancelWaitingListHandler(req: Request, res: Response) {
       req.user.appUserId,
       isStaff,
     );
-
-    console.log("Result from service:", result);
 
     if (!result.success) {
       return res.status(400).json({ error: result.message });
@@ -271,7 +264,10 @@ export async function assignTableHandler(req: Request, res: Response) {
         .single();
 
       if (waitingEntry && tableData) {
-        await notifyClientTableAssigned(waitingEntry.client_id, tableData.number.toString());
+        await notifyClientTableAssigned(
+          waitingEntry.client_id,
+          tableData.number.toString(),
+        );
       }
     } catch (notifyError) {
       console.error("Error enviando notificación al cliente:", notifyError);
@@ -476,7 +472,10 @@ export async function getMyStatusHandler(req: Request, res: Response) {
           };
           return res.json(result);
         } catch (error) {
-          console.error("🔍 getMyStatusHandler - Error calculando posición:", error);
+          console.error(
+            "🔍 getMyStatusHandler - Error calculando posición:",
+            error,
+          );
           // Si falla el cálculo de posición, aún está en waiting
           const result = {
             status: "in_queue",

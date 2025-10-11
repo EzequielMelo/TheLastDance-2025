@@ -16,6 +16,7 @@ export interface OrderItem {
   unit_price: number;
   subtotal: number;
   status: OrderItemStatus; // NUEVO: Status individual del item
+  batch_id?: string; // NUEVO: Identificador de tanda
   created_at: string;
   menu_item?: {
     id: string;

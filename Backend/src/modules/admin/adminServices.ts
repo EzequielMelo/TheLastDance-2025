@@ -187,8 +187,6 @@ export async function createStaff(
   }
   if (!file) throw new Error("Foto obligatoria");
 
-  console.log("✅ Validaciones pasadas, creando usuario en Auth...");
-
   // Crear en Auth con email confirmado
   const { data: authData, error: authErr } =
     await supabaseAdmin.auth.admin.createUser({
@@ -205,13 +203,10 @@ export async function createStaff(
   }
 
   const userId = authData.user.id;
-  console.log("✅ Usuario creado en Auth con ID:", userId);
 
   try {
-    console.log("📸 Subiendo avatar...");
     // Subir avatar
     const profile_image = await uploadAvatar(userId, file);
-    console.log("✅ Avatar subido:", profile_image);
 
     // Insert en 'users' aprobado
     const row: any = {
@@ -241,8 +236,6 @@ export async function createStaff(
       console.error("❌ Error insertando en users:", dbErr);
       throw new Error("Error al guardar perfil: " + dbErr.message);
     }
-
-    console.log("✅ Staff creado exitosamente!");
 
     return {
       message: "Staff creado correctamente.",

@@ -52,7 +52,7 @@ export default function WaiterOrdersScreen() {
   const [selectedItems, setSelectedItems] = useState<{
     [batchKey: string]: string[];
   }>({});
-  const [individualMode, setIndividualMode] = useState<{
+  const [rejectMode, setRejectMode] = useState<{
     [batchKey: string]: boolean;
   }>({});
 
@@ -120,8 +120,8 @@ export default function WaiterOrdersScreen() {
     }
   };
 
-  const toggleIndividualMode = (batchKey: string) => {
-    setIndividualMode(prev => ({
+  const toggleRejectMode = (batchKey: string) => {
+    setRejectMode(prev => ({
       ...prev,
       [batchKey]: !prev[batchKey],
     }));
@@ -146,44 +146,44 @@ export default function WaiterOrdersScreen() {
     });
   };
 
-  const handleIndividualAction = async (
+  const handleRejectWithSelection = async (
     orderId: string,
     batchKey: string,
-    action: "accept" | "reject",
+    batchItems: any[],
   ) => {
-    const selectedItemIds = selectedItems[batchKey] || [];
+    const rejectedItemIds = selectedItems[batchKey] || [];
 
-    if (selectedItemIds.length === 0) {
-      Alert.alert("Error", "Selecciona al menos un item");
+    if (rejectedItemIds.length === 0) {
+      Alert.alert(
+        "Error",
+        "Selecciona al menos un item que no está disponible",
+      );
       return;
     }
 
     try {
       setActionLoading(batchKey);
 
-      if (action === "accept") {
-        await approveIndividualItems(orderId, selectedItemIds);
-        Alert.alert("Éxito", `${selectedItemIds.length} items aprobados`);
-      } else {
-        await rejectIndividualItems(
-          orderId,
-          selectedItemIds,
-          "Producto sin stock disponible",
-        );
-        Alert.alert(
-          "Éxito",
-          `${selectedItemIds.length} items rechazados. El cliente puede reemplazarlos.`,
-        );
-      }
+      // Usar la función específica para rechazar items individuales de una tanda
+      await rejectIndividualItems(
+        orderId,
+        rejectedItemIds,
+        "Productos no disponibles en stock",
+      );
 
-      // Limpiar selección y modo individual
+      Alert.alert(
+        "Éxito",
+        `Tanda procesada: ${rejectedItemIds.length} items sin stock, el resto disponible para modificar.`,
+      );
+
+      // Limpiar selección y modo
       setSelectedItems(prev => ({ ...prev, [batchKey]: [] }));
-      setIndividualMode(prev => ({ ...prev, [batchKey]: false }));
+      setRejectMode(prev => ({ ...prev, [batchKey]: false }));
 
       // Refrescar datos
       await fetchOrders();
     } catch (error: any) {
-      console.error("Error procesando acción individual:", error);
+      console.error("Error procesando rechazo con selección:", error);
       Alert.alert("Error", error.message || "Error procesando la acción");
     } finally {
       setActionLoading(null);
@@ -554,38 +554,23 @@ export default function WaiterOrdersScreen() {
                             Items de la tanda ({batch.total_items}):
                           </Text>
 
-                          <TouchableOpacity
-                            onPress={() => toggleIndividualMode(batchKey)}
-                            style={{
-                              backgroundColor: individualMode[batchKey]
-                                ? "#d4af37"
-                                : "rgba(212, 175, 55, 0.2)",
-                              borderRadius: 6,
-                              paddingHorizontal: 8,
-                              paddingVertical: 4,
-                              flexDirection: "row",
-                              alignItems: "center",
-                            }}
-                          >
-                            <Settings
-                              size={12}
-                              color={
-                                individualMode[batchKey] ? "#1a1a1a" : "#d4af37"
-                              }
-                            />
+                          {rejectMode[batchKey] && (
                             <Text
                               style={{
-                                color: individualMode[batchKey]
-                                  ? "#1a1a1a"
-                                  : "#d4af37",
+                                color: "#ef4444",
                                 fontSize: 12,
-                                fontWeight: "500",
-                                marginLeft: 4,
+                                fontWeight: "600",
+                                backgroundColor: "rgba(239, 68, 68, 0.1)",
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                borderRadius: 6,
+                                borderWidth: 1,
+                                borderColor: "rgba(239, 68, 68, 0.3)",
                               }}
                             >
-                              Individual
+                              Selecciona items SIN STOCK
                             </Text>
-                          </TouchableOpacity>
+                          )}
                         </View>
 
                         {batch.items.map((item, itemIndex) => {
@@ -598,41 +583,44 @@ export default function WaiterOrdersScreen() {
                           const isSelected = (
                             selectedItems[batchKey] || []
                           ).includes(item.id);
-                          const isIndividualMode = individualMode[batchKey];
+                          const isRejectMode = rejectMode[batchKey];
 
                           return (
                             <TouchableOpacity
                               key={`${item.id}-${itemIndex}`}
                               onPress={() =>
-                                isIndividualMode &&
+                                isRejectMode &&
                                 toggleItemSelection(batchKey, item.id)
                               }
-                              disabled={!isIndividualMode}
+                              disabled={!isRejectMode}
                               style={{
                                 flexDirection: "row",
                                 alignItems: "center",
                                 backgroundColor: isSelected
-                                  ? "rgba(212, 175, 55, 0.2)"
-                                  : "rgba(59, 130, 246, 0.1)",
+                                  ? "rgba(239, 68, 68, 0.2)"
+                                  : isRejectMode
+                                    ? "rgba(59, 130, 246, 0.1)"
+                                    : "rgba(59, 130, 246, 0.05)",
                                 borderRadius: 8,
                                 padding: 12,
                                 marginBottom: 8,
                                 borderWidth: isSelected ? 1 : 0,
-                                borderColor: "#d4af37",
+                                borderColor: "#ef4444",
+                                opacity: isRejectMode ? 1 : 0.7,
                               }}
                             >
-                              {/* Checkbox en modo individual */}
-                              {isIndividualMode && (
+                              {/* Checkbox en modo rechazo */}
+                              {isRejectMode && (
                                 <View style={{ marginRight: 8 }}>
                                   {isSelected ? (
                                     <View
                                       style={{
-                                        backgroundColor: "#d4af37",
+                                        backgroundColor: "#ef4444",
                                         borderRadius: 4,
                                         padding: 2,
                                       }}
                                     >
-                                      <Check size={12} color="#1a1a1a" />
+                                      <XCircle size={12} color="white" />
                                     </View>
                                   ) : (
                                     <Square size={16} color="#6b7280" />
@@ -689,162 +677,172 @@ export default function WaiterOrdersScreen() {
                       {/* Botones de acción para la tanda */}
                       <View
                         style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
+                          flexDirection: "column",
                           gap: 12,
                         }}
                       >
-                        {individualMode ? (
+                        {rejectMode[batchKey] ? (
                           <>
-                            {/* Botones para modo individual */}
-                            <TouchableOpacity
-                              onPress={() =>
-                                handleIndividualAction(
-                                  batch.order_id,
-                                  batchKey,
-                                  "accept",
-                                )
-                              }
-                              disabled={
-                                isProcessing ||
-                                (selectedItems[batchKey] || []).length === 0
-                              }
+                            {/* Modo selección de items sin stock */}
+                            <View
                               style={{
-                                flex: 1,
-                                backgroundColor:
-                                  (selectedItems[batchKey] || []).length === 0
-                                    ? "#374151"
-                                    : "#22c55e",
-                                borderRadius: 10,
-                                padding: 14,
-                                flexDirection: "row",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                opacity: isProcessing ? 0.7 : 1,
+                                backgroundColor: "rgba(239, 68, 68, 0.1)",
+                                borderRadius: 8,
+                                padding: 12,
+                                borderWidth: 1,
+                                borderColor: "rgba(239, 68, 68, 0.3)",
                               }}
                             >
-                              <Check size={18} color="white" />
                               <Text
                                 style={{
-                                  color: "white",
-                                  fontSize: 14,
-                                  fontWeight: "600",
-                                  marginLeft: 6,
+                                  color: "#ef4444",
+                                  fontSize: 12,
+                                  textAlign: "center",
+                                  marginBottom: 8,
                                 }}
                               >
-                                Aceptar (
-                                {(selectedItems[batchKey] || []).length})
+                                Items seleccionados:{" "}
+                                <Text style={{ fontWeight: "600" }}>
+                                  SIN STOCK
+                                </Text>
+                                {"\n"}
+                                Items no seleccionados:{" "}
+                                <Text style={{ fontWeight: "600" }}>
+                                  DISPONIBLES para modificar
+                                </Text>
                               </Text>
-                            </TouchableOpacity>
+                            </View>
 
-                            <TouchableOpacity
-                              onPress={() =>
-                                handleIndividualAction(
-                                  batch.order_id,
-                                  batchKey,
-                                  "reject",
-                                )
-                              }
-                              disabled={
-                                isProcessing ||
-                                (selectedItems[batchKey] || []).length === 0
-                              }
-                              style={{
-                                flex: 1,
-                                backgroundColor:
+                            <View style={{ flexDirection: "row", gap: 12 }}>
+                              <TouchableOpacity
+                                onPress={() =>
+                                  handleRejectWithSelection(
+                                    batch.order_id,
+                                    batchKey,
+                                    batch.items,
+                                  )
+                                }
+                                disabled={
+                                  isProcessing ||
                                   (selectedItems[batchKey] || []).length === 0
-                                    ? "#374151"
-                                    : "#ef4444",
-                                borderRadius: 10,
-                                padding: 14,
-                                flexDirection: "row",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                opacity: isProcessing ? 0.7 : 1,
-                              }}
-                            >
-                              <XCircle size={18} color="white" />
-                              <Text
+                                }
                                 style={{
-                                  color: "white",
-                                  fontSize: 14,
-                                  fontWeight: "600",
-                                  marginLeft: 6,
+                                  flex: 1,
+                                  backgroundColor:
+                                    (selectedItems[batchKey] || []).length === 0
+                                      ? "#374151"
+                                      : "#ef4444",
+                                  borderRadius: 10,
+                                  padding: 14,
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  opacity: isProcessing ? 0.7 : 1,
                                 }}
                               >
-                                Rechazar (
-                                {(selectedItems[batchKey] || []).length})
-                              </Text>
-                            </TouchableOpacity>
+                                <XCircle size={18} color="white" />
+                                <Text
+                                  style={{
+                                    color: "white",
+                                    fontSize: 14,
+                                    fontWeight: "600",
+                                    marginLeft: 6,
+                                  }}
+                                >
+                                  Confirmar (
+                                  {(selectedItems[batchKey] || []).length} sin
+                                  stock)
+                                </Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                onPress={() => toggleRejectMode(batchKey)}
+                                disabled={isProcessing}
+                                style={{
+                                  backgroundColor: "#6b7280",
+                                  borderRadius: 10,
+                                  padding: 14,
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    color: "white",
+                                    fontSize: 14,
+                                    fontWeight: "600",
+                                  }}
+                                >
+                                  Cancelar
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
                           </>
                         ) : (
                           <>
-                            {/* Botones para modo batch (toda la tanda) */}
-                            <TouchableOpacity
-                              onPress={() =>
-                                handleBatchAction(
-                                  batch.order_id,
-                                  batch.items,
-                                  "accept",
-                                )
-                              }
-                              disabled={isProcessing}
-                              style={{
-                                flex: 1,
-                                backgroundColor: "#22c55e",
-                                borderRadius: 10,
-                                padding: 14,
-                                flexDirection: "row",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                opacity: isProcessing ? 0.7 : 1,
-                              }}
-                            >
-                              <CheckCircle size={18} color="white" />
-                              <Text
+                            {/* Botones principales */}
+                            <View style={{ flexDirection: "row", gap: 12 }}>
+                              <TouchableOpacity
+                                onPress={() =>
+                                  handleBatchAction(
+                                    batch.order_id,
+                                    batch.items,
+                                    "accept",
+                                  )
+                                }
+                                disabled={isProcessing}
                                 style={{
-                                  color: "white",
-                                  fontSize: 14,
-                                  fontWeight: "600",
-                                  marginLeft: 6,
+                                  flex: 1,
+                                  backgroundColor: "#22c55e",
+                                  borderRadius: 10,
+                                  padding: 16,
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  opacity: isProcessing ? 0.7 : 1,
                                 }}
                               >
-                                Aceptar Tanda
-                              </Text>
-                            </TouchableOpacity>
+                                <CheckCircle size={18} color="white" />
+                                <Text
+                                  style={{
+                                    color: "white",
+                                    fontSize: 14,
+                                    fontWeight: "600",
+                                    marginLeft: 6,
+                                  }}
+                                >
+                                  Aceptar Tanda Completa
+                                </Text>
+                              </TouchableOpacity>
 
-                            <TouchableOpacity
-                              onPress={() =>
-                                handleBatchAction(
-                                  batch.order_id,
-                                  batch.items,
-                                  "reject",
-                                )
-                              }
-                              disabled={isProcessing}
-                              style={{
-                                flex: 1,
-                                backgroundColor: "#ef4444",
-                                borderRadius: 10,
-                                padding: 14,
-                                flexDirection: "row",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                opacity: isProcessing ? 0.7 : 1,
-                              }}
-                            >
-                              <XCircle size={18} color="white" />
-                              <Text
+                              <TouchableOpacity
+                                onPress={() => toggleRejectMode(batchKey)}
+                                disabled={isProcessing}
                                 style={{
-                                  color: "white",
-                                  fontSize: 14,
-                                  fontWeight: "600",
-                                  marginLeft: 6,
+                                  flex: 1,
+                                  backgroundColor: "#ef4444",
+                                  borderRadius: 10,
+                                  padding: 16,
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  opacity: isProcessing ? 0.7 : 1,
                                 }}
                               >
-                                Rechazar Tanda
-                              </Text>
-                            </TouchableOpacity>
+                                <Settings size={18} color="white" />
+                                <Text
+                                  style={{
+                                    color: "white",
+                                    fontSize: 14,
+                                    fontWeight: "600",
+                                    marginLeft: 6,
+                                  }}
+                                >
+                                  Rechazar (Seleccionar Items)
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
                           </>
                         )}
                       </View>

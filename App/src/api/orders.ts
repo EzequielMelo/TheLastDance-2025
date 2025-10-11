@@ -240,7 +240,9 @@ export const updateKitchenItemStatus = async (
 };
 
 // Obtener estado de pedidos de una mesa (cliente escanea QR)
-export const getTableOrdersStatus = async (tableId: string): Promise<{
+export const getTableOrdersStatus = async (
+  tableId: string,
+): Promise<{
   orders: Order[];
   stats: {
     totalOrders: number;
@@ -383,17 +385,41 @@ export const approveIndividualItems = async (
   itemIds: string[],
 ): Promise<Order> => {
   try {
-    const response = await api.put(
-      `/orders/${orderId}/approve-individual-items`,
-      {
-        itemIds,
-      },
-    );
+    const response = await api.put(`/orders/${orderId}/waiter-items-action`, {
+      itemIds,
+      action: "accept",
+    });
     return response.data.order;
   } catch (error: any) {
     console.error("Error aprobando items individuales:", error);
     throw new Error(
       error.response?.data?.error || "Error aprobando items individuales",
+    );
+  }
+};
+
+// Enviar modificaciones de tanda (mantiene items rejected como auxiliares)
+export const submitTandaModifications = async (
+  orderId: string,
+  modificationsData: {
+    keepItems: string[]; // IDs de items needs_modification que se mantienen
+    newItems: Array<{
+      menu_item_id: string;
+      quantity: number;
+      unit_price: number;
+    }>;
+  },
+): Promise<Order> => {
+  try {
+    const response = await api.put(
+      `/orders/${orderId}/submit-tanda-modifications`,
+      modificationsData,
+    );
+    return response.data.order;
+  } catch (error: any) {
+    console.error("Error enviando modificaciones de tanda:", error);
+    throw new Error(
+      error.response?.data?.error || "Error enviando modificaciones de tanda",
     );
   }
 };

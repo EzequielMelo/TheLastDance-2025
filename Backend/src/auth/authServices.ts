@@ -61,10 +61,8 @@ export async function registerUser(
 
   // Foto de perfil opcional
   if (file) {
-    console.log("📸 Uploading avatar...");
     try {
       avatarUrl = await uploadAvatarService(userId!, file);
-      console.log("✅ Avatar uploaded:", avatarUrl);
     } catch (error) {
       console.error("❌ Avatar upload failed:", error);
       throw new Error("Error al subir imagen de perfil");
@@ -266,7 +264,6 @@ export async function registerAnonymousUser(
 
 export async function refreshToken(refreshToken: string) {
   try {
-    console.log("🔄 Intentando renovar token con refresh token");
 
     // Usar Supabase para renovar el token
     const { data, error } = await supabase.auth.refreshSession({
@@ -276,8 +273,6 @@ export async function refreshToken(refreshToken: string) {
     if (error || !data.session) {
       throw new Error("Error renovando token: " + error?.message);
     }
-
-    console.log("✅ Token renovado exitosamente");
 
     return {
       access_token: data.session.access_token,
@@ -345,7 +340,6 @@ export async function verifyToken(accessToken: string) {
 }
 
 export async function deleteAnonymousUser(userId: string) {
-  console.log("🗑️ Iniciando eliminación de usuario anónimo:", userId);
 
   // 1. Verificar que el usuario existe y es anónimo
   const { data: user, error: getUserError } = await supabaseAdmin
@@ -359,8 +353,6 @@ export async function deleteAnonymousUser(userId: string) {
     throw new Error("Usuario anónimo no encontrado.");
   }
 
-  console.log("👤 Usuario encontrado:", user);
-
   // 2. Eliminar foto de perfil del storage si existe
   if (user.profile_image) {
     console.log(
@@ -371,12 +363,9 @@ export async function deleteAnonymousUser(userId: string) {
     try {
       // Extraer el path correcto de la URL usando la función utilitaria
       const filePath = extractPathFromUrl(user.profile_image);
-      console.log("📁 Path extraído:", filePath);
 
       if (filePath) {
-        console.log("�️ Intentando eliminar archivo con path:", filePath);
         await deleteFile(STORAGE_BUCKETS.PROFILE_IMAGES, filePath);
-        console.log("✅ Foto eliminada del storage exitosamente");
       } else {
         console.warn(
           "⚠️ No se pudo extraer el path de la URL:",
@@ -395,7 +384,6 @@ export async function deleteAnonymousUser(userId: string) {
             alternativePath,
           );
           await deleteFile(STORAGE_BUCKETS.PROFILE_IMAGES, alternativePath);
-          console.log("✅ Foto eliminada con método alternativo");
         }
       }
     } catch (error) {
@@ -405,7 +393,6 @@ export async function deleteAnonymousUser(userId: string) {
   }
 
   // 3. Eliminar usuario de la tabla users
-  console.log("🗑️ Eliminando usuario de la base de datos");
   const { error: deleteError } = await supabaseAdmin
     .from("users")
     .delete()
@@ -418,8 +405,6 @@ export async function deleteAnonymousUser(userId: string) {
       "Error al eliminar usuario anónimo: " + deleteError.message,
     );
   }
-
-  console.log("✅ Usuario anónimo eliminado exitosamente");
 
   return {
     message: "Usuario anónimo eliminado exitosamente.",

@@ -13,7 +13,6 @@ import type {
 
 // Obtener lista de espera completa para el maitre
 export async function getWaitingList(): Promise<WaitingListResponse> {
-  console.log('📋 getWaitingList - Iniciando consulta de lista de espera');
   
   // Primero obtenemos las entradas de waiting_list
   const { data: waitingEntries, error: waitingError } = await supabaseAdmin
@@ -34,7 +33,6 @@ export async function getWaitingList(): Promise<WaitingListResponse> {
   }
 
   if (!waitingEntries || waitingEntries.length === 0) {
-    console.log('📋 getWaitingList - No hay entradas en waiting_list');
     return {
       waiting_list: [],
       total_waiting: 0,
@@ -43,7 +41,6 @@ export async function getWaitingList(): Promise<WaitingListResponse> {
 
   // Obtener IDs de clientes únicos
   const clientIds = [...new Set(waitingEntries.map(entry => entry.client_id))];
-  console.log('📋 getWaitingList - IDs de clientes:', clientIds);
 
   // Consultar usuarios por separado
   const { data: users, error: usersError } = await supabaseAdmin
@@ -79,8 +76,6 @@ export async function getWaitingList(): Promise<WaitingListResponse> {
       }
     };
   });
-
-  console.log('📋 getWaitingList - Lista combinada:', waitingList.length, 'entradas');
 
   // Calcular tiempo promedio de espera para los que ya fueron asignados hoy
   const { data: seatedToday } = await supabaseAdmin
@@ -155,7 +150,6 @@ export async function getClientPosition(clientId: string): Promise<{
   estimatedWait?: number;
   entry: WaitingListEntry;
 }> {
-  console.log('📍 getClientPosition - Calculando posición para cliente:', clientId);
   
   const { data: clientEntry } = await supabaseAdmin
     .from("waiting_list")
@@ -164,10 +158,7 @@ export async function getClientPosition(clientId: string): Promise<{
     .eq("status", "waiting")
     .single();
 
-  console.log('📍 getClientPosition - Entrada del cliente:', clientEntry);
-
   if (!clientEntry) {
-    console.log('📍 getClientPosition - Cliente no encontrado en waiting_list');
     throw new Error("Cliente no encontrado en la lista de espera");
   }
 
@@ -180,7 +171,6 @@ export async function getClientPosition(clientId: string): Promise<{
     );
 
   const position = (count || 0) + 1;
-  console.log('📍 getClientPosition - Posición calculada:', position);
 
   // Estimar tiempo de espera basado en promedio del día
   const { data: avgData } = await supabaseAdmin
@@ -205,8 +195,6 @@ export async function getClientPosition(clientId: string): Promise<{
 
     estimatedWait = Math.round((avgWaitTime / (1000 * 60)) * position); // minutos * posición
   }
-
-  console.log('📍 getClientPosition - Tiempo estimado:', estimatedWait);
 
   return {
     position,
@@ -235,14 +223,11 @@ export async function getTablesStatus(): Promise<TablesStatusResponse> {
 
   let clientsData: any[] = [];
   if (clientIds.length > 0) {
-    console.log("Buscando información de clientes para IDs:", clientIds);
 
     const { data: clients, error: clientsError } = await supabaseAdmin
       .from("users")
       .select("id, first_name, last_name, profile_image, profile_code")
       .in("id", clientIds);
-
-    console.log("Datos de clientes obtenidos:", clients);
 
     if (clientsError) {
       console.warn("Error obteniendo datos de clientes:", clientsError.message);
@@ -303,7 +288,6 @@ export async function assignClientToTable({
       .single();
 
     if (waitingError || !waitingEntry) {
-      console.log('❌ [assignClientToTable] Cliente no encontrado en lista de espera');
       return {
         success: false,
         message: "Cliente no encontrado en la lista de espera",
@@ -320,7 +304,6 @@ export async function assignClientToTable({
       .single();
 
     if (tableError || !table) {
-      console.log('❌ [assignClientToTable] Mesa no disponible');
       return {
         success: false,
         message: "Mesa no disponible o ya asignada a otro cliente",
@@ -349,7 +332,6 @@ export async function assignClientToTable({
       .eq("id", waiting_list_id);
 
     if (updateWaitingError) {
-      console.log('❌ [assignClientToTable] Error actualizando waiting list');
       throw new Error(
         `Error actualizando lista de espera: ${updateWaitingError.message}`,
       );
@@ -542,9 +524,6 @@ export async function freeTable(
 
     // 3. Si había un cliente asignado, actualizar su estado en waiting_list
     if (clientId) {
-      console.log(`=== LIBERANDO MESA - ACTUALIZANDO CLIENTE ===`);
-      console.log(`Cliente ID: ${clientId}`);
-      console.log(`Mesa número: ${table.number}`);
 
       // Buscar la entrada más reciente del cliente en waiting_list
       const { data: waitingEntry, error: waitingError } = await supabaseAdmin
@@ -555,7 +534,6 @@ export async function freeTable(
         .limit(1)
         .single();
 
-      console.log(`Entrada en waiting_list encontrada:`, waitingEntry);
       console.log(`Error en búsqueda:`, waitingError);
 
       if (waitingError) {
@@ -564,12 +542,10 @@ export async function freeTable(
           waitingError.message,
         );
       } else if (waitingEntry) {
-        console.log(`Estado actual del cliente: ${waitingEntry.status}`);
 
         // Si el cliente tenía estado 'seated', cambiarlo a 'displaced'
         // (indica que fue removido por staff, no por cancelación propia)
         if (waitingEntry.status === "seated") {
-          console.log(`Cambiando estado de 'seated' a 'displaced'...`);
 
           const { error: statusUpdateError } = await supabaseAdmin
             .from("waiting_list")
@@ -600,7 +576,6 @@ export async function freeTable(
         );
       }
     } else {
-      console.log(`Mesa ${table.number} no tenía cliente asignado`);
     }
 
     return { success: true, message: "Mesa liberada exitosamente" };
@@ -620,12 +595,9 @@ export async function cancelWaitingListEntry(
   isStaff?: boolean,
 ): Promise<{ success: boolean; message: string }> {
   try {
-    console.log("=== SERVICIO CANCELAR ENTRADA ===");
-    console.log("Parámetros:", { waitingListId, reason, userId, isStaff });
 
     // Si no es staff, verificar que sea el dueño de la entrada
     if (!isStaff && userId) {
-      console.log("Verificando permisos para usuario no-staff...");
 
       const { data: entry, error: selectError } = await supabaseAdmin
         .from("waiting_list")
@@ -633,8 +605,6 @@ export async function cancelWaitingListEntry(
         .eq("id", waitingListId)
         .eq("status", "waiting")
         .single();
-
-      console.log("Resultado de búsqueda de entrada:", { entry, selectError });
 
       if (selectError) {
         console.error("Error en select:", selectError);
@@ -663,8 +633,6 @@ export async function cancelWaitingListEntry(
       }
     }
 
-    console.log("Procediendo a cancelar entrada...");
-
     const { error } = await supabaseAdmin
       .from("waiting_list")
       .update({
@@ -674,8 +642,6 @@ export async function cancelWaitingListEntry(
       })
       .eq("id", waitingListId)
       .eq("status", "waiting");
-
-    console.log("Resultado de update:", { error });
 
     if (error) {
       throw new Error(`Error cancelando entrada: ${error.message}`);
