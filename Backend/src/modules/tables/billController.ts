@@ -1,11 +1,13 @@
 import { Request, Response } from "express";
 import { supabaseAdmin } from "../../config/supabase";
 
-export const getBillData = async (req: Request, res: Response): Promise<void> => {
+export const getBillData = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const { tableId } = req.params;
     const userId = req.user?.appUserId;
-
 
     if (!userId) {
       res.status(401).json({
@@ -15,17 +17,15 @@ export const getBillData = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-
     // 1. Verificar que el usuario tiene acceso a esta mesa
-    
+
     // Primero, verificar si la mesa existe
     const { data: tableExists, error: existsError } = await supabaseAdmin
       .from("tables")
       .select("id, number, id_client, is_occupied, table_status")
       .eq("id", tableId)
       .single();
-    
-    
+
     if (existsError || !tableExists) {
       console.log(`❌ Mesa no existe. Error:`, existsError);
       res.status(404).json({
@@ -34,7 +34,7 @@ export const getBillData = async (req: Request, res: Response): Promise<void> =>
       });
       return;
     }
-    
+
     // Ahora verificar si el usuario tiene acceso
     const { data: table, error: tableError } = await supabaseAdmin
       .from("tables")
@@ -43,7 +43,6 @@ export const getBillData = async (req: Request, res: Response): Promise<void> =>
       .eq("id_client", userId)
       .eq("is_occupied", true)
       .single();
-
 
     if (tableError || !table) {
       res.status(404).json({
@@ -54,7 +53,7 @@ export const getBillData = async (req: Request, res: Response): Promise<void> =>
     }
 
     // 2. Verificar que el estado de la mesa sea 'bill_requested'
-    if (table.table_status !== 'bill_requested') {
+    if (table.table_status !== "bill_requested") {
       res.status(400).json({
         success: false,
         message: "La cuenta no ha sido solicitada para esta mesa",
@@ -65,7 +64,8 @@ export const getBillData = async (req: Request, res: Response): Promise<void> =>
     // 3. Obtener todos los pedidos de la mesa
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
-      .select(`
+      .select(
+        `
         id,
         total_amount,
         created_at,
@@ -81,7 +81,8 @@ export const getBillData = async (req: Request, res: Response): Promise<void> =>
             category
           )
         )
-      `)
+      `,
+      )
       .eq("table_id", tableId)
       .eq("user_id", userId)
       .eq("order_items.status", "delivered")
@@ -95,6 +96,22 @@ export const getBillData = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
+    // Primero, verificar si la mesa existe
+    const { data: user, error: userError } = await supabaseAdmin
+      .from("users")
+      .select("id, first_name, last_name")
+      .eq("id", userId)
+      .single();
+    console.log("Usuario obtenido:", user);
+
+    if (!user || userError) {
+      console.log(`❌ Usuario no existe. Error:`, userError);
+      res.status(404).json({
+        success: false,
+        message: "Usuario no encontrado",
+      });
+      return;
+    }
 
     // 4. Procesar los datos para el formato del ticket
     let billItems: any[] = [];
@@ -102,7 +119,9 @@ export const getBillData = async (req: Request, res: Response): Promise<void> =>
 
     orders?.forEach(order => {
       order.order_items?.forEach((item: any) => {
-        const menuItem = Array.isArray(item.menu_items) ? item.menu_items[0] : item.menu_items;
+        const menuItem = Array.isArray(item.menu_items)
+          ? item.menu_items[0]
+          : item.menu_items;
         billItems.push({
           id: item.id,
           name: menuItem?.name || "Item desconocido",
@@ -126,6 +145,7 @@ export const getBillData = async (req: Request, res: Response): Promise<void> =>
     const billData = {
       tableNumber: table.number,
       tableId: table.id,
+      idClient: user.id,
       items: billItems,
       subtotal,
       gameDiscounts,
@@ -135,14 +155,15 @@ export const getBillData = async (req: Request, res: Response): Promise<void> =>
       currency: "ARS", // o la moneda que uses
     };
 
-    console.log(`✅ Datos de cuenta procesados: ${billItems.length} items, total: $${finalTotal}`);
+    console.log(
+      `✅ Datos de cuenta procesados: ${billItems.length} items, total: $${finalTotal}`,
+    );
 
     res.json({
       success: true,
       data: billData,
       message: "Datos de cuenta obtenidos exitosamente",
     });
-
   } catch (error) {
     console.error("Error en getBillData:", error);
     res.status(500).json({

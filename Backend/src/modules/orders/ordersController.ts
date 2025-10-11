@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import {
   createOrder,
+  payOrder,
   getOrderById,
   getUserOrders,
   getTableOrders,
@@ -28,6 +29,54 @@ import {
   submitTandaModifications,
 } from "./ordersServices";
 import type { CreateOrderDTO, OrderItemStatus } from "./orders.types";
+
+// Esquema para procesar pago de orden
+/*
+const payOrderSchema = z.object({
+  totalAmount: z.number().positive(),
+  tipAmount: z.number().min(0),
+  satisfaction: z.object({
+    percentage: z.number().min(0).max(100),
+    label: z.string(),
+    tipPercentage: z.number().min(0).max(100),
+  }),
+});
+*/
+
+// Handler para procesar pago de orden
+export async function payOrderHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Usuario no autenticado" });
+      return;
+    }
+    const { orderId } = req.params;
+    if (!orderId) {
+      res.status(400).json({ error: "ID de la orden requerido" });
+      return;
+    }
+    const { idClient } = req.body;
+    console.log("Client ID:", idClient);
+    if (!idClient) {
+      res.status(400).json({ error: "ID de cliente requerido" });
+      return;
+    }
+    const updatedOrder = await payOrder(orderId, idClient);
+    res.json({
+      success: true,
+      message: "Pago procesado exitosamente",
+      order: updatedOrder,
+    });
+  } catch (error: any) {
+    console.error("❌ Error procesando pago de orden:", error);
+    res.status(400).json({
+      error: error.message || "Error al procesar el pago de la orden",
+    });
+  }
+}
 
 const createOrderSchema = z.object({
   table_id: z.string().uuid().optional(),
@@ -1093,7 +1142,7 @@ export async function checkTableDeliveryStatusHandler(
       return;
     }
 
-    const tableId = req.params['tableId'];
+    const tableId = req.params["tableId"];
     const userId = req.user.appUserId;
 
     if (!tableId) {
@@ -1106,8 +1155,8 @@ export async function checkTableDeliveryStatusHandler(
     res.json({
       success: true,
       data: deliveryStatus,
-      message: deliveryStatus.allDelivered 
-        ? "Todos los items han sido entregados" 
+      message: deliveryStatus.allDelivered
+        ? "Todos los items han sido entregados"
         : `${deliveryStatus.pendingItems.length} items pendientes de entrega`,
     });
   } catch (error: any) {

@@ -1,3 +1,5 @@
+import { payOrderHandler } from "./ordersController";
+
 import express from "express";
 import { authenticateUser } from "../../middlewares/authMiddleware";
 import {
@@ -27,6 +29,9 @@ import {
 } from "./ordersController";
 
 const router = express.Router();
+
+// Procesar pago de una orden
+router.put("/:orderId/pay", authenticateUser, payOrderHandler);
 
 // Rutas protegidas - requieren autenticación
 router.use(authenticateUser);

@@ -1,3 +1,4 @@
+// Procesar pago de una orden
 import api from "./axios";
 import type { Order, CreateOrderRequest } from "../types/Order";
 
@@ -14,6 +15,24 @@ export interface WaiterOrderActionResponse {
   order: Order;
   rejectedItems?: any[];
 }
+
+export const payOrder = async (
+  orderId: string,
+  idClient: string,
+): Promise<Order> => {
+  try {
+    const response = await api.put(`/orders/${orderId}/pay`, {
+      idClient,
+    });
+    console.log("Response from payOrder:", response.data);
+    return response.data.order;
+  } catch (error: any) {
+    console.error("Error procesando pago de orden:", error);
+    throw new Error(
+      error.response?.data?.error || "Error procesando pago de la orden",
+    );
+  }
+};
 
 export const getUserOrders = async (): Promise<Order[]> => {
   try {
@@ -283,7 +302,9 @@ export const getTableOrdersStatus = async (
 };
 
 // Verificar si todos los items de una mesa están entregados
-export const checkTableDeliveryStatus = async (tableId: string): Promise<{
+export const checkTableDeliveryStatus = async (
+  tableId: string,
+): Promise<{
   allDelivered: boolean;
   totalItems: number;
   deliveredItems: number;
@@ -305,7 +326,9 @@ export const checkTableDeliveryStatus = async (tableId: string): Promise<{
 };
 
 // Confirmar que se ha recibido el pedido completo (persistente)
-export const confirmTableDelivery = async (tableId: string): Promise<{
+export const confirmTableDelivery = async (
+  tableId: string,
+): Promise<{
   success: boolean;
   message: string;
   table?: any;
@@ -317,9 +340,7 @@ export const confirmTableDelivery = async (tableId: string): Promise<{
     return response.data;
   } catch (error: any) {
     console.error("❌ API: Error confirmando entrega:", error);
-    throw new Error(
-      error.response?.data?.error || "Error confirmando entrega",
-    );
+    throw new Error(error.response?.data?.error || "Error confirmando entrega");
   }
 };
 

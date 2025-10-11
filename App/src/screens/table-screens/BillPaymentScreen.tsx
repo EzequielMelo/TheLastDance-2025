@@ -8,7 +8,10 @@ import {
   Alert,
 } from "react-native";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
-import type { RootStackNavigationProp, RootStackParamList } from "../../navigation/RootStackParamList";
+import type {
+  RootStackNavigationProp,
+  RootStackParamList,
+} from "../../navigation/RootStackParamList";
 import {
   Receipt,
   DollarSign,
@@ -18,6 +21,7 @@ import {
 } from "lucide-react-native";
 import { useAuth } from "../../auth/useAuth";
 import api from "../../api/axios";
+import { payOrder } from "../../api/orders";
 
 interface BillItem {
   id: string;
@@ -37,6 +41,7 @@ interface GameDiscount {
 interface BillData {
   tableNumber: number;
   tableId: string;
+  idClient: string;
   items: BillItem[];
   subtotal: number;
   gameDiscounts: GameDiscount[];
@@ -61,12 +66,13 @@ const satisfactionLevels: SatisfactionLevel[] = [
 ];
 
 const BillPaymentScreen: React.FC = () => {
-  const route = useRoute<RouteProp<RootStackParamList, 'BillPayment'>>();
+  const route = useRoute<RouteProp<RootStackParamList, "BillPayment">>();
   const navigation = useNavigation<RootStackNavigationProp>();
   const { user } = useAuth();
-  
+
   const [billData, setBillData] = useState<BillData | null>(null);
-  const [selectedSatisfaction, setSelectedSatisfaction] = useState<SatisfactionLevel>(satisfactionLevels[0]);
+  const [selectedSatisfaction, setSelectedSatisfaction] =
+    useState<SatisfactionLevel>(satisfactionLevels[0]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,23 +86,27 @@ const BillPaymentScreen: React.FC = () => {
       setError(null);
 
       const tableId = route.params?.tableId;
-      
+
       if (!tableId) {
         setError("ID de mesa no proporcionado");
         return;
       }
 
       const response = await api.get(`/tables/${tableId}/bill`);
-      
+
       if (response.data.success) {
         setBillData(response.data.data);
       } else {
-        setError(response.data.message || "Error al cargar los datos de la cuenta");
+        setError(
+          response.data.message || "Error al cargar los datos de la cuenta",
+        );
       }
     } catch (err: any) {
       console.error("Error loading bill data:", err);
       console.error("Error response:", err.response?.data);
-      setError(err.response?.data?.message || "Error al cargar los datos de la cuenta");
+      setError(
+        err.response?.data?.message || "Error al cargar los datos de la cuenta",
+      );
     } finally {
       setLoading(false);
     }
@@ -104,7 +114,9 @@ const BillPaymentScreen: React.FC = () => {
 
   const calculateTipAmount = (): number => {
     if (!billData) return 0;
-    return Math.round((billData.finalTotal * selectedSatisfaction.tipPercentage) / 100);
+    return Math.round(
+      (billData.finalTotal * selectedSatisfaction.tipPercentage) / 100,
+    );
   };
 
   const getTotalWithTip = (): number => {
@@ -122,15 +134,15 @@ const BillPaymentScreen: React.FC = () => {
       Alert.alert(
         "Confirmar Pago",
         `Total a pagar: $${totalAmount.toLocaleString()}\n` +
-        `Propina: $${tipAmount.toLocaleString()}\n\n` +
-        `¿Proceder con el pago?`,
+          `Propina: $${tipAmount.toLocaleString()}\n\n` +
+          `¿Proceder con el pago?`,
         [
           { text: "Cancelar", style: "cancel" },
           {
             text: "Confirmar",
             onPress: () => processPay(totalAmount, tipAmount),
           },
-        ]
+        ],
       );
     } catch (err) {
       console.error("Error handling payment:", err);
@@ -140,8 +152,17 @@ const BillPaymentScreen: React.FC = () => {
 
   const processPay = async (totalAmount: number, tipAmount: number) => {
     try {
-      // TODO: Implementar llamada a la API para procesar el pago
-      
+      if (!billData) return;
+      // Log de los datos enviados a payOrder
+      console.log("Datos enviados a payOrder:", {
+        tableId: billData.tableId,
+        idClient: billData.idClient,
+        totalAmount,
+        tipAmount,
+        selectedSatisfaction,
+      });
+      // Llamar a la API para procesar el pago
+      await payOrder(billData.tableId, billData.idClient);
       Alert.alert(
         "Pago Procesado",
         "¡Gracias por tu visita! El pago ha sido procesado exitosamente.",
@@ -150,7 +171,7 @@ const BillPaymentScreen: React.FC = () => {
             text: "OK",
             onPress: () => navigation.navigate("Home"),
           },
-        ]
+        ],
       );
     } catch (err) {
       console.error("Error processing payment:", err);
@@ -199,8 +220,11 @@ const BillPaymentScreen: React.FC = () => {
           <Text className="text-white text-lg font-semibold mb-3">
             Pedidos Realizados
           </Text>
-          {billData.items.map((item) => (
-            <View key={item.id} className="flex-row justify-between items-center py-2">
+          {billData.items.map(item => (
+            <View
+              key={item.id}
+              className="flex-row justify-between items-center py-2"
+            >
               <View className="flex-1">
                 <Text className="text-white font-medium">{item.name}</Text>
                 <Text className="text-gray-400 text-sm">
@@ -212,7 +236,7 @@ const BillPaymentScreen: React.FC = () => {
               </Text>
             </View>
           ))}
-          
+
           {/* Subtotal */}
           <View className="border-t border-gray-700 mt-3 pt-3">
             <View className="flex-row justify-between">
@@ -231,26 +255,37 @@ const BillPaymentScreen: React.FC = () => {
               <Gift size={20} color="#10b981" className="mr-2" />
               Descuentos por Juegos
             </Text>
-            {billData.gameDiscounts.map((discount: GameDiscount, index: number) => (
-              <View key={index} className="flex-row justify-between items-center py-2">
-                <View className="flex-1">
-                  <Text className="text-green-400 font-medium">{discount.gameType}</Text>
-                  <Text className="text-gray-400 text-sm">
-                    {discount.wonFirstTry ? "¡Ganaste en el primer intento!" : "Descuento aplicado"}
+            {billData.gameDiscounts.map(
+              (discount: GameDiscount, index: number) => (
+                <View
+                  key={index}
+                  className="flex-row justify-between items-center py-2"
+                >
+                  <View className="flex-1">
+                    <Text className="text-green-400 font-medium">
+                      {discount.gameType}
+                    </Text>
+                    <Text className="text-gray-400 text-sm">
+                      {discount.wonFirstTry
+                        ? "¡Ganaste en el primer intento!"
+                        : "Descuento aplicado"}
+                    </Text>
+                  </View>
+                  <Text className="text-green-400 font-semibold">
+                    -${discount.discount.toLocaleString()}
                   </Text>
                 </View>
-                <Text className="text-green-400 font-semibold">
-                  -${discount.discount.toLocaleString()}
-                </Text>
-              </View>
-            ))}
+              ),
+            )}
           </View>
         )}
 
         {/* Total Parcial */}
         <View className="bg-gray-800 rounded-lg p-4 mb-4">
           <View className="flex-row justify-between items-center">
-            <Text className="text-white text-lg font-semibold">Total Parcial</Text>
+            <Text className="text-white text-lg font-semibold">
+              Total Parcial
+            </Text>
             <Text className="text-white text-lg font-bold">
               ${billData.finalTotal.toLocaleString()}
             </Text>
@@ -263,14 +298,14 @@ const BillPaymentScreen: React.FC = () => {
             <Star size={20} color="#fbbf24" className="mr-2" />
             Grado de Satisfacción
           </Text>
-          
+
           <Text className="text-gray-300 mb-3">
             Selecciona tu nivel de satisfacción con el servicio:
           </Text>
-          
+
           {/* Opciones de satisfacción */}
           <View className="space-y-2 mb-4">
-            {satisfactionLevels.map((level) => (
+            {satisfactionLevels.map(level => (
               <TouchableOpacity
                 key={level.percentage}
                 onPress={() => setSelectedSatisfaction(level)}
@@ -296,11 +331,12 @@ const BillPaymentScreen: React.FC = () => {
               </TouchableOpacity>
             ))}
           </View>
-          
+
           {/* Mostrar cálculo de propina */}
           <View className="p-3 bg-gray-700 rounded-lg">
             <Text className="text-gray-300">
-              Propina calculada ({selectedSatisfaction.tipPercentage}%): ${calculateTipAmount().toLocaleString()}
+              Propina calculada ({selectedSatisfaction.tipPercentage}%): $
+              {calculateTipAmount().toLocaleString()}
             </Text>
           </View>
         </View>
@@ -323,9 +359,7 @@ const BillPaymentScreen: React.FC = () => {
           className="bg-green-600 py-4 rounded-lg flex-row justify-center items-center"
         >
           <CheckCircle size={20} color="white" className="mr-2" />
-          <Text className="text-white text-lg font-bold ml-2">
-            Pagar
-          </Text>
+          <Text className="text-white text-lg font-bold ml-2">Pagar</Text>
         </TouchableOpacity>
       </View>
     </View>
