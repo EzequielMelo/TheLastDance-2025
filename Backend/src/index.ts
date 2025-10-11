@@ -200,11 +200,7 @@ if (process.env["NODE_ENV"] !== "production") {
 
 // Start server
 const server = httpServer.listen(PORT, "0.0.0.0", () => {
-  console.log(
-    `🚀 Server running on port ${PORT} in ${process.env["NODE_ENV"] || "development"} mode`,
-  );
-  console.log(`📍 Health check available at http://localhost:${PORT}/health`);
-  console.log(`💬 Socket.IO chat server ready`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
 
 // Make io available for other modules

@@ -22,6 +22,7 @@ import {
   getTableOrdersStatusHandler,
   rejectIndividualItemsHandler,
   approveBatchCompletelyHandler,
+  submitTandaModificationsHandler,
 } from "./ordersController";
 
 const router = express.Router();
@@ -56,6 +57,11 @@ router.put("/:orderId/add-items", addItemsToPartialOrderHandler);
 router.put("/:orderId/add-items-to-existing", addItemsToExistingOrderHandler);
 // Reemplazar items rechazados con nuevos items
 router.put("/:orderId/replace-rejected-items", replaceRejectedItemsHandler);
+// Enviar modificaciones de tanda (mantiene rejected como auxiliares)
+router.put(
+  "/:orderId/submit-tanda-modifications",
+  submitTandaModificationsHandler,
+);
 
 // Obtener pedido específico por ID
 router.get("/:orderId", getOrderHandler);

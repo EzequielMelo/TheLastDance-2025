@@ -9,6 +9,7 @@ import {
   Alert,
   RefreshControl,
   Dimensions,
+  Modal,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -26,9 +27,15 @@ import {
   Plus,
   Minus,
   Lock,
+  X,
+  ShoppingCart,
 } from "lucide-react-native";
 import api from "../../api/axios";
-import { replaceRejectedItems } from "../../api/orders";
+import {
+  replaceRejectedItems,
+  addItemsToExistingOrder,
+  submitTandaModifications,
+} from "../../api/orders";
 import { useCart } from "../../context/CartContext";
 import FloatingCart from "../../components/cart/FloatingCart";
 import CartModal from "../../components/cart/CartModal";
@@ -92,12 +99,15 @@ export default function MenuScreen() {
     loadMenuItems();
   }, [selectedCategory]);
 
-  // Inicializar items seleccionados con los rechazados
+  // Inicializar items seleccionados solo con los disponibles (NO los rechazados)
   useEffect(() => {
     if (isModifyMode && rejectedItems.length > 0) {
       const initialSelected: { [key: string]: number } = {};
+      // Solo incluir items que NO están rechazados (disponibles en la tanda)
       rejectedItems.forEach((item: any) => {
-        initialSelected[item.menu_item_id] = item.quantity;
+        if (item.status !== "rejected") {
+          initialSelected[item.menu_item_id] = item.quantity;
+        }
       });
       setSelectedModifyItems(initialSelected);
     }
@@ -130,6 +140,16 @@ export default function MenuScreen() {
   };
 
   const handleAddToCart = (item: MenuItem) => {
+    // No permitir agregar items rechazados
+    if (wasItemRejected(item.id)) {
+      Alert.alert(
+        "Producto no disponible",
+        "Este producto fue rechazado por falta de stock. Selecciona un producto alternativo.",
+        [{ text: "Entendido" }],
+      );
+      return;
+    }
+
     if (isModifyMode) {
       // En modo modificación, actualizar items seleccionados
       setSelectedModifyItems(prev => ({
@@ -159,6 +179,16 @@ export default function MenuScreen() {
   };
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
+    // No permitir cambiar cantidad de items rechazados
+    if (wasItemRejected(itemId)) {
+      Alert.alert(
+        "Producto no disponible",
+        "Este producto fue rechazado por falta de stock. No puedes modificar su cantidad.",
+        [{ text: "Entendido" }],
+      );
+      return;
+    }
+
     if (isModifyMode) {
       // En modo modificación, actualizar items seleccionados
       if (newQuantity <= 0) {
@@ -192,31 +222,102 @@ export default function MenuScreen() {
   const wasItemRejected = (itemId: string) => {
     return (
       isModifyMode &&
-      rejectedItems.some((rejected: any) => rejected.menu_item_id === itemId)
+      rejectedItems.some(
+        (rejected: any) =>
+          rejected.menu_item_id === itemId && rejected.status === "rejected",
+      )
     );
   };
 
   const handleSubmitModifications = async () => {
-    if (!orderId || Object.keys(selectedModifyItems).length === 0) {
-      Alert.alert("Error", "Debes seleccionar al menos un producto");
+    if (!orderId) {
+      Alert.alert("Error", "No se pudo identificar la orden");
       return;
     }
 
     setIsSubmittingChanges(true);
     try {
-      const rejectedItemIds = rejectedItems.map((item: any) => item.id);
-      const formattedNewItems = Object.entries(selectedModifyItems).map(
-        ([itemId, quantity]) => {
+      // Identificar items needs_modification de la tanda original
+      const needsModificationItems = rejectedItems.filter(
+        (item: any) => item.status === "needs_modification",
+      );
+
+      // Items needs_modification que el usuario mantiene (están en selectedModifyItems)
+      const keepItems = needsModificationItems
+        .filter((item: any) => selectedModifyItems[item.menu_item_id])
+        .map((item: any) => item.id);
+
+      // Separar items nuevos de items mantenidos
+      // Incluir TODOS los items de la tanda original (rejected + needs_modification)
+      const allOriginalItems = rejectedItems.filter(
+        (item: any) =>
+          item.status === "rejected" || item.status === "needs_modification",
+      );
+      const originalMenuItems = allOriginalItems.map(
+        (item: any) => item.menu_item_id,
+      );
+
+      // Solo los items que NO existían en la tanda original son nuevos
+      const formattedNewItems = Object.entries(selectedModifyItems)
+        .filter(([itemId, quantity]) => !originalMenuItems.includes(itemId))
+        .map(([itemId, quantity]) => {
           const menuItem = menuItems.find(m => m.id === itemId);
           return {
             menu_item_id: itemId,
             quantity,
             unit_price: menuItem?.price || 0,
           };
-        },
-      );
+        });
 
-      await replaceRejectedItems(orderId, rejectedItemIds, formattedNewItems);
+      // Si no hay cambios, preguntar al usuario
+      if (keepItems.length === 0 && formattedNewItems.length === 0) {
+        Alert.alert(
+          "Sin cambios",
+          "No has realizado ningún cambio. ¿Quieres mantener solo los productos disponibles de la tanda original?",
+          [
+            { text: "Cancelar", style: "cancel" },
+            {
+              text: "Mantener disponibles",
+              onPress: async () => {
+                try {
+                  await submitTandaModifications(orderId, {
+                    keepItems: needsModificationItems.map(item => item.id),
+                    newItems: [],
+                  });
+
+                  Alert.alert(
+                    "Cambios Enviados",
+                    "Se mantendrán los productos disponibles de la tanda original",
+                    [
+                      {
+                        text: "OK",
+                        onPress: () => {
+                          refreshOrders();
+                          navigation.goBack();
+                        },
+                      },
+                    ],
+                  );
+                } catch (error: any) {
+                  Alert.alert(
+                    "Error",
+                    error.message || "No se pudieron enviar los cambios",
+                  );
+                }
+                setIsSubmittingChanges(false);
+              },
+            },
+          ],
+        );
+        setIsSubmittingChanges(false);
+        return;
+      }
+
+      // Enviar modificaciones de tanda
+      await submitTandaModifications(orderId, {
+        keepItems,
+        newItems: formattedNewItems,
+      });
 
       Alert.alert(
         "Cambios Enviados",
@@ -243,9 +344,12 @@ export default function MenuScreen() {
   };
 
   const handleCancelModifications = () => {
+    const actuallyRejectedCount = rejectedItems.filter(
+      (item: any) => item.status === "rejected",
+    ).length;
     Alert.alert(
       "Cancelar Modificación",
-      `¿Estás seguro que quieres cancelar? Los ${rejectedItems.length} productos rechazados serán eliminados permanentemente y no se agregarán productos nuevos.`,
+      `¿Estás seguro que quieres cancelar? Los ${actuallyRejectedCount} productos rechazados serán eliminados permanentemente y no se agregarán productos nuevos.`,
       [
         {
           text: "No, continuar modificando",
@@ -262,7 +366,18 @@ export default function MenuScreen() {
 
             try {
               // Solo eliminar los productos rechazados sin reemplazarlos
-              const rejectedItemIds = rejectedItems.map((item: any) => item.id);
+              const actuallyRejectedItems = rejectedItems.filter(
+                (item: any) => item.status === "rejected",
+              );
+              const rejectedItemIds = actuallyRejectedItems.map(
+                (item: any) => item.id,
+              );
+
+              if (rejectedItemIds.length === 0) {
+                Alert.alert("Error", "No hay items rechazados para eliminar.");
+                return;
+              }
+
               await replaceRejectedItems(orderId, rejectedItemIds, []); // Array vacío = no reemplazar
 
               Alert.alert(
@@ -393,93 +508,54 @@ export default function MenuScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Información de items rechazados */}
-        {isModifyMode && (
-          <View
-            style={{
-              backgroundColor: "rgba(239, 68, 68, 0.1)",
-              borderRadius: 12,
-              padding: 16,
-              marginHorizontal: 24,
-              marginBottom: 16,
-              borderWidth: 1,
-              borderColor: "rgba(239, 68, 68, 0.3)",
-            }}
-          >
-            <Text
-              style={{
-                color: "#ef4444",
-                fontSize: 16,
-                fontWeight: "600",
-                marginBottom: 8,
-              }}
-            >
-              📋 Productos Rechazados
-            </Text>
-            <Text
-              style={{
-                color: "#fca5a5",
-                fontSize: 14,
-                marginBottom: 12,
-              }}
-            >
-              {rejectedItems.length}{" "}
-              {rejectedItems.length === 1
-                ? "producto fue rechazado"
-                : "productos fueron rechazados"}{" "}
-              por el mozo. Selecciona nuevos productos para reemplazarlos.
-            </Text>
+        {/* Información compacta de items rechazados */}
+        {isModifyMode &&
+          (() => {
+            // Filtrar solo los items que fueron realmente rechazados (sin stock)
+            const actuallyRejectedItems = rejectedItems.filter(
+              (item: any) => item.status === "rejected",
+            );
 
-            {/* Lista de productos rechazados */}
-            <View style={{ gap: 8, marginBottom: 12 }}>
-              {rejectedItems.map((item: any, index: number) => (
-                <View
-                  key={index}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    backgroundColor: "rgba(239, 68, 68, 0.1)",
-                    borderRadius: 8,
-                    padding: 8,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: "#fca5a5",
-                      fontSize: 14,
-                      flex: 1,
-                    }}
-                  >
-                    • {item.menu_item?.name || "Producto"} (x{item.quantity})
-                  </Text>
-                </View>
-              ))}
-            </View>
+            if (actuallyRejectedItems.length === 0) return null;
 
-            {/* Botón para eliminar toda la tanda */}
-            <TouchableOpacity
-              onPress={handleCancelModifications}
-              style={{
-                backgroundColor: "rgba(239, 68, 68, 0.2)",
-                borderRadius: 8,
-                padding: 12,
-                alignItems: "center",
-                borderWidth: 1,
-                borderColor: "rgba(239, 68, 68, 0.4)",
-              }}
-            >
-              <Text
+            return (
+              <View
                 style={{
-                  color: "#ef4444",
-                  fontSize: 14,
-                  fontWeight: "600",
+                  backgroundColor: "rgba(239, 68, 68, 0.1)",
+                  borderRadius: 8,
+                  padding: 12,
+                  marginHorizontal: 24,
+                  marginBottom: 16,
+                  borderLeftWidth: 4,
+                  borderLeftColor: "#ef4444",
                 }}
               >
-                🗑️ No quiero reemplazar, eliminar estos productos
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
+                <View>
+                  <Text
+                    style={{
+                      color: "#ef4444",
+                      fontSize: 14,
+                      fontWeight: "600",
+                      marginBottom: 2,
+                    }}
+                  >
+                    ❌ Sin stock:{" "}
+                    {actuallyRejectedItems
+                      .map(item => item.menu_item?.name)
+                      .join(", ")}
+                  </Text>
+                  <Text
+                    style={{
+                      color: "#dc2626",
+                      fontSize: 12,
+                    }}
+                  >
+                    Selecciona productos alternativos del menú
+                  </Text>
+                </View>
+              </View>
+            );
+          })()}
 
         {/* Category Filter */}
         <View
@@ -783,9 +859,12 @@ export default function MenuScreen() {
                             style={{
                               flexDirection: "row",
                               alignItems: "center",
-                              backgroundColor: "#d4af37",
+                              backgroundColor: isRejected
+                                ? "#9ca3af"
+                                : "#d4af37",
                               borderRadius: 8,
                               paddingHorizontal: 4,
+                              opacity: isRejected ? 0.5 : 1,
                             }}
                           >
                             <TouchableOpacity
@@ -795,16 +874,20 @@ export default function MenuScreen() {
                                   getCurrentItemQuantity(item.id) - 1,
                                 )
                               }
+                              disabled={isRejected}
                               style={{
                                 padding: 8,
                               }}
                             >
-                              <Minus size={16} color="#1a1a1a" />
+                              <Minus
+                                size={16}
+                                color={isRejected ? "#ffffff" : "#1a1a1a"}
+                              />
                             </TouchableOpacity>
 
                             <Text
                               style={{
-                                color: "#1a1a1a",
+                                color: isRejected ? "#ffffff" : "#1a1a1a",
                                 fontWeight: "600",
                                 fontSize: 16,
                                 marginHorizontal: 12,
@@ -820,19 +903,25 @@ export default function MenuScreen() {
                                   getCurrentItemQuantity(item.id) + 1,
                                 )
                               }
+                              disabled={isRejected}
                               style={{
                                 padding: 8,
                               }}
                             >
-                              <Plus size={16} color="#1a1a1a" />
+                              <Plus
+                                size={16}
+                                color={isRejected ? "#ffffff" : "#1a1a1a"}
+                              />
                             </TouchableOpacity>
                           </View>
                         ) : (
                           <TouchableOpacity
                             onPress={() => handleAddToCart(item)}
+                            disabled={isRejected}
                             style={{
-                              backgroundColor:
-                                hasPendingOrder && !isModifyMode
+                              backgroundColor: isRejected
+                                ? "#9ca3af"
+                                : hasPendingOrder && !isModifyMode
                                   ? "#6b7280"
                                   : "#d4af37",
                               borderRadius: 8,
@@ -840,11 +929,27 @@ export default function MenuScreen() {
                               paddingVertical: 8,
                               flexDirection: "row",
                               alignItems: "center",
-                              opacity:
-                                hasPendingOrder && !isModifyMode ? 0.8 : 1,
+                              opacity: isRejected
+                                ? 0.5
+                                : hasPendingOrder && !isModifyMode
+                                  ? 0.8
+                                  : 1,
                             }}
                           >
-                            {hasPendingOrder && !isModifyMode ? (
+                            {isRejected ? (
+                              <>
+                                <X size={16} color="#ffffff" />
+                                <Text
+                                  style={{
+                                    color: "#ffffff",
+                                    fontWeight: "600",
+                                    marginLeft: 4,
+                                  }}
+                                >
+                                  No disponible
+                                </Text>
+                              </>
+                            ) : hasPendingOrder && !isModifyMode ? (
                               <>
                                 <Lock size={16} color="#ffffff" />
                                 <Text
@@ -883,11 +988,12 @@ export default function MenuScreen() {
         )}
       </ScrollView>
 
-      {/* Floating Cart Component o Botón de Enviar Modificaciones */}
+      {/* Floating Cart Component o Carrito de Modificaciones */}
       {isModifyMode ? (
-        // Botón para enviar modificaciones
+        // Carrito flotante para modificaciones
         Object.keys(selectedModifyItems).length > 0 && (
-          <View
+          <TouchableOpacity
+            onPress={() => setCartModalVisible(true)}
             style={{
               position: "absolute",
               bottom: 34,
@@ -906,7 +1012,7 @@ export default function MenuScreen() {
               elevation: 8,
             }}
           >
-            <View>
+            <View style={{ flex: 1 }}>
               <Text
                 style={{
                   color: "#1a1a1a",
@@ -914,7 +1020,7 @@ export default function MenuScreen() {
                   fontWeight: "600",
                 }}
               >
-                🔄 Reemplazando {rejectedItems.length} productos
+                � Productos de reemplazo
               </Text>
               <Text
                 style={{
@@ -923,32 +1029,58 @@ export default function MenuScreen() {
                   opacity: 0.8,
                 }}
               >
-                {Object.keys(selectedModifyItems).length} nuevos productos
-                seleccionados
+                {Object.values(selectedModifyItems).reduce(
+                  (sum, qty) => sum + qty,
+                  0,
+                )}{" "}
+                productos de reemplazo
               </Text>
             </View>
 
-            <TouchableOpacity
-              onPress={handleSubmitModifications}
-              disabled={isSubmittingChanges}
+            <View
               style={{
                 backgroundColor: "#1a1a1a",
                 borderRadius: 12,
-                paddingHorizontal: 16,
-                paddingVertical: 8,
-                opacity: isSubmittingChanges ? 0.7 : 1,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                flexDirection: "row",
+                alignItems: "center",
               }}
             >
               <Text
                 style={{
                   color: "#d4af37",
                   fontWeight: "600",
+                  marginRight: 4,
                 }}
               >
-                {isSubmittingChanges ? "Enviando..." : "Enviar"}
+                Ver carrito
               </Text>
-            </TouchableOpacity>
-          </View>
+              <View
+                style={{
+                  backgroundColor: "#d4af37",
+                  borderRadius: 10,
+                  width: 20,
+                  height: 20,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#1a1a1a",
+                    fontSize: 12,
+                    fontWeight: "bold",
+                  }}
+                >
+                  {Object.values(selectedModifyItems).reduce(
+                    (sum, qty) => sum + qty,
+                    0,
+                  )}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
         )
       ) : (
         // FloatingCart normal
@@ -959,6 +1091,412 @@ export default function MenuScreen() {
             onClose={() => setCartModalVisible(false)}
           />
         </>
+      )}
+
+      {/* Modal para modificaciones o CartModal normal */}
+      {isModifyMode ? (
+        <Modal
+          visible={cartModalVisible}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setCartModalVisible(false)}
+        >
+          <LinearGradient
+            colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
+            style={{ flex: 1 }}
+          >
+            <View style={{ flex: 1, paddingTop: 60 }}>
+              {/* Header del modal */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingHorizontal: 24,
+                  paddingBottom: 20,
+                  borderBottomWidth: 1,
+                  borderBottomColor: "rgba(255,255,255,0.1)",
+                }}
+              >
+                <View>
+                  <Text
+                    style={{
+                      color: "white",
+                      fontSize: 24,
+                      fontWeight: "700",
+                    }}
+                  >
+                    🛒 Productos de reemplazo
+                  </Text>
+                  <Text
+                    style={{
+                      color: "#d1d5db",
+                      fontSize: 14,
+                      marginTop: 4,
+                    }}
+                  >
+                    {Object.values(selectedModifyItems).reduce(
+                      (sum, qty) => sum + qty,
+                      0,
+                    )}{" "}
+                    productos de reemplazo
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setCartModalVisible(false)}
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                    borderRadius: 8,
+                    padding: 8,
+                  }}
+                >
+                  <X size={24} color="white" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Lista de productos seleccionados */}
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ padding: 24 }}
+              >
+                {/* Sección informativa de productos rechazados */}
+                {(() => {
+                  const actuallyRejectedItems = rejectedItems.filter(
+                    (item: any) => item.status === "rejected",
+                  );
+                  if (actuallyRejectedItems.length === 0) return null;
+
+                  return (
+                    <View
+                      style={{
+                        backgroundColor: "rgba(239, 68, 68, 0.1)",
+                        borderRadius: 12,
+                        padding: 16,
+                        marginBottom: 20,
+                        borderLeftWidth: 4,
+                        borderLeftColor: "#ef4444",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "#ef4444",
+                          fontSize: 16,
+                          fontWeight: "600",
+                          marginBottom: 8,
+                        }}
+                      >
+                        📋 Productos que necesitas reemplazar:
+                      </Text>
+                      {actuallyRejectedItems.map((item: any, index: number) => (
+                        <Text
+                          key={index}
+                          style={{
+                            color: "#fca5a5",
+                            fontSize: 14,
+                            marginBottom: 4,
+                            textDecorationLine: "line-through",
+                          }}
+                        >
+                          • {item.menu_item?.name || "Producto"} (x
+                          {item.quantity})
+                        </Text>
+                      ))}
+                      <Text
+                        style={{
+                          color: "#dc2626",
+                          fontSize: 12,
+                          marginTop: 8,
+                          fontStyle: "italic",
+                        }}
+                      >
+                        Estos productos no se incluyen en el total del carrito
+                      </Text>
+                    </View>
+                  );
+                })()}
+
+                {/* Productos de reemplazo seleccionados */}
+                {Object.keys(selectedModifyItems).length > 0 && (
+                  <Text
+                    style={{
+                      color: "#22c55e",
+                      fontSize: 16,
+                      fontWeight: "600",
+                      marginBottom: 16,
+                    }}
+                  >
+                    ✅ Productos de reemplazo seleccionados:
+                  </Text>
+                )}
+
+                {Object.entries(selectedModifyItems).map(
+                  ([itemId, quantity]) => {
+                    const menuItem = menuItems.find(m => m.id === itemId);
+                    if (!menuItem) return null;
+
+                    return (
+                      <View
+                        key={itemId}
+                        style={{
+                          backgroundColor: "rgba(255,255,255,0.05)",
+                          borderRadius: 12,
+                          padding: 16,
+                          marginBottom: 12,
+                          borderWidth: 1,
+                          borderColor: "rgba(255,255,255,0.1)",
+                        }}
+                      >
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={{
+                                color: "white",
+                                fontSize: 16,
+                                fontWeight: "600",
+                              }}
+                            >
+                              {menuItem.name}
+                            </Text>
+                            <Text
+                              style={{
+                                color: "#d1d5db",
+                                fontSize: 14,
+                                marginTop: 4,
+                              }}
+                            >
+                              {formatPrice(menuItem.price)} •{" "}
+                              {menuItem.prepMinutes} min
+                            </Text>
+                          </View>
+
+                          {/* Controles de cantidad */}
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              backgroundColor: "#d4af37",
+                              borderRadius: 8,
+                              paddingHorizontal: 4,
+                            }}
+                          >
+                            <TouchableOpacity
+                              onPress={() =>
+                                handleQuantityChange(itemId, quantity - 1)
+                              }
+                              style={{ padding: 8 }}
+                            >
+                              <Minus size={16} color="#1a1a1a" />
+                            </TouchableOpacity>
+
+                            <Text
+                              style={{
+                                color: "#1a1a1a",
+                                fontWeight: "600",
+                                fontSize: 16,
+                                marginHorizontal: 12,
+                              }}
+                            >
+                              {quantity}
+                            </Text>
+
+                            <TouchableOpacity
+                              onPress={() =>
+                                handleQuantityChange(itemId, quantity + 1)
+                              }
+                              style={{ padding: 8 }}
+                            >
+                              <Plus size={16} color="#1a1a1a" />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  },
+                )}
+
+                {Object.keys(selectedModifyItems).length === 0 && (
+                  <View
+                    style={{
+                      alignItems: "center",
+                      justifyContent: "center",
+                      paddingVertical: 60,
+                    }}
+                  >
+                    <ShoppingCart size={64} color="#6b7280" />
+                    <Text
+                      style={{
+                        color: "#9ca3af",
+                        fontSize: 18,
+                        marginTop: 16,
+                        textAlign: "center",
+                      }}
+                    >
+                      No has seleccionado productos de reemplazo
+                    </Text>
+                    <Text
+                      style={{
+                        color: "#6b7280",
+                        fontSize: 14,
+                        marginTop: 8,
+                        textAlign: "center",
+                      }}
+                    >
+                      Navega por el menú y selecciona productos alternativos
+                    </Text>
+                  </View>
+                )}
+              </ScrollView>
+
+              {/* Resumen del total */}
+              {Object.keys(selectedModifyItems).length > 0 && (
+                <View
+                  style={{
+                    paddingHorizontal: 24,
+                    paddingVertical: 16,
+                    borderTopWidth: 1,
+                    borderTopColor: "rgba(255,255,255,0.1)",
+                    backgroundColor: "rgba(255,255,255,0.02)",
+                  }}
+                >
+                  {(() => {
+                    const totalQuantity = Object.values(
+                      selectedModifyItems,
+                    ).reduce((sum, qty) => sum + qty, 0);
+                    const totalPrice = Object.entries(
+                      selectedModifyItems,
+                    ).reduce((sum, [itemId, quantity]) => {
+                      const menuItem = menuItems.find(m => m.id === itemId);
+                      return sum + (menuItem ? menuItem.price * quantity : 0);
+                    }, 0);
+
+                    return (
+                      <View>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            marginBottom: 8,
+                          }}
+                        >
+                          <Text style={{ color: "#d1d5db", fontSize: 16 }}>
+                            Productos de reemplazo:
+                          </Text>
+                          <Text
+                            style={{
+                              color: "white",
+                              fontSize: 16,
+                              fontWeight: "600",
+                            }}
+                          >
+                            {totalQuantity}{" "}
+                            {totalQuantity === 1 ? "producto" : "productos"}
+                          </Text>
+                        </View>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: "#d1d5db",
+                              fontSize: 18,
+                              fontWeight: "600",
+                            }}
+                          >
+                            Total de reemplazos:
+                          </Text>
+                          <Text
+                            style={{
+                              color: "#d4af37",
+                              fontSize: 20,
+                              fontWeight: "700",
+                            }}
+                          >
+                            {formatPrice(totalPrice)}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })()}
+                </View>
+              )}
+
+              {/* Footer con botones de acción */}
+              {Object.keys(selectedModifyItems).length > 0 && (
+                <View
+                  style={{
+                    padding: 24,
+                    borderTopWidth: 1,
+                    borderTopColor: "rgba(255,255,255,0.1)",
+                  }}
+                >
+                  <View style={{ flexDirection: "row", gap: 12 }}>
+                    <TouchableOpacity
+                      onPress={handleCancelModifications}
+                      style={{
+                        flex: 1,
+                        backgroundColor: "rgba(239, 68, 68, 0.2)",
+                        borderRadius: 12,
+                        padding: 16,
+                        alignItems: "center",
+                        borderWidth: 1,
+                        borderColor: "rgba(239, 68, 68, 0.4)",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "#ef4444",
+                          fontWeight: "600",
+                          fontSize: 16,
+                        }}
+                      >
+                        🗑️ Eliminar todo
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={handleSubmitModifications}
+                      disabled={isSubmittingChanges}
+                      style={{
+                        flex: 2,
+                        backgroundColor: "#d4af37",
+                        borderRadius: 12,
+                        padding: 16,
+                        alignItems: "center",
+                        opacity: isSubmittingChanges ? 0.7 : 1,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "#1a1a1a",
+                          fontWeight: "700",
+                          fontSize: 16,
+                        }}
+                      >
+                        {isSubmittingChanges
+                          ? "Enviando..."
+                          : "✅ Confirmar cambios"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+          </LinearGradient>
+        </Modal>
+      ) : (
+        <CartModal
+          visible={cartModalVisible}
+          onClose={() => setCartModalVisible(false)}
+        />
       )}
     </LinearGradient>
   );

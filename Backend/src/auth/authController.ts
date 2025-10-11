@@ -30,7 +30,6 @@ export const registerAnonymousUser: RequestHandler = async (req, res) => {
         size: req.file.size,
       });
     }
-    console.log("=================================");
 
     const { first_name, last_name } = req.body;
 
@@ -171,11 +170,9 @@ export const checkTokenValidity: RequestHandler = async (req, res) => {
 
 export const updatePushToken: RequestHandler = async (req, res) => {
   try {
-    console.log("📱 Received updatePushToken request");
 
     const authHeader = req.headers.authorization || "";
     if (!authHeader.startsWith("Bearer ")) {
-      console.log("❌ No bearer token provided");
       res.status(401).json({ error: "Token no proporcionado." });
       return;
     }
@@ -185,7 +182,6 @@ export const updatePushToken: RequestHandler = async (req, res) => {
 
     // Verificar si es un token anónimo o normal
     if (token.startsWith("anon_")) {
-      console.log("🔍 Processing anonymous token");
       const parts = token.split("_");
       if (parts.length >= 3 && parts[1]) {
         // Verificar expiración solo para tokens no permanentes
@@ -198,7 +194,6 @@ export const updatePushToken: RequestHandler = async (req, res) => {
             const hoursPassed = (now - timestamp) / (1000 * 60 * 60);
 
             if (hoursPassed > 24) {
-              console.log("❌ Anonymous token expired");
               res.status(401).json({ error: "Token anónimo expirado." });
               return;
             }
@@ -206,38 +201,29 @@ export const updatePushToken: RequestHandler = async (req, res) => {
         }
 
         userId = parts[1];
-        console.log("✅ Anonymous user ID extracted:", userId);
       } else {
-        console.log("❌ Invalid anonymous token format");
         res.status(401).json({ error: "Token anónimo inválido." });
         return;
       }
     } else {
       // Token normal de Supabase Auth
-      console.log("🔍 Processing Supabase auth token");
       const authUser = await authService.verifyToken(token);
       if (!authUser.id) {
-        console.log("❌ No user ID found in token");
         res.status(401).json({ error: "ID de usuario no encontrado." });
         return;
       }
       userId = authUser.id;
-      console.log("✅ Supabase user ID extracted:", userId);
     }
 
     const { pushToken } = req.body;
-    console.log("📱 Push token received:", pushToken);
 
     if (!pushToken) {
-      console.log("❌ No push token provided in request body");
       res.status(400).json({ error: "Push token es requerido" });
       return;
     }
 
     // Actualizar el push token usando el servicio
-    console.log("🔄 Updating push token for user:", userId);
     await updateUserPushToken(userId, pushToken);
-    console.log("✅ Push token updated successfully");
 
     res.status(200).json({ message: "Push token actualizado exitosamente" });
   } catch (error) {
@@ -248,20 +234,16 @@ export const updatePushToken: RequestHandler = async (req, res) => {
 
 export const refreshToken: RequestHandler = async (req, res) => {
   try {
-    console.log("🔄 Received refresh token request");
 
     const { refresh_token } = req.body;
 
     if (!refresh_token) {
-      console.log("❌ No refresh token provided");
       res.status(400).json({ error: "Refresh token es requerido" });
       return;
     }
 
-    console.log("🔍 Processing refresh token request");
     const result = await authService.refreshToken(refresh_token);
 
-    console.log("✅ Token refreshed successfully");
     res.status(200).json(result);
   } catch (error) {
     console.error("❌ Error en refreshToken:", error);
@@ -271,11 +253,9 @@ export const refreshToken: RequestHandler = async (req, res) => {
 
 export const deleteAnonymousUser: RequestHandler = async (req, res) => {
   try {
-    console.log("🗑️ Received deleteAnonymousUser request");
 
     const authHeader = req.headers.authorization || "";
     if (!authHeader.startsWith("Bearer ")) {
-      console.log("❌ No bearer token provided");
       res.status(401).json({ error: "Token no proporcionado." });
       return;
     }
@@ -284,7 +264,6 @@ export const deleteAnonymousUser: RequestHandler = async (req, res) => {
 
     // Verificar que es un token anónimo
     if (!token.startsWith("anon_")) {
-      console.log("❌ Not an anonymous token");
       res
         .status(400)
         .json({ error: "Solo usuarios anónimos pueden usar este endpoint." });
@@ -293,17 +272,14 @@ export const deleteAnonymousUser: RequestHandler = async (req, res) => {
 
     const parts = token.split("_");
     if (parts.length < 3 || !parts[1]) {
-      console.log("❌ Invalid anonymous token format");
       res.status(401).json({ error: "Token anónimo inválido." });
       return;
     }
 
     const userId = parts[1];
-    console.log("🔍 Deleting anonymous user:", userId);
 
     const result = await authService.deleteAnonymousUser(userId);
 
-    console.log("✅ Anonymous user deleted successfully");
     res.status(200).json(result);
   } catch (error) {
     console.error("❌ Error en deleteAnonymousUser:", error);

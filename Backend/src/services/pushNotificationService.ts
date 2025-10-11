@@ -19,8 +19,6 @@ async function sendExpoPushNotification(
     data: notificationData.data || {},
   }));
 
-  console.log('📨 Sending push notifications to tokens:', expoPushTokens);
-
   try {
     const response = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
@@ -33,15 +31,12 @@ async function sendExpoPushNotification(
     });
 
     const result = await response.json();
-    console.log('📱 Push notification response:', result);
     
     // Log detallado de resultados
     if (result && typeof result === 'object' && 'data' in result && Array.isArray(result.data)) {
       result.data.forEach((item: any, index: number) => {
         if (item.status === 'error') {
-          console.log(`❌ Token ${index + 1} error:`, item.message);
         } else {
-          console.log(`✅ Token ${index + 1} sent successfully`);
         }
       });
     }
@@ -95,17 +90,13 @@ export async function getEmployeeTokens(): Promise<string[]> {
 // Función principal para notificar sobre nuevo registro de cliente
 export async function notifyNewClientRegistration(clientName: string, clientId: string) {
   try {
-    console.log(`Enviando notificación de nuevo cliente: ${clientName}`);
     
     // Obtener tokens de supervisores y dueños
     const tokens = await getSupervisorAndOwnerTokens();
     
     if (tokens.length === 0) {
-      console.log('No hay supervisores/dueños con push tokens para notificar');
       return;
     }
-
-    console.log(`Enviando notificación a ${tokens.length} supervisores/dueños`);
 
     // Preparar datos de la notificación
     const notificationData: PushNotificationData = {
@@ -121,7 +112,6 @@ export async function notifyNewClientRegistration(clientName: string, clientId: 
     // Enviar notificación
     await sendExpoPushNotification(tokens, notificationData);
     
-    console.log('Notificación enviada exitosamente');
   } catch (error) {
     console.error('Error al enviar notificación de nuevo cliente:', error);
   }
@@ -130,16 +120,12 @@ export async function notifyNewClientRegistration(clientName: string, clientId: 
 // Función para notificar a clientes (ejemplo: pedido listo, promociones, etc.)
 export async function notifyClients(title: string, body: string, data?: any) {
   try {
-    console.log(`Enviando notificación a clientes: ${title}`);
     
     const tokens = await getClientTokens();
     
     if (tokens.length === 0) {
-      console.log('No hay clientes con push tokens para notificar');
       return;
     }
-
-    console.log(`Enviando notificación a ${tokens.length} clientes`);
 
     const notificationData: PushNotificationData = {
       title,
@@ -148,7 +134,6 @@ export async function notifyClients(title: string, body: string, data?: any) {
     };
 
     await sendExpoPushNotification(tokens, notificationData);
-    console.log('Notificación a clientes enviada exitosamente');
   } catch (error) {
     console.error('Error al enviar notificación a clientes:', error);
   }
@@ -157,16 +142,12 @@ export async function notifyClients(title: string, body: string, data?: any) {
 // Función para notificar a empleados (ejemplo: nuevos platos, cambios de turno, etc.)
 export async function notifyEmployees(title: string, body: string, data?: any) {
   try {
-    console.log(`Enviando notificación a empleados: ${title}`);
     
     const tokens = await getEmployeeTokens();
     
     if (tokens.length === 0) {
-      console.log('No hay empleados con push tokens para notificar');
       return;
     }
-
-    console.log(`Enviando notificación a ${tokens.length} empleados`);
 
     const notificationData: PushNotificationData = {
       title,
@@ -175,7 +156,6 @@ export async function notifyEmployees(title: string, body: string, data?: any) {
     };
 
     await sendExpoPushNotification(tokens, notificationData);
-    console.log('Notificación a empleados enviada exitosamente');
   } catch (error) {
     console.error('Error al enviar notificación a empleados:', error);
   }
@@ -184,7 +164,6 @@ export async function notifyEmployees(title: string, body: string, data?: any) {
 // Función para notificar al cliente recién registrado sobre el estado de su cuenta
 export async function notifyClientAccountCreated(clientId: string) {
   try {
-    console.log(`Enviando notificación de cuenta creada al cliente: ${clientId}`);
     
     // Obtener el push token del cliente específico
     const { data: client, error } = await supabaseAdmin
@@ -199,11 +178,8 @@ export async function notifyClientAccountCreated(clientId: string) {
     }
 
     if (!client?.push_token) {
-      console.log('Cliente no tiene push token registrado');
       return;
     }
-
-    console.log(`Enviando notificación de cuenta creada a: ${client.name}`);
 
     // Preparar datos de la notificación para el cliente
     const notificationData: PushNotificationData = {
@@ -218,7 +194,6 @@ export async function notifyClientAccountCreated(clientId: string) {
     // Enviar notificación al cliente específico
     await sendExpoPushNotification([client.push_token], notificationData);
     
-    console.log('Notificación de cuenta creada enviada exitosamente');
   } catch (error) {
     console.error('Error al enviar notificación de cuenta creada:', error);
   }
@@ -227,7 +202,6 @@ export async function notifyClientAccountCreated(clientId: string) {
 // Función para actualizar el push token de un usuario
 export async function updateUserPushToken(userId: string, pushToken: string) {
   try {
-    console.log('🔄 updateUserPushToken called with:', { userId, pushToken });
     
     const { error } = await supabaseAdmin
       .from('users')
@@ -239,7 +213,6 @@ export async function updateUserPushToken(userId: string, pushToken: string) {
       throw new Error('Error actualizando token de notificaciones');
     }
 
-    console.log('✅ Push token actualizado exitosamente para usuario:', userId);
   } catch (error) {
     console.error('❌ Error en updateUserPushToken:', error);
     throw error;
@@ -310,7 +283,6 @@ async function getClientToken(clientId: string): Promise<string | null> {
       .single();
 
     if (error || !user) {
-      console.log('Cliente no encontrado o sin push token:', clientId);
       return null;
     }
 
@@ -324,16 +296,12 @@ async function getClientToken(clientId: string): Promise<string | null> {
 // Función para notificar al maître cuando un cliente se une a la lista de espera
 export async function notifyMaitreNewWaitingClient(clientName: string, partySize: number, tableType?: string) {
   try {
-    console.log(`📋 Notificando al maître: nuevo cliente en lista de espera - ${clientName}`);
     
     const tokens = await getMaitreTokens();
     
     if (tokens.length === 0) {
-      console.log('No hay maîtres con push tokens para notificar');
       return;
     }
-
-    console.log(`Enviando notificación a ${tokens.length} maîtres`);
 
     const notificationData: PushNotificationData = {
       title: 'Nuevo cliente en lista de espera',
@@ -348,7 +316,6 @@ export async function notifyMaitreNewWaitingClient(clientName: string, partySize
     };
 
     await sendExpoPushNotification(tokens, notificationData);
-    console.log('✅ Notificación enviada al maître exitosamente');
   } catch (error) {
     console.error('❌ Error al enviar notificación al maître:', error);
   }
@@ -357,16 +324,12 @@ export async function notifyMaitreNewWaitingClient(clientName: string, partySize
 // Función para notificar al cliente cuando se le asigna una mesa
 export async function notifyClientTableAssigned(clientId: string, tableNumber: string) {
   try {
-    console.log(`🏷️ Notificando al cliente: mesa asignada - Mesa #${tableNumber}`);
     
     const token = await getClientToken(clientId);
     
     if (!token) {
-      console.log('Cliente no tiene push token para notificar');
       return;
     }
-
-    console.log(`Enviando notificación de mesa asignada al cliente: ${clientId}`);
 
     const notificationData: PushNotificationData = {
       title: '¡Tu mesa está lista!',
@@ -379,7 +342,6 @@ export async function notifyClientTableAssigned(clientId: string, tableNumber: s
     };
 
     await sendExpoPushNotification([token], notificationData);
-    console.log('✅ Notificación de mesa asignada enviada exitosamente');
   } catch (error) {
     console.error('❌ Error al enviar notificación de mesa asignada:', error);
   }
@@ -388,16 +350,12 @@ export async function notifyClientTableAssigned(clientId: string, tableNumber: s
 // Función para notificar a todos los mozos sobre una nueva consulta de cliente (solo el primer mensaje)
 export async function notifyWaitersNewClientMessage(clientName: string, tableNumber: string, message: string) {
   try {
-    console.log(`💬 Notificando a mozos: nueva consulta de cliente - Mesa #${tableNumber}`);
     
     const tokens = await getWaiterTokens();
     
     if (tokens.length === 0) {
-      console.log('No hay mozos con push tokens para notificar');
       return;
     }
-
-    console.log(`Enviando notificación a ${tokens.length} mozos`);
 
     // Truncar mensaje si es muy largo
     const truncatedMessage = message.length > 50 ? message.substring(0, 47) + '...' : message;
@@ -415,7 +373,6 @@ export async function notifyWaitersNewClientMessage(clientName: string, tableNum
     };
 
     await sendExpoPushNotification(tokens, notificationData);
-    console.log('✅ Notificación de consulta enviada a mozos exitosamente');
   } catch (error) {
     console.error('❌ Error al enviar notificación de consulta a mozos:', error);
   }

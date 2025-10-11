@@ -76,7 +76,6 @@ export async function createStaffController(req: Request, res: Response) {
     });
 
     if (!req.user) {
-      console.log("❌ No hay usuario autenticado");
       return res.status(401).json({ error: "No autenticado" });
     }
 
@@ -84,9 +83,7 @@ export async function createStaffController(req: Request, res: Response) {
       profile_code: req.user.profile_code as "dueno" | "supervisor",
     };
 
-    console.log("🚀 Llamando a createStaff service...");
     const result = await createStaff(actor, req.body, req.file);
-    console.log("✅ Staff creado, enviando respuesta:", result.message);
 
     return res.json(result);
   } catch (e: any) {

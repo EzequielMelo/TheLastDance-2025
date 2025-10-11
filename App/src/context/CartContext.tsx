@@ -780,8 +780,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   };
 
   const submitToAcceptedOrder = async () => {
-    if (!hasAcceptedOrder || cartItems.length === 0) {
-      console.warn("No hay pedido aceptado o carrito está vacío");
+    if (cartItems.length === 0) {
+      console.warn("El carrito está vacío");
       return;
     }
 
@@ -796,7 +796,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       );
 
       if (!acceptedOrder) {
-        throw new Error("No se encontró pedido aceptado");
+        throw new Error("No se encontró pedido aceptado sin items pendientes");
       }
 
       // Convertir items del carrito al formato requerido

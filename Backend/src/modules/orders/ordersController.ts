@@ -24,6 +24,7 @@ import {
   getTableOrdersStatus,
   rejectIndividualItemsFromBatch,
   approveBatchCompletely,
+  submitTandaModifications,
 } from "./ordersServices";
 import type { CreateOrderDTO, OrderItemStatus } from "./orders.types";
 
@@ -83,7 +84,7 @@ const replaceRejectedItemsSchema = z.object({
         unit_price: z.number().positive(),
       }),
     )
-    .min(1),
+    .min(0), // Permitir array vacío para eliminación sin reemplazo
 });
 
 // Crear nuevo pedido
@@ -99,10 +100,7 @@ export async function createOrderHandler(
 
     const parsed = createOrderSchema.parse(req.body);
     const userId = req.user.appUserId;
-
-    console.log("🛒 Creando pedido para usuario:", userId);
-    console.log("📦 Datos del pedido:", JSON.stringify(parsed, null, 2));
-
+    
     const orderData: CreateOrderDTO = {
       table_id: parsed.table_id,
       items: parsed.items as any,
@@ -112,8 +110,6 @@ export async function createOrderHandler(
     };
 
     const order = await createOrder(orderData, userId);
-
-    console.log("✅ Pedido creado exitosamente:", order.id);
     res.status(201).json({
       success: true,
       message: "Pedido creado exitosamente",
@@ -409,8 +405,6 @@ export async function waiterOrderActionHandler(
         res.status(400).json({ error: "Acción no válida" });
         return;
     }
-
-    console.log(`✅ Acción de mozo ${action} completada para orden ${orderId}`);
   } catch (error: any) {
     console.error("❌ Error en waiterOrderActionHandler:", error);
 
@@ -447,16 +441,8 @@ export async function addItemsToPartialOrderHandler(
 
     const parsed = addItemToPartialOrderSchema.parse(req.body);
     const userId = req.user.appUserId;
-
-    console.log(
-      `🛒 Agregando items a pedido parcial ${orderId} para usuario:`,
-      userId,
-    );
-    console.log("📦 Items a agregar:", JSON.stringify(parsed.items, null, 2));
-
+    
     const result = await addItemsToPartialOrder(orderId, parsed.items, userId);
-
-    console.log(`✅ Items agregados exitosamente a pedido ${orderId}`);
     res.json({
       success: true,
       message:
@@ -499,16 +485,8 @@ export async function addItemsToExistingOrderHandler(
 
     const parsed = addItemToPartialOrderSchema.parse(req.body);
     const userId = req.user.appUserId;
-
-    console.log(
-      `🛒 Agregando items a orden existente ${orderId} para usuario:`,
-      userId,
-    );
-    console.log("📦 Items a agregar:", JSON.stringify(parsed.items, null, 2));
-
+    
     const result = await addItemsToExistingOrder(orderId, parsed.items, userId);
-
-    console.log(`✅ Items agregados exitosamente a orden ${orderId}`);
     res.json({
       success: true,
       message:
@@ -576,10 +554,6 @@ export async function waiterItemsActionHandler(
       return;
     }
 
-    console.log(
-      `🔄 Mozo ${action} items [${itemIds.join(", ")}] en orden ${orderId}`,
-    );
-
     const result = await waiterItemsActionNew(
       orderId,
       action as "accept" | "reject",
@@ -606,11 +580,6 @@ export async function getWaiterPendingBatchesHandler(
   res: Response,
 ): Promise<void> {
   try {
-    console.log(
-      "📦 Obteniendo tandas pendientes para mozo:",
-      req.user?.appUserId,
-    );
-
     if (!req.user?.appUserId) {
       res.status(401).json({
         success: false,
@@ -658,11 +627,6 @@ export async function getWaiterPendingItemsHandler(
   res: Response,
 ): Promise<void> {
   try {
-    console.log(
-      "📋 Obteniendo items pendientes para mozo:",
-      req.user?.appUserId,
-    );
-
     if (!req.user?.appUserId) {
       res.status(401).json({
         success: false,
@@ -725,11 +689,6 @@ export async function replaceRejectedItemsHandler(
       res.status(400).json({ error: "ID del pedido requerido" });
       return;
     }
-
-    console.log(
-      `🔄 Reemplazando items rechazados en orden ${orderId} para usuario ${userId}`,
-    );
-
     const updatedOrder = await replaceRejectedItems(
       orderId,
       userId,
@@ -765,14 +724,11 @@ export async function getKitchenPendingOrdersHandler(
 
     // Verificar que el usuario es cocinero
     if (req.user.position_code !== "cocinero") {
-      res.status(403).json({ 
-        error: "Solo los cocineros pueden acceder a esta función" 
+      res.status(403).json({
+        error: "Solo los cocineros pueden acceder a esta función",
       });
       return;
     }
-
-    console.log(`👨‍🍳 Obteniendo pedidos pendientes para cocinero ${req.user.appUserId}`);
-
     const pendingOrders = await getKitchenPendingOrders();
 
     res.json({
@@ -803,8 +759,8 @@ export async function updateKitchenItemStatusHandler(
 
     // Verificar que el usuario es cocinero
     if (req.user.position_code !== "cocinero") {
-      res.status(403).json({ 
-        error: "Solo los cocineros pueden actualizar items de cocina" 
+      res.status(403).json({
+        error: "Solo los cocineros pueden actualizar items de cocina",
       });
       return;
     }
@@ -813,8 +769,8 @@ export async function updateKitchenItemStatusHandler(
     const { status } = req.body;
 
     if (!itemId || !status) {
-      res.status(400).json({ 
-        error: "ID del item y status son requeridos" 
+      res.status(400).json({
+        error: "ID del item y status son requeridos",
       });
       return;
     }
@@ -822,18 +778,15 @@ export async function updateKitchenItemStatusHandler(
     // Validar status
     const validStatuses: OrderItemStatus[] = ["preparing", "ready"];
     if (!validStatuses.includes(status)) {
-      res.status(400).json({ 
-        error: "Status inválido. Use 'preparing' o 'ready'" 
+      res.status(400).json({
+        error: "Status inválido. Use 'preparing' o 'ready'",
       });
       return;
     }
-
-    console.log(`👨‍🍳 Actualizando item ${itemId} a status ${status} por cocinero ${req.user.appUserId}`);
-
     const result = await updateKitchenItemStatus(
       itemId,
       status,
-      req.user.appUserId
+      req.user.appUserId,
     );
 
     if (!result.success) {
@@ -879,9 +832,6 @@ export async function getBartenderPendingOrdersHandler(
       });
       return;
     }
-
-    console.log(`🍷 Obteniendo pedidos pendientes para bartender: ${req.user.appUserId}`);
-
     const pendingOrders = await getBartenderPendingOrders();
 
     res.json({
@@ -923,25 +873,22 @@ export async function updateBartenderItemStatusHandler(
     const { status } = req.body;
 
     if (!itemId) {
-      res.status(400).json({ 
-        error: "ID del item es requerido" 
+      res.status(400).json({
+        error: "ID del item es requerido",
       });
       return;
     }
 
     if (!status || !["preparing", "ready"].includes(status)) {
-      res.status(400).json({ 
-        error: "Status inválido. Use 'preparing' o 'ready'" 
+      res.status(400).json({
+        error: "Status inválido. Use 'preparing' o 'ready'",
       });
       return;
     }
-
-    console.log(`🍷 Actualizando item ${itemId} a status ${status} por bartender ${req.user.appUserId}`);
-
     const result = await updateBartenderItemStatus(
       itemId,
       status,
-      req.user.appUserId
+      req.user.appUserId,
     );
 
     if (!result.success) {
@@ -980,28 +927,28 @@ export async function getTableOrdersStatusHandler(
     const { tableId } = req.params;
 
     if (!tableId) {
-      res.status(400).json({ 
-        error: "ID de mesa requerido" 
+      res.status(400).json({
+        error: "ID de mesa requerido",
       });
       return;
     }
-
-    console.log(`📱 Obteniendo estado de pedidos para mesa ${tableId} y usuario ${req.user.appUserId}`);
-
     const orders = await getTableOrdersStatus(tableId, req.user.appUserId);
 
     // Calcular estadísticas de los pedidos
     const stats = {
       totalOrders: orders.length,
-      totalItems: orders.reduce((sum, order) => sum + order.order_items.length, 0),
+      totalItems: orders.reduce(
+        (sum, order) => sum + order.order_items.length,
+        0,
+      ),
       itemsByStatus: {
         pending: 0,
         accepted: 0,
         rejected: 0,
         preparing: 0,
         ready: 0,
-        delivered: 0
-      }
+        delivered: 0,
+      },
     };
 
     orders.forEach(order => {
@@ -1014,9 +961,10 @@ export async function getTableOrdersStatusHandler(
       success: true,
       data: orders,
       stats,
-      message: orders.length > 0 
-        ? `${orders.length} pedidos encontrados` 
-        : "No tienes pedidos en esta mesa",
+      message:
+        orders.length > 0
+          ? `${orders.length} pedidos encontrados`
+          : "No tienes pedidos en esta mesa",
     });
   } catch (error: any) {
     console.error("❌ Error obteniendo estado de pedidos de mesa:", error);
@@ -1067,11 +1015,6 @@ export async function rejectIndividualItemsHandler(
       res.status(400).json({ error: "ID del pedido requerido" });
       return;
     }
-
-    console.log(
-      `❌ Rechazando items individuales en orden ${orderId} por mozo ${waiterId}`,
-    );
-
     const updatedOrder = await rejectIndividualItemsFromBatch(
       orderId,
       waiterId,
@@ -1127,11 +1070,6 @@ export async function approveBatchCompletelyHandler(
       res.status(400).json({ error: "ID del pedido y batch ID requeridos" });
       return;
     }
-
-    console.log(
-      `✅ Aprobando tanda completa ${batchId} en orden ${orderId} por mozo ${waiterId}`,
-    );
-
     const updatedOrder = await approveBatchCompletely(
       orderId,
       waiterId,
@@ -1147,6 +1085,59 @@ export async function approveBatchCompletelyHandler(
     console.error("❌ Error aprobando tanda completa:", error);
     res.status(400).json({
       error: error.message || "Error al aprobar tanda completa",
+    });
+  }
+}
+
+// Esquema para enviar modificaciones de tanda
+const submitTandaModificationsSchema = z.object({
+  keepItems: z.array(z.string().uuid()).default([]),
+  newItems: z
+    .array(
+      z.object({
+        menu_item_id: z.string().uuid(),
+        quantity: z.number().int().min(1).max(10),
+        unit_price: z.number().positive(),
+      }),
+    )
+    .default([]),
+});
+
+// Enviar modificaciones de tanda (mantiene items rejected como auxiliares)
+export async function submitTandaModificationsHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Usuario no autenticado" });
+      return;
+    }
+
+    const { orderId } = req.params;
+
+    if (!orderId) {
+      res.status(400).json({ error: "ID del pedido requerido" });
+      return;
+    }
+
+    const parsed = submitTandaModificationsSchema.parse(req.body);
+    const updatedOrder = await submitTandaModifications(
+      orderId,
+      req.user.appUserId,
+      parsed.keepItems,
+      parsed.newItems,
+    );
+
+    res.json({
+      success: true,
+      message: "Modificaciones de tanda enviadas correctamente",
+      order: updatedOrder,
+    });
+  } catch (error: any) {
+    console.error("❌ Error enviando modificaciones de tanda:", error);
+    res.status(400).json({
+      error: error.message || "Error al enviar modificaciones de tanda",
     });
   }
 }

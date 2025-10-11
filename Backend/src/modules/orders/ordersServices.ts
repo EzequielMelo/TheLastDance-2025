@@ -11,9 +11,6 @@ export async function createOrder(
   userId: string,
 ): Promise<OrderWithItems> {
   try {
-    console.log("📝 Creando pedido para usuario:", userId);
-    console.log("📦 Items del pedido:", orderData.items);
-
     // 1. Validar que todos los productos existen y están activos
     const menuItemIds = orderData.items.map(item => item.id);
     const { data: menuItems, error: menuError } = await supabaseAdmin
@@ -36,9 +33,7 @@ export async function createOrder(
 
       // Opcional: Verificar que los precios coinciden (seguridad)
       if (Math.abs(dbItem.price - frontendItem.price) > 0.01) {
-        console.warn(
-          `⚠️ Precio no coincide para ${frontendItem.name}: DB=${dbItem.price}, Frontend=${frontendItem.price}`,
-        );
+        // Precio no coincide - usando precio de BD por seguridad
       }
     }
 
@@ -65,7 +60,6 @@ export async function createOrder(
 
     // 5. Generar batch_id para la primera tanda
     const initialBatchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    console.log(`📦 Primera tanda con batch_id: ${initialBatchId}`);
 
     // 6. Crear los items del pedido usando los datos del frontend
     const orderItemsData = orderData.items.map(item => ({
@@ -88,7 +82,6 @@ export async function createOrder(
     // 7. Obtener el pedido completo con items
     const fullOrder = await getOrderById(newOrder.id);
 
-    console.log("✅ Pedido creado exitosamente:", newOrder.id);
     return fullOrder;
   } catch (error) {
     console.error("❌ Error en createOrder:", error);
@@ -104,7 +97,15 @@ export async function getOrderById(orderId: string): Promise<OrderWithItems> {
       `
       *,
       order_items (
-        *,
+        id,
+        order_id,
+        menu_item_id,
+        quantity,
+        unit_price,
+        subtotal,
+        status,
+        batch_id,
+        created_at,
         menu_item:menu_items (
           id,
           name,
@@ -136,7 +137,6 @@ export async function getOrderById(orderId: string): Promise<OrderWithItems> {
 
 // Obtener pedidos del usuario
 export async function getUserOrders(userId: string): Promise<OrderWithItems[]> {
-  console.log(`🔍 Getting orders for user: ${userId}`);
 
   const { data, error } = await supabaseAdmin
     .from("orders")
@@ -144,7 +144,15 @@ export async function getUserOrders(userId: string): Promise<OrderWithItems[]> {
       `
       *,
       order_items (
-        *,
+        id,
+        order_id,
+        menu_item_id,
+        quantity,
+        unit_price,
+        subtotal,
+        status,
+        batch_id,
+        created_at,
         menu_item:menu_items (
           id,
           name,
@@ -166,11 +174,6 @@ export async function getUserOrders(userId: string): Promise<OrderWithItems[]> {
   if (error) {
     console.error(`❌ Error getting user orders:`, error);
     throw new Error(`Error obteniendo pedidos del usuario: ${error.message}`);
-  }
-
-  console.log(`✅ Found ${data?.length || 0} orders for user ${userId}`);
-  if (data && data.length > 0) {
-    console.log(`📄 First order structure:`, JSON.stringify(data[0], null, 2));
   }
 
   return (data as OrderWithItems[]) || [];
@@ -528,9 +531,6 @@ export async function rejectIndividualItemsFromBatch(
   reason?: string,
 ): Promise<OrderWithItems> {
   try {
-    console.log(`🔄 Rechazando items individuales de la orden ${orderId}`);
-    console.log(`Items a rechazar: ${itemsToReject.join(", ")}`);
-
     // 1. Verificar que la orden existe
     const currentOrder = await getOrderById(orderId);
 
@@ -622,15 +622,11 @@ export async function rejectIndividualItemsFromBatch(
       .eq("id", orderId);
 
     if (noteError) {
-      console.warn(`⚠️ Error agregando notas a la orden: ${noteError.message}`);
     }
 
     // 7. Obtener la orden actualizada
     const updatedOrder = await getOrderById(orderId);
 
-    console.log(
-      `✅ Tanda completa devuelta al cliente. Items no disponibles: ${itemsToReject.join(", ")}`,
-    );
     return updatedOrder;
   } catch (error) {
     console.error("❌ Error en rejectIndividualItemsFromBatch:", error);
@@ -645,10 +641,6 @@ export async function approveBatchCompletely(
   batchId: string,
 ): Promise<OrderWithItems> {
   try {
-    console.log(
-      `✅ Aprobando tanda completa ${batchId} de la orden ${orderId}`,
-    );
-
     // 1. Verificar que la orden existe
     const currentOrder = await getOrderById(orderId);
 
@@ -715,13 +707,10 @@ export async function approveBatchCompletely(
       .eq("id", orderId);
 
     if (noteError) {
-      console.warn(`⚠️ Error agregando notas a la orden: ${noteError.message}`);
     }
 
     // 6. Obtener la orden actualizada
     const updatedOrder = await getOrderById(orderId);
-
-    console.log(`✅ Tanda ${batchId} aprobada completamente`);
     return updatedOrder;
   } catch (error) {
     console.error("❌ Error en approveBatchCompletely:", error);
@@ -744,8 +733,6 @@ export async function addItemsToPartialOrder(
   userId: string,
 ): Promise<OrderWithItems> {
   try {
-    console.log(`📝 Agregando items a pedido parcial ${orderId}`);
-
     // 1. Verificar que la orden existe, está en estado "partial" y pertenece al usuario
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
@@ -781,9 +768,6 @@ export async function addItemsToPartialOrder(
 
       // Verificar precios (opcional - se podría usar precio de BD)
       if (Math.abs(menuItem.price - newItem.price) > 0.01)
-        console.warn(
-          `⚠️ Precio discrepante para ${newItem.name}: BD=${menuItem.price}, Frontend=${newItem.price}`,
-        );
     }
 
     // 4. Insertar nuevos order_items
@@ -826,10 +810,6 @@ export async function addItemsToPartialOrder(
     const newEstimatedTime = Math.max(
       ...allOrderItems.map(item => (item.menu_items as any).prep_minutes),
     );
-
-    console.log(`💰 Nuevo total: $${newTotalAmount}`);
-    console.log(`⏰ Nuevo tiempo estimado: ${newEstimatedTime} min`);
-
     // 6. Actualizar orden (cambiar a pending y actualizar totales)
     const { error: updateError } = await supabaseAdmin
       .from("orders")
@@ -843,11 +823,6 @@ export async function addItemsToPartialOrder(
 
     if (updateError)
       throw new Error(`Error actualizando orden: ${updateError.message}`);
-
-    console.log(
-      `✅ Items agregados exitosamente. Orden ${orderId} cambiada a estado pending`,
-    );
-
     // 7. Obtener orden actualizada completa
     const updatedOrder = await getOrderById(orderId);
     return updatedOrder;
@@ -872,8 +847,6 @@ export async function addItemsToExistingOrder(
   userId: string,
 ): Promise<OrderWithItems> {
   try {
-    console.log(`📝 Agregando items a pedido existente ${orderId}`);
-
     // 1. Verificar que la orden existe y pertenece al usuario
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
@@ -914,15 +887,10 @@ export async function addItemsToExistingOrder(
 
       // Verificar precios (opcional - se podría usar precio de BD)
       if (Math.abs(menuItem.price - newItem.price) > 0.01)
-        console.warn(
-          `⚠️ Precio discrepante para ${newItem.name}: BD=${menuItem.price}, Frontend=${newItem.price}`,
-        );
     }
 
     // 5. Generar un batch_id único para esta nueva tanda
     const batchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    console.log(`📦 Nueva tanda con batch_id: ${batchId}`);
-
     // 6. Insertar nuevos order_items con status 'pending' y batch_id único
     const orderItemsToInsert = newItems.map(item => ({
       order_id: orderId,
@@ -967,10 +935,6 @@ export async function addItemsToExistingOrder(
     const newEstimatedTime = Math.max(
       ...allOrderItems.map(item => (item.menu_items as any).prep_minutes),
     );
-
-    console.log(`💰 Nuevo total: $${newTotalAmount}`);
-    console.log(`⏰ Nuevo tiempo estimado: ${newEstimatedTime} min`);
-
     // 8. Actualizar orden - solo actualizar totales (los items nuevos van como pending)
     const { error: updateError } = await supabaseAdmin
       .from("orders")
@@ -983,11 +947,6 @@ export async function addItemsToExistingOrder(
 
     if (updateError)
       throw new Error(`Error actualizando orden: ${updateError.message}`);
-
-    console.log(
-      `✅ Items agregados exitosamente a la orden ${orderId}. Nuevos items en estado 'pending' con batch_id: ${batchId}`,
-    );
-
     // 9. Obtener orden actualizada completa
     const updatedOrder = await getOrderById(orderId);
     return updatedOrder;
@@ -1204,11 +1163,6 @@ export async function getWaiterPendingBatches(
     (a: any, b: any) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
   );
-
-  console.log(
-    `📦 Encontradas ${batchesArray.length} tandas pendientes para mozo ${waiterId}`,
-  );
-
   return batchesArray;
 }
 
@@ -1223,10 +1177,7 @@ export async function waiterItemsActionNew(
   affectedItems: any[];
 }> {
   try {
-    console.log(
-      `👨‍💼 Mozo ${action} items [${itemIds.join(", ")}] en orden ${orderId}`,
-    );
-
+    
     // 1. Verificar que la orden existe y no está pagada
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
@@ -1254,9 +1205,6 @@ export async function waiterItemsActionNew(
     if (action === "reject" && itemIds.length > 0) {
       // LÓGICA DE TANDAS: Si rechazamos al menos un item, identificar su tanda
       // y devolver TODA la tanda a "pending" para que el cliente pueda modificar todo
-
-      console.log("🔄 Rechazando items - implementando lógica de tandas");
-
       // 3a. Identificar las tandas: obtener batch_id de los items que se van a rechazar
       const { data: itemsToReject, error: rejectError } = await supabaseAdmin
         .from("order_items")
@@ -1269,8 +1217,6 @@ export async function waiterItemsActionNew(
 
       // 3b. Extraer todos los batch_ids únicos de los items rechazados
       const batchIds = [...new Set(itemsToReject.map(item => item.batch_id))];
-      console.log(`📦 Batch IDs afectados: ${batchIds.join(", ")}`);
-
       // 3c. Obtener TODOS los items de las tandas afectadas (mismo batch_id)
       const { data: batchItems, error: batchError } = await supabaseAdmin
         .from("order_items")
@@ -1282,10 +1228,6 @@ export async function waiterItemsActionNew(
       if (batchError || !batchItems) {
         throw new Error("Error obteniendo items de la tanda");
       }
-
-      console.log(
-        `📦 Tandas identificadas: ${batchItems.length} items total en ${batchIds.length} tanda(s)`,
-      );
 
       // 3d. Devolver TODA las tandas afectadas a "pending"
       const allBatchItemIds = batchItems.map(item => item.id);
@@ -1318,10 +1260,6 @@ export async function waiterItemsActionNew(
           `Error marcando items rechazados: ${rejectUpdateError.message}`,
         );
       }
-
-      console.log(
-        `✅ Tanda devuelta a pending. ${itemIds.length} items rechazados específicamente.`,
-      );
     } else {
       // 3. Lógica normal para aceptar (no requiere lógica de tandas)
       const newStatus = action === "accept" ? "accepted" : "rejected";
@@ -1371,11 +1309,6 @@ export async function waiterItemsActionNew(
     if (orderUpdateError) {
       throw new Error(`Error actualizando orden: ${orderUpdateError.message}`);
     }
-
-    console.log(
-      `✅ Acción ${action} completada en ${itemIds.length} items. Nuevo total: $${newTotalAmount}`,
-    );
-
     // 6. Retornar orden actualizada
     const updatedOrder = await getOrderById(orderId);
 
@@ -1401,8 +1334,6 @@ export async function replaceRejectedItems(
   }>,
 ): Promise<OrderWithItems> {
   try {
-    console.log(`🔄 Reemplazando items rechazados en orden ${orderId}`);
-
     // 1. Verificar que la orden existe y pertenece al usuario
     const existingOrder = await getOrderById(orderId);
     if (existingOrder.user_id !== userId) {
@@ -1461,8 +1392,6 @@ export async function replaceRejectedItems(
 
     // 5. Generar batch_id para los items de reemplazo
     const replacementBatchId = `replacement_${Date.now()}_${orderId}`;
-    console.log(`📦 Items de reemplazo con batch_id: ${replacementBatchId}`);
-
     // 6. Crear nuevos items (en estado pending)
     const orderItemsToInsert = newItems.map(item => ({
       order_id: orderId,
@@ -1518,11 +1447,6 @@ export async function replaceRejectedItems(
     if (updateError) {
       throw new Error(`Error actualizando orden: ${updateError.message}`);
     }
-
-    console.log(
-      `✅ Items rechazados reemplazados exitosamente en orden ${orderId}`,
-    );
-
     // 8. Retornar orden actualizada
     const updatedOrder = await getOrderById(orderId);
     return updatedOrder;
@@ -1537,12 +1461,12 @@ export async function replaceRejectedItems(
 // Obtener pedidos para cocina (items con category "plato" en estados activos)
 export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
   try {
-    console.log("👨‍🍳 Obteniendo pedidos para cocina (todos los estados activos)...");
-
+    
     // Obtener todos los items activos que son platos
     const { data: kitchenItems, error: itemsError } = await supabaseAdmin
       .from("order_items")
-      .select(`
+      .select(
+        `
         id,
         order_id,
         menu_item_id,
@@ -1572,24 +1496,26 @@ export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
           tables(id, number),
           users(id, first_name, last_name, profile_image)
         )
-      `)
+      `,
+      )
       .in("status", ["accepted", "preparing", "ready"])
       .eq("menu_items.category", "plato")
       .order("created_at", { ascending: true });
 
     if (itemsError) {
-      throw new Error(`Error obteniendo items de cocina: ${itemsError.message}`);
+      throw new Error(
+        `Error obteniendo items de cocina: ${itemsError.message}`,
+      );
     }
 
     if (!kitchenItems || kitchenItems.length === 0) {
-      console.log("👨‍🍳 No hay items pendientes para cocina");
       return [];
     }
 
     // Agrupar items por orden
     const ordersMap = new Map<string, OrderWithItems>();
 
-    kitchenItems.forEach((item) => {
+    kitchenItems.forEach(item => {
       const order = (item as any).orders;
       const menuItem = (item as any).menu_items;
 
@@ -1598,7 +1524,7 @@ export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
           ...order,
           table: order.tables,
           user: order.users,
-          order_items: []
+          order_items: [],
         });
       }
 
@@ -1612,13 +1538,11 @@ export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
         subtotal: item.subtotal,
         status: item.status,
         created_at: item.created_at,
-        menu_item: menuItem
+        menu_item: menuItem,
       });
     });
 
     const ordersArray = Array.from(ordersMap.values());
-    console.log(`👨‍🍳 Encontradas ${ordersArray.length} órdenes con items para cocina`);
-
     return ordersArray;
   } catch (error) {
     console.error("❌ Error en getKitchenPendingOrders:", error);
@@ -1630,11 +1554,9 @@ export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
 export async function updateKitchenItemStatus(
   itemId: string,
   newStatus: OrderItemStatus,
-  cookId: string
+  cookId: string,
 ): Promise<{ success: boolean; message: string }> {
   try {
-    console.log(`👨‍🍳 Actualizando item ${itemId} a status ${newStatus} por cocinero ${cookId}`);
-
     // Validar que el nuevo status es válido para cocina
     const validStatuses: OrderItemStatus[] = ["preparing", "ready"];
     if (!validStatuses.includes(newStatus)) {
@@ -1644,11 +1566,13 @@ export async function updateKitchenItemStatus(
     // Verificar que el item existe y es un plato
     const { data: item, error: itemError } = await supabaseAdmin
       .from("order_items")
-      .select(`
+      .select(
+        `
         id,
         status,
         menu_items!inner(category)
-      `)
+      `,
+      )
       .eq("id", itemId)
       .single();
 
@@ -1675,18 +1599,16 @@ export async function updateKitchenItemStatus(
     if (updateError) {
       throw new Error(`Error actualizando status: ${updateError.message}`);
     }
-
-    console.log(`✅ Item ${itemId} actualizado a ${newStatus}`);
-
     return {
       success: true,
-      message: `Item actualizado a ${newStatus === "preparing" ? "preparando" : "listo"}`
+      message: `Item actualizado a ${newStatus === "preparing" ? "preparando" : "listo"}`,
     };
   } catch (error) {
     console.error("❌ Error en updateKitchenItemStatus:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Error interno del servidor"
+      message:
+        error instanceof Error ? error.message : "Error interno del servidor",
     };
   }
 }
@@ -1694,11 +1616,9 @@ export async function updateKitchenItemStatus(
 // Obtener estado de pedidos de una mesa específica (para cliente que escanea QR)
 export async function getTableOrdersStatus(
   tableId: string,
-  userId: string
+  userId: string,
 ): Promise<OrderWithItems[]> {
   try {
-    console.log(`📱 Obteniendo estado de pedidos para mesa ${tableId} y usuario ${userId}`);
-
     // Verificar que el usuario tiene acceso a esta mesa
     const { data: tableData, error: tableError } = await supabaseAdmin
       .from("tables")
@@ -1714,7 +1634,8 @@ export async function getTableOrdersStatus(
     // Obtener todas las órdenes de la mesa del usuario
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
-      .select(`
+      .select(
+        `
         id,
         user_id,
         table_id,
@@ -1743,7 +1664,8 @@ export async function getTableOrdersStatus(
         ),
         tables(id, number),
         users(id, first_name, last_name, profile_image)
-      `)
+      `,
+      )
       .eq("table_id", tableId)
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
@@ -1751,9 +1673,6 @@ export async function getTableOrdersStatus(
     if (ordersError) {
       throw new Error(`Error obteniendo pedidos: ${ordersError.message}`);
     }
-
-    console.log(`📱 Encontradas ${orders?.length || 0} órdenes para la mesa`);
-
     // Mapear los datos para que coincidan con el tipo OrderWithItems
     const mappedOrders: OrderWithItems[] = (orders || []).map((order: any) => ({
       ...order,
@@ -1762,8 +1681,8 @@ export async function getTableOrdersStatus(
       order_items: order.order_items.map((item: any) => ({
         ...item,
         order_id: order.id,
-        menu_item: item.menu_items?.[0] || null
-      }))
+        menu_item: item.menu_items?.[0] || null,
+      })),
     }));
 
     return mappedOrders;
@@ -1778,12 +1697,12 @@ export async function getTableOrdersStatus(
 // Obtener pedidos pendientes para bar (items con category "bebida" y status "accepted")
 export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
   try {
-    console.log("🍷 Obteniendo pedidos para bar (todos los estados activos)...");
-
+    
     // Obtener todos los items activos que son bebidas
     const { data: barItems, error: itemsError } = await supabaseAdmin
       .from("order_items")
-      .select(`
+      .select(
+        `
         id,
         order_id,
         menu_item_id,
@@ -1813,7 +1732,8 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
           tables(id, number),
           users(id, first_name, last_name, profile_image)
         )
-      `)
+      `,
+      )
       .in("status", ["accepted", "preparing", "ready"])
       .eq("menu_items.category", "bebida")
       .order("created_at", { ascending: true });
@@ -1823,31 +1743,21 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
     }
 
     if (!barItems || barItems.length === 0) {
-      console.log("🍷 No hay items pendientes para bar");
       return [];
     }
 
     // Agrupar items por orden
     const ordersMap = new Map<string, OrderWithItems>();
 
-    barItems.forEach((item) => {
+    barItems.forEach(item => {
       const order = (item as any).orders;
       const menuItem = (item as any).menu_items;
-
-      console.log("🍷 Procesando item de bar:", {
-        itemId: item.id,
-        orderId: order?.id,
-        menuItemName: menuItem?.name,
-        orderHasTables: !!order?.tables,
-        orderHasUsers: !!order?.users
-      });
-
       if (!ordersMap.has(order.id)) {
         ordersMap.set(order.id, {
           ...order,
           table: order.tables,
           user: order.users,
-          order_items: []
+          order_items: [],
         });
       }
 
@@ -1861,14 +1771,12 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
         subtotal: item.subtotal,
         status: item.status,
         created_at: item.created_at,
-        menu_item: menuItem
+        menu_item: menuItem,
       });
     });
 
     const ordersArray = Array.from(ordersMap.values());
-    console.log(`🍷 Encontradas ${ordersArray.length} órdenes con items para bar`);
-    console.log("🍷 Estructura de primera orden:", JSON.stringify(ordersArray[0], null, 2));
-
+    
     return ordersArray;
   } catch (error) {
     console.error("❌ Error en getBartenderPendingOrders:", error);
@@ -1880,11 +1788,9 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
 export async function updateBartenderItemStatus(
   itemId: string,
   newStatus: OrderItemStatus,
-  bartenderId: string
+  bartenderId: string,
 ): Promise<{ success: boolean; message: string }> {
   try {
-    console.log(`🍷 Actualizando item ${itemId} a status ${newStatus} por bartender ${bartenderId}`);
-
     // Validar que el nuevo status es válido para bar
     const validStatuses: OrderItemStatus[] = ["preparing", "ready"];
     if (!validStatuses.includes(newStatus)) {
@@ -1894,16 +1800,20 @@ export async function updateBartenderItemStatus(
     // Verificar que el item existe y es una bebida
     const { data: item, error: itemError } = await supabaseAdmin
       .from("order_items")
-      .select(`
+      .select(
+        `
         id,
         status,
         menu_items!inner(category)
-      `)
+      `,
+      )
       .eq("id", itemId)
       .single();
 
     if (itemError || !item) {
-      throw new Error(`Item no encontrado: ${itemError?.message || "Item inexistente"}`);
+      throw new Error(
+        `Item no encontrado: ${itemError?.message || "Item inexistente"}`,
+      );
     }
 
     // Verificar que es una bebida
@@ -1919,7 +1829,7 @@ export async function updateBartenderItemStatus(
       rejected: [],
       preparing: ["ready"],
       ready: ["delivered"],
-      delivered: []
+      delivered: [],
     };
 
     if (!validTransitions[currentStatus]?.includes(newStatus)) {
@@ -1931,7 +1841,7 @@ export async function updateBartenderItemStatus(
       .from("order_items")
       .update({
         status: newStatus,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq("id", itemId);
 
@@ -1941,18 +1851,111 @@ export async function updateBartenderItemStatus(
 
     const statusMessages: Record<"preparing" | "ready", string> = {
       preparing: "Bebida marcada como en preparación",
-      ready: "Bebida marcada como lista"
+      ready: "Bebida marcada como lista",
     };
-
-    console.log(`✅ ${statusMessages[newStatus as "preparing" | "ready"]} - Item: ${itemId}`);
-
     return {
       success: true,
-      message: statusMessages[newStatus as "preparing" | "ready"]
+      message: statusMessages[newStatus as "preparing" | "ready"],
     };
-
   } catch (error) {
     console.error("❌ Error en updateBartenderItemStatus:", error);
+    throw error;
+  }
+}
+
+// Enviar modificaciones de tanda (mantiene items rejected como auxiliares)
+export async function submitTandaModifications(
+  orderId: string,
+  userId: string,
+  keepItems: string[],
+  newItems: Array<{
+    menu_item_id: string;
+    quantity: number;
+    unit_price: number;
+  }>,
+): Promise<OrderWithItems> {
+  try {
+    // 1. Verificar que la orden existe y pertenece al usuario
+    const existingOrder = await getOrderById(orderId);
+    if (existingOrder.user_id !== userId) {
+      throw new Error("No tienes permisos para modificar esta orden");
+    }
+
+    if (existingOrder.is_paid) {
+      throw new Error("No se pueden modificar órdenes que ya están pagadas");
+    }
+
+    // 2. Generar un único batch_id para todas las modificaciones (mantenidos + nuevos)
+    const modificationBatchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // 3. Actualizar items needs_modification que se mantienen a status pending + nuevo batch_id
+    if (keepItems.length > 0) {
+      const { error: updateKeepError } = await supabaseAdmin
+        .from("order_items")
+        .update({
+          status: "pending",
+          batch_id: modificationBatchId, // Mismo batch_id para unificar tanda
+        })
+        .eq("order_id", orderId)
+        .in("id", keepItems)
+        .eq("status", "needs_modification");
+
+      if (updateKeepError) {
+        throw new Error(
+          `Error actualizando items mantenidos: ${updateKeepError.message}`,
+        );
+      }
+    }
+
+    // 4. Agregar nuevos items como pending con el mismo batch_id
+    if (newItems.length > 0) {
+      const newOrderItems = newItems.map(item => ({
+        order_id: orderId,
+        menu_item_id: item.menu_item_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        subtotal: item.quantity * item.unit_price,
+        status: "pending" as const,
+        batch_id: modificationBatchId, // Mismo batch_id para unificar tanda
+      }));
+
+      const { error: insertError } = await supabaseAdmin
+        .from("order_items")
+        .insert(newOrderItems);
+
+      if (insertError) {
+        throw new Error(`Error agregando nuevos items: ${insertError.message}`);
+      }
+    }
+
+    // 4. Recalcular total de la orden (excluyendo items rejected que son auxiliares)
+    const { data: orderItems, error: itemsError } = await supabaseAdmin
+      .from("order_items")
+      .select("subtotal")
+      .eq("order_id", orderId)
+      .neq("status", "rejected"); // Excluir items rejected del cálculo
+
+    if (itemsError) {
+      throw new Error(`Error calculando total: ${itemsError.message}`);
+    }
+
+    const newTotal =
+      orderItems?.reduce((sum, item) => sum + item.subtotal, 0) || 0;
+
+    // 5. Actualizar el total de la orden
+    const { error: updateOrderError } = await supabaseAdmin
+      .from("orders")
+      .update({ total_amount: newTotal })
+      .eq("id", orderId);
+
+    if (updateOrderError) {
+      throw new Error(
+        `Error actualizando total de orden: ${updateOrderError.message}`,
+      );
+    }
+    // 6. Retornar la orden actualizada
+    return await getOrderById(orderId);
+  } catch (error) {
+    console.error("❌ Error en submitTandaModifications:", error);
     throw error;
   }
 }

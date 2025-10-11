@@ -44,16 +44,12 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
   const getStatusInfo = (status: OrderItemStatus) => {
     switch (status) {
       case "pending":
-        // Si hay items rechazados, esto puede ser una tanda devuelta
-        const hasRejectedItems = groups.rejected.length > 0;
         return {
           color: "#ffa500",
           bgColor: "rgba(255, 165, 0, 0.1)",
           icon: Clock,
-          title: hasRejectedItems ? "Tanda Devuelta" : "Esperando Confirmación",
-          description: hasRejectedItems
-            ? "Estos productos fueron devueltos para que puedas modificar tu selección"
-            : "El mozo está revisando estos productos",
+          title: "Esperando Confirmación",
+          description: "El mozo está revisando estos productos",
         };
       case "accepted":
         return {
@@ -73,12 +69,12 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
         };
       case "needs_modification":
         return {
-          color: "#f59e0b",
-          bgColor: "rgba(245, 158, 11, 0.1)",
-          icon: X,
-          title: "Requiere Modificación",
+          color: "#22c55e",
+          bgColor: "rgba(34, 197, 94, 0.1)",
+          icon: CheckCircle,
+          title: "Disponibles en Tanda",
           description:
-            "Estos productos necesitan ser modificados antes de continuar",
+            "Estos productos sí tenemos en stock, forman parte de la tanda afectada",
         };
       case "preparing":
         return {
@@ -107,15 +103,574 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
     }
   };
 
+  const renderModificationRequiredGroup = () => {
+    const rejectedItems = groups.rejected;
+    const needsModificationItems = groups.needs_modification;
+    const pendingItems = groups.pending;
+
+    // Verificar si realmente hay items que requieren acción del usuario
+    const hasItemsNeedingAction = needsModificationItems.length > 0;
+
+    // Verificar si hay modificaciones enviadas (items pending de modificaciones)
+    const hasModificationsAlreadySent =
+      rejectedItems.length > 0 && pendingItems.length > 0;
+
+    // Verificar si la tanda ya fue completamente procesada
+    const acceptedItems = groups.accepted;
+    const preparingItems = groups.preparing;
+    const readyItems = groups.ready;
+    const deliveredItems = groups.delivered;
+
+    const tandaWasProcessed =
+      acceptedItems.length > 0 ||
+      preparingItems.length > 0 ||
+      readyItems.length > 0 ||
+      deliveredItems.length > 0;
+
+    // Solo mostrar el grupo de modificación si:
+    // 1. Hay items que necesitan acción (needs_modification), O
+    // 2. Hay items rejected pero la tanda no ha sido procesada completamente
+    const shouldShowModificationGroup =
+      hasItemsNeedingAction ||
+      (rejectedItems.length > 0 &&
+        !tandaWasProcessed &&
+        !hasModificationsAlreadySent);
+
+    if (!shouldShowModificationGroup) return null;
+
+    // Si ya se enviaron modificaciones, mostrar mensaje diferente
+    if (hasModificationsAlreadySent) {
+      return (
+        <View
+          style={{
+            backgroundColor: "rgba(59, 130, 246, 0.1)",
+            borderRadius: 12,
+            padding: 16,
+            marginBottom: 12,
+            borderWidth: 1,
+            borderColor: "rgba(59, 130, 246, 0.3)",
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginBottom: 12,
+            }}
+          >
+            <Clock size={22} color="#3b82f6" />
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: "700",
+                  color: "#3b82f6",
+                }}
+              >
+                ⏳ Modificaciones Enviadas
+              </Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#6b7280",
+                  marginTop: 2,
+                }}
+              >
+                Tus cambios están siendo revisados por el mozo
+              </Text>
+            </View>
+          </View>
+
+          <Text
+            style={{
+              fontSize: 14,
+              color: "#1e40af",
+              textAlign: "center",
+              fontStyle: "italic",
+            }}
+          >
+            💡 No puedes realizar más modificaciones hasta que el mozo apruebe o
+            rechace los cambios actuales
+          </Text>
+        </View>
+      );
+    }
+
+    // Combinar todos los items que requieren modificación
+    const allItemsRequiringModification = [
+      ...rejectedItems,
+      ...needsModificationItems,
+      ...(rejectedItems.length > 0 || needsModificationItems.length > 0
+        ? pendingItems
+        : []),
+    ];
+
+    return (
+      <View
+        style={{
+          backgroundColor: "rgba(255, 193, 7, 0.1)",
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 12,
+          borderWidth: 1,
+          borderColor: "rgba(255, 193, 7, 0.3)",
+        }}
+      >
+        {/* Header unificado */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginBottom: 16,
+          }}
+        >
+          <X size={22} color="#ffc107" />
+          <View style={{ flex: 1, marginLeft: 8 }}>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "700",
+                color: "#ffc107",
+              }}
+            >
+              ⚠️ Se requiere modificación
+            </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#6b7280",
+                marginTop: 2,
+              }}
+            >
+              Algunos productos no tienen stock. Otros sí están disponibles.
+            </Text>
+          </View>
+        </View>
+
+        {/* Productos no disponibles */}
+        {rejectedItems.length > 0 && (
+          <View style={{ marginBottom: 16 }}>
+            <Text
+              style={{
+                fontSize: 15,
+                fontWeight: "600",
+                color: "#ef4444",
+                marginBottom: 8,
+              }}
+            >
+              ❌ No disponibles:
+            </Text>
+            {rejectedItems.map((item, index) => (
+              <View
+                key={item.id}
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  backgroundColor: "rgba(239, 68, 68, 0.15)",
+                  borderRadius: 8,
+                  marginBottom: 6,
+                  borderLeftWidth: 3,
+                  borderLeftColor: "#ef4444",
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "500",
+                      color: "#ef4444",
+                      textDecorationLine: "line-through",
+                    }}
+                  >
+                    {item.menu_item?.name}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#dc2626",
+                    }}
+                  >
+                    Cantidad: {item.quantity} • Sin stock
+                  </Text>
+                </View>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "600",
+                    color: "#ef4444",
+                    backgroundColor: "rgba(239, 68, 68, 0.2)",
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 4,
+                  }}
+                >
+                  NO DISPONIBLE
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Productos disponibles en esta tanda */}
+        {needsModificationItems.length > 0 && (
+          <View style={{ marginBottom: 16 }}>
+            <Text
+              style={{
+                fontSize: 15,
+                fontWeight: "600",
+                color: "#22c55e",
+                marginBottom: 8,
+              }}
+            >
+              ✅ Disponibles (en esta tanda):
+            </Text>
+            {needsModificationItems.map((item, index) => (
+              <View
+                key={item.id}
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  backgroundColor: "rgba(34, 197, 94, 0.15)",
+                  borderRadius: 8,
+                  marginBottom: 6,
+                  borderLeftWidth: 3,
+                  borderLeftColor: "#22c55e",
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "500",
+                      color: "#16a34a",
+                    }}
+                  >
+                    {item.menu_item?.name}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#15803d",
+                    }}
+                  >
+                    Cantidad: {item.quantity} • Tenemos stock
+                  </Text>
+                </View>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "600",
+                    color: "#22c55e",
+                    backgroundColor: "rgba(34, 197, 94, 0.2)",
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 4,
+                  }}
+                >
+                  DISPONIBLE
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Productos pendientes afectados */}
+        {pendingItems.length > 0 &&
+          (rejectedItems.length > 0 || needsModificationItems.length > 0) && (
+            <View style={{ marginBottom: 16 }}>
+              <Text
+                style={{
+                  fontSize: 15,
+                  fontWeight: "600",
+                  color: "#6b7280",
+                  marginBottom: 8,
+                }}
+              >
+                📦 También incluye:
+              </Text>
+              {pendingItems.map((item, index) => (
+                <View
+                  key={item.id}
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    paddingVertical: 8,
+                    paddingHorizontal: 12,
+                    backgroundColor: "rgba(156, 163, 175, 0.1)",
+                    borderRadius: 8,
+                    marginBottom: 4,
+                    borderLeftWidth: 3,
+                    borderLeftColor: "#9ca3af",
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: "500",
+                        color: "#6b7280",
+                      }}
+                    >
+                      {item.menu_item?.name}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: "#9ca3af",
+                      }}
+                    >
+                      Cantidad: {item.quantity} • En la misma tanda
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "600",
+                      color: "#6b7280",
+                    }}
+                  >
+                    ${item.subtotal}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+        {/* Instrucciones y botón de acción */}
+        <View
+          style={{
+            backgroundColor: "rgba(59, 130, 246, 0.1)",
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 12,
+            borderWidth: 1,
+            borderColor: "rgba(59, 130, 246, 0.3)",
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 14,
+              fontWeight: "600",
+              color: "#3b82f6",
+              marginBottom: 4,
+            }}
+          >
+            ℹ️ ¿Qué significa esto?
+          </Text>
+          <Text
+            style={{
+              fontSize: 12,
+              color: "#1e40af",
+              lineHeight: 16,
+            }}
+          >
+            • Los productos marcados ❌ no tienen stock disponible
+            {"\n"}• Los productos marcados ✅ sí tenemos en stock
+            {"\n"}• Puedes reemplazar los no disponibles con otros del menú
+            {"\n"}• Los disponibles se mantendrán en tu pedido modificado
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={{
+            backgroundColor: "#ffc107",
+            borderRadius: 8,
+            padding: 14,
+            alignItems: "center",
+          }}
+          onPress={() => {
+            onModifyRejectedItems(allItemsRequiringModification);
+          }}
+        >
+          <Text
+            style={{
+              color: "#1a1a1a",
+              fontWeight: "700",
+              fontSize: 15,
+            }}
+          >
+            🔄 Modificar Selección
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // Renderizar items rejected como información "sin stock" cuando ya no requieren modificación
+  const renderRejectedItemsAsInfo = () => {
+    const rejectedItems = groups.rejected;
+    const needsModificationItems = groups.needs_modification;
+    const pendingItems = groups.pending;
+
+    // Solo mostrar si hay items rejected PERO ya no se requiere modificación
+    const hasItemsNeedingAction = needsModificationItems.length > 0;
+    const hasModificationsAlreadySent =
+      rejectedItems.length > 0 && pendingItems.length > 0;
+
+    // Verificar si la tanda ya fue procesada
+    const acceptedItems = groups.accepted;
+    const preparingItems = groups.preparing;
+    const readyItems = groups.ready;
+    const deliveredItems = groups.delivered;
+
+    const tandaWasProcessed =
+      acceptedItems.length > 0 ||
+      preparingItems.length > 0 ||
+      readyItems.length > 0 ||
+      deliveredItems.length > 0;
+
+    // Mostrar info de rejected solo si:
+    // - Hay items rejected Y
+    // - NO hay items que necesiten acción Y
+    // - (La tanda fue procesada O ya se enviaron modificaciones)
+    const shouldShowRejectedInfo =
+      rejectedItems.length > 0 &&
+      !hasItemsNeedingAction &&
+      (tandaWasProcessed || hasModificationsAlreadySent);
+
+    if (!shouldShowRejectedInfo) return null;
+
+    return (
+      <View
+        style={{
+          backgroundColor: "rgba(239, 68, 68, 0.1)",
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 12,
+          borderWidth: 1,
+          borderColor: "rgba(239, 68, 68, 0.3)",
+        }}
+      >
+        {/* Header */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginBottom: 12,
+          }}
+        >
+          <X size={22} color="#ef4444" />
+          <View style={{ flex: 1, marginLeft: 8 }}>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "700",
+                color: "#ef4444",
+              }}
+            >
+              ❌ Productos Sin Stock
+            </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#6b7280",
+                marginTop: 2,
+              }}
+            >
+              Estos productos no estaban disponibles en el momento del pedido
+            </Text>
+          </View>
+        </View>
+
+        {/* Lista de items rechazados */}
+        {rejectedItems.map((item, index) => (
+          <View
+            key={item.id}
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              paddingVertical: 8,
+              paddingHorizontal: 12,
+              backgroundColor: "rgba(239, 68, 68, 0.15)",
+              borderRadius: 8,
+              marginBottom: 6,
+              borderLeftWidth: 3,
+              borderLeftColor: "#ef4444",
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: "500",
+                  color: "#ef4444",
+                  textDecorationLine: "line-through",
+                }}
+              >
+                {item.menu_item?.name}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#dc2626",
+                }}
+              >
+                Cantidad: {item.quantity} • Sin stock disponible
+              </Text>
+            </View>
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: "600",
+                color: "#ef4444",
+                backgroundColor: "rgba(239, 68, 68, 0.2)",
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 4,
+              }}
+            >
+              SIN STOCK
+            </Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   const renderItemGroup = (status: OrderItemStatus, items: OrderItem[]) => {
     if (items.length === 0) return null;
 
+    // No renderizar grupos individuales si ya están en el grupo de modificación
+    if (status === "rejected" || status === "needs_modification") return null;
+
+    // Para items pending, solo ocultar los que pertenecen a la misma tanda de modificación
+    if (
+      status === "pending" &&
+      (groups.rejected.length > 0 || groups.needs_modification.length > 0)
+    ) {
+      // Obtener batch_ids de items que requieren modificación
+      const modificationBatchIds = new Set(
+        [
+          ...groups.rejected.map(item => item.batch_id),
+          ...groups.needs_modification.map(item => item.batch_id),
+        ].filter(Boolean), // Filtrar null/undefined
+      );
+
+      // Filtrar solo items pending que NO pertenecen a tandas de modificación
+      const newTandaItems = items.filter(item => {
+        // Si el item no tiene batch_id, considerarlo como nueva tanda
+        if (!item.batch_id) return true;
+        // Si el batch_id no está en los de modificación, es nueva tanda
+        return !modificationBatchIds.has(item.batch_id);
+      });
+
+      // Si todos los items pending son de modificación, no renderizar este grupo
+      if (newTandaItems.length === 0) return null;
+
+      // Renderizar solo los items de nuevas tandas
+      items = newTandaItems;
+    }
+
     const statusInfo = getStatusInfo(status);
     const StatusIcon = statusInfo.icon;
-    const canModify =
-      status === "rejected" ||
-      status === "needs_modification" ||
-      status === "pending";
 
     return (
       <View
@@ -203,106 +758,27 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             </Text>
           </View>
         ))}
-
-        {/* Botón de acción para items rechazados, que necesitan modificación o devueltos */}
-        {(status === "rejected" ||
-          status === "needs_modification" ||
-          (status === "pending" &&
-            (groups.rejected.length > 0 ||
-              groups.needs_modification.length > 0))) && (
-          <View>
-            {/* Mensaje explicativo para tandas devueltas */}
-            {status === "pending" &&
-              (groups.rejected.length > 0 ||
-                groups.needs_modification.length > 0) && (
-                <View
-                  style={{
-                    backgroundColor: "rgba(239, 68, 68, 0.1)",
-                    borderRadius: 6,
-                    padding: 8,
-                    marginTop: 8,
-                    borderWidth: 1,
-                    borderColor: "rgba(239, 68, 68, 0.3)",
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: "#ef4444",
-                      textAlign: "center",
-                      fontWeight: "500",
-                    }}
-                  >
-                    ⚠️ Tanda devuelta por falta de stock
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: "#6b7280",
-                      textAlign: "center",
-                      marginTop: 2,
-                    }}
-                  >
-                    Algunos productos no están disponibles. Puedes modificar
-                    toda tu selección.
-                  </Text>
-                </View>
-              )}
-
-            <TouchableOpacity
-              style={{
-                backgroundColor:
-                  status === "rejected" ? statusInfo.color : "#ef4444",
-                borderRadius: 8,
-                padding: 12,
-                marginTop: 12,
-                alignItems: "center",
-              }}
-              onPress={() => {
-                // Si hay items pending y rejected/needs_modification, pasar todos los grupos para modificación
-                const itemsToModify =
-                  status === "rejected" || status === "needs_modification"
-                    ? items
-                    : [
-                        ...groups.pending,
-                        ...groups.rejected,
-                        ...groups.needs_modification,
-                      ];
-                onModifyRejectedItems(itemsToModify);
-              }}
-            >
-              <Text
-                style={{
-                  color: "white",
-                  fontWeight: "600",
-                  fontSize: 14,
-                }}
-              >
-                {status === "rejected"
-                  ? "Modificar Productos Rechazados"
-                  : status === "needs_modification"
-                    ? "Modificar Productos"
-                    : "Modificar Toda la Tanda"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
     );
   };
 
   const canAddMoreItems = () => {
-    // Solo se pueden agregar más items si no hay items pendientes ni que necesiten modificación
+    // Solo se pueden agregar más items si no hay items que requieran modificación
     // y hay al menos algunos items aceptados (no todos rechazados)
-    const hasPendingItems =
-      groups.pending.length > 0 || groups.needs_modification.length > 0;
+    const hasItemsRequiringModification =
+      groups.pending.length > 0 ||
+      groups.needs_modification.length > 0 ||
+      groups.rejected.length > 0;
+
     const hasAcceptedOrBetter =
       groups.accepted.length > 0 ||
       groups.preparing.length > 0 ||
       groups.ready.length > 0 ||
       groups.delivered.length > 0;
 
-    return !hasPendingItems && hasAcceptedOrBetter && !order.is_paid;
+    return (
+      !hasItemsRequiringModification && hasAcceptedOrBetter && !order.is_paid
+    );
   };
 
   return (
@@ -329,7 +805,13 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
         {new Date(order.created_at).toLocaleString()}
       </Text>
 
-      {/* Grupos de items por estado */}
+      {/* Sección unificada de modificación requerida */}
+      {renderModificationRequiredGroup()}
+
+      {/* Items rejected como información (cuando ya no requieren modificación) */}
+      {renderRejectedItemsAsInfo()}
+
+      {/* Grupos de items por estado (excluyendo los que ya están en modificación) */}
       {Object.entries(groups).map(([status, items]) =>
         renderItemGroup(status as OrderItemStatus, items),
       )}
@@ -374,8 +856,8 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             textAlign: "center",
           }}
         >
-          💡 Puedes modificar productos rechazados o agregar nuevos items cuando
-          no haya productos esperando confirmación.
+          💡 Cuando hay productos que requieren modificación, debes resolverlos
+          antes de poder agregar más items al pedido.
         </Text>
       </View>
 
