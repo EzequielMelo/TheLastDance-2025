@@ -10,6 +10,7 @@ import {
   FlatList,
   Alert,
   ScrollView,
+  RefreshControl,
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
@@ -42,6 +43,8 @@ export default function HomeScreen({ navigation, route }: Props) {
   const [deliveringItems, setDeliveringItems] = useState<Set<string>>(new Set());
   // Estado para manejar refresh del cliente
   const [clientRefreshTrigger, setClientRefreshTrigger] = useState(0);
+  // Estado para pull-to-refresh
+  const [refreshing, setRefreshing] = useState(false);
 
   // Función para verificar el estado en la lista de espera
   const checkWaitingListStatus = useCallback(async () => {
@@ -121,6 +124,29 @@ export default function HomeScreen({ navigation, route }: Props) {
   const handleClientRefresh = () => {
     setClientRefreshTrigger(prev => prev + 1);
   };
+
+  // Función para manejar pull-to-refresh
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      // Refrescar estado del cliente
+      await checkWaitingListStatus();
+      
+      // Refrescar items ready si es mozo
+      if (user?.position_code === "mozo") {
+        await loadReadyItems();
+      }
+      
+      // Triggear refresh del cliente
+      setClientRefreshTrigger(prev => prev + 1);
+      
+      ToastAndroid.show("Estado actualizado", ToastAndroid.SHORT);
+    } catch (error) {
+      console.error("Error al refrescar:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [checkWaitingListStatus, loadReadyItems, user]);
 
   const loadDishesMenu = async () => {
     try {
@@ -311,6 +337,14 @@ export default function HomeScreen({ navigation, route }: Props) {
           style={{ flex: 1 }}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 20 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={["#d4af37"]}
+              tintColor="#d4af37"
+            />
+          }
         >
           {isCliente ? (
             <View>

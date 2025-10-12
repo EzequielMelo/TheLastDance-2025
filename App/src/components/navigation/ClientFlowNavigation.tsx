@@ -36,47 +36,34 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
     deliveredItems: number;
   } | null>(null);
   const [checkingDelivery, setCheckingDelivery] = useState(false);
+  const [lastRefreshTrigger, setLastRefreshTrigger] = useState(0);
 
   const handleRefresh = async () => {
     await refresh();
     onRefresh?.();
   };
 
-  // Verificar estado de entrega cuando el usuario está sentado
+  // Solo ejecutar cuando se dispare refreshTrigger (pull-to-refresh)
   useEffect(() => {
-    const checkDelivery = async () => {
-      if (state === "seated" && occupiedTable?.id && !checkingDelivery) {
-        console.log("🔍 Checking delivery status for table:", occupiedTable.id);
-        try {
-          setCheckingDelivery(true);
-          const status = await checkTableDeliveryStatus(occupiedTable.id);
-          console.log("📦 Delivery status received:", status);
-          setDeliveryStatus(status);
-        } catch (error) {
-          console.error("❌ Error checking delivery status:", error);
-          // No mostrar error al usuario, solo log
-        } finally {
-          setCheckingDelivery(false);
-        }
-      } else {
-        console.log("⏭️ Skipping delivery check:", { 
-          state, 
-          hasTable: !!occupiedTable?.id, 
-          checking: checkingDelivery 
-        });
-      }
-    };
-
-    checkDelivery();
-  }, [state, occupiedTable?.id]);
-
-  // Actualizar estado cuando se dispara el refresh trigger desde HomeScreen
-  useEffect(() => {
-    if (refreshTrigger && refreshTrigger > 0) {
-      console.log("🔄 Refresh trigger activated:", refreshTrigger);
+    // Solo ejecutar si es un nuevo trigger válido
+    if (refreshTrigger && refreshTrigger > lastRefreshTrigger) {
+      setLastRefreshTrigger(refreshTrigger);
+      console.log("🔄 Pull-to-refresh activado");
+      
+      // Refrescar estado general
       refresh();
+      
+      // Verificar delivery status si corresponde (con delay para que refresh termine)
+      setTimeout(() => {
+        if (state === "seated" && occupiedTable?.id && deliveryConfirmationStatus === 'pending') {
+          console.log("🔍 Verificando delivery status");
+          checkTableDeliveryStatus(occupiedTable.id)
+            .then(setDeliveryStatus)
+            .catch(console.error);
+        }
+      }, 500);
     }
-  }, [refreshTrigger]); // Quitar refresh de las dependencias para evitar bucles
+  }, [refreshTrigger]); // SOLO refreshTrigger como dependencia
 
   const renderStateContent = () => {
     switch (state) {
@@ -332,7 +319,7 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                 )}
                 
                 {/* Solo mostrar estos botones si NO está en estado bill_requested */}
-                <View className="flex-row gap-4">
+                <View className="flex-row gap-4 mb-4">
                   <TouchableOpacity
                     onPress={() => navigation.navigate("Menu")}
                     className="bg-yellow-600 px-6 py-3 rounded-lg"

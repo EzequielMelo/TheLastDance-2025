@@ -2089,23 +2089,6 @@ export async function checkAllItemsDelivered(
     // Considerar "todo entregado" si todos los items válidos (no rejected) están delivered
     const allDelivered = validItems.length === 0 || deliveredItems.length === validItems.length;
 
-    console.log(`📊 Verificación de entrega - Total items: ${orderItems.length}, Items válidos (no rejected): ${validItems.length}, Entregados: ${deliveredItems.length}, Pendientes: ${pendingItems.length}`);
-
-    // Si todos los items válidos están entregados, actualizar el table_status de la mesa
-    if (allDelivered && validItems.length > 0) {
-      const { error: tableUpdateError } = await supabaseAdmin
-        .from("tables")
-        .update({
-          table_status: 'delivered'
-        })
-        .eq("id", tableId);
-
-      if (tableUpdateError) {
-        // No falla la función por esto, solo es un warning
-        console.warn("Error actualizando table_status:", tableUpdateError.message);
-      }
-    }
-
     return {
       allDelivered,
       totalItems: validItems.length, // Solo contar items válidos (no rejected)

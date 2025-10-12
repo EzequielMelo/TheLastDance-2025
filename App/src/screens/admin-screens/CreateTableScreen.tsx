@@ -52,7 +52,12 @@ export default function CreateTableScreen({ navigation }: any) {
 
   // Montar el componente QR cuando hay número
   useEffect(() => {
+    console.log("🔄 useEffect qrMounted - number:", number);
+    console.log("🔄 Number(number):", Number(number));
+    console.log("🔄 Number(number) > 0:", Number(number) > 0);
+    
     if (number && Number(number) > 0) {
+      console.log("✅ Activando qrMounted");
       setQrMounted(true);
       setQrGenerated(false);
       // Limpiar QR anterior
@@ -60,6 +65,7 @@ export default function CreateTableScreen({ navigation }: any) {
       next[1] = null;
       setImages(next);
     } else {
+      console.log("❌ Desactivando qrMounted");
       setQrMounted(false);
       setQrGenerated(false);
     }
@@ -122,7 +128,11 @@ export default function CreateTableScreen({ navigation }: any) {
     // Si tenemos el ID real de la mesa, usarlo; sino usar el número temporalmente
     // Formato: thelastdance://table/{tableId}
     const idToUse = tableId || tableNumber;
-    return `thelastdance://table/${idToUse}`;
+    const qrContent = `thelastdance://table/${idToUse}`;
+    
+    console.log("🔍 Generando QR:", { tableNumber, tableId, idToUse, qrContent });
+    
+    return qrContent;
   };
 
   // Función para seleccionar desde galería
@@ -501,17 +511,21 @@ export default function CreateTableScreen({ navigation }: any) {
 
       {/* QR Generator (siempre montado cuando hay número) */}
       {qrMounted && (
-        <View
-          style={{
-            position: "absolute",
-            left: -1000,
-            top: -1000,
-            width: 400,
-            height: 400,
-          }}
-        >
+        <>
+          {console.log("🏗️ Renderizando componente QR montado")}
           <View
             ref={qrRef}
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              width: 400,
+              height: 400,
+              zIndex: -1,
+              opacity: 0,
+            }}
+          >
+          <View
             style={{
               padding: 50,
               backgroundColor: "white",
@@ -521,16 +535,51 @@ export default function CreateTableScreen({ navigation }: any) {
               justifyContent: "center",
             }}
           >
-            <QRCode
-              value={generateQRContent(number)}
-              size={300}
-              color="black"
-              backgroundColor="white"
-              quietZone={10}
-              enableLinearGradient={false}
-            />
+            {number && number.trim() !== "" ? (
+              <View style={{ alignItems: "center" }}>
+                <QRCode
+                  value={`thelastdance://table/${number}`}
+                  size={250}
+                  color="black"
+                  backgroundColor="white"
+                />
+                <Text style={{ 
+                  fontSize: 18, 
+                  fontWeight: "bold", 
+                  color: "#000", 
+                  marginTop: 20,
+                  textAlign: "center" 
+                }}>
+                  Mesa #{number}
+                </Text>
+                <Text style={{ 
+                  fontSize: 14, 
+                  color: "#666", 
+                  marginTop: 5,
+                  textAlign: "center" 
+                }}>
+                  thelastdance://table/{number}
+                </Text>
+              </View>
+            ) : (
+              <View
+                style={{
+                  width: 300,
+                  height: 300,
+                  backgroundColor: "#f3f4f6",
+                  borderRadius: 10,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text style={{ color: "#6b7280", fontSize: 16 }}>
+                  Generando QR...
+                </Text>
+              </View>
+            )}
           </View>
         </View>
+        </>
       )}
 
       {/* Modal de Cámara */}
