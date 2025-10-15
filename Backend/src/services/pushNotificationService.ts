@@ -675,6 +675,42 @@ export async function notifyWaiterPaymentRequest(
   }
 }
 
+// Función para notificar al mozo cuando el cliente realiza el pago
+export async function notifyWaiterPaymentCompleted(
+  waiterId: string,
+  clientName: string,
+  tableNumber: string,
+  totalAmount: number,
+) {
+  try {
+    const token = await getWaiterToken(waiterId);
+
+    if (!token) {
+      return;
+    }
+
+    const notificationData: PushNotificationData = {
+      title: `✅ Pago realizado - Mesa #${tableNumber}`,
+      body: `${clientName} completó el pago de $${totalAmount.toLocaleString()}. Confirma para liberar la mesa.`,
+      data: {
+        type: "payment_completed",
+        tableNumber,
+        clientName,
+        totalAmount,
+        waiterId,
+        screen: "WaiterPaymentConfirmations",
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación de pago completado:",
+      error,
+    );
+  }
+}
+
 // Función para notificar al cliente cuando el mozo confirma el pago
 export async function notifyClientPaymentConfirmation(
   clientId: string,

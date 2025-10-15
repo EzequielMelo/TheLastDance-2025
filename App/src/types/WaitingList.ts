@@ -6,7 +6,7 @@ export interface WaitingListEntry {
   party_size: number;
   preferred_table_type: "vip" | "estandar" | "accesible" | null;
   special_requests: string | null;
-  status: "waiting" | "seated" | "cancelled" | "no_show" | "displaced";
+  status: "waiting" | "seated" | "cancelled" | "no_show" | "displaced" | "confirm_pending" | "completed";
   priority: number;
   joined_at: string;
   seated_at: string | null;

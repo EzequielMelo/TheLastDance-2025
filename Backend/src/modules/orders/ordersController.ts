@@ -27,7 +27,9 @@ import {
   rejectIndividualItemsFromBatch,
   approveBatchCompletely,
   payOrder,
+  confirmPaymentAndReleaseTable,
   getWaiterReadyItems,
+  getWaiterPendingPayments,
   markItemAsDelivered,
   submitTandaModifications,
 } from "./ordersServices";
@@ -1426,6 +1428,37 @@ export async function payOrderHandler(
   }
 }
 
+// Confirmar pago y liberar mesa (para mozos)
+export async function confirmPaymentHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Usuario no autenticado" });
+      return;
+    }
+
+    const tableId = req.params['tableId'];
+    const waiterId = req.user.appUserId;
+
+    if (!tableId) {
+      res.status(400).json({ error: "ID de mesa requerido" });
+      return;
+    }
+
+    const result = await confirmPaymentAndReleaseTable(tableId, waiterId);
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("❌ Error confirmando pago:", error);
+    res.status(400).json({
+      success: false,
+      error: error.message || "Error al confirmar el pago",
+    });
+  }
+}
+
 // ============= CONTROLADORES PARA MOZOS - ITEMS READY =============
 
 // Obtener items listos para entregar (ready) de las mesas asignadas al mozo
@@ -1457,6 +1490,43 @@ export async function getWaiterReadyItemsHandler(
     });
   } catch (error: any) {
     console.error("❌ Error obteniendo items ready para mozo:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error interno del servidor",
+      error: error.message || "Error desconocido",
+    });
+  }
+}
+
+// Obtener mesas con pago pendiente de confirmación (para mozos)
+export async function getWaiterPendingPaymentsHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Usuario no autenticado" });
+      return;
+    }
+
+    // Verificar que el usuario es mozo
+    if (req.user.position_code !== "mozo") {
+      res.status(403).json({ 
+        error: "Solo los mozos pueden acceder a esta función" 
+      });
+      return;
+    }
+
+    const waiterId = req.user.appUserId;
+    const pendingPayments = await getWaiterPendingPayments(waiterId);
+
+    res.json({
+      success: true,
+      data: pendingPayments,
+      message: `${pendingPayments.length} mesas con pago pendiente de confirmación`,
+    });
+  } catch (error: any) {
+    console.error("❌ Error obteniendo pagos pendientes para mozo:", error);
     res.status(500).json({
       success: false,
       message: "Error interno del servidor",

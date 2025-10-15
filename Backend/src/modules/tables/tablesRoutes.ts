@@ -17,6 +17,7 @@ import {
   getMyStatusHandler,
   confirmDeliveryHandler,
   getBillData,
+  requestBillHandler,
 } from "./tablesController";
 
 const router = express.Router();
@@ -100,6 +101,9 @@ router.post(
 
 // POST /api/tables/:id/confirm-delivery - Confirmar entrega de pedido (solo clientes)
 router.post("/:id/confirm-delivery", authenticateUser, confirmDeliveryHandler);
+
+// POST /api/tables/:id/request-bill - Solicitar la cuenta (solo clientes)
+router.post("/:id/request-bill", authenticateUser, requestBillHandler);
 
 // GET /api/tables/:tableId/bill - Obtener datos de la cuenta para pagar (solo clientes)
 router.get("/:tableId/bill", authenticateUser, getBillData);
