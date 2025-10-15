@@ -20,7 +20,7 @@ import ScanOrderQRScreen from "../screens/table-screens/ScanOrderQRScreen";
 import JoinWaitingListScreen from "../screens/table-screens/JoinWaitingListScreen";
 import MyWaitingPositionScreen from "../screens/table-screens/MyWaitingPositionScreen";
 import MenuScreen from "../screens/menu-screens/MenuScreen";
-import GamesScreen from "../screens/GamesScreen";
+import GamesScreen from "../screens/games/GamesScreen";
 import SurveyScreen from "../screens/SurveyScreen";
 import { CartProvider } from "../context/CartContext";
 import WaiterDashboardScreen from "../screens/waiter-screens/WaiterDashboardScreen";
@@ -30,6 +30,9 @@ import BillPaymentScreen from "../screens/table-screens/BillPaymentScreen";
 import WaiterOrdersScreen from "../components/orders/WaiterOrdersScreen";
 import KitchenDashboardScreen from "../screens/kitchen-screens/KitchenDashboardScreen";
 import BartenderDashboardScreen from "../screens/bar-screens/BartenderDashboardScreen";
+import MemoryGame from "../screens/games/MemoryGame";
+import FastMathGame from "../screens/games/FastMathGame";
+import PuzzleGame from "../screens/games/PuzzleGame";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -116,6 +119,23 @@ function NavigatorContent() {
           <Stack.Screen
             name="Games"
             component={GamesScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Memory"
+            component={MemoryGame}
+            options={{ headerShown: false }}
+          />
+
+          <Stack.Screen
+            name="FastMath"
+            component={FastMathGame}
+            options={{ headerShown: false }}
+          />
+
+          <Stack.Screen
+            name="Puzzle"
+            component={PuzzleGame}
             options={{ headerShown: false }}
           />
           <Stack.Screen

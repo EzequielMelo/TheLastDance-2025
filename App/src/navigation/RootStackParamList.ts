@@ -17,7 +17,12 @@ export type RootStackParamList = {
   MyWaitingPosition: undefined; // Ver posición en lista de espera
   ScanTableQR: undefined; // Escanear QR de mesa para confirmar llegada
   ScanOrderQR: undefined; // Escanear QR para confirmar pedido entregado
+
   Games: undefined; // Pantalla de juegos
+  Memory: undefined; // Juego de la memoria
+  FastMath: undefined; // Juego de
+  Puzzle: undefined; // Juego de puzzle
+
   Survey: undefined; // Pantalla de encuesta
   Menu:
     | {
