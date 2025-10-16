@@ -24,7 +24,9 @@ import {
   rejectIndividualItemsHandler,
   approveBatchCompletelyHandler,
   payOrderHandler,
+  confirmPaymentHandler,
   getWaiterReadyItemsHandler,
+  getWaiterPendingPaymentsHandler,
   markItemAsDeliveredHandler,
   submitTandaModificationsHandler,
 } from "./ordersController";
@@ -49,6 +51,7 @@ router.get("/waiter/active", getWaiterActiveOrdersHandler);
 router.get("/waiter/pending-items", getWaiterPendingItemsHandler); // Solo items pendientes (legacy)
 router.get("/waiter/pending-batches", getWaiterPendingBatchesHandler); // Tandas pendientes agrupadas por batch_id
 router.get("/waiter/ready-items", getWaiterReadyItemsHandler); // Items listos para entregar
+router.get("/waiter/pending-payments", getWaiterPendingPaymentsHandler); // Mesas con pago pendiente de confirmación
 router.put("/:orderId/waiter-action", waiterOrderActionHandler);
 router.put("/:orderId/waiter-items-action", waiterItemsActionHandler); // Acción sobre items específicos
 router.put("/waiter/item/:itemId/delivered", markItemAsDeliveredHandler); // Marcar item como entregado
@@ -69,6 +72,9 @@ router.put("/:orderId/submit-tanda-modifications", submitTandaModificationsHandl
 
 // Procesar pago de todas las órdenes de una mesa (usando orderId como tableId)
 router.put("/:orderId/pay", payOrderHandler);
+
+// Confirmar pago y liberar mesa (para mozos)
+router.put("/table/:tableId/confirm-payment", confirmPaymentHandler);
 
 // Obtener pedido específico por ID
 router.get("/:orderId", getOrderHandler);

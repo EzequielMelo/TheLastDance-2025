@@ -8,6 +8,7 @@ export type ClientState =
   | "assigned" // Mesa asignada pero no confirmada
   | "seated" // Mesa confirmada (sentado)
   | "displaced" // Removido de mesa por staff
+  | "confirm_pending" // Pago realizado, esperando confirmación del mozo
   | "loading" // Cargando estado
   | "error"; // Error al obtener estado
 
@@ -85,6 +86,11 @@ export const useClientState = (): ClientStateData => {
         case "displaced":
           setWaitingId(response.data.waitingListId);
           setState("displaced");
+          break;
+
+        case "confirm_pending":
+          setWaitingId(response.data.waitingListId);
+          setState("confirm_pending");
           break;
 
         case "not_in_queue":

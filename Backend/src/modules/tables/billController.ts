@@ -61,7 +61,7 @@ export const getBillData = async (
       return;
     }
 
-    // 3. Obtener todos los pedidos de la mesa
+    // 3. Obtener todos los pedidos NO PAGADOS de la mesa
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
       .select(
@@ -85,6 +85,7 @@ export const getBillData = async (
       )
       .eq("table_id", tableId)
       .eq("user_id", userId)
+      .eq("is_paid", false) // CRÍTICO: Solo órdenes no pagadas
       .eq("order_items.status", "delivered")
       .order("created_at", { ascending: true });
 

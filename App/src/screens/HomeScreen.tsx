@@ -25,6 +25,7 @@ import Sidebar from "../components/navigation/Sidebar";
 import CartModal from "../components/cart/CartModal";
 import ActionCard from "../components/common/ActionCard";
 import { getDishesForKitchen, getDrinksForBar, MenuItem } from "../services/menuService";
+import { getWaiterPendingPayments, confirmPayment } from "../api/orders";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
@@ -41,10 +42,20 @@ export default function HomeScreen({ navigation, route }: Props) {
   const [readyItems, setReadyItems] = useState<any[]>([]);
   const [loadingReadyItems, setLoadingReadyItems] = useState(false);
   const [deliveringItems, setDeliveringItems] = useState<Set<string>>(new Set());
+  // Estados para mesas con pago pendiente (mozos)
+  const [pendingPaymentTables, setPendingPaymentTables] = useState<any[]>([]);
+  const [loadingPaymentTables, setLoadingPaymentTables] = useState(false);
   // Estado para manejar refresh del cliente
   const [clientRefreshTrigger, setClientRefreshTrigger] = useState(0);
   // Estado para pull-to-refresh
   const [refreshing, setRefreshing] = useState(false);
+  // Estado para información del mozo (cuando cliente está esperando confirmación)
+  const [waiterInfo, setWaiterInfo] = useState<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    profile_image?: string;
+  } | null>(null);
 
   // Función para verificar el estado en la lista de espera
   const checkWaitingListStatus = useCallback(async () => {
@@ -54,6 +65,7 @@ export default function HomeScreen({ navigation, route }: Props) {
       const response = await api.get("/tables/my-status");
       setWaitingListStatus(response.data.status);
     } catch (error) {
+      console.error("Error checking table status:", error);
       // Si hay error, asumimos que no está en la lista
       setWaitingListStatus("not_in_queue");
     }
@@ -83,12 +95,81 @@ export default function HomeScreen({ navigation, route }: Props) {
     }
   }, [user]);
 
-  // Cargar items listos para mozos
+  // Función para cargar mesas con pago pendiente (solo para mozos)
+  const loadPendingPaymentTables = useCallback(async () => {
+    if (!user || user.position_code !== "mozo") {
+      return;
+    }
+    
+    try {
+      setLoadingPaymentTables(true);
+      const tables = await getWaiterPendingPayments();
+      setPendingPaymentTables(tables || []);
+    } catch (error: any) {
+      // Solo mostrar error si es un error real de red/servidor, no cuando simplemente no hay mesas
+      console.warn("Error loading pending payment tables:", error);
+      // No mostrar toast para errores silenciosos
+      if (error.message && !error.message.includes("No hay") && !error.message.includes("no encontr")) {
+        ToastAndroid.show(
+          "Error al cargar información de pagos", 
+          ToastAndroid.SHORT
+        );
+      }
+    } finally {
+      setLoadingPaymentTables(false);
+    }
+  }, [user]);
+
+  // Función para obtener información del mozo (para clientes en confirm_pending)
+  const loadWaiterInfo = useCallback(async () => {
+    console.log("🔍 loadWaiterInfo iniciado");
+    
+    if (!user || user.position_code) {
+      console.log("❌ loadWaiterInfo - Usuario no válido o tiene position_code");
+      return;
+    }
+    
+    try {
+      // Obtener información de la mesa actual del cliente
+      console.log("🔍 Obteniendo my-status...");
+      const response = await api.get("/tables/my-status");
+      console.log("🔍 my-status en loadWaiterInfo:", response.data);
+      
+      if (response.data.status === "confirm_pending" && response.data.table?.id) {
+        console.log("🔍 Cliente está en confirm_pending, obteniendo info de mesa:", response.data.table.id);
+        
+        // Si ya tenemos el id_waiter en la respuesta de my-status, usarlo directamente
+        if (response.data.table.id_waiter) {
+          console.log("🔍 Mesa tiene mozo asignado:", response.data.table.id_waiter);
+          
+          // Obtener información del mozo directamente
+          const waiterResponse = await api.get(`/users/${response.data.table.id_waiter}`);
+          console.log("🔍 Waiter response:", waiterResponse.data);
+          
+          if (waiterResponse.data.success) {
+            console.log("✅ WaiterInfo obtenida:", waiterResponse.data.data);
+            setWaiterInfo(waiterResponse.data.data);
+          }
+        } else {
+          console.log("❌ Mesa no tiene mozo asignado");
+        }
+      } else {
+        console.log("❌ Cliente no está en confirm_pending o no tiene table.id");
+        setWaiterInfo(null);
+      }
+    } catch (error: any) {
+      console.error("❌ Error loading waiter info:", error);
+      setWaiterInfo(null);
+    }
+  }, [user]);
+
+  // Cargar items listos y pagos pendientes para mozos
   useEffect(() => {
     if (user && user.position_code === "mozo") {
       loadReadyItems();
+      loadPendingPaymentTables();
     }
-  }, [user, loadReadyItems]);
+  }, [user, loadReadyItems, loadPendingPaymentTables]);
 
   // Escuchar parámetros de navegación para refrescar cuando sea necesario
   useEffect(() => {
@@ -101,13 +182,16 @@ export default function HomeScreen({ navigation, route }: Props) {
     }
   }, [route.params?.refresh, user, token, checkWaitingListStatus]);
 
-  // Refrescar items ready cada 30 segundos para mozos
+  // Refrescar items ready y pagos pendientes cada 30 segundos para mozos
   useEffect(() => {
     if (user?.position_code !== "mozo") return;
     
-    const interval = setInterval(loadReadyItems, 30000);
+    const interval = setInterval(() => {
+      loadReadyItems();
+      loadPendingPaymentTables();
+    }, 30000);
     return () => clearInterval(interval);
-  }, [user, loadReadyItems]);
+  }, [user, loadReadyItems, loadPendingPaymentTables]);
 
   const handleNavigate = (screenName: string, params?: any) => {
     navigation.navigate(screenName as any, params);
@@ -132,9 +216,10 @@ export default function HomeScreen({ navigation, route }: Props) {
       // Refrescar estado del cliente
       await checkWaitingListStatus();
       
-      // Refrescar items ready si es mozo
+      // Refrescar items ready y pagos pendientes si es mozo
       if (user?.position_code === "mozo") {
         await loadReadyItems();
+        await loadPendingPaymentTables();
       }
       
       // Triggear refresh del cliente
@@ -147,6 +232,20 @@ export default function HomeScreen({ navigation, route }: Props) {
       setRefreshing(false);
     }
   }, [checkWaitingListStatus, loadReadyItems, user]);
+
+  // Cargar información del mozo para clientes en confirm_pending
+  useEffect(() => {
+    console.log("🔍 useEffect mozo - user:", user?.id, "position_code:", user?.position_code);
+    console.log("🔍 useEffect mozo - waitingListStatus:", waitingListStatus);
+    
+    if (user && !user.position_code && waitingListStatus === "confirm_pending") {
+      console.log("✅ Condiciones cumplidas - cargando info del mozo");
+      loadWaiterInfo();
+    } else if (waitingListStatus !== "confirm_pending") {
+      console.log("❌ Estado no es confirm_pending - limpiando waiterInfo");
+      setWaiterInfo(null);
+    }
+  }, [user, waitingListStatus, loadWaiterInfo]);
 
   const loadDishesMenu = async () => {
     try {
@@ -189,8 +288,9 @@ export default function HomeScreen({ navigation, route }: Props) {
               
               ToastAndroid.show("Item marcado como entregado", ToastAndroid.SHORT);
               
-              // Recargar la lista de items listos
+              // Recargar la lista de items listos y pagos pendientes
               await loadReadyItems();
+              await loadPendingPaymentTables();
               
             } catch (error: any) {
               console.error("Error delivering item:", error);
@@ -204,6 +304,37 @@ export default function HomeScreen({ navigation, route }: Props) {
                 newSet.delete(itemId);
                 return newSet;
               });
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Función para confirmar pago de una mesa
+  const handleConfirmPayment = (tableId: string, tableName: string, customerName: string) => {
+    Alert.alert(
+      "Confirmar Pago",
+      `¿Confirmas que recibiste el pago de la mesa ${tableName} de ${customerName}?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Confirmar",
+          onPress: async () => {
+            try {
+              await confirmPayment(tableId);
+              ToastAndroid.show("Pago confirmado y mesa liberada", ToastAndroid.SHORT);
+              
+              // Recargar las listas
+              await loadReadyItems();
+              await loadPendingPaymentTables();
+              
+            } catch (error: any) {
+              console.error("Error confirmando pago:", error);
+              ToastAndroid.show(
+                error.message || "Error al confirmar pago", 
+                ToastAndroid.SHORT
+              );
             }
           }
         }
@@ -352,6 +483,100 @@ export default function HomeScreen({ navigation, route }: Props) {
                 onRefresh={handleClientRefresh} 
                 refreshTrigger={clientRefreshTrigger}
               />
+              
+              {/* Card del mozo cuando el pago está pendiente de confirmación */}
+              {(() => {
+                console.log("🔍 Render card - waitingListStatus:", waitingListStatus);
+                console.log("🔍 Render card - waiterInfo:", waiterInfo);
+                console.log("🔍 Render card - condición completa:", waitingListStatus === "confirm_pending" && waiterInfo);
+                return null;
+              })()}
+              
+              {waitingListStatus === "confirm_pending" && waiterInfo && (
+                <View style={{
+                  backgroundColor: "rgba(251, 191, 36, 0.1)",
+                  borderRadius: 16,
+                  padding: 20,
+                  marginTop: 16,
+                  borderWidth: 1,
+                  borderColor: "rgba(251, 191, 36, 0.3)",
+                  alignItems: "center",
+                }}>
+                  {/* Foto circular del mozo */}
+                  <View style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 40,
+                    backgroundColor: "#f59e0b",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 12,
+                    borderWidth: 3,
+                    borderColor: "#fbbf24",
+                  }}>
+                    {waiterInfo.profile_image ? (
+                      <Image
+                        source={{ uri: waiterInfo.profile_image }}
+                        style={{ 
+                          width: 74, 
+                          height: 74, 
+                          borderRadius: 37 
+                        }}
+                      />
+                    ) : (
+                      <UserIcon size={40} color="white" />
+                    )}
+                  </View>
+                  
+                  {/* Nombre del mozo */}
+                  <Text style={{ 
+                    color: "#fbbf24", 
+                    fontSize: 18, 
+                    fontWeight: "700",
+                    marginBottom: 4,
+                    textAlign: "center"
+                  }}>
+                    {waiterInfo.first_name} {waiterInfo.last_name}
+                  </Text>
+                  
+                  {/* Mensaje de espera */}
+                  <Text style={{ 
+                    color: "white", 
+                    fontSize: 16, 
+                    fontWeight: "600",
+                    marginBottom: 8,
+                    textAlign: "center"
+                  }}>
+                    Esperando confirmación del mozo
+                  </Text>
+                  
+                  {/* Mensaje descriptivo */}
+                  <Text style={{ 
+                    color: "#ccc", 
+                    fontSize: 14,
+                    textAlign: "center",
+                    lineHeight: 20
+                  }}>
+                    Tu pago fue procesado exitosamente. El mozo confirmará la recepción y liberará tu mesa en breve.
+                  </Text>
+                  
+                  {/* Indicador de carga animado */}
+                  <View style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginTop: 12
+                  }}>
+                    <ActivityIndicator size="small" color="#fbbf24" />
+                    <Text style={{ 
+                      color: "#fbbf24", 
+                      fontSize: 12,
+                      marginLeft: 8
+                    }}>
+                      Procesando...
+                    </Text>
+                  </View>
+                </View>
+              )}
               
               {/* Info sobre el sidebar para clientes */}
               <View style={{
@@ -598,6 +823,84 @@ export default function HomeScreen({ navigation, route }: Props) {
                             </TouchableOpacity>
                           </View>
                         ))}
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Lista de mesas con pago pendiente de confirmación */}
+              {pendingPaymentTables.length > 0 && (
+                <View style={{
+                  backgroundColor: "rgba(251, 191, 36, 0.1)",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: "rgba(251, 191, 36, 0.3)",
+                }}>
+                  <Text style={{ 
+                    color: "#fbbf24", 
+                    fontSize: 16, 
+                    fontWeight: "600", 
+                    marginBottom: 12 
+                  }}>
+                    💰 Pagos pendientes de confirmación
+                  </Text>
+                  
+                  <View>
+                    {pendingPaymentTables.map((table) => (
+                      <View key={table.table_id} style={{
+                        backgroundColor: "#1a1a1a",
+                        borderRadius: 8,
+                        padding: 16,
+                        marginBottom: 12,
+                        borderLeftWidth: 4,
+                        borderLeftColor: "#fbbf24",
+                      }}><Text>#$</Text>
+                        {/* Header de la mesa */}
+                        <View style={{ 
+                          flexDirection: "row", 
+                          justifyContent: "space-between", 
+                          alignItems: "center",
+                          marginBottom: 12 
+                        }}>
+                          <View>
+                            <Text style={{ 
+                              color: "#fbbf24", 
+                              fontSize: 18, 
+                              fontWeight: "700" 
+                            }}>
+                              Mesa #{table.table_number}
+                            </Text>
+                            <Text style={{ 
+                              color: "#ccc", 
+                              fontSize: 14,
+                              marginTop: 2
+                            }}>
+                              {table.customer_name}
+                            </Text>
+                          </View>
+                          
+                          {/* Botón confirmar pago */}
+                          <TouchableOpacity
+                            onPress={() => handleConfirmPayment(
+                              table.table_id, 
+                              table.table_number.toString(), 
+                              table.customer_name
+                            )}
+                            style={{
+                              backgroundColor: "#fbbf24",
+                              paddingHorizontal: 20,
+                              paddingVertical: 12,
+                              borderRadius: 8,
+                              flexDirection: "row",
+                              alignItems: "center",
+                            }}
+                          >
+                            <CheckCircle size={18} color="white" />
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     ))}
                   </View>

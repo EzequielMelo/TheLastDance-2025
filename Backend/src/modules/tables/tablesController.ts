@@ -20,6 +20,7 @@ import type {
 import {
   notifyMaitreNewWaitingClient,
   notifyClientTableAssigned,
+  notifyWaiterPaymentRequest,
 } from "../../services/pushNotificationService";
 
 // ========== CONTROLADORES PARA LISTA DE ESPERA ==========
@@ -407,7 +408,38 @@ export async function getMyStatusHandler(req: Request, res: Response) {
 
     const clientId = req.user.appUserId;
 
-    // 1. Verificar mesa ocupada
+    // 1. PRIMERO: Verificar estado en waiting_list (incluyendo confirm_pending)
+    const { data: waitingEntry, error: waitingError } = await supabaseAdmin
+      .from("waiting_list")
+      .select("id, status, party_size, preferred_table_type, special_requests")
+      .eq("client_id", clientId)
+      .in("status", ["waiting", "displaced", "confirm_pending"]) // Incluir confirm_pending
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Si está en confirm_pending, devolver ese estado (tiene prioridad sobre seated)
+    if (!waitingError && waitingEntry && waitingEntry.status === "confirm_pending") {
+      // También obtener información de la mesa asignada para confirm_pending
+      const { data: clientTable } = await supabaseAdmin
+        .from("tables")
+        .select("id, number, id_waiter")
+        .eq("id_client", clientId)
+        .eq("is_occupied", true)
+        .maybeSingle();
+
+      const result = {
+        status: "confirm_pending",
+        waitingListId: waitingEntry.id,
+        party_size: waitingEntry.party_size,
+        preferred_table_type: waitingEntry.preferred_table_type,
+        special_requests: waitingEntry.special_requests,
+        table: clientTable || null, // Incluir información de la mesa si existe
+      };
+      return res.json(result);
+    }
+
+    // 2. Verificar mesa ocupada
     const { data: occupiedTable, error: occupiedError } = await supabaseAdmin
       .from("tables")
       .select("id, number, table_status")
@@ -424,7 +456,7 @@ export async function getMyStatusHandler(req: Request, res: Response) {
       return res.json(result);
     }
 
-    // 2. Verificar mesa asignada pero no ocupada
+    // 3. Verificar mesa asignada pero no ocupada
     const { data: assignedTable, error: assignedError } = await supabaseAdmin
       .from("tables")
       .select("id, number")
@@ -440,17 +472,8 @@ export async function getMyStatusHandler(req: Request, res: Response) {
       return res.json(result);
     }
 
-    // 3. Verificar estado en waiting_list (solo estados activos)
-    const { data: waitingEntry, error: waitingError } = await supabaseAdmin
-      .from("waiting_list")
-      .select("id, status, party_size, preferred_table_type, special_requests")
-      .eq("client_id", clientId)
-      .in("status", ["waiting", "displaced"]) // Solo considerar estados activos
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (waitingEntry && !waitingError) {
+    // 4. Verificar otros estados en waiting_list (que no sean confirm_pending)
+    if (!waitingError && waitingEntry) {
       if (waitingEntry.status === "displaced") {
         const result = {
           status: "displaced",
@@ -535,6 +558,121 @@ export async function confirmDeliveryHandler(req: Request, res: Response) {
   } catch (e: any) {
     console.error("Error confirmando entrega:", e.message);
     return res.status(500).json({ error: "Error interno del servidor" });
+  }
+}
+
+// POST /api/tables/:id/request-bill - Solicitar la cuenta (solo clientes)
+export async function requestBillHandler(req: Request, res: Response) {
+  try {
+    const tableId = req.params["id"];
+    const clientId = req.user?.appUserId;
+
+    if (!clientId) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    if (!tableId) {
+      return res.status(400).json({ error: "ID de mesa requerido" });
+    }
+
+    // 1. Verificar que el cliente tiene acceso a la mesa
+    const { data: table, error: tableError } = await supabaseAdmin
+      .from("tables")
+      .select("id, number, id_client, id_waiter, table_status")
+      .eq("id", tableId)
+      .eq("id_client", clientId)
+      .eq("is_occupied", true)
+      .single();
+
+    if (tableError || !table) {
+      return res.status(403).json({ 
+        error: "Mesa no encontrada o no tienes acceso a ella" 
+      });
+    }
+
+    if (!table.id_waiter) {
+      return res.status(400).json({ 
+        error: "No hay mozo asignado a esta mesa" 
+      });
+    }
+
+    // 2. Actualizar estado de la mesa a 'bill_requested'
+    const { error: updateError } = await supabaseAdmin
+      .from("tables")
+      .update({ table_status: "bill_requested" })
+      .eq("id", tableId);
+
+    if (updateError) {
+      console.error("Error actualizando estado de mesa:", updateError);
+      return res.status(500).json({ 
+        error: "Error interno del servidor" 
+      });
+    }
+
+    // 3. Calcular el total de las órdenes no pagadas
+    const { data: orders, error: ordersError } = await supabaseAdmin
+      .from("orders")
+      .select(`
+        id,
+        total_amount,
+        order_items (
+          quantity,
+          price,
+          menu_items (name)
+        )
+      `)
+      .eq("table_id", tableId)
+      .eq("user_id", clientId)
+      .eq("is_paid", false);
+
+    if (ordersError) {
+      console.error("Error obteniendo órdenes:", ordersError);
+      return res.status(500).json({ 
+        error: "Error calculando el total" 
+      });
+    }
+
+    const totalAmount = (orders || []).reduce((sum, order) => sum + (order.total_amount || 0), 0);
+
+    // 4. Obtener información del cliente para la notificación
+    const { data: clientData, error: clientError } = await supabaseAdmin
+      .from("users")
+      .select("first_name, last_name")
+      .eq("id", clientId)
+      .single();
+
+    const clientName = clientData && !clientError
+      ? `${clientData.first_name} ${clientData.last_name}`.trim()
+      : "Cliente";
+
+    // 5. Enviar notificación al mozo
+    try {
+      await notifyWaiterPaymentRequest(
+        table.id_waiter,
+        clientName,
+        table.number,
+        totalAmount
+      );
+    } catch (notifyError) {
+      console.error("Error enviando notificación al mozo:", notifyError);
+      // No bloqueamos la respuesta por error de notificación
+    }
+
+    return res.json({
+      success: true,
+      message: "Cuenta solicitada exitosamente",
+      data: {
+        tableNumber: table.number,
+        totalAmount,
+        itemsCount: orders?.length || 0,
+      }
+    });
+
+  } catch (error) {
+    console.error("Error en requestBillHandler:", error);
+    return res.status(500).json({ 
+      error: "Error interno del servidor" 
+    });
   }
 }
 

@@ -348,6 +348,34 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
           </View>
         );
 
+      case "confirm_pending":
+        return (
+          <View className="items-center">
+            <Clock size={64} color="#f59e0b" />
+            <Text className="text-white text-xl font-bold mt-4 mb-2">
+              Pago Pendiente de Confirmación
+            </Text>
+            <Text className="text-gray-300 text-center mb-2">
+              Hemos recibido tu pago
+            </Text>
+            <Text className="text-amber-400 text-lg font-semibold mb-4">
+              Esperando confirmación del mozo
+            </Text>
+            <Text className="text-gray-300 text-center mb-6">
+              Tu pago fue procesado exitosamente. El mozo confirmará la recepción y liberará tu mesa en breve.
+            </Text>
+            <View className="flex-row gap-4">
+              <TouchableOpacity
+                onPress={handleRefresh}
+                className="bg-amber-600 px-6 py-3 rounded-lg flex-row items-center"
+              >
+                <RefreshCcw size={16} color="white" className="mr-2" />
+                <Text className="text-white font-semibold">Actualizar Estado</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        );
+
       case "displaced":
         return (
           <View className="items-center">

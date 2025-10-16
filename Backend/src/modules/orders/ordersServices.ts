@@ -2030,20 +2030,26 @@ export async function checkAllItemsDelivered(
       throw new Error("La mesa no existe");
     }
 
-    // Obtener todas las órdenes del usuario para esta mesa (sin importar si la mesa está ocupada o no)
+    // Obtener todas las órdenes NO PAGADAS del usuario para esta mesa
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
       .select("id")
       .eq("table_id", tableId)
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .eq("is_paid", false); // CRÍTICO: Solo órdenes no pagadas
 
     if (ordersError) {
       throw new Error(`Error obteniendo órdenes: ${ordersError.message}`);
     }
 
     if (!orders || orders.length === 0) {
-      // Si no hay órdenes del usuario para esta mesa, no tiene acceso
-      throw new Error("No tienes órdenes en esta mesa");
+      // Si no hay órdenes no pagadas del usuario para esta mesa
+      return {
+        allDelivered: true, // Si no hay órdenes pendientes, consideramos que todo está entregado
+        totalItems: 0,
+        deliveredItems: 0,
+        pendingItems: []
+      };
     }
 
     // Extraer los IDs de las órdenes
@@ -2120,8 +2126,11 @@ export async function payOrder(
       .single();
 
     if (tableError || !table) {
+      console.error(`❌ Error verificando mesa: ${tableError?.message || 'Mesa no encontrada'}`);
       throw new Error("Mesa no encontrada o no tienes acceso a ella");
     }
+
+    console.log(`✅ Mesa verificada: ${table.number}, estado actual: ${table.table_status}`);
 
     // 2. Obtener todas las órdenes no pagadas del cliente en esta mesa
     const { data: orders, error: ordersError } = await supabaseAdmin
@@ -2139,30 +2148,186 @@ export async function payOrder(
       throw new Error("No hay órdenes pendientes de pago");
     }
 
-    console.log(`📝 Encontradas ${orders.length} órdenes para pagar`);
+    console.log(`📝 Encontradas ${orders.length} órdenes para procesar pago`);
 
-    // 3. Actualizar todas las órdenes como pagadas
-    const orderIds = orders.map(order => order.id);
-    const { error: updateError } = await supabaseAdmin
-      .from("orders")
+    // 3. NO actualizar is_paid aquí - se actualizará cuando el mozo confirme
+    // Las órdenes permanecen con is_paid = false hasta la confirmación del mozo
+    
+    console.log(`🔄 Procesando pago del cliente (pendiente de confirmación del mozo)`);
+
+    // 4. PRIMERO: Marcar la mesa como "pago pendiente de confirmación"
+    console.log(`🔄 Actualizando mesa ${tableId} a payment_pending...`);
+    const { error: tableUpdateError } = await supabaseAdmin
+      .from("tables")
       .update({
-        is_paid: true,
-        updated_at: new Date().toISOString(),
+        table_status: "payment_pending", // Nuevo estado: pago pendiente de confirmación por el mozo
       })
-      .in("id", orderIds);
+      .eq("id", tableId);
 
-    if (updateError) {
-      throw new Error(`Error actualizando estado de pago: ${updateError.message}`);
+    if (tableUpdateError) {
+      console.error(`❌ Error actualizando estado de mesa: ${tableUpdateError.message}`);
+      throw new Error(`Error actualizando estado de mesa: ${tableUpdateError.message}`);
     }
 
-    console.log(`✅ ${orders.length} órdenes marcadas como pagadas`);
+    console.log(`✅ Mesa ${tableId} marcada como pago pendiente de confirmación`);
 
-    // 4. Actualizar el estado de waiting_list a 'completed' si el cliente tiene una entrada activa
+    // 5. NOTIFICAR AL MOZO sobre el pago realizado
+    if (table.id_waiter) {
+      try {
+        // Obtener información del cliente
+        const { data: clientData, error: clientError } = await supabaseAdmin
+          .from("users")
+          .select("first_name, last_name")
+          .eq("id", clientId)
+          .single();
+
+        const clientName = clientData && !clientError
+          ? `${clientData.first_name} ${clientData.last_name}`.trim()
+          : "Cliente";
+
+        // Calcular el total de las órdenes
+        const { data: orderAmounts } = await supabaseAdmin
+          .from("orders")
+          .select("total_amount")
+          .eq("table_id", tableId)
+          .eq("user_id", clientId)
+          .eq("is_paid", false);
+
+        const totalAmount = orderAmounts?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+
+        // Importar la función de notificación aquí para evitar dependencia circular
+        const { notifyWaiterPaymentCompleted } = await import("../../services/pushNotificationService");
+        
+        await notifyWaiterPaymentCompleted(
+          table.id_waiter,
+          clientName,
+          table.number,
+          totalAmount
+        );
+      } catch (notifyError) {
+        console.error("Error enviando notificación de pago al mozo:", notifyError);
+        // No bloqueamos la función por error de notificación
+      }
+    }
+
+    // 6. SEGUNDO: Actualizar el estado de waiting_list a 'confirm_pending' si el cliente tiene una entrada activa
+    console.log(`🔄 Buscando entrada en waiting_list para cliente ${clientId}...`);
     const { data: waitingEntry, error: waitingError } = await supabaseAdmin
       .from("waiting_list")
       .select("*")
       .eq("client_id", clientId)
       .in("status", ["waiting", "seated"])
+      .order("joined_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!waitingError && waitingEntry) {
+      console.log(`✅ Entrada en waiting_list encontrada: ${waitingEntry.id}, estado actual: ${waitingEntry.status}`);
+      console.log(`🎯 Actualizando waiting_list entry ${waitingEntry.id} a confirm_pending`);
+      
+      const { error: waitingUpdateError } = await supabaseAdmin
+        .from("waiting_list")
+        .update({
+          status: "confirm_pending",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", waitingEntry.id);
+
+      if (waitingUpdateError) {
+        console.error(`❌ Error actualizando waiting_list: ${waitingUpdateError.message}`);
+        console.warn(`⚠️ Error actualizando waiting_list: ${waitingUpdateError.message}`);
+        // No falla la función por esto, el pago ya se procesó
+      } else {
+        console.log(`✅ Waiting_list entry marcada como confirm_pending`);
+      }
+    } else {
+      console.log(`ℹ️ No se encontró entrada activa en waiting_list para el cliente`);
+      if (waitingError) {
+        console.warn(`⚠️ Error buscando waiting_list: ${waitingError.message}`);
+      }
+    }
+
+    // 6. Obtener las órdenes para retornar (aún no pagadas, pero procesadas)
+    const orderIds = orders.map(order => order.id);
+    const paidOrders: OrderWithItems[] = [];
+    for (const orderId of orderIds) {
+      try {
+        const order = await getOrderById(orderId);
+        paidOrders.push(order);
+      } catch (error) {
+        console.warn(`⚠️ Error obteniendo orden ${orderId}:`, error);
+      }
+    }
+
+    return {
+      success: true,
+      message: `Pago procesado y pendiente de confirmación del mozo para ${orders.length} órdenes`,
+      paidOrders,
+    };
+
+  } catch (error) {
+    console.error("❌ Error procesando pago:", error);
+    throw error;
+  }
+}
+
+// Confirmar pago y liberar mesa (función para mozos)
+export async function confirmPaymentAndReleaseTable(
+  tableId: string,
+  waiterId: string,
+): Promise<{ success: boolean; message: string }> {
+  try {
+    console.log(`💰 Mozo ${waiterId} confirmando pago para mesa ${tableId}`);
+
+    // 1. Verificar que la mesa tiene pago pendiente y que el mozo es el asignado
+    const { data: table, error: tableError } = await supabaseAdmin
+      .from("tables")
+      .select("*")
+      .eq("id", tableId)
+      .eq("id_waiter", waiterId)
+      .eq("table_status", "payment_pending")
+      .eq("is_occupied", true)
+      .single();
+
+    if (tableError || !table) {
+      throw new Error("Mesa no encontrada, no tienes acceso o no hay pago pendiente");
+    }
+
+    // 2. Marcar todas las órdenes de la mesa como pagadas (AHORA SÍ)
+    const { data: orders, error: ordersError } = await supabaseAdmin
+      .from("orders")
+      .select("id")
+      .eq("table_id", tableId)
+      .eq("user_id", table.id_client)
+      .eq("is_paid", false); // Solo órdenes que aún no están marcadas como pagadas
+
+    if (ordersError) {
+      throw new Error(`Error obteniendo órdenes: ${ordersError.message}`);
+    }
+
+    if (orders && orders.length > 0) {
+      const orderIds = orders.map(order => order.id);
+      const { error: updateError } = await supabaseAdmin
+        .from("orders")
+        .update({
+          is_paid: true,
+          updated_at: new Date().toISOString(),
+        })
+        .in("id", orderIds);
+
+      if (updateError) {
+        throw new Error(`Error marcando órdenes como pagadas: ${updateError.message}`);
+      }
+
+      console.log(`✅ ${orders.length} órdenes marcadas como pagadas por confirmación del mozo`);
+    }
+
+    // 3. Actualizar waiting_list a 'completed' para el cliente
+    const { data: waitingEntry, error: waitingError } = await supabaseAdmin
+      .from("waiting_list")
+      .select("*")
+      .eq("client_id", table.id_client)
+      .eq("status", "confirm_pending")
       .order("joined_at", { ascending: false })
       .limit(1)
       .single();
@@ -2180,16 +2345,15 @@ export async function payOrder(
 
       if (waitingUpdateError) {
         console.warn(`⚠️ Error actualizando waiting_list: ${waitingUpdateError.message}`);
-        // No falla la función por esto, el pago ya se procesó
       } else {
         console.log(`✅ Waiting_list entry marcada como completed`);
       }
     } else {
-      console.log(`ℹ️ No se encontró entrada activa en waiting_list para el cliente`);
+      console.log(`ℹ️ No se encontró entrada confirm_pending en waiting_list para el cliente`);
     }
 
-    // 5. Liberar completamente la mesa después del pago
-    const { error: tableUpdateError } = await supabaseAdmin
+    // 4. Liberar completamente la mesa
+    const { error: releaseError } = await supabaseAdmin
       .from("tables")
       .update({
         id_client: null,
@@ -2198,32 +2362,81 @@ export async function payOrder(
       })
       .eq("id", tableId);
 
-    if (tableUpdateError) {
-      console.warn(`⚠️ Error liberando mesa: ${tableUpdateError.message}`);
-      // No falla la función por esto, el pago ya se procesó
-    } else {
-      console.log(`✅ Mesa ${tableId} liberada completamente después del pago`);
+    if (releaseError) {
+      throw new Error(`Error liberando mesa: ${releaseError.message}`);
     }
 
-    // 6. Obtener las órdenes completas para retornar
-    const paidOrders: OrderWithItems[] = [];
-    for (const orderId of orderIds) {
-      try {
-        const order = await getOrderById(orderId);
-        paidOrders.push(order);
-      } catch (error) {
-        console.warn(`⚠️ Error obteniendo orden ${orderId}:`, error);
-      }
+    console.log(`✅ Mesa ${tableId} liberada completamente por mozo ${waiterId}`);
+
+    // 5. Obtener el total real de las órdenes pagadas para las notificaciones
+    const { data: paidOrdersData } = await supabaseAdmin
+      .from("orders")
+      .select("total_amount")
+      .eq("table_id", tableId)
+      .eq("user_id", table.id_client)
+      .eq("is_paid", true);
+
+    const finalTotalAmount = paidOrdersData?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+
+    // 6. Obtener información del cliente y mozo para las notificaciones
+    const { data: clientData, error: clientError } = await supabaseAdmin
+      .from("users")
+      .select("first_name, last_name")
+      .eq("id", table.id_client)
+      .single();
+
+    const { data: waiterData, error: waiterError } = await supabaseAdmin
+      .from("users")
+      .select("first_name, last_name")
+      .eq("id", waiterId)
+      .single();
+
+    const clientName = clientData && !clientError
+      ? `${clientData.first_name} ${clientData.last_name}`.trim()
+      : "Cliente";
+
+    const waiterName = waiterData && !waiterError
+      ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
+      : "Mozo";
+
+    // 7. Enviar notificación al cliente confirmando que el pago fue recibido
+    try {
+      const { notifyClientPaymentConfirmation } = await import("../../services/pushNotificationService");
+      await notifyClientPaymentConfirmation(
+        table.id_client,
+        waiterName,
+        table.number,
+        finalTotalAmount
+      );
+      console.log(`📱 Notificación de pago confirmado enviada al cliente`);
+    } catch (notifyError) {
+      console.warn(`⚠️ Error enviando notificación al cliente:`, notifyError);
+      // No falla la función por esto
+    }
+
+    // 8. Enviar notificación a gerencia sobre el pago recibido
+    try {
+      const { notifyManagementPaymentReceived } = await import("../../services/pushNotificationService");
+      await notifyManagementPaymentReceived(
+        clientName,
+        table.number,
+        finalTotalAmount,
+        waiterName,
+        "efectivo" // Método de pago simulado
+      );
+      console.log(`📱 Notificación de pago recibido enviada a gerencia`);
+    } catch (notifyError) {
+      console.warn(`⚠️ Error enviando notificación a gerencia:`, notifyError);
+      // No falla la función por esto
     }
 
     return {
       success: true,
-      message: `Pago procesado exitosamente para ${orders.length} órdenes`,
-      paidOrders,
+      message: "Pago confirmado y mesa liberada exitosamente",
     };
 
   } catch (error) {
-    console.error("❌ Error procesando pago:", error);
+    console.error("❌ Error confirmando pago:", error);
     throw error;
   }
 }
@@ -2325,6 +2538,73 @@ export async function getWaiterReadyItems(waiterId: string): Promise<any[]> {
   } catch (error) {
     console.error("❌ Error en getWaiterReadyItems:", error);
     throw error;
+  }
+}
+
+// Obtener mesas con pago pendiente de confirmación para un mozo
+export async function getWaiterPendingPayments(waiterId: string): Promise<any[]> {
+  try {
+    // Log más discreto - solo en desarrollo
+    if (process.env['NODE_ENV'] === 'development') {
+      console.log(`💰 Verificando mesas con pago pendiente para mozo ${waiterId}`);
+    }
+
+    // Primero obtenemos las mesas con pago pendiente
+    const { data: tables, error } = await supabaseAdmin
+      .from("tables")
+      .select(`
+        id,
+        number,
+        id_client,
+        table_status
+      `)
+      .eq("id_waiter", waiterId)
+      .eq("table_status", "payment_pending")
+      .eq("is_occupied", true)
+      .order("number", { ascending: true });
+
+    if (error) {
+      // Solo loguear errores reales de base de datos, no lanzar excepción
+      console.warn(`⚠️ Error consultando mesas con pago pendiente: ${error.message}`);
+      return [];
+    }
+
+    if (!tables || tables.length === 0) {
+      // Mensaje más discreto cuando no hay mesas pendientes
+      if (process.env['NODE_ENV'] === 'development') {
+        console.log("💰 No hay mesas con pago pendiente actualmente");
+      }
+      return [];
+    }
+
+    // Luego obtenemos la información de los clientes por separado
+    const result = [];
+    for (const table of tables) {
+      if (table.id_client) {
+        const { data: user, error: userError } = await supabaseAdmin
+          .from("users")
+          .select("id, first_name, last_name, profile_image")
+          .eq("id", table.id_client)
+          .single();
+
+        result.push({
+          table_id: table.id,
+          table_number: table.number,
+          customer_name: user && !userError 
+            ? `${user.first_name} ${user.last_name}` 
+            : "Cliente desconocido",
+          customer_id: table.id_client,
+        });
+      }
+    }
+
+    console.log(`💰 ${result.length} mesa(s) con pago pendiente encontrada(s)`);
+    return result;
+
+  } catch (error) {
+    // Capturar cualquier error inesperado pero no propagarlo
+    console.warn("⚠️ Error verificando pagos pendientes:", error);
+    return [];
   }
 }
 
