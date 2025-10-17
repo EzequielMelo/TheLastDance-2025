@@ -22,6 +22,7 @@ import {
 import { useAuth } from "../../auth/useAuth";
 import api from "../../api/axios";
 import { payOrder } from "../../api/orders";
+import { clearDiscount } from "../../storage/discountStorage";
 
 interface BillItem {
   id: string;
@@ -161,6 +162,10 @@ const BillPaymentScreen: React.FC = () => {
       });
       // Llamar a la API para procesar el pago
       await payOrder(billData.tableId, billData.idClient);
+      
+      // ✅ Resetear descuentos de juegos después del pago exitoso
+      const discountCleared = await clearDiscount();
+      console.log("🎮 Game discount reset:", discountCleared ? "✅ Success" : "❌ Failed");
       
       ToastAndroid.show(
         "🎉 ¡Pago procesado exitosamente! Gracias por tu visita",

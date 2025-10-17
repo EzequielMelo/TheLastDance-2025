@@ -4,7 +4,7 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Alert,
+  ToastAndroid,
   RefreshControl,
   Image,
 } from "react-native";
@@ -77,7 +77,7 @@ export default function WaiterOrdersScreen() {
       setActiveOrders(active);
     } catch (error: any) {
       console.error("Error obteniendo datos del mozo:", error);
-      Alert.alert("Error", "No se pudieron cargar los datos");
+      ToastAndroid.show("❌ No se pudieron cargar los datos", ToastAndroid.SHORT);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -105,16 +105,16 @@ export default function WaiterOrdersScreen() {
           : undefined,
       );
 
-      Alert.alert(
-        "Éxito",
-        `Tanda ${action === "accept" ? "aceptada" : "rechazada"} correctamente`,
+      ToastAndroid.show(
+        `✅ Tanda ${action === "accept" ? "aceptada" : "rechazada"} correctamente`,
+        ToastAndroid.SHORT
       );
 
       // Refrescar datos
       await fetchOrders();
     } catch (error: any) {
       console.error("Error procesando acción del mozo:", error);
-      Alert.alert("Error", error.message || "Error procesando la acción");
+      ToastAndroid.show(`❌ Error: ${error.message || "Error procesando la acción"}`, ToastAndroid.SHORT);
     } finally {
       setActionLoading(null);
     }
@@ -154,10 +154,7 @@ export default function WaiterOrdersScreen() {
     const rejectedItemIds = selectedItems[batchKey] || [];
 
     if (rejectedItemIds.length === 0) {
-      Alert.alert(
-        "Error",
-        "Selecciona al menos un item que no está disponible",
-      );
+      ToastAndroid.show("⚠️ Selecciona al menos un item que no está disponible", ToastAndroid.SHORT);
       return;
     }
 
@@ -171,9 +168,9 @@ export default function WaiterOrdersScreen() {
         "Productos no disponibles en stock",
       );
 
-      Alert.alert(
-        "Éxito",
-        `Tanda procesada: ${rejectedItemIds.length} items sin stock, el resto disponible para modificar.`,
+      ToastAndroid.show(
+        `✅ Tanda procesada: ${rejectedItemIds.length} items sin stock, el resto disponible para modificar`,
+        ToastAndroid.LONG
       );
 
       // Limpiar selección y modo
@@ -184,7 +181,7 @@ export default function WaiterOrdersScreen() {
       await fetchOrders();
     } catch (error: any) {
       console.error("Error procesando rechazo con selección:", error);
-      Alert.alert("Error", error.message || "Error procesando la acción");
+      ToastAndroid.show(`❌ Error: ${error.message || "Error procesando la acción"}`, ToastAndroid.SHORT);
     } finally {
       setActionLoading(null);
     }

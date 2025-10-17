@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  Alert,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
@@ -106,11 +105,11 @@ export default function ScanOrderQRScreen() {
       console.log("🏠 My tableId:", myTableId);
 
       if (!tableId) {
-        Alert.alert(
-          "QR Inválido",
-          "Este código QR no contiene información válida de mesa.",
-          [{ text: "OK", onPress: () => setScanned(false) }],
+        ToastAndroid.show(
+          "❌ QR Inválido: No contiene información válida de mesa",
+          ToastAndroid.SHORT
         );
+        setTimeout(() => setScanned(false), 1500);
         return;
       }
 
@@ -136,11 +135,11 @@ export default function ScanOrderQRScreen() {
         console.log("💳 statusResponse.data.table:", statusResponse.data.table);
         
         if (!realTableId) {
-          Alert.alert(
-            "Error",
-            "No se pudo identificar tu mesa. Por favor, vuelve a escanear tu mesa primero.",
-            [{ text: "OK", onPress: () => setScanned(false) }]
+          ToastAndroid.show(
+            "❌ Mesa no identificada. Escanea tu mesa primero",
+            ToastAndroid.SHORT
           );
+          setTimeout(() => setScanned(false), 1500);
           return;
         }
         
@@ -153,11 +152,11 @@ export default function ScanOrderQRScreen() {
 
       // Si no es bill_requested, confirmar la entrega del pedido
       if (!myTableId) {
-        Alert.alert(
-          "Error",
-          "No se pudo identificar tu mesa. Por favor, vuelve a escanear tu mesa primero.",
-          [{ text: "OK", onPress: () => setScanned(false) }]
+        ToastAndroid.show(
+          "❌ Mesa no identificada. Escanea tu mesa primero",
+          ToastAndroid.SHORT
         );
+        setTimeout(() => setScanned(false), 1500);
         return;
       }
       
@@ -167,31 +166,16 @@ export default function ScanOrderQRScreen() {
         throw new Error(confirmResponse.data.error || "Error confirmando entrega");
       }
 
-      // Entrega confirmada exitosamente, mostrar opciones
-      Alert.alert(
-        "¡Entrega Confirmada! 🎉",
-        `Has confirmado la recepción de todos tus items. Ahora puedes acceder a nuevas opciones:`,
-        [
-          {
-            text: "Jugar",
-            onPress: () => {
-              ToastAndroid.show("Accediendo a juegos", ToastAndroid.SHORT);
-              navigation.navigate("Games");
-            },
-          },
-          {
-            text: "Encuesta",
-            onPress: () => {
-              navigation.navigate("Survey");
-            },
-          },
-          {
-            text: "Volver",
-            style: "cancel",
-            onPress: () => navigation.navigate("Home", { refresh: Date.now() }),
-          },
-        ],
+      // Entrega confirmada exitosamente
+      ToastAndroid.show(
+        "🎉 ¡Entrega Confirmada! Ahora puedes jugar, llenar encuesta o pedir la cuenta",
+        ToastAndroid.LONG
       );
+      
+      // Navegar al home donde podrá acceder a todas las opciones
+      setTimeout(() => {
+        navigation.navigate("Home", { refresh: Date.now() });
+      }, 2500);
 
     } catch (error: any) {
       console.error("Error processing QR scan:", error);
@@ -209,9 +193,11 @@ export default function ScanOrderQRScreen() {
         errorMessage = "No tienes permisos para realizar esta acción en esta mesa.";
       }
 
-      Alert.alert(alertTitle, errorMessage, [
-        { text: "OK", onPress: () => setScanned(false) },
-      ]);
+      ToastAndroid.show(
+        `❌ ${alertTitle}: ${errorMessage}`,
+        ToastAndroid.LONG
+      );
+      setTimeout(() => setScanned(false), 2000);
     } finally {
       setProcessing(false);
     }

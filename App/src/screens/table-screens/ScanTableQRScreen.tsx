@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  Alert,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
@@ -95,11 +94,11 @@ export default function ScanTableQRScreen() {
       }
 
       if (!tableId) {
-        Alert.alert(
-          "QR Inválido",
-          "Este código QR no contiene información válida de mesa.",
-          [{ text: "OK", onPress: () => setScanned(false) }],
+        ToastAndroid.show(
+          "❌ QR Inválido - No contiene información válida de mesa",
+          ToastAndroid.SHORT
         );
+        setScanned(false);
         return;
       }
 
@@ -107,23 +106,16 @@ export default function ScanTableQRScreen() {
       const response = await api.post(`/tables/${tableId}/activate`);
 
       if (response.data.success) {
-        // Mostrar éxito
-        Alert.alert(
-          "¡Mesa Confirmada!",
-          `Has confirmado tu llegada a la mesa ${response.data.table.table_number}. ¡Disfruta tu experiencia!`,
-          [
-            {
-              text: "Continuar",
-              onPress: () => {
-                ToastAndroid.show(
-                  "Mesa activada correctamente",
-                  ToastAndroid.SHORT,
-                );
-                navigation.navigate("Home");
-              },
-            },
-          ],
+        // Mostrar éxito con Toast
+        ToastAndroid.show(
+          `🎉 ¡Mesa ${response.data.table.table_number} confirmada! Disfruta tu experiencia`,
+          ToastAndroid.LONG,
         );
+        
+        // Navegar después de un breve delay
+        setTimeout(() => {
+          navigation.navigate("Home");
+        }, 2000);
       } else {
         throw new Error(response.data.message || "Error al activar la mesa");
       }
@@ -157,9 +149,8 @@ export default function ScanTableQRScreen() {
           "Esta mesa no puede ser activada en este momento.";
       }
 
-      Alert.alert(alertTitle, errorMessage, [
-        { text: "OK", onPress: () => setScanned(false) },
-      ]);
+      ToastAndroid.show(`❌ ${alertTitle}: ${errorMessage}`, ToastAndroid.LONG);
+      setScanned(false);
     } finally {
       setProcessing(false);
     }
