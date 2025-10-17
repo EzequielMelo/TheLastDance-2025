@@ -32,7 +32,12 @@ export async function approveClient(req: Request, res: Response) {
       return;
     }
 
-    await processClientApproval(id);
+    if (!req.user) {
+      res.status(401).json({ error: "No autenticado" });
+      return;
+    }
+
+    await processClientApproval(id, req.user.appUserId);
     res.json({ ok: true });
     return;
   } catch (e: any) {
@@ -56,10 +61,16 @@ export async function rejectClient(req: Request, res: Response) {
       return;
     }
 
+    if (!req.user) {
+      console.log("❌ Usuario no autenticado");
+      res.status(401).json({ error: "No autenticado" });
+      return;
+    }
+
     const reason = (req.body?.reason as string) || "";
     console.log("🔄 Procesando rechazo:", { id, reason });
     
-    await processClientRejection(id, reason);
+    await processClientRejection(id, reason, req.user.appUserId);
     
     console.log("✅ Cliente rechazado exitosamente");
     res.json({ ok: true });

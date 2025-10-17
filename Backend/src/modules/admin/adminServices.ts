@@ -11,6 +11,10 @@ import {
   CreateTableBody,
   Table,
 } from "../../types/adminTypes";
+import {
+  notifyClientAccountApproved,
+  notifyClientAccountRejected,
+} from "../../services/pushNotificationService";
 
 // Tipos para los servicios
 export interface Client {
@@ -161,29 +165,78 @@ export async function sendClientRejectionEmail(
   }
 }
 
-// Servicio completo para aprobar cliente (actualizar estado + enviar email)
-export async function processClientApproval(id: string): Promise<void> {
-  const clientData = await approveClientById(id);
-  await sendClientApprovalEmail(id, clientData.first_name);
+// Servicio completo para aprobar cliente (actualizar estado + enviar email + push notification)
+export async function processClientApproval(id: string, approverId: string): Promise<void> {
+  try {
+    console.log("🔄 Iniciando processClientApproval:", { id, approverId });
+    
+    // Paso 1: Actualizar estado en base de datos
+    const clientData = await approveClientById(id);
+    console.log("✅ Cliente aprobado en BD:", clientData);
+    
+    // Paso 2: Obtener información del administrador que aprueba
+    const { data: approverData, error: approverError } = await supabaseAdmin
+      .from("users")
+      .select("first_name, last_name, profile_code")
+      .eq("id", approverId)
+      .single();
+    
+    const approverName = approverError || !approverData 
+      ? "Administrador" 
+      : `${approverData.first_name || ''} ${approverData.last_name || ''}`.trim() || "Administrador";
+    
+    console.log("✅ Información del aprobador:", { approverName, profile: approverData?.profile_code });
+    
+    // Paso 3: Enviar email de aprobación
+    await sendClientApprovalEmail(id, clientData.first_name);
+    console.log("✅ Email de aprobación enviado");
+    
+    // Paso 4: Enviar notificación push
+    await notifyClientAccountApproved(id, `${clientData.first_name} ${clientData.last_name}`.trim(), approverName);
+    console.log("✅ Push notification de aprobación enviada");
+    
+  } catch (error) {
+    console.error("❌ Error en processClientApproval:", error);
+    throw error instanceof Error ? error : new Error("Error aprobando cliente");
+  }
 }
 
-// Servicio completo para rechazar cliente (actualizar estado + enviar email)
+// Servicio completo para rechazar cliente (actualizar estado + enviar email + push notification)
 export async function processClientRejection(
   id: string,
   reason: string = "",
+  rejectorId: string,
 ): Promise<void> {
   try {
-    console.log("🔄 Iniciando processClientRejection:", { id, reason });
+    console.log("🔄 Iniciando processClientRejection:", { id, reason, rejectorId });
     
     // Paso 1: Actualizar estado en base de datos
     console.log("🔄 Paso 1: Rechazando cliente en BD...");
     const clientData = await rejectClientById(id);
     console.log("✅ Cliente rechazado en BD:", clientData);
     
-    // Paso 2: Enviar email de notificación
-    console.log("🔄 Paso 2: Enviando email de rechazo...");
+    // Paso 2: Obtener información del administrador que rechaza
+    const { data: rejectorData, error: rejectorError } = await supabaseAdmin
+      .from("users")
+      .select("first_name, last_name, profile_code")
+      .eq("id", rejectorId)
+      .single();
+    
+    const rejectorName = rejectorError || !rejectorData 
+      ? "Administrador" 
+      : `${rejectorData.first_name || ''} ${rejectorData.last_name || ''}`.trim() || "Administrador";
+    
+    console.log("✅ Información del rechazador:", { rejectorName, profile: rejectorData?.profile_code });
+    
+    // Paso 3: Enviar email de rechazo
+    console.log("🔄 Paso 3: Enviando email de rechazo...");
     await sendClientRejectionEmail(id, clientData.first_name, reason);
     console.log("✅ Email de rechazo enviado exitosamente");
+    
+    // Paso 4: Enviar notificación push
+    console.log("🔄 Paso 4: Enviando push notification de rechazo...");
+    await notifyClientAccountRejected(id, `${clientData.first_name} ${clientData.last_name}`.trim(), rejectorName, reason);
+    console.log("✅ Push notification de rechazo enviada");
     
   } catch (error) {
     console.error("❌ Error en processClientRejection:", error);

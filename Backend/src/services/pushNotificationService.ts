@@ -785,3 +785,75 @@ export async function notifyManagementPaymentReceived(
     );
   }
 }
+
+// Función para notificar al cliente cuando su cuenta es aprobada
+export async function notifyClientAccountApproved(
+  clientId: string,
+  clientName: string,
+  approvedBy: string,
+) {
+  try {
+    const token = await getClientToken(clientId);
+
+    if (!token) {
+      return;
+    }
+
+    const notificationData: PushNotificationData = {
+      title: "¡Cuenta aprobada! 🎉",
+      body: `${clientName}, tu cuenta ha sido aprobada. Ya puedes acceder a todas las funciones de la app.`,
+      data: {
+        type: "account_approved",
+        clientId,
+        clientName,
+        approvedBy,
+        screen: "Home",
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación de cuenta aprobada:",
+      error,
+    );
+  }
+}
+
+// Función para notificar al cliente cuando su cuenta es rechazada
+export async function notifyClientAccountRejected(
+  clientId: string,
+  clientName: string,
+  rejectedBy: string,
+  reason?: string,
+) {
+  try {
+    const token = await getClientToken(clientId);
+
+    if (!token) {
+      return;
+    }
+
+    const reasonText = reason ? ` Motivo: ${reason}` : '';
+    
+    const notificationData: PushNotificationData = {
+      title: "Cuenta rechazada ❌",
+      body: `${clientName}, tu solicitud de cuenta ha sido rechazada.${reasonText} Puedes contactar al restaurante para más información.`,
+      data: {
+        type: "account_rejected",
+        clientId,
+        clientName,
+        rejectedBy,
+        reason,
+        screen: "Contact",
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación de cuenta rechazada:",
+      error,
+    );
+  }
+}
