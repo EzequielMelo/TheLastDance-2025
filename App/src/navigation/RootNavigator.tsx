@@ -17,6 +17,7 @@ import GenerateWaitingListQRScreen from "../screens/table-screens/GenerateWaitin
 import ScanQRScreen from "../screens/table-screens/ScanQRScreen";
 import ScanTableQRScreen from "../screens/table-screens/ScanTableQRScreen";
 import ScanOrderQRScreen from "../screens/table-screens/ScanOrderQRScreen";
+import QRScannerScreen from "../screens/QRScannerScreen";
 import JoinWaitingListScreen from "../screens/table-screens/JoinWaitingListScreen";
 import MyWaitingPositionScreen from "../screens/table-screens/MyWaitingPositionScreen";
 import MenuScreen from "../screens/menu-screens/MenuScreen";
@@ -115,6 +116,11 @@ function NavigatorContent() {
             name="ScanOrderQR"
             component={ScanOrderQRScreen}
             options={{ title: "Confirmar Pedido", headerBackTitle: "Volver" }}
+          />
+          <Stack.Screen
+            name="QRScanner"
+            component={QRScannerScreen}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="Games"

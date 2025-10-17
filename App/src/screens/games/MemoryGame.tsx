@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ToastAndroid } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
@@ -76,8 +76,10 @@ export default function MemoryGame() {
     setPlayer(next);
 
     if (pattern[next.length - 1] !== index) {
-      Alert.alert("Fallaste", "Volvés al inicio");
-      navigation.navigate("Games" as any);
+      ToastAndroid.show("❌ Fallaste - Volvés al inicio", ToastAndroid.SHORT);
+      setTimeout(() => {
+        navigation.navigate("Games" as any);
+      }, 1500);
       return;
     }
 
@@ -85,16 +87,16 @@ export default function MemoryGame() {
       if (round >= MAX_ROUNDS) {
         const res = await awardIfFirstWin(true, DISCOUNT);
         if (res.awarded) {
-          Alert.alert("🎉 ¡Ganaste!", `Obtuviste ${DISCOUNT}% de descuento`);
+          ToastAndroid.show(`🎉 ¡Ganaste! Obtuviste ${DISCOUNT}% de descuento`, ToastAndroid.LONG);
         } else {
-          Alert.alert(
-            "🎉 Ganaste",
-            res.discount
-              ? "Ya tenés un descuento aplicado."
-              : "Ganaste, pero ya no hay premio disponible.",
-          );
+          const message = res.discount
+            ? "🎉 Ganaste, pero ya tenés un descuento aplicado"
+            : "🎉 Ganaste, pero ya no hay premio disponible";
+          ToastAndroid.show(message, ToastAndroid.LONG);
         }
-        navigation.navigate("Games" as any);
+        setTimeout(() => {
+          navigation.navigate("Games" as any);
+        }, 2500);
       } else {
         startRound(round + 1);
       }

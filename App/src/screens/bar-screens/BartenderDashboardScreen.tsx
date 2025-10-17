@@ -7,7 +7,6 @@ import {
   RefreshControl,
   ToastAndroid,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -68,7 +67,7 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
       console.log(`✅ Se cargaron ${ordersData.length} órdenes para bar`);
     } catch (error: any) {
       console.error("❌ Error cargando órdenes de bar:", error);
-      Alert.alert("Error", "No se pudieron cargar las órdenes");
+      ToastAndroid.show("❌ No se pudieron cargar las órdenes", ToastAndroid.SHORT);
     } finally {
       setLoading(false);
     }
@@ -91,7 +90,7 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
       await fetchBartenderOrders();
     } catch (error) {
       console.error("Error actualizando estado:", error);
-      Alert.alert("Error", "No se pudo actualizar el estado");
+      ToastAndroid.show("❌ No se pudo actualizar el estado", ToastAndroid.SHORT);
     }
   };
 

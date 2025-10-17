@@ -676,4 +676,133 @@ export async function requestBillHandler(req: Request, res: Response) {
   }
 }
 
+// GET /api/tables/:tableId/order-status - Consultar solo el estado de productos del cliente (QR flotante)
+export async function getTableOrderStatusHandler(req: Request, res: Response) {
+  try {
+    const tableId = req.params["tableId"];
+    const clientId = req.user?.appUserId;
+
+    if (!clientId) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    if (!tableId) {
+      return res.status(400).json({ error: "ID de mesa requerido" });
+    }
+
+    // 1. Verificar que el cliente tiene acceso a esta mesa
+    const { data: table, error: tableError } = await supabaseAdmin
+      .from("tables")
+      .select("id, number, id_client")
+      .eq("id", tableId)
+      .eq("id_client", clientId)
+      .eq("is_occupied", true)
+      .single();
+
+    if (tableError || !table) {
+      return res.status(403).json({ 
+        error: "No tienes acceso a esta mesa o la mesa no está ocupada" 
+      });
+    }
+
+    // 2. Obtener todas las órdenes no pagadas del cliente en esta mesa
+    const { data: orders, error: ordersError } = await supabaseAdmin
+      .from("orders")
+      .select(`
+        id,
+        total_amount,
+        created_at,
+        order_items (
+          id,
+          quantity,
+          status,
+          menu_items (
+            id,
+            name,
+            category,
+            prep_minutes
+          )
+        )
+      `)
+      .eq("table_id", tableId)
+      .eq("user_id", clientId)
+      .eq("is_paid", false)
+      .order("created_at", { ascending: false });
+
+    if (ordersError) {
+      return res.status(500).json({ 
+        error: "Error obteniendo órdenes" 
+      });
+    }
+
+    if (!orders || orders.length === 0) {
+      return res.json({
+        success: true,
+        message: "No hay órdenes activas",
+        data: {
+          table_number: table.number,
+          orders: []
+        }
+      });
+    }
+
+    // 3. Organizar los datos por estado
+    const statusCounts = {
+      pending: 0,
+      accepted: 0,
+      preparing: 0,
+      ready: 0,
+      delivered: 0,
+      rejected: 0
+    };
+
+    const itemsByStatus: Record<string, any[]> = {
+      pending: [],
+      accepted: [],
+      preparing: [],
+      ready: [],
+      delivered: [],
+      rejected: []
+    };
+
+    orders.forEach(order => {
+      order.order_items.forEach((item: any) => {
+        const status = item.status;
+        if (status in statusCounts) {
+          statusCounts[status as keyof typeof statusCounts]++;
+        }
+        
+        if (status in itemsByStatus && itemsByStatus[status]) {
+          itemsByStatus[status]!.push({
+            id: item.id,
+            name: item.menu_items.name,
+            category: item.menu_items.category,
+            quantity: item.quantity,
+            prep_minutes: item.menu_items.prep_minutes,
+            order_id: order.id
+          });
+        }
+      });
+    });
+
+    return res.json({
+      success: true,
+      message: "Estado de órdenes obtenido exitosamente",
+      data: {
+        table_number: table.number,
+        summary: statusCounts,
+        items_by_status: itemsByStatus,
+        total_orders: orders.length,
+        last_order_time: orders[0]?.created_at
+      }
+    });
+
+  } catch (error) {
+    console.error("Error en getTableOrderStatusHandler:", error);
+    return res.status(500).json({ 
+      error: "Error interno del servidor" 
+    });
+  }
+}
+
 export { getBillData };

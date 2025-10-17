@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  Alert,
+  ToastAndroid,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -51,7 +51,7 @@ export default function TableChatScreen() {
   } = useChat({
     tableId,
     onError: (error: string) => {
-      Alert.alert("Error de Chat", error);
+      ToastAndroid.show(`💬 Error de Chat: ${error}`, ToastAndroid.SHORT);
     },
     onUserJoined: (userData: {
       userName: string;
@@ -98,7 +98,7 @@ export default function TableChatScreen() {
     if (success) {
       setInputMessage("");
     } else {
-      Alert.alert("Error", "No se pudo enviar el mensaje");
+      ToastAndroid.show("❌ No se pudo enviar el mensaje", ToastAndroid.SHORT);
     }
   };
 

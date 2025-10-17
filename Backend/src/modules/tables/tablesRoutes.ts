@@ -18,6 +18,7 @@ import {
   confirmDeliveryHandler,
   getBillData,
   requestBillHandler,
+  getTableOrderStatusHandler,
 } from "./tablesController";
 
 const router = express.Router();
@@ -104,6 +105,9 @@ router.post("/:id/confirm-delivery", authenticateUser, confirmDeliveryHandler);
 
 // POST /api/tables/:id/request-bill - Solicitar la cuenta (solo clientes)
 router.post("/:id/request-bill", authenticateUser, requestBillHandler);
+
+// GET /api/tables/:tableId/order-status - Consultar solo el estado de productos (QR flotante)
+router.get("/:tableId/order-status", authenticateUser, getTableOrderStatusHandler);
 
 // GET /api/tables/:tableId/bill - Obtener datos de la cuenta para pagar (solo clientes)
 router.get("/:tableId/bill", authenticateUser, getBillData);

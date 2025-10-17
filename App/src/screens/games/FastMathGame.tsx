@@ -4,7 +4,7 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Alert,
+  ToastAndroid,
   Animated,
   Easing,
   LayoutChangeEvent,
@@ -130,8 +130,10 @@ export default function FastMathGame() {
     stopTimer();
     clearIntervalRef();
     clearTimeoutRef();
-    Alert.alert("Tiempo terminado", "Se acabó el tiempo — volvés al inicio");
-    navigation.navigate("Games" as any);
+    ToastAndroid.show("⏰ Tiempo terminado - Volvés al inicio", ToastAndroid.SHORT);
+    setTimeout(() => {
+      navigation.navigate("Games" as any);
+    }, 1500);
   };
 
   const generateQuestion = () => {
@@ -179,24 +181,26 @@ export default function FastMathGame() {
     clearTimeoutRef();
 
     if (selected !== question.answer) {
-      Alert.alert("Fallaste", "Respuesta incorrecta — volvés al inicio");
-      navigation.navigate("Games" as any);
+      ToastAndroid.show("❌ Fallaste - Respuesta incorrecta", ToastAndroid.SHORT);
+      setTimeout(() => {
+        navigation.navigate("Games" as any);
+      }, 1500);
       return;
     }
 
     if (round >= MAX_ROUNDS) {
       const res = await awardIfFirstWin(true, DISCOUNT);
       if (res.awarded) {
-        Alert.alert("🎉 ¡Ganaste!", `Obtuviste ${DISCOUNT}% de descuento`);
+        ToastAndroid.show(`🎉 ¡Ganaste! Obtuviste ${DISCOUNT}% de descuento`, ToastAndroid.LONG);
       } else {
-        Alert.alert(
-          "Ganaste",
-          res.discount
-            ? "Pero ya tenés un descuento aplicado."
-            : "Ganaste, pero ya no hay premio disponible.",
-        );
+        const message = res.discount
+          ? "🎮 Ganaste, pero ya tenés un descuento aplicado"
+          : "🎮 Ganaste, pero ya no hay premio disponible";
+        ToastAndroid.show(message, ToastAndroid.LONG);
       }
-      navigation.navigate("Games" as any);
+      setTimeout(() => {
+        navigation.navigate("Games" as any);
+      }, 2500);
       return;
     }
 

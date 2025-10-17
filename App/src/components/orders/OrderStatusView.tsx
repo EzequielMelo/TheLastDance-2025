@@ -45,32 +45,32 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
     switch (status) {
       case "pending":
         return {
-          color: "#ffa500",
-          bgColor: "rgba(255, 165, 0, 0.1)",
+          color: "#f59e0b", // Amber más vibrante
+          bgColor: "rgba(245, 158, 11, 0.15)",
           icon: Clock,
           title: "Esperando Confirmación",
           description: "El mozo está revisando estos productos",
         };
       case "accepted":
         return {
-          color: "#22c55e",
-          bgColor: "rgba(34, 197, 94, 0.1)",
+          color: "#10b981", // Emerald más vibrante
+          bgColor: "rgba(16, 185, 129, 0.15)",
           icon: CheckCircle,
           title: "Confirmados",
           description: "Estos productos fueron aprobados",
         };
       case "rejected":
         return {
-          color: "#ef4444",
-          bgColor: "rgba(239, 68, 68, 0.1)",
+          color: "#f87171", // Red más suave pero visible
+          bgColor: "rgba(248, 113, 113, 0.15)",
           icon: X,
           title: "No Disponibles",
           description: "No disponemos de stock de estos productos",
         };
       case "needs_modification":
         return {
-          color: "#22c55e",
-          bgColor: "rgba(34, 197, 94, 0.1)",
+          color: "#06b6d4", // Cyan para diferenciarlo
+          bgColor: "rgba(6, 182, 212, 0.15)",
           icon: CheckCircle,
           title: "Disponibles en Tanda",
           description:
@@ -78,24 +78,24 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
         };
       case "preparing":
         return {
-          color: "#f59e0b",
-          bgColor: "rgba(245, 158, 11, 0.1)",
+          color: "#f59e0b", // Amber consistente
+          bgColor: "rgba(245, 158, 11, 0.15)",
           icon: ChefHat,
           title: "En Preparación",
           description: "La cocina está preparando estos productos",
         };
       case "ready":
         return {
-          color: "#10b981",
-          bgColor: "rgba(16, 185, 129, 0.1)",
+          color: "#22c55e", // Green más vibrante
+          bgColor: "rgba(34, 197, 94, 0.15)",
           icon: CheckCircle2,
           title: "Listos para Servir",
           description: "Estos productos están listos",
         };
       case "delivered":
         return {
-          color: "#6b7280",
-          bgColor: "rgba(107, 114, 128, 0.1)",
+          color: "#9ca3af", // Gray más claro pero visible
+          bgColor: "rgba(156, 163, 175, 0.15)",
           icon: CheckCircle2,
           title: "Entregados",
           description: "Productos servidos en tu mesa",
@@ -698,7 +698,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
               style={{
                 fontSize: 16,
                 fontWeight: "600",
-                color: statusInfo.color,
+                color: "#ffffff", // Texto blanco para mejor contraste
               }}
             >
               {statusInfo.title}
@@ -706,7 +706,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             <Text
               style={{
                 fontSize: 12,
-                color: "#6b7280",
+                color: "#e5e7eb", // Texto gris claro para descripción
                 marginTop: 2,
               }}
             >
@@ -733,7 +733,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                 style={{
                   fontSize: 14,
                   fontWeight: "500",
-                  color: "#111827",
+                  color: "#ffffff", // Texto blanco para mejor contraste
                 }}
               >
                 {item.menu_item?.name}
@@ -741,7 +741,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
               <Text
                 style={{
                   fontSize: 12,
-                  color: "#6b7280",
+                  color: "#d1d5db", // Gris claro para subtexto
                 }}
               >
                 Cantidad: {item.quantity}
@@ -751,7 +751,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
               style={{
                 fontSize: 14,
                 fontWeight: "600",
-                color: statusInfo.color,
+                color: "#ffffff", // Texto blanco para precio
               }}
             >
               ${item.subtotal}

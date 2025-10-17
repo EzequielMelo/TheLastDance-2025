@@ -291,7 +291,6 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                   </>
                 ) : (
                   <>
-                    {console.log("⚠️ Showing default seated view - Mesa Confirmada")}
                     <CheckCircle size={64} color="#22c55e" />
                     <Text className="text-white text-xl font-bold mt-4 mb-2">
                       ¡Mesa Confirmada!

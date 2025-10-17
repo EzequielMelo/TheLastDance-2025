@@ -163,6 +163,28 @@ export const LoginScreen = ({ navigation }: Props) => {
             
             <TouchableOpacity
               onPress={() => {
+                setEmail("franco@gmail.com");
+                setPassword("123456");
+                login({ email: "franco@gmail.com", password: "123456" });
+              }}
+              className="px-3 py-2 rounded-lg bg-cyan-600/20 border border-cyan-500/30"
+            >
+              <Text className="text-cyan-300 text-center text-sm">💁‍♂️ Mozo</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                setEmail("pachu@gmail.com");
+                setPassword("123456");
+                login({ email: "pachu@gmail.com", password: "123456" });
+              }}
+              className="px-3 py-2 rounded-lg bg-amber-600/20 border border-amber-500/30"
+            >
+              <Text className="text-amber-300 text-center text-sm">💂 Maitre</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
                 setEmail("momo@gmail.com");
                 setPassword("123456");
                 login({ email: "momo@gmail.com", password: "123456" });

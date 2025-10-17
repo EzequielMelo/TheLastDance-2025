@@ -2293,7 +2293,7 @@ export async function confirmPaymentAndReleaseTable(
       throw new Error("Mesa no encontrada, no tienes acceso o no hay pago pendiente");
     }
 
-    // 2. Marcar todas las órdenes de la mesa como pagadas (AHORA SÍ)
+    // 2. Marcar todas las órdenes de la mesa como pagadas
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
       .select("id")
@@ -2368,15 +2368,17 @@ export async function confirmPaymentAndReleaseTable(
 
     console.log(`✅ Mesa ${tableId} liberada completamente por mozo ${waiterId}`);
 
-    // 5. Obtener el total real de las órdenes pagadas para las notificaciones
-    const { data: paidOrdersData } = await supabaseAdmin
-      .from("orders")
-      .select("total_amount")
-      .eq("table_id", tableId)
-      .eq("user_id", table.id_client)
-      .eq("is_paid", true);
+    // 5. Obtener el total real SOLO de las órdenes que acabamos de marcar como pagadas
+    let finalTotalAmount = 0;
+    if (orders && orders.length > 0) {
+      const orderIds = orders.map(order => order.id);
+      const { data: paidOrdersData } = await supabaseAdmin
+        .from("orders")
+        .select("total_amount")
+        .in("id", orderIds);
 
-    const finalTotalAmount = paidOrdersData?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+      finalTotalAmount = paidOrdersData?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+    }
 
     // 6. Obtener información del cliente y mozo para las notificaciones
     const { data: clientData, error: clientError } = await supabaseAdmin

@@ -5,7 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
+  ToastAndroid,
 } from "react-native";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import type {
@@ -131,22 +131,20 @@ const BillPaymentScreen: React.FC = () => {
       const tipAmount = calculateTipAmount();
       const totalAmount = getTotalWithTip();
 
-      Alert.alert(
-        "Confirmar Pago",
-        `Total a pagar: $${totalAmount.toLocaleString()}\n` +
-          `Propina: $${tipAmount.toLocaleString()}\n\n` +
-          `¿Proceder con el pago?`,
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Confirmar",
-            onPress: () => processPay(totalAmount, tipAmount),
-          },
-        ],
+      // Mostrar información del pago y proceder directamente
+      ToastAndroid.show(
+        `💰 Total: $${billData.finalTotal.toLocaleString()} + Propina: $${tipAmount.toLocaleString()} = $${totalAmount.toLocaleString()}`,
+        ToastAndroid.LONG
       );
+      
+      // Proceder con el pago después de un breve delay para que se vea el toast
+      setTimeout(() => {
+        processPay(totalAmount, tipAmount);
+      }, 1000);
+      
     } catch (err) {
       console.error("Error handling payment:", err);
-      Alert.alert("Error", "Error al procesar el pago");
+      ToastAndroid.show("❌ Error al procesar el pago", ToastAndroid.SHORT);
     }
   };
 
@@ -163,19 +161,20 @@ const BillPaymentScreen: React.FC = () => {
       });
       // Llamar a la API para procesar el pago
       await payOrder(billData.tableId, billData.idClient);
-      Alert.alert(
-        "Pago Procesado",
-        "¡Gracias por tu visita! El pago ha sido procesado exitosamente.",
-        [
-          {
-            text: "OK",
-            onPress: () => navigation.navigate("Home"),
-          },
-        ],
+      
+      ToastAndroid.show(
+        "🎉 ¡Pago procesado exitosamente! Gracias por tu visita",
+        ToastAndroid.LONG
       );
+      
+      // Navegar al home después de un breve delay
+      setTimeout(() => {
+        navigation.navigate("Home");
+      }, 2000);
+      
     } catch (err) {
       console.error("Error processing payment:", err);
-      Alert.alert("Error", "Error al procesar el pago");
+      ToastAndroid.show("❌ Error al procesar el pago", ToastAndroid.SHORT);
     }
   };
 

@@ -17,7 +17,7 @@ import type { RootStackParamList } from "../navigation/RootStackParamList";
 import { useAuth } from "../auth/useAuth";
 import { useFocusEffect } from "@react-navigation/native";
 import api from "../api/axios";
-import { Menu, User as UserIcon, Users, QrCode, UtensilsCrossed, Wine, BookOpen, CheckCircle, Clock } from "lucide-react-native";
+import { Menu, User as UserIcon, Users, QrCode, UtensilsCrossed, Wine, BookOpen, CheckCircle, Clock, Search } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User";
 import ClientFlowNavigation from "../components/navigation/ClientFlowNavigation";
@@ -131,23 +131,17 @@ export default function HomeScreen({ navigation, route }: Props) {
     
     try {
       // Obtener información de la mesa actual del cliente
-      console.log("🔍 Obteniendo my-status...");
       const response = await api.get("/tables/my-status");
-      console.log("🔍 my-status en loadWaiterInfo:", response.data);
       
       if (response.data.status === "confirm_pending" && response.data.table?.id) {
-        console.log("🔍 Cliente está en confirm_pending, obteniendo info de mesa:", response.data.table.id);
         
         // Si ya tenemos el id_waiter en la respuesta de my-status, usarlo directamente
         if (response.data.table.id_waiter) {
-          console.log("🔍 Mesa tiene mozo asignado:", response.data.table.id_waiter);
           
           // Obtener información del mozo directamente
           const waiterResponse = await api.get(`/users/${response.data.table.id_waiter}`);
-          console.log("🔍 Waiter response:", waiterResponse.data);
           
           if (waiterResponse.data.success) {
-            console.log("✅ WaiterInfo obtenida:", waiterResponse.data.data);
             setWaiterInfo(waiterResponse.data.data);
           }
         } else {
@@ -247,6 +241,59 @@ export default function HomeScreen({ navigation, route }: Props) {
     }
   }, [user, waitingListStatus, loadWaiterInfo]);
 
+  // Función para manejar el escaneo exitoso del QR de la mesa
+  const handleOrderStatusQRScan = async (tableId: string) => {
+    if (!user || user.position_code) {
+      ToastAndroid.show("Esta función es solo para clientes", ToastAndroid.SHORT);
+      return;
+    }
+
+    try {
+      // Verificar que el QR escaneado corresponda a la mesa del cliente
+      const response = await api.get("/tables/my-table");
+      
+      if (!response.data.hasOccupiedTable) {
+        ToastAndroid.show("No tienes una mesa ocupada actualmente", ToastAndroid.LONG);
+        return;
+      }
+
+      const myTableNumber = response.data.table.number.toString();
+      const myTableId = response.data.table.id.toString();
+      
+      // El QR puede contener el number o el id de la mesa, verificamos ambos
+      if (tableId !== myTableNumber && tableId !== myTableId) {
+        ToastAndroid.show(
+          `Este QR no corresponde a tu mesa. Tu mesa es la #${response.data.table.number}`, 
+          ToastAndroid.LONG
+        );
+        return;
+      }
+
+      // Si el QR es correcto, abrir el CartModal
+      setCartModalVisible(true);
+      ToastAndroid.show("✅ Mesa verificada - Consultando tus productos...", ToastAndroid.SHORT);
+      
+    } catch (error: any) {
+      console.error("Error validando mesa:", error);
+      
+      let errorMessage = "Error verificando tu mesa";
+      if (error.response?.status === 401) {
+        errorMessage = "Debes iniciar sesión para usar esta función";
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      
+      ToastAndroid.show(errorMessage, ToastAndroid.LONG);
+    }
+  };
+
+  const navigateToQRScanner = () => {
+    navigation.navigate("QRScanner", {
+      mode: "order_status",
+      onScanSuccess: handleOrderStatusQRScan
+    });
+  };
+
   const loadDishesMenu = async () => {
     try {
       const dishes = await getDishesForKitchen();
@@ -273,73 +320,53 @@ export default function HomeScreen({ navigation, route }: Props) {
 
   // Función para marcar item como entregado
   const handleDeliverItem = async (itemId: string, itemName: string) => {
-    Alert.alert(
-      "Confirmar entrega",
-      `¿Confirmas que entregaste "${itemName}"?`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Confirmar",
-          onPress: async () => {
-            try {
-              setDeliveringItems(prev => new Set([...prev, itemId]));
+    try {
+      ToastAndroid.show(`📋 Entregando "${itemName}"...`, ToastAndroid.SHORT);
+      
+      setDeliveringItems(prev => new Set([...prev, itemId]));
+      
+      await api.put(`/orders/waiter/item/${itemId}/delivered`);
+      
+      ToastAndroid.show("✅ Item marcado como entregado", ToastAndroid.SHORT);
+      
+      // Recargar la lista de items listos y pagos pendientes
+      await loadReadyItems();
+      await loadPendingPaymentTables();
               
-              await api.put(`/orders/waiter/item/${itemId}/delivered`);
-              
-              ToastAndroid.show("Item marcado como entregado", ToastAndroid.SHORT);
-              
-              // Recargar la lista de items listos y pagos pendientes
-              await loadReadyItems();
-              await loadPendingPaymentTables();
-              
-            } catch (error: any) {
-              console.error("Error delivering item:", error);
-              ToastAndroid.show(
-                error.response?.data?.error || "Error al marcar como entregado",
-                ToastAndroid.SHORT
-              );
-            } finally {
-              setDeliveringItems(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(itemId);
-                return newSet;
-              });
-            }
-          }
-        }
-      ]
-    );
+    } catch (error: any) {
+      console.error("Error delivering item:", error);
+      ToastAndroid.show(
+        error.response?.data?.error || "Error al marcar como entregado",
+        ToastAndroid.SHORT
+      );
+    } finally {
+      setDeliveringItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(itemId);
+        return newSet;
+      });
+    }
   };
 
   // Función para confirmar pago de una mesa
-  const handleConfirmPayment = (tableId: string, tableName: string, customerName: string) => {
-    Alert.alert(
-      "Confirmar Pago",
-      `¿Confirmas que recibiste el pago de la mesa ${tableName} de ${customerName}?`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Confirmar",
-          onPress: async () => {
-            try {
-              await confirmPayment(tableId);
-              ToastAndroid.show("Pago confirmado y mesa liberada", ToastAndroid.SHORT);
+  const handleConfirmPayment = async (tableId: string, tableName: string, customerName: string) => {
+    try {
+      ToastAndroid.show(`💰 Confirmando pago de ${customerName} - Mesa ${tableName}...`, ToastAndroid.SHORT);
+      
+      await confirmPayment(tableId);
+      ToastAndroid.show("✅ Pago confirmado y mesa liberada", ToastAndroid.SHORT);
+      
+      // Recargar las listas
+      await loadReadyItems();
+      await loadPendingPaymentTables();
               
-              // Recargar las listas
-              await loadReadyItems();
-              await loadPendingPaymentTables();
-              
-            } catch (error: any) {
-              console.error("Error confirmando pago:", error);
-              ToastAndroid.show(
-                error.message || "Error al confirmar pago", 
-                ToastAndroid.SHORT
-              );
-            }
-          }
-        }
-      ]
-    );
+    } catch (error: any) {
+      console.error("Error confirmando pago:", error);
+      ToastAndroid.show(
+        error.message || "Error al confirmar pago", 
+        ToastAndroid.SHORT
+      );
+    }
   };
 
   const isCliente =
@@ -486,9 +513,6 @@ export default function HomeScreen({ navigation, route }: Props) {
               
               {/* Card del mozo cuando el pago está pendiente de confirmación */}
               {(() => {
-                console.log("🔍 Render card - waitingListStatus:", waitingListStatus);
-                console.log("🔍 Render card - waiterInfo:", waiterInfo);
-                console.log("🔍 Render card - condición completa:", waitingListStatus === "confirm_pending" && waiterInfo);
                 return null;
               })()}
               
@@ -791,7 +815,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                             
                             {/* Botón entregar */}
                             <TouchableOpacity
-                              onPress={() => handleDeliverItem(item.id, item.menu_item.name)}
+                              onPress={async () => await handleDeliverItem(item.id, item.menu_item.name)}
                               disabled={deliveringItems.has(item.id)}
                               style={{
                                 backgroundColor: "#10b981",
@@ -884,7 +908,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                           
                           {/* Botón confirmar pago */}
                           <TouchableOpacity
-                            onPress={() => handleConfirmPayment(
+                            onPress={async () => await handleConfirmPayment(
                               table.table_id, 
                               table.table_number.toString(), 
                               table.customer_name
@@ -1074,6 +1098,36 @@ export default function HomeScreen({ navigation, route }: Props) {
           </View>
         </View>
       </Modal>
+
+      {/* Botón flotante para escanear QR y ver estado de productos (solo para clientes) */}
+      {user && !user.position_code && (
+        <TouchableOpacity
+          onPress={navigateToQRScanner}
+          style={{
+            position: 'absolute',
+            bottom: 80, // Subimos de 30 a 80 para evitar los botones del sistema
+            right: 30,
+            backgroundColor: '#d4af37',
+            borderRadius: 30,
+            width: 60,
+            height: 60,
+            justifyContent: 'center',
+            alignItems: 'center',
+            elevation: 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 3.84,
+          }}
+        >
+          <QrCode size={28} color="#1a1a1a" />
+        </TouchableOpacity>
+      )}
+
+      <CartModal
+        visible={cartModalVisible}
+        onClose={() => setCartModalVisible(false)}
+      />
     </LinearGradient>
   );
 }
