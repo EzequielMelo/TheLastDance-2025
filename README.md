@@ -14,73 +14,92 @@
 
 <hr/>
 
-<h2 id="preview-app">📱 Vista previa de la App</h2>
+<h2 id="preview-app" align="center">📱 Vista previa de la App</h2>
 
 <p align="center">
   A continuación se muestran algunas pantallas representativas de la aplicación móvil desarrollada por el equipo <strong>The Last Dance</strong>.
 </p>
 
-<div style="display: flex; overflow-x: auto; gap: 20px; padding: 10px;">
-  <div align="center" style="min-width:220px;">
-    <img src="screenshots/pantalla-inicio.png" alt="Pantalla de Login" width="200" style="border-radius:12px;"/><br/>
-    <strong>Pantalla de Login</strong><br/>
-    <sub>Permite a los usuarios acceder con su cuenta registrada.</sub>
+<div align="center" style="
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  padding: 10px;
+">
+
+  <!-- Pantalla de Login -->
+  <div style="flex: 1 1 45%; max-width: 300px; min-width: 200px; text-align: center;">
+    <img src="screenshots/pantalla-inicio.png" alt="Pantalla de Login" width="100%" style="border-radius:12px;"/>
+    <p><strong>Pantalla de Login</strong><br/><sub>Permite a los usuarios acceder con su cuenta registrada.</sub></p>
   </div>
-  <div align="center" style="min-width:220px;">
-    <img src="screenshots/pantalla-registro-usuarios.png" alt="Pantalla de Registro" width="200" style="border-radius:12px;"/><br/>
-    <strong>Pantalla de Registro</strong><br/>
-    <sub>Formulario de creación de cuenta para nuevos usuarios.</sub>
+
+  <!-- Pantalla de Registro -->
+  <div style="flex: 1 1 45%; max-width: 300px; min-width: 200px; text-align: center;">
+    <img src="screenshots/pantalla-registro-usuarios.png" alt="Pantalla de Registro" width="100%" style="border-radius:12px;"/>
+    <p><strong>Pantalla de Registro</strong><br/><sub>Formulario de creación de cuenta para nuevos usuarios.</sub></p>
   </div>
-  <div align="center" style="min-width:220px;">
-    <img src="screenshots/homescreen.cliente.png" alt="Pantalla Principal" width="200" style="border-radius:12px;"/><br/>
-    <strong>Pantalla Principal</strong><br/>
-    <sub>Vista inicial de la pantalla de cliente.</sub>
+
+  <!-- Pantalla Principal -->
+  <div style="flex: 1 1 45%; max-width: 300px; min-width: 200px; text-align: center;">
+    <img src="screenshots/homescreen.cliente.png" alt="Pantalla Principal" width="100%" style="border-radius:12px;"/>
+    <p><strong>Pantalla Principal</strong><br/><sub>Vista inicial de la pantalla de cliente.</sub></p>
   </div>
-  <div align="center" style="min-width:220px;">
-    <img src="screenshots/menu-cliente.png" alt="Menú Cliente" width="200" style="border-radius:12px;"/><br/>
-    <strong>Menú - Cliente</strong><br/>
-    <sub>Visualización de todos los productos disponibles.</sub>
+
+  <!-- Menú Cliente -->
+  <div style="flex: 1 1 45%; max-width: 300px; min-width: 200px; text-align: center;">
+    <img src="screenshots/menu-cliente.png" alt="Menú Cliente" width="100%" style="border-radius:12px;"/>
+    <p><strong>Menú - Cliente</strong><br/><sub>Visualización de todos los productos disponibles.</sub></p>
   </div>
-  <div align="center" style="min-width:220px;">
-    <img src="screenshots/carrito-cliente.png" alt="Carrito" width="200" style="border-radius:12px;"/><br/>
-    <strong>Carrito - Cliente</strong><br/>
-    <sub>Permite ver el pedido actual y su estado.</sub>
+
+  <!-- Carrito Cliente -->
+  <div style="flex: 1 1 45%; max-width: 300px; min-width: 200px; text-align: center;">
+    <img src="screenshots/carrito-cliente.png" alt="Carrito Cliente" width="100%" style="border-radius:12px;"/>
+    <p><strong>Carrito - Cliente</strong><br/><sub>Permite ver el pedido actual y su estado.</sub></p>
   </div>
-  <div align="center" style="min-width:220px;">
-    <img src="screenshots/mesas-maitre.png" alt="Lista de Espera" width="200" style="border-radius:12px;"/><br/>
-    <strong>Lista de Espera - Maitre</strong><br/>
-    <sub>Gestión visual de mesas y turnos pendientes.</sub>
+
+  <!-- Lista de Espera -->
+  <div style="flex: 1 1 45%; max-width: 300px; min-width: 200px; text-align: center;">
+    <img src="screenshots/mesas-maitre.png" alt="Lista de Espera" width="100%" style="border-radius:12px;"/>
+    <p><strong>Lista de Espera - Maitre</strong><br/><sub>Gestión visual de mesas y turnos pendientes.</sub></p>
   </div>
-  <div align="center" style="min-width:220px;">
-    <img src="screenshots/añadirplato-mozo.png" alt="Añadir Platos" width="200" style="border-radius:12px;"/><br/>
-    <strong>Añadir Platos - Cocinero</strong><br/>
-    <sub>Formulario para crear nuevos platos o bebidas.</sub>
+
+  <!-- Añadir Platos -->
+  <div style="flex: 1 1 45%; max-width: 300px; min-width: 200px; text-align: center;">
+    <img src="screenshots/añadirplato-mozo.png" alt="Añadir Platos" width="100%" style="border-radius:12px;"/>
+    <p><strong>Añadir Platos - Cocinero</strong><br/><sub>Formulario para crear nuevos platos o bebidas.</sub></p>
   </div>
-  <div align="center" style="min-width:220px;">
-    <img src="screenshots/ver-platos-cocinero.png" alt="Visualizar Platos" width="200" style="border-radius:12px;"/><br/>
-    <strong>Visualizar Platos - Cocinero</strong><br/>
-    <sub>Listado de todos los platos disponibles.</sub>
+
+  <!-- Visualizar Platos -->
+  <div style="flex: 1 1 45%; max-width: 300px; min-width: 200px; text-align: center;">
+    <img src="screenshots/ver-platos-cocinero.png" alt="Visualizar Platos" width="100%" style="border-radius:12px;"/>
+    <p><strong>Visualizar Platos - Cocinero</strong><br/><sub>Listado de todos los platos disponibles.</sub></p>
   </div>
-  <div align="center" style="min-width:220px;">
-    <img src="screenshots/ver-pedidos-cocinero.png" alt="Pedidos Cocinero" width="200" style="border-radius:12px;"/><br/>
-    <strong>Pedidos y Estados - Cocinero</strong><br/>
-    <sub>Monitoreo de pedidos en preparación.</sub>
+
+  <!-- Pedidos Cocinero -->
+  <div style="flex: 1 1 45%; max-width: 300px; min-width: 200px; text-align: center;">
+    <img src="screenshots/ver-pedidos-cocinero.png" alt="Pedidos Cocinero" width="100%" style="border-radius:12px;"/>
+    <p><strong>Pedidos y Estados - Cocinero</strong><br/><sub>Monitoreo de pedidos en preparación.</sub></p>
   </div>
-  <div align="center" style="min-width:220px;">
-    <img src="screenshots/agregarpersonal-dueño.png" alt="Agregar Personal" width="200" style="border-radius:12px;"/><br/>
-    <strong>Agregar Personal - Dueño/Supervisor</strong><br/>
-    <sub>Formulario para registrar nuevos empleados.</sub>
+
+  <!-- Agregar Personal -->
+  <div style="flex: 1 1 45%; max-width: 300px; min-width: 200px; text-align: center;">
+    <img src="screenshots/agregarpersonal-dueño.png" alt="Agregar Personal" width="100%" style="border-radius:12px;"/>
+    <p><strong>Agregar Personal - Dueño/Supervisor</strong><br/><sub>Formulario para registrar nuevos empleados.</sub></p>
   </div>
-  <div align="center" style="min-width:220px;">
-    <img src="screenshots/agregarmesa-dueño.png" alt="Agregar Mesa" width="200" style="border-radius:12px;"/><br/>
-    <strong>Agregar Mesa - Dueño/Supervisor</strong><br/>
-    <sub>Formulario para registrar nuevas mesas.</sub>
+
+  <!-- Agregar Mesa -->
+  <div style="flex: 1 1 45%; max-width: 300px; min-width: 200px; text-align: center;">
+    <img src="screenshots/agregarmesa-dueño.png" alt="Agregar Mesa" width="100%" style="border-radius:12px;"/>
+    <p><strong>Agregar Mesa - Dueño/Supervisor</strong><br/><sub>Formulario para registrar nuevas mesas.</sub></p>
   </div>
-  <div align="center" style="min-width:220px;">
-    <img src="screenshots/gestionmeseros-dueño.png" alt="Gestión Meseros" width="200" style="border-radius:12px;"/><br/>
-    <strong>Gestión de Meseros - Dueño/Supervisor</strong><br/>
-    <sub>Visualización de meseros y sus mesas asignadas.</sub>
+
+  <!-- Gestión de Meseros -->
+  <div style="flex: 1 1 45%; max-width: 300px; min-width: 200px; text-align: center;">
+    <img src="screenshots/gestionmeseros-dueño.png" alt="Gestión Meseros" width="100%" style="border-radius:12px;"/>
+    <p><strong>Gestión de Meseros - Dueño/Supervisor</strong><br/><sub>Visualización de meseros y sus mesas asignadas.</sub></p>
   </div>
+
 </div>
 
 <p align="center">
