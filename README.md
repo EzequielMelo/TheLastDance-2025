@@ -14,6 +14,85 @@
 
 <hr/>
 
+<h2 id="preview-app">📱 Vista previa de la App</h2>
+
+<p align="center">
+  A continuación se muestran algunas pantallas representativas de la aplicación móvil desarrollada por el equipo <strong>The Last Dance</strong>.
+</p>
+
+<table align="center">
+  <tr>
+    <td align="center" width="220">
+      <img src="screenshots/pantalla-inicio.png" alt="Pantalla de Login" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
+      <strong>Pantalla de Login</strong><br/>
+      <sub>Permite a los usuarios acceder con su cuenta registrada.</sub>
+    </td>
+    <td align="center" width="220">
+      <img src="screenshots/pantalla-registro-usuarios.png" alt="Pantalla de Registro" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
+      <strong>Pantalla de Registro</strong><br/>
+      <sub>Formulario de creación de cuenta para nuevos usuarios.</sub>
+    </td>
+    <td align="center" width="220">
+      <img src="screenshots/homescreen.cliente.png" alt="Pantalla Principal" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
+      <strong>Pantalla Principal</strong><br/>
+      <sub>Vista inicial de la pantalla de cliente</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="220">
+      <img src="screenshots/menu-cliente.png" alt="Chat Cliente - Mesero" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
+      <strong>Menu - Cliente</strong><br/>
+      <sub>Menu para ver todos los productos disponibles.</sub>
+    </td>
+    <td align="center" width="220">
+      <img src="screenshots/carrito-cliente.png" alt="Chat Cliente - Mesero" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
+      <strong>Carrito(visualizar estado del pedido) - Cliente</strong><br/>
+      <sub>Carrito donde poder ver y visualizar el estado de mi pedido</sub>
+    </td>
+    <td align="center" width="220">
+      <img src="screenshots/mesas-maitre.png" alt="Lista de Espera" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
+      <strong>Lista de Espera - Maitre</strong><br/>
+      <sub>Gestión visual de las mesas y turnos en espera.</sub>
+    </td>
+    <td align="center" width="220">
+      <img src="screenshots/añadirplato-mozo.png" alt="Notificaciones" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
+      <strong>Añadir platos - Cocinero</strong><br/>
+      <sub>Formulario de creacion de nuevos platos (aplica tambien para Bartenders)</sub>
+    </td>
+    <td align="center" width="220">
+      <img src="screenshots/ver-platos-cocinero.png" alt="Notificaciones" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
+      <strong>visualizar platos - Cocinero</strong><br/>
+      <sub>Visualizacion de todos los platos (aplica tambien para Bartenders)</sub>
+    </td>
+    <td align="center" width="220">
+      <img src="screenshots/ver-pedidos-cocinero.png" alt="Notificaciones" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
+      <strong>Pedidos y estados - Cocinero</strong><br/>
+      <sub>Visualizar pedidos y estados (aplica tambien para Bartenders)</sub>
+    </td>
+    <td align="center" width="220">
+      <img src="screenshots/agregarpersonal-dueño.png" alt="Notificaciones" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
+      <strong>Agregar personal - Dueño o supervisor</strong><br/>
+      <sub>Formulario de creación de nuevo personal</sub>
+    </td>
+    <td align="center" width="220">
+      <img src="screenshots/agregarmesa-dueño.png" alt="Notificaciones" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
+      <strong>Agregar mesa - Dueño o supervisor</strong><br/>
+      <sub>Formulario de creación de nuevas mesas</sub>
+    </td>
+    <td align="center" width="220">
+      <img src="screenshots/getionmeseros-dueño.png" alt="Notificaciones" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
+      <strong>Gestion meseros - Dueño o supervisor</strong><br/>
+      <sub>Visualizar meseros y sus mesas</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <em>Estas capturas corresponden a la versión actual de la app desarrollada en Expo (React Native).</em>
+</p>
+
+<hr/>
+
 <h2 id="bitacora-commits">📝 Bitácora de Commits (hitos)</h2>
 
 <!--
@@ -50,8 +129,8 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
     <li>[x] Listado de usuarios en estado pendiente desde usuario Dueño</li>
     <li>[x] Deploy del backend en Render</li>
     <li>[x] Sistema de Mesas y listas de espera</li>
-    <li>[ ] Chat cliente - mesero</li>
-    <li>[ ] Sistema de meseros - </li>
+    <li>[x] Chat cliente - mesero</li>
+    <li>[x] Sistema de meseros - </li>
   </ul>
 </details>
 
@@ -66,8 +145,8 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
     <li>[x] Login funcional completo</li>
     <li>[x] Registro de usuario completo</li>
     <li>[x] Version preliminar del SplashScreen</li>
-    <li>[ ] Creacion de juegos</li>
-    <li>[ ] Sistema de descuentos asociado a los juegos</li>
+    <li>[x] Creacion de juegos</li>
+    <li>[x] Sistema de descuentos asociado a los juegos</li>
   </ul>
 </details>
 
@@ -87,7 +166,7 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
     <li>[x] Formulario para crear empleados/supervisores con lectura QR y Camara de fotos.</li>
     <li>[x] Visualizacion del menu en los clientes</li>
     <li>[x] Push notifications</li>
-    <li>[ ] Creacion de pedidos</li>
+    <li>[x] Creacion de pedidos</li>
   </ul>
 </details>
 
