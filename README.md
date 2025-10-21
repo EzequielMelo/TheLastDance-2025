@@ -20,72 +20,68 @@
   A continuación se muestran algunas pantallas representativas de la aplicación móvil desarrollada por el equipo <strong>The Last Dance</strong>.
 </p>
 
-<table align="center">
-  <tr>
-    <td align="center" width="220">
-      <img src="screenshots/pantalla-inicio.png" alt="Pantalla de Login" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
-      <strong>Pantalla de Login</strong><br/>
-      <sub>Permite a los usuarios acceder con su cuenta registrada.</sub>
-    </td>
-    <td align="center" width="220">
-      <img src="screenshots/pantalla-registro-usuarios.png" alt="Pantalla de Registro" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
-      <strong>Pantalla de Registro</strong><br/>
-      <sub>Formulario de creación de cuenta para nuevos usuarios.</sub>
-    </td>
-    <td align="center" width="220">
-      <img src="screenshots/homescreen.cliente.png" alt="Pantalla Principal" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
-      <strong>Pantalla Principal</strong><br/>
-      <sub>Vista inicial de la pantalla de cliente</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="220">
-      <img src="screenshots/menu-cliente.png" alt="Chat Cliente - Mesero" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
-      <strong>Menu - Cliente</strong><br/>
-      <sub>Menu para ver todos los productos disponibles.</sub>
-    </td>
-    <td align="center" width="220">
-      <img src="screenshots/carrito-cliente.png" alt="Chat Cliente - Mesero" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
-      <strong>Carrito(visualizar estado del pedido) - Cliente</strong><br/>
-      <sub>Carrito donde poder ver y visualizar el estado de mi pedido</sub>
-    </td>
-    <td align="center" width="220">
-      <img src="screenshots/mesas-maitre.png" alt="Lista de Espera" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
-      <strong>Lista de Espera - Maitre</strong><br/>
-      <sub>Gestión visual de las mesas y turnos en espera.</sub>
-    </td>
-    <td align="center" width="220">
-      <img src="screenshots/añadirplato-mozo.png" alt="Notificaciones" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
-      <strong>Añadir platos - Cocinero</strong><br/>
-      <sub>Formulario de creacion de nuevos platos (aplica tambien para Bartenders)</sub>
-    </td>
-    <td align="center" width="220">
-      <img src="screenshots/ver-platos-cocinero.png" alt="Notificaciones" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
-      <strong>visualizar platos - Cocinero</strong><br/>
-      <sub>Visualizacion de todos los platos (aplica tambien para Bartenders)</sub>
-    </td>
-    <td align="center" width="220">
-      <img src="screenshots/ver-pedidos-cocinero.png" alt="Notificaciones" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
-      <strong>Pedidos y estados - Cocinero</strong><br/>
-      <sub>Visualizar pedidos y estados (aplica tambien para Bartenders)</sub>
-    </td>
-    <td align="center" width="220">
-      <img src="screenshots/agregarpersonal-dueño.png" alt="Notificaciones" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
-      <strong>Agregar personal - Dueño o supervisor</strong><br/>
-      <sub>Formulario de creación de nuevo personal</sub>
-    </td>
-    <td align="center" width="220">
-      <img src="screenshots/agregarmesa-dueño.png" alt="Notificaciones" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
-      <strong>Agregar mesa - Dueño o supervisor</strong><br/>
-      <sub>Formulario de creación de nuevas mesas</sub>
-    </td>
-    <td align="center" width="220">
-      <img src="screenshots/getionmeseros-dueño.png" alt="Notificaciones" width="200" style="border-radius:12px; margin-bottom:6px;"/><br/>
-      <strong>Gestion meseros - Dueño o supervisor</strong><br/>
-      <sub>Visualizar meseros y sus mesas</sub>
-    </td>
-  </tr>
-</table>
+<div style="display: flex; overflow-x: auto; gap: 20px; padding: 10px;">
+  <div align="center" style="min-width:220px;">
+    <img src="screenshots/pantalla-inicio.png" alt="Pantalla de Login" width="200" style="border-radius:12px;"/><br/>
+    <strong>Pantalla de Login</strong><br/>
+    <sub>Permite a los usuarios acceder con su cuenta registrada.</sub>
+  </div>
+  <div align="center" style="min-width:220px;">
+    <img src="screenshots/pantalla-registro-usuarios.png" alt="Pantalla de Registro" width="200" style="border-radius:12px;"/><br/>
+    <strong>Pantalla de Registro</strong><br/>
+    <sub>Formulario de creación de cuenta para nuevos usuarios.</sub>
+  </div>
+  <div align="center" style="min-width:220px;">
+    <img src="screenshots/homescreen.cliente.png" alt="Pantalla Principal" width="200" style="border-radius:12px;"/><br/>
+    <strong>Pantalla Principal</strong><br/>
+    <sub>Vista inicial de la pantalla de cliente.</sub>
+  </div>
+  <div align="center" style="min-width:220px;">
+    <img src="screenshots/menu-cliente.png" alt="Menú Cliente" width="200" style="border-radius:12px;"/><br/>
+    <strong>Menú - Cliente</strong><br/>
+    <sub>Visualización de todos los productos disponibles.</sub>
+  </div>
+  <div align="center" style="min-width:220px;">
+    <img src="screenshots/carrito-cliente.png" alt="Carrito" width="200" style="border-radius:12px;"/><br/>
+    <strong>Carrito - Cliente</strong><br/>
+    <sub>Permite ver el pedido actual y su estado.</sub>
+  </div>
+  <div align="center" style="min-width:220px;">
+    <img src="screenshots/mesas-maitre.png" alt="Lista de Espera" width="200" style="border-radius:12px;"/><br/>
+    <strong>Lista de Espera - Maitre</strong><br/>
+    <sub>Gestión visual de mesas y turnos pendientes.</sub>
+  </div>
+  <div align="center" style="min-width:220px;">
+    <img src="screenshots/añadirplato-mozo.png" alt="Añadir Platos" width="200" style="border-radius:12px;"/><br/>
+    <strong>Añadir Platos - Cocinero</strong><br/>
+    <sub>Formulario para crear nuevos platos o bebidas.</sub>
+  </div>
+  <div align="center" style="min-width:220px;">
+    <img src="screenshots/ver-platos-cocinero.png" alt="Visualizar Platos" width="200" style="border-radius:12px;"/><br/>
+    <strong>Visualizar Platos - Cocinero</strong><br/>
+    <sub>Listado de todos los platos disponibles.</sub>
+  </div>
+  <div align="center" style="min-width:220px;">
+    <img src="screenshots/ver-pedidos-cocinero.png" alt="Pedidos Cocinero" width="200" style="border-radius:12px;"/><br/>
+    <strong>Pedidos y Estados - Cocinero</strong><br/>
+    <sub>Monitoreo de pedidos en preparación.</sub>
+  </div>
+  <div align="center" style="min-width:220px;">
+    <img src="screenshots/agregarpersonal-dueño.png" alt="Agregar Personal" width="200" style="border-radius:12px;"/><br/>
+    <strong>Agregar Personal - Dueño/Supervisor</strong><br/>
+    <sub>Formulario para registrar nuevos empleados.</sub>
+  </div>
+  <div align="center" style="min-width:220px;">
+    <img src="screenshots/agregarmesa-dueño.png" alt="Agregar Mesa" width="200" style="border-radius:12px;"/><br/>
+    <strong>Agregar Mesa - Dueño/Supervisor</strong><br/>
+    <sub>Formulario para registrar nuevas mesas.</sub>
+  </div>
+  <div align="center" style="min-width:220px;">
+    <img src="screenshots/gestionmeseros-dueño.png" alt="Gestión Meseros" width="200" style="border-radius:12px;"/><br/>
+    <strong>Gestión de Meseros - Dueño/Supervisor</strong><br/>
+    <sub>Visualización de meseros y sus mesas asignadas.</sub>
+  </div>
+</div>
 
 <p align="center">
   <em>Estas capturas corresponden a la versión actual de la app desarrollada en Expo (React Native).</em>
