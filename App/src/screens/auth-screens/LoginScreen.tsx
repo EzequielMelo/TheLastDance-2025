@@ -58,13 +58,7 @@ export const LoginScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <ScrollView 
-      style={{ flex: 1 }}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <FormLayout
+    <FormLayout
         title="Bienvenido"
         subtitle="Inicia sesión en Last Dance"
         icon={<ChefHat size={60} color="#d4af37" strokeWidth={1.5} />}
@@ -149,14 +143,19 @@ export const LoginScreen = ({ navigation }: Props) => {
           <Text className="text-white text-center mb-3 text-sm opacity-70">
             Ingresos Rápidos
           </Text>
-          <View className="space-y-2">
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 4 }}
+            className="flex-row"
+          >
             <TouchableOpacity
               onPress={() => {
                 setEmail("julian9@gmail.com");
                 setPassword("123456");
                 login({ email: "julian9@gmail.com", password: "123456" });
               }}
-              className="px-3 py-2 rounded-lg bg-blue-600/20 border border-blue-500/30"
+              className="px-3 py-2 mx-1 rounded-lg bg-blue-600/20 border border-blue-500/30 min-w-[120px]"
             >
               <Text className="text-blue-300 text-center text-sm">👤 Cliente registrado</Text>
             </TouchableOpacity>
@@ -167,7 +166,7 @@ export const LoginScreen = ({ navigation }: Props) => {
                 setPassword("123456");
                 login({ email: "franco@gmail.com", password: "123456" });
               }}
-              className="px-3 py-2 rounded-lg bg-cyan-600/20 border border-cyan-500/30"
+              className="px-3 py-2 mx-1 rounded-lg bg-cyan-600/20 border border-cyan-500/30 min-w-[120px]"
             >
               <Text className="text-cyan-300 text-center text-sm">💁‍♂️ Mozo</Text>
             </TouchableOpacity>
@@ -178,7 +177,7 @@ export const LoginScreen = ({ navigation }: Props) => {
                 setPassword("123456");
                 login({ email: "pachu@gmail.com", password: "123456" });
               }}
-              className="px-3 py-2 rounded-lg bg-amber-600/20 border border-amber-500/30"
+              className="px-3 py-2 mx-1 rounded-lg bg-amber-600/20 border border-amber-500/30 min-w-[120px]"
             >
               <Text className="text-amber-300 text-center text-sm">💂 Maitre</Text>
             </TouchableOpacity>
@@ -189,7 +188,7 @@ export const LoginScreen = ({ navigation }: Props) => {
                 setPassword("123456");
                 login({ email: "momo@gmail.com", password: "123456" });
               }}
-              className="px-3 py-2 rounded-lg bg-orange-600/20 border border-orange-500/30"
+              className="px-3 py-2 mx-1 rounded-lg bg-orange-600/20 border border-orange-500/30 min-w-[120px]"
             >
               <Text className="text-orange-300 text-center text-sm">👨‍🍳 Cocinero</Text>
             </TouchableOpacity>
@@ -200,7 +199,7 @@ export const LoginScreen = ({ navigation }: Props) => {
                 setPassword("123456");
                 login({ email: "messi10@gmail.com", password: "123456" });
               }}
-              className="px-3 py-2 rounded-lg bg-purple-600/20 border border-purple-500/30"
+              className="px-3 py-2 mx-1 rounded-lg bg-purple-600/20 border border-purple-500/30 min-w-[120px]"
             >
               <Text className="text-purple-300 text-center text-sm">🍷 Bartender</Text>
             </TouchableOpacity>
@@ -211,7 +210,7 @@ export const LoginScreen = ({ navigation }: Props) => {
                 setPassword("123456");
                 login({ email: "coscu@gmail.com", password: "123456" });
               }}
-              className="px-3 py-2 rounded-lg bg-green-600/20 border border-green-500/30"
+              className="px-3 py-2 mx-1 rounded-lg bg-green-600/20 border border-green-500/30 min-w-[120px]"
             >
               <Text className="text-green-300 text-center text-sm">👔 Supervisor</Text>
             </TouchableOpacity>
@@ -222,13 +221,12 @@ export const LoginScreen = ({ navigation }: Props) => {
                 setPassword("123456");
                 login({ email: "admin@example.com", password: "123456" });
               }}
-              className="px-3 py-2 rounded-lg bg-red-600/20 border border-red-500/30"
+              className="px-3 py-2 mx-1 rounded-lg bg-red-600/20 border border-red-500/30 min-w-[120px]"
             >
               <Text className="text-red-300 text-center text-sm">👑 Dueño</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       </FormLayout>
-    </ScrollView>
   );
 };

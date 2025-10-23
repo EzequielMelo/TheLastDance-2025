@@ -93,9 +93,19 @@ export async function registerUser(
     insertPayload.dni = (body as any).dni;
     insertPayload.cuil = (body as any).cuil;
   } else if (profile_code === "cliente_registrado" && email) {
-    sendPendingEmail(email, body.first_name).catch(err =>
-      console.error("No se pudo enviar tplPending:", err?.message || err),
-    );
+    // Enviar email de forma async pero con mejor logging
+    sendPendingEmail(email, body.first_name).catch(err => {
+      console.error("❌ Error enviando email de registro pendiente:", {
+        email,
+        name: body.first_name,
+        error: err?.message || err,
+        stack: err?.stack
+      });
+      
+      // Opcional: aquí podrías implementar un sistema de reintentos
+      // o guardar el email en una cola para procesarlo después
+    });
+    
     // dni/cuil vienen en el DTO de cliente
     insertPayload.dni = (body as any).dni;
     insertPayload.cuil = (body as any).cuil;

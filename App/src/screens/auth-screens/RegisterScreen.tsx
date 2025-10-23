@@ -11,6 +11,7 @@ import type { RootStackParamList } from "../../navigation/RootStackParamList";
 import FormLayout from "../../Layouts/formLayout";
 import TextField from "../../components/form/TextField";
 import ImageField from "../../components/form/ImageField";
+import CUILField from "../../components/form/CUILField";
 import {
   useRegisterForm,
   FormDataType,
@@ -66,13 +67,6 @@ export const RegisterScreen = ({ navigation }: Props) => {
           dni = dniMatch[1];
         }
       }
-
-      // La estructura es:
-      // fields[0]: número de trámite
-      // fields[1]: APELLIDO
-      // fields[2]: NOMBRE(S)
-      // fields[3]: sexo (M/F)
-      // fields[4]: DNI
 
       Logger.debug("Campos separados:", fields);
 
@@ -146,8 +140,14 @@ export const RegisterScreen = ({ navigation }: Props) => {
       // Actualizar DNI
       handleInputChange("dni", dni);
 
-      // Crear el formato de CUIL con el DNI en el medio
-      const cuilFormat = `__-${dni}-_`;
+      // Obtener el CUIL actual para preservar el primer y último dígito si ya están completados
+      const currentCuil = formData.cuil || "--";
+      const cuilParts = currentCuil.split("-");
+      const firstDigits = cuilParts[0] || "";
+      const lastDigit = cuilParts[2] || "";
+      
+      // Crear el formato de CUIL con el DNI en el medio, preservando lo que ya estaba
+      const cuilFormat = `${firstDigits}-${dni}-${lastDigit}`;
       handleInputChange("cuil", cuilFormat);
 
       // Actualizar nombres si se pudieron extraer
@@ -173,7 +173,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
         message += `, ${loadedFields.join(" y ")} completado${loadedFields.length > 1 ? "s" : ""}`;
       }
 
-      message += ". Completa los dígitos del CUIL";
+      message += ". Completa los primeros 2 dígitos y el último dígito del CUIL";
 
       ToastAndroid.show(message, ToastAndroid.LONG);
     } else {
@@ -344,26 +344,79 @@ export const RegisterScreen = ({ navigation }: Props) => {
         bottomLinkText="Inicia Sesión"
         onBottomLinkPress={() => navigation.goBack()}
       >
+        {/* Botón de Escanear DNI - Opción más pequeña */}
+        <View className="mb-4">
+          <TouchableOpacity
+            onPress={showDNIOptions}
+            className="bg-blue-600/20 px-4 py-2 rounded-lg border border-blue-500/30 self-start"
+          >
+            <View className="flex-row items-center">
+              <Text className="text-blue-300 text-lg font-medium">Escanear DNI</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Layout con Nombre/Apellido y Foto */}
+        <View className="flex-row mb-4 gap-3" style={{ minHeight: 140 }}>
+          {/* Columna izquierda: Nombre y Apellido */}
+          <View className="flex-1">
+            <Text className="text-white text-sm font-medium mb-1">Nombre</Text>
+            <TextField
+              placeholder="Nombre"
+              value={formData.first_name}
+              onChangeText={v => handleInputChange("first_name", v)}
+              onBlur={() => handleBlur("first_name")}
+              focused={focused === "first_name"}
+              onFocus={() => setFocused("first_name")}
+              error={errors.first_name}
+            />
+            <Text className="text-white text-sm font-medium mb-1">Apellido</Text>
+            <TextField
+              placeholder="Apellido"
+              value={formData.last_name}
+              onChangeText={v => handleInputChange("last_name", v)}
+              onBlur={() => handleBlur("last_name")}
+              focused={focused === "last_name"}
+              onFocus={() => setFocused("last_name")}
+              error={errors.last_name}
+            />
+          </View>
+
+          {/* Columna derecha: Foto (ocupa altura de ambos campos) */}
+          <View className="flex-1">
+            <ImageField
+              label="Foto"
+              image={formData.file}
+              onPick={selectPhotoOption}
+              onClear={() => {
+                handleInputChange("file", null);
+              }}
+              error={errors.file}
+              focused={focused === "file"}
+            />
+          </View>
+        </View>
+        <Text className="text-white text-sm font-medium mb-1">DNI</Text>
         <TextField
-          placeholder="Nombre"
-          value={formData.first_name}
-          onChangeText={v => handleInputChange("first_name", v)}
-          onBlur={() => handleBlur("first_name")}
-          focused={focused === "first_name"}
-          onFocus={() => setFocused("first_name")}
-          error={errors.first_name}
+          placeholder="DNI"
+          value={formData.dni}
+          onChangeText={v => handleInputChange("dni", v)}
+          onBlur={() => handleBlur("dni")}
+          keyboardType="phone-pad"
+          focused={focused === "dni"}
+          onFocus={() => setFocused("dni")}
+          error={errors.dni}
         />
 
-        <TextField
-          placeholder="Apellido"
-          value={formData.last_name}
-          onChangeText={v => handleInputChange("last_name", v)}
-          onBlur={() => handleBlur("last_name")}
-          focused={focused === "last_name"}
-          onFocus={() => setFocused("last_name")}
-          error={errors.last_name}
+        <CUILField
+          value={formData.cuil}
+          onChangeText={v => handleInputChange("cuil", v)}
+          onBlur={() => handleBlur("cuil")}
+          focused={focused === "cuil"}
+          onFocus={() => setFocused("cuil")}
+          error={errors.cuil}
         />
-
+        
         <TextField
           placeholder="Correo electrónico"
           value={formData.email}
@@ -386,55 +439,15 @@ export const RegisterScreen = ({ navigation }: Props) => {
           error={errors.password}
         />
 
-        <View>
-          <View className="flex-row items-center justify-between mb-2">
-            <Text className="text-white text-sm font-medium">DNI</Text>
-            <TouchableOpacity
-              onPress={showDNIOptions}
-              className="bg-blue-500 px-3 py-1 rounded"
-            >
-              <Text className="text-white text-xs">Escanear DNI</Text>
-            </TouchableOpacity>
-          </View>
-
-          <TextField
-            placeholder="DNI"
-            value={formData.dni}
-            onChangeText={v => handleInputChange("dni", v)}
-            onBlur={() => handleBlur("dni")}
-            keyboardType="phone-pad"
-            focused={focused === "dni"}
-            onFocus={() => setFocused("dni")}
-            error={errors.dni}
-          />
-        </View>
-
-        <View>
-          <Text className="text-white text-sm font-medium mb-1">CUIL</Text>
-          <Text className="text-gray-400 text-xs mb-2">
-            Formato: XX-XXXXXXXX-X (completa los dígitos faltantes)
-          </Text>
-          <TextField
-            placeholder="Ej: 20-12345678-9"
-            value={formData.cuil}
-            onChangeText={v => handleInputChange("cuil", v)}
-            onBlur={() => handleBlur("cuil")}
-            keyboardType="phone-pad"
-            focused={focused === "cuil"}
-            onFocus={() => setFocused("cuil")}
-            error={errors.cuil}
-          />
-        </View>
-
-        <ImageField
-          label="Foto"
-          image={formData.file}
-          onPick={selectPhotoOption}
-          onClear={() => {
-            handleInputChange("file", null);
-          }}
-          error={errors.file}
-          focused={focused === "file"}
+        <TextField
+          placeholder="Confirmar contraseña"
+          value={formData.confirmPassword}
+          onChangeText={v => handleInputChange("confirmPassword", v)}
+          onBlur={() => handleBlur("confirmPassword")}
+          secureTextEntry
+          focused={focused === "confirmPassword"}
+          onFocus={() => setFocused("confirmPassword")}
+          error={errors.confirmPassword}
         />
       </FormLayout>
 

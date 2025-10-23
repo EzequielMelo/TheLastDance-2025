@@ -12,6 +12,7 @@ export type FormDataType = {
   cuil: string;
   email: string;
   password: string;
+  confirmPassword: string;
   file: RNImage;
   file_uri?: string;
   first_name: string;
@@ -35,7 +36,7 @@ export const useRegisterForm = (
     mode,
     first_name: "", last_name: "",
     dni: "", cuil: "",
-    email: "", password: "",
+    email: "", password: "", confirmPassword: "",
     profile_code: profile_default,
     position_code: profile_default === "empleado" ? "bartender" : "",
     file: null, file_uri: undefined,
@@ -79,6 +80,8 @@ export const useRegisterForm = (
         return !value || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value)) ? "Email inválido" : "";
       case "password":
         return !value || String(value).length < 6 ? "Mínimo 6 caracteres" : "";
+      case "confirmPassword":
+        return !value ? "Campo obligatorio" : value !== formData.password ? "Las contraseñas no coinciden" : "";
       case "position_code":
         return isEmpleado && !value ? "Elegí un puesto" : "";
       default:
@@ -91,6 +94,12 @@ export const useRegisterForm = (
     if (touched[field]) {
       const error = validateField(field, value);
       setErrors(prev => ({ ...prev, [field]: error }));
+    }
+    
+    // If password changes, re-validate confirmPassword if it has been touched
+    if (field === "password" && touched.confirmPassword) {
+      const confirmError = validateField("confirmPassword", formData.confirmPassword);
+      setErrors(prev => ({ ...prev, confirmPassword: confirmError }));
     }
   };
 
@@ -157,7 +166,7 @@ export const useRegisterForm = (
 
     // Para usuarios registrados: validación completa
     const p = formData.profile_code;
-    const baseReq = ["first_name", "last_name", "email", "password"] as const;
+    const baseReq = ["first_name", "last_name", "email", "password", "confirmPassword"] as const;
     const clientRegReq = ["dni", "cuil"] as const;
     const empleadoReq = ["position_code"] as const;
 
