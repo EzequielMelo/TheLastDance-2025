@@ -2,9 +2,18 @@ import { Request, Response } from 'express';
 import { verifyTransporter, sendMail } from '../lib/mailer';
 import { sendPendingEmail } from '../lib/emails';
 
-export async function testEmail(req: Request, res: Response) {
+export async function testEmail(req: Request, res: Response): Promise<void> {
   try {
     const { to, type = 'test' } = req.body;
+    
+    // Validar que se proporcione un email
+    if (!to) {
+      res.status(400).json({
+        success: false,
+        error: "El campo 'to' es requerido"
+      });
+      return;
+    }
     
     console.log("🧪 Iniciando test de email:", { to, type });
     
@@ -24,12 +33,13 @@ export async function testEmail(req: Request, res: Response) {
     console.log("🔗 Conexión SMTP:", isConnected ? "✅ OK" : "❌ FALLO");
     
     if (!isConnected) {
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
         error: "No se pudo conectar al servidor SMTP",
         envCheck,
         smtpConnection: false
       });
+      return;
     }
     
     // Enviar email de prueba
