@@ -20,19 +20,20 @@ if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !FROM_EMAIL) {
 export const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: SMTP_PORT,
-  secure: SMTP_PORT === 587,
+  secure: SMTP_PORT === 465, // true para 465 (SSL), false para 587 (STARTTLS)
   auth: { 
     user: SMTP_USER, 
     pass: SMTP_PASS 
   },
   // Configuraciones adicionales para Render
-  connectionTimeout: 60000, // 60 segundos
-  greetingTimeout: 30000,   // 30 segundos
-  socketTimeout: 60000,     // 60 segundos
+  connectionTimeout: 10000, // 10 segundos (más rápido para detectar bloqueos)
+  greetingTimeout: 10000,   // 10 segundos
+  socketTimeout: 10000,     // 10 segundos
   // Configuraciones adicionales para evitar problemas de red
-  requireTLS: true,         // Forzar TLS
+  requireTLS: false,        // No forzar TLS (más permisivo)
   tls: {
-    rejectUnauthorized: false // Permitir certificados auto-firmados
+    rejectUnauthorized: false, // Permitir certificados auto-firmados
+    ciphers: 'SSLv3'          // Usar cifrado más compatible
   },
   // Configuración de debug
   debug: process.env['NODE_ENV'] !== 'production',
@@ -64,7 +65,8 @@ export async function sendMail({to, subject, html, text,}: {
       host: SMTP_HOST, 
       port: SMTP_PORT, 
       user: SMTP_USER ? "✅ Configurado" : "❌ Faltante",
-      secure: SMTP_PORT === 465
+      secure: SMTP_PORT === 465,
+      tls: SMTP_PORT === 587 ? "STARTTLS" : "SSL"
     });
     
     // Verificar conexión antes de enviar
