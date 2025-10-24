@@ -149,6 +149,21 @@ app.get("/api/ping", (_req, res) => {
   });
 });
 
+// Test de email endpoint (temporal para debugging)
+app.post("/api/test-email", async (req, res) => {
+  try {
+    const { testEmail } = await import("./lib/testEmailController");
+    await testEmail(req, res);
+  } catch (error) {
+    console.error("Error cargando testEmailController:", error);
+    res.status(500).json({
+      success: false,
+      error: "Error interno del servidor",
+      message: error instanceof Error ? error.message : "Error desconocido"
+    });
+  }
+});
+
 // API Routes (comentar si no existen aún)
 app.use("/api/auth", authRoutes);
 app.use("/api/menu", menuRoutes);

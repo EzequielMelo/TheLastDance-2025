@@ -11,10 +11,7 @@ import {
   CreateTableBody,
   Table,
 } from "../../types/adminTypes";
-import {
-  notifyClientAccountApproved,
-  notifyClientAccountRejected,
-} from "../../services/pushNotificationService";
+import { notifyClientAccountApproved } from "../../services/pushNotificationService";
 
 // Tipos para los servicios
 export interface Client {
@@ -232,11 +229,6 @@ export async function processClientRejection(
     console.log("🔄 Paso 3: Enviando email de rechazo...");
     await sendClientRejectionEmail(id, clientData.first_name, reason);
     console.log("✅ Email de rechazo enviado exitosamente");
-    
-    // Paso 4: Enviar notificación push
-    console.log("🔄 Paso 4: Enviando push notification de rechazo...");
-    await notifyClientAccountRejected(id, `${clientData.first_name} ${clientData.last_name}`.trim(), rejectorName, reason);
-    console.log("✅ Push notification de rechazo enviada");
     
   } catch (error) {
     console.error("❌ Error en processClientRejection:", error);

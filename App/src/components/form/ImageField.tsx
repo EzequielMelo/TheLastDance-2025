@@ -24,21 +24,21 @@ export default function ImageField({
   const showError = !!error && !image;
 
   return (
-    <View className="mb-4">
-      <Text className="text-gray-300 mb-1">{label}</Text>
-      <View className="flex-row items-center gap-3">
+    <View className="mb-4 flex-1">
+      <Text className="text-white text-sm font-medium mb-1">{label}</Text>
+      <View className="flex-1">
         <TouchableOpacity
           onPress={onPick}
-          className={`w-24 h-24 rounded-xl overflow-hidden bg-white/10 border items-center justify-center ${
+          className={`flex-1 min-h-[120px] rounded-xl overflow-hidden bg-white/10 border items-center justify-center ${
             showError ? "border-red-500" : "border-white/20"
           } ${focused ? "border-[#d4af37]" : ""}`}
         >
           {image ? (
-            <Image source={{ uri: image.uri }} className="w-full h-full" />
+            <Image source={{ uri: image.uri }} className="w-full h-full" resizeMode="cover" />
           ) : (
             <>
-              <ImagePlus size={24} color="#888" />
-              <Text className="text-gray-400 text-xs mt-1">Elegir</Text>
+              <ImagePlus size={32} color="#888" />
+              <Text className="text-gray-400 text-sm mt-2">Elegir foto</Text>
             </>
           )}
         </TouchableOpacity>
@@ -46,7 +46,7 @@ export default function ImageField({
         {!!image && (
           <TouchableOpacity
             onPress={onClear}
-            className="px-3 py-2 rounded-lg bg-black/40 border border-white/10"
+            className="px-3 py-2 mt-2 rounded-lg bg-black/40 border border-white/10 self-center"
           >
             <Text className="text-white text-xs">Quitar</Text>
           </TouchableOpacity>
