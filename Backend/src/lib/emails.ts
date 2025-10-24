@@ -1,4 +1,4 @@
-import { sendMail } from "./mailer";
+import { sendMail } from "./resendMailer";
 import { tplPending, tplApproved, tplRejected } from "./emailTemplates";
 
 const htmlToText = (html: string) =>

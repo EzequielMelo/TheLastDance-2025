@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { verifyTransporter, sendMail } from '../lib/mailer';
+import { verifyTransporter, sendMail } from '../lib/resendMailer';
 import { sendPendingEmail } from '../lib/emails';
 
 export async function testEmail(req: Request, res: Response): Promise<void> {
