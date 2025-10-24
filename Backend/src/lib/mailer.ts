@@ -20,7 +20,7 @@ if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !FROM_EMAIL) {
 export const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: SMTP_PORT,
-  secure: SMTP_PORT === 465, // true para 465, false para otros puertos
+  secure: SMTP_PORT === 587,
   auth: { 
     user: SMTP_USER, 
     pass: SMTP_PASS 
@@ -29,6 +29,14 @@ export const transporter = nodemailer.createTransport({
   connectionTimeout: 60000, // 60 segundos
   greetingTimeout: 30000,   // 30 segundos
   socketTimeout: 60000,     // 60 segundos
+  // Configuraciones adicionales para evitar problemas de red
+  requireTLS: true,         // Forzar TLS
+  tls: {
+    rejectUnauthorized: false // Permitir certificados auto-firmados
+  },
+  // Configuración de debug
+  debug: process.env['NODE_ENV'] !== 'production',
+  logger: process.env['NODE_ENV'] !== 'production'
 });
 
 // Función para verificar conectividad SMTP
