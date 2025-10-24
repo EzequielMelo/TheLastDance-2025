@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
+  FlatList,
   ScrollView,
   TouchableOpacity,
   Image,
@@ -40,7 +41,9 @@ import { useCart } from "../../context/CartContext";
 import FloatingCart from "../../components/cart/FloatingCart";
 import CartModal from "../../components/cart/CartModal";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
+// Altura disponible por producto (dejamos espacio para la barra superior)
+const ITEM_VISIBLE_HEIGHT = Math.max(height - 180, 400);
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type MenuScreenRouteProp = RouteProp<RootStackParamList, "Menu">;
@@ -445,9 +448,9 @@ export default function MenuScreen() {
       {/* Header */}
       <View
         style={{
-          paddingTop: 48,
+          paddingTop: 30,
           paddingHorizontal: 24,
-          paddingBottom: 16,
+          paddingBottom: 26,
         }}
       >
         <View
@@ -604,12 +607,13 @@ export default function MenuScreen() {
       </View>
 
       {/* Menu Items */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          paddingHorizontal: 24,
-          paddingBottom: cartCount > 0 ? 120 : 24, // Más espacio cuando hay items en el carrito
-        }}
+      <FlatList
+        data={filteredItems}
+        keyExtractor={item => item.id}
+        pagingEnabled
+        decelerationRate="fast"
+        snapToAlignment="start"
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -618,375 +622,329 @@ export default function MenuScreen() {
             colors={["#d4af37"]}
           />
         }
-      >
-        {filteredItems.length === 0 ? (
-          <View
-            style={{
-              alignItems: "center",
-              justifyContent: "center",
-              paddingVertical: 48,
-            }}
-          >
-            <Utensils size={64} color="#6b7280" />
-            <Text
+        // Reservamos siempre espacio para el carrito para evitar huecos feos.
+        contentContainerStyle={{ paddingBottom: 120 }}
+        renderItem={({ item }) => {
+          const CategoryIcon = getCategoryIcon(item.category);
+          const categoryColor = getCategoryColor(item.category);
+          const isRejected = wasItemRejected(item.id);
+
+          // Reservamos espacio inferior para el carrito flotante / footer (constante para consistencia)
+          const RESERVED_BOTTOM = 120;
+          const innerCardHeight = Math.max(
+            ITEM_VISIBLE_HEIGHT - RESERVED_BOTTOM + 20,
+            300,
+          );
+
+          return (
+            <View
               style={{
-                color: "#9ca3af",
-                fontSize: 18,
-                marginTop: 16,
-                textAlign: "center",
+                height: ITEM_VISIBLE_HEIGHT,
+                width: "100%",
+                justifyContent: "flex-start",
+                paddingHorizontal: 24,
+                paddingBottom: 24,
               }}
             >
-              {selectedCategory === "all"
-                ? "No hay elementos en el menú"
-                : `No hay ${selectedCategory === "plato" ? "platos" : "bebidas"} disponibles`}
-            </Text>
-          </View>
-        ) : (
-          <View style={{ gap: 20 }}>
-            {filteredItems.map(item => {
-              const CategoryIcon = getCategoryIcon(item.category);
-              const categoryColor = getCategoryColor(item.category);
-              const isRejected = wasItemRejected(item.id);
+              <View
+                style={{
+                  height: innerCardHeight,
+                  backgroundColor: "rgba(255,255,255,0.05)",
+                  borderRadius: 16,
+                  overflow: "hidden",
+                  borderWidth: 1,
+                  borderColor: isRejected ? "#ef4444" : "rgba(255,255,255,0.1)",
+                }}
+              >
+                {isRejected && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: 12,
+                      right: 12,
+                      backgroundColor: "#ef4444",
+                      borderRadius: 8,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      zIndex: 1,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "white",
+                        fontSize: 12,
+                        fontWeight: "600",
+                      }}
+                    >
+                      RECHAZADO
+                    </Text>
+                  </View>
+                )}
 
-              return (
-                <View
-                  key={item.id}
-                  style={{
-                    backgroundColor: "rgba(255,255,255,0.05)",
-                    borderRadius: 16,
-                    overflow: "hidden",
-                    borderWidth: 1,
-                    borderColor: isRejected
-                      ? "#ef4444"
-                      : "rgba(255,255,255,0.1)",
-                  }}
-                >
-                  {/* Indicador de item rechazado */}
-                  {isRejected && (
+                {/* Images Section */}
+                {item.menu_item_images && item.menu_item_images.length > 0 && (
+                  <View style={{ height: innerCardHeight * 0.55 }}>
+                    <FlatList
+                      data={item.menu_item_images.sort(
+                        (a, b) => a.position - b.position,
+                      )}
+                      keyExtractor={img => img.id}
+                      horizontal
+                      pagingEnabled
+                      decelerationRate="fast"
+                      snapToInterval={width - 48}
+                      showsHorizontalScrollIndicator={false}
+                      renderItem={({ item: imgItem }) => (
+                        <Image
+                          source={{ uri: imgItem.image_url }}
+                          style={{
+                            width: width - 48,
+                            height: innerCardHeight * 0.55,
+                            resizeMode: "cover",
+                          }}
+                        />
+                      )}
+                    />
+                  </View>
+                )}
+
+                {/* Content Section */}
+                <View style={{ padding: 20 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
+                      <View
+                        style={{
+                          backgroundColor: categoryColor,
+                          borderRadius: 8,
+                          padding: 6,
+                          marginRight: 12,
+                        }}
+                      >
+                        <CategoryIcon size={16} color="white" />
+                      </View>
+                      <Text
+                        style={{
+                          color: "#9ca3af",
+                          fontSize: 12,
+                          fontWeight: "500",
+                          textTransform: "uppercase",
+                          letterSpacing: 1,
+                        }}
+                      >
+                        {item.category === "plato" ? "Plato" : "Bebida"}
+                      </Text>
+                    </View>
+
                     <View
                       style={{
-                        position: "absolute",
-                        top: 12,
-                        right: 12,
-                        backgroundColor: "#ef4444",
+                        backgroundColor: "#d4af37",
                         borderRadius: 8,
-                        paddingHorizontal: 8,
+                        paddingHorizontal: 12,
                         paddingVertical: 4,
-                        zIndex: 1,
                       }}
                     >
                       <Text
                         style={{
-                          color: "white",
-                          fontSize: 12,
-                          fontWeight: "600",
+                          color: "#1a1a1a",
+                          fontSize: 16,
+                          fontWeight: "700",
                         }}
                       >
-                        RECHAZADO
+                        {formatPrice(item.price)}
                       </Text>
                     </View>
-                  )}
-                  {/* Images Section */}
-                  {item.menu_item_images &&
-                    item.menu_item_images.length > 0 && (
-                      <View style={{ height: 200 }}>
-                        <ScrollView
-                          horizontal
-                          pagingEnabled
-                          showsHorizontalScrollIndicator={false}
-                          style={{ flex: 1 }}
-                        >
-                          {item.menu_item_images
-                            .sort((a, b) => a.position - b.position)
-                            .map((img, index) => (
-                              <Image
-                                key={img.id}
-                                source={{ uri: img.image_url }}
-                                style={{
-                                  width: width - 48,
-                                  height: 200,
-                                  resizeMode: "cover",
-                                }}
-                              />
-                            ))}
-                        </ScrollView>
+                  </View>
 
-                        {/* Image indicators */}
-                        <View
-                          style={{
-                            position: "absolute",
-                            bottom: 12,
-                            left: 0,
-                            right: 0,
-                            flexDirection: "row",
-                            justifyContent: "center",
-                            gap: 6,
-                          }}
-                        >
-                          {item.menu_item_images.map((_, index) => (
-                            <View
-                              key={index}
-                              style={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: 4,
-                                backgroundColor: "rgba(255,255,255,0.7)",
-                              }}
-                            />
-                          ))}
-                        </View>
-                      </View>
-                    )}
+                  <Text
+                    style={{
+                      color: "white",
+                      fontSize: 24,
+                      fontWeight: "700",
+                      marginBottom: 8,
+                    }}
+                  >
+                    {item.name}
+                  </Text>
 
-                  {/* Content Section */}
-                  <View style={{ padding: 20 }}>
-                    {/* Header with category */}
+                  <Text
+                    style={{
+                      color: "#d1d5db",
+                      fontSize: 14,
+                      lineHeight: 20,
+                      marginBottom: 16,
+                    }}
+                  >
+                    {item.description}
+                  </Text>
+
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      paddingTop: 12,
+                      borderTopWidth: 1,
+                      borderTopColor: "rgba(255,255,255,0.1)",
+                    }}
+                  >
                     <View
                       style={{
                         flexDirection: "row",
                         alignItems: "center",
-                        justifyContent: "space-between",
-                        marginBottom: 12,
+                        flex: 1,
                       }}
                     >
-                      <View
-                        style={{ flexDirection: "row", alignItems: "center" }}
-                      >
-                        <View
-                          style={{
-                            backgroundColor: categoryColor,
-                            borderRadius: 8,
-                            padding: 6,
-                            marginRight: 12,
-                          }}
-                        >
-                          <CategoryIcon size={16} color="white" />
-                        </View>
-                        <Text
-                          style={{
-                            color: "#9ca3af",
-                            fontSize: 12,
-                            fontWeight: "500",
-                            textTransform: "uppercase",
-                            letterSpacing: 1,
-                          }}
-                        >
-                          {item.category === "plato" ? "Plato" : "Bebida"}
-                        </Text>
-                      </View>
-
-                      <View
+                      <Clock size={16} color="#d4af37" />
+                      <Text
                         style={{
-                          backgroundColor: "#d4af37",
-                          borderRadius: 8,
-                          paddingHorizontal: 12,
-                          paddingVertical: 4,
+                          color: "#d4af37",
+                          fontSize: 14,
+                          fontWeight: "500",
+                          marginLeft: 6,
                         }}
                       >
-                        <Text
-                          style={{
-                            color: "#1a1a1a",
-                            fontSize: 16,
-                            fontWeight: "700",
-                          }}
-                        >
-                          {formatPrice(item.price)}
-                        </Text>
-                      </View>
+                        {item.prepMinutes} min
+                      </Text>
                     </View>
 
-                    {/* Name */}
-                    <Text
-                      style={{
-                        color: "white",
-                        fontSize: 20,
-                        fontWeight: "600",
-                        marginBottom: 8,
-                      }}
-                    >
-                      {item.name}
-                    </Text>
-
-                    {/* Description */}
-                    <Text
-                      style={{
-                        color: "#d1d5db",
-                        fontSize: 14,
-                        lineHeight: 20,
-                        marginBottom: 16,
-                      }}
-                    >
-                      {item.description}
-                    </Text>
-
-                    {/* Footer with prep time and cart controls */}
                     <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        paddingTop: 12,
-                        borderTopWidth: 1,
-                        borderTopColor: "rgba(255,255,255,0.1)",
-                      }}
+                      style={{ flexDirection: "row", alignItems: "center" }}
                     >
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          flex: 1,
-                        }}
-                      >
-                        <Clock size={16} color="#d4af37" />
-                        <Text
+                      {getCurrentItemQuantity(item.id) > 0 ? (
+                        <View
                           style={{
-                            color: "#d4af37",
-                            fontSize: 14,
-                            fontWeight: "500",
-                            marginLeft: 6,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            backgroundColor: isRejected ? "#9ca3af" : "#d4af37",
+                            borderRadius: 8,
+                            paddingHorizontal: 4,
+                            opacity: isRejected ? 0.5 : 1,
                           }}
                         >
-                          {item.prepMinutes} min
-                        </Text>
-                      </View>
-
-                      {/* Add to cart controls */}
-                      <View
-                        style={{ flexDirection: "row", alignItems: "center" }}
-                      >
-                        {getCurrentItemQuantity(item.id) > 0 ? (
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              backgroundColor: isRejected
-                                ? "#9ca3af"
-                                : "#d4af37",
-                              borderRadius: 8,
-                              paddingHorizontal: 4,
-                              opacity: isRejected ? 0.5 : 1,
-                            }}
-                          >
-                            <TouchableOpacity
-                              onPress={() =>
-                                handleQuantityChange(
-                                  item.id,
-                                  getCurrentItemQuantity(item.id) - 1,
-                                )
-                              }
-                              disabled={isRejected}
-                              style={{
-                                padding: 8,
-                              }}
-                            >
-                              <Minus
-                                size={16}
-                                color={isRejected ? "#ffffff" : "#1a1a1a"}
-                              />
-                            </TouchableOpacity>
-
-                            <Text
-                              style={{
-                                color: isRejected ? "#ffffff" : "#1a1a1a",
-                                fontWeight: "600",
-                                fontSize: 16,
-                                marginHorizontal: 12,
-                              }}
-                            >
-                              {getCurrentItemQuantity(item.id)}
-                            </Text>
-
-                            <TouchableOpacity
-                              onPress={() =>
-                                handleQuantityChange(
-                                  item.id,
-                                  getCurrentItemQuantity(item.id) + 1,
-                                )
-                              }
-                              disabled={isRejected}
-                              style={{
-                                padding: 8,
-                              }}
-                            >
-                              <Plus
-                                size={16}
-                                color={isRejected ? "#ffffff" : "#1a1a1a"}
-                              />
-                            </TouchableOpacity>
-                          </View>
-                        ) : (
                           <TouchableOpacity
-                            onPress={() => handleAddToCart(item)}
+                            onPress={() =>
+                              handleQuantityChange(
+                                item.id,
+                                getCurrentItemQuantity(item.id) - 1,
+                              )
+                            }
                             disabled={isRejected}
+                            style={{ padding: 8 }}
+                          >
+                            <Minus
+                              size={16}
+                              color={isRejected ? "#ffffff" : "#1a1a1a"}
+                            />
+                          </TouchableOpacity>
+
+                          <Text
                             style={{
-                              backgroundColor: isRejected
-                                ? "#9ca3af"
-                                : hasPendingOrder && !isModifyMode
-                                  ? "#6b7280"
-                                  : "#d4af37",
-                              borderRadius: 8,
-                              paddingHorizontal: 16,
-                              paddingVertical: 8,
-                              flexDirection: "row",
-                              alignItems: "center",
-                              opacity: isRejected
-                                ? 0.5
-                                : hasPendingOrder && !isModifyMode
-                                  ? 0.8
-                                  : 1,
+                              color: isRejected ? "#ffffff" : "#1a1a1a",
+                              fontWeight: "600",
+                              fontSize: 16,
+                              marginHorizontal: 12,
                             }}
                           >
-                            {isRejected ? (
-                              <>
-                                <X size={16} color="#ffffff" />
-                                <Text
-                                  style={{
-                                    color: "#ffffff",
-                                    fontWeight: "600",
-                                    marginLeft: 4,
-                                  }}
-                                >
-                                  No disponible
-                                </Text>
-                              </>
-                            ) : hasPendingOrder && !isModifyMode ? (
-                              <>
-                                <Lock size={16} color="#ffffff" />
-                                <Text
-                                  style={{
-                                    color: "#ffffff",
-                                    fontWeight: "600",
-                                    marginLeft: 4,
-                                  }}
-                                >
-                                  Bloqueado
-                                </Text>
-                              </>
-                            ) : (
-                              <>
-                                <Plus size={16} color="#1a1a1a" />
-                                <Text
-                                  style={{
-                                    color: "#1a1a1a",
-                                    fontWeight: "600",
-                                    marginLeft: 4,
-                                  }}
-                                >
-                                  {isModifyMode ? "Seleccionar" : "Agregar"}
-                                </Text>
-                              </>
-                            )}
+                            {getCurrentItemQuantity(item.id)}
+                          </Text>
+
+                          <TouchableOpacity
+                            onPress={() =>
+                              handleQuantityChange(
+                                item.id,
+                                getCurrentItemQuantity(item.id) + 1,
+                              )
+                            }
+                            disabled={isRejected}
+                            style={{ padding: 8 }}
+                          >
+                            <Plus
+                              size={16}
+                              color={isRejected ? "#ffffff" : "#1a1a1a"}
+                            />
                           </TouchableOpacity>
-                        )}
-                      </View>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => handleAddToCart(item)}
+                          disabled={isRejected}
+                          style={{
+                            backgroundColor: isRejected
+                              ? "#9ca3af"
+                              : hasPendingOrder && !isModifyMode
+                                ? "#6b7280"
+                                : "#d4af37",
+                            borderRadius: 8,
+                            paddingHorizontal: 16,
+                            paddingVertical: 8,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            opacity: isRejected
+                              ? 0.5
+                              : hasPendingOrder && !isModifyMode
+                                ? 0.8
+                                : 1,
+                          }}
+                        >
+                          {isRejected ? (
+                            <>
+                              <X size={16} color="#ffffff" />
+                              <Text
+                                style={{
+                                  color: "#ffffff",
+                                  fontWeight: "600",
+                                  marginLeft: 4,
+                                }}
+                              >
+                                No disponible
+                              </Text>
+                            </>
+                          ) : hasPendingOrder && !isModifyMode ? (
+                            <>
+                              <Lock size={16} color="#ffffff" />
+                              <Text
+                                style={{
+                                  color: "#ffffff",
+                                  fontWeight: "600",
+                                  marginLeft: 4,
+                                }}
+                              >
+                                Bloqueado
+                              </Text>
+                            </>
+                          ) : (
+                            <>
+                              <Plus size={16} color="#1a1a1a" />
+                              <Text
+                                style={{
+                                  color: "#1a1a1a",
+                                  fontWeight: "600",
+                                  marginLeft: 4,
+                                }}
+                              >
+                                {isModifyMode ? "Seleccionar" : "Agregar"}
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                 </View>
-              );
-            })}
-          </View>
-        )}
-      </ScrollView>
+              </View>
+            </View>
+          );
+        }}
+      />
 
       {/* Floating Cart Component o Carrito de Modificaciones */}
       {isModifyMode ? (

@@ -44,7 +44,7 @@ function NavigatorContent() {
 
   React.useEffect(() => {
     if (!isLoading) {
-      const timer = setTimeout(() => setShowSplash(false), 2000); // 2s mínimo
+      const timer = setTimeout(() => setShowSplash(false), 3000); // 3s mínimo
       return () => clearTimeout(timer);
     }
   }, [isLoading]);
