@@ -68,15 +68,16 @@ export default function FormLayout({
       className="flex-1"
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1"
         keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
       >
         <ScrollView
           contentContainerStyle={{ 
             flexGrow: 1, 
-            paddingBottom: 50,
-            justifyContent: isKeyboardVisible ? 'flex-start' : 'center'
+            paddingBottom: isKeyboardVisible ? 300 : 50,
+            justifyContent: isKeyboardVisible ? 'flex-start' : 'center',
+            paddingTop: isKeyboardVisible ? 20 : 0
           }}
           className="px-8 py-12"
           keyboardShouldPersistTaps="handled"

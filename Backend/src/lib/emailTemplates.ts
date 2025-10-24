@@ -1,19 +1,56 @@
 const brandColor = "#d4af37";
-const textColor = "#1a1a1a";
-const gray = "#666";
-const logoUrl = process.env['BRAND_LOGO_URL'] || "https://i.ibb.co/WP6r1xH/logo.png";
+const darkBg = "#1a1a1a";
+const brownBg = "#2d1810";
+const textColor = "#ffffff";
+const grayText = "#9ca3af";
+const logoUrl = process.env['BRAND_LOGO_URL'] || "https://eahhbvsassnukebtvate.supabase.co/storage/v1/object/public/Icon/icono.png";
 
 const wrapper = (title: string, body: string) => `
-  <div style="font-family:Arial,Helvetica,sans-serif;background:#111;color:#fff;padding:24px">
-    <table align="center" width="100%" style="max-width:560px;background:#1b1412;border-radius:16px;padding:24px">
-      <tr><td style="text-align:center;padding-bottom:16px">
-        <img src="${logoUrl}" alt="Logo" style="width:64px;height:64px;border-radius:12px"/>
-      </td></tr>
-      <tr><td style="text-align:center;color:${textColor};background:#fff;border-radius:10px;padding:8px 12px;font-size:18px;font-weight:700">
-        ${title}
-      </td></tr>
-      <tr><td style="padding-top:12px;color:${gray};font-size:14px;line-height:1.6">${body}</td></tr>
-      <tr><td style="padding-top:20px;text-align:center;color:${gray};font-size:12px">© ${new Date().getFullYear()} Last Dance</td></tr>
+  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;background:linear-gradient(135deg, ${darkBg} 0%, ${brownBg} 50%, ${darkBg} 100%);min-height:100vh;padding:40px 20px">
+    <table align="center" width="100%" style="max-width:600px;background:${darkBg};border-radius:20px;padding:40px;box-shadow:0 20px 40px rgba(0,0,0,0.5);border:1px solid rgba(212,175,55,0.2)">
+      
+      <!-- Logo y Header -->
+      <tr>
+        <td style="text-align:center;padding-bottom:32px">
+          <img src="${logoUrl}" alt="Last Dance Logo" style="width:80px;height:80px;border-radius:16px;box-shadow:0 8px 16px rgba(212,175,55,0.3)"/>
+        </td>
+      </tr>
+      
+      <!-- Título con gradiente dorado -->
+      <tr>
+        <td style="text-align:center;padding-bottom:24px">
+          <div style="background:linear-gradient(90deg, ${brandColor} 0%, #b8941f 50%, ${brandColor} 100%);color:${darkBg};border-radius:12px;padding:16px 24px;font-size:20px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase">
+            ${title}
+          </div>
+        </td>
+      </tr>
+      
+      <!-- Contenido -->
+      <tr>
+        <td style="padding:24px 0;color:${textColor};font-size:16px;line-height:1.7;text-align:left">
+          ${body}
+        </td>
+      </tr>
+      
+      <!-- Separador decorativo -->
+      <tr>
+        <td style="padding:20px 0;text-align:center">
+          <div style="height:2px;background:linear-gradient(90deg, transparent 0%, ${brandColor} 50%, transparent 100%);width:60%;margin:0 auto;border-radius:1px"></div>
+        </td>
+      </tr>
+      
+      <!-- Footer -->
+      <tr>
+        <td style="padding-top:24px;text-align:center;color:${grayText};font-size:14px">
+          <div style="margin-bottom:16px">
+            <span style="color:${brandColor};font-weight:600">Last Dance Restaurant</span>
+          </div>
+          <div style="font-size:12px;opacity:0.8">
+            © ${new Date().getFullYear()} Todos los derechos reservados
+          </div>
+        </td>
+      </tr>
+      
     </table>
   </div>
 `;
@@ -22,10 +59,22 @@ export const tplPending = (name: string) =>
   wrapper(
     "¡Recibimos tu registro!",
     `
-    Hola <b>${name}</b>,<br/><br/>
-    Tu cuenta fue creada y está <span style="color:${brandColor}">pendiente de aprobación</span>.
-    Te avisaremos cuando sea revisada por nuestro equipo.<br/><br/>
-    ¡Gracias por elegirnos!
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:18px;margin-bottom:8px">¡Hola <strong style="color:${brandColor}">${name}</strong>!</div>
+    </div>
+    
+    <p style="margin-bottom:20px">
+      Tu cuenta ha sido creada exitosamente y está <strong style="color:${brandColor};background:rgba(212,175,55,0.1);padding:2px 8px;border-radius:4px">pendiente de aprobación</strong>.
+    </p>
+    
+    <p style="margin-bottom:20px">
+      Nuestro equipo revisará tu solicitud en las próximas horas. Te notificaremos por email una vez que sea procesada.
+    </p>
+    
+    <div style="text-align:center;margin-top:32px">
+      <div style="color:${brandColor};font-weight:600;font-size:16px">¡Gracias por elegirnos!</div>
+      <div style="color:${grayText};font-size:14px;margin-top:8px">El equipo de Last Dance</div>
+    </div>
     `
   );
 
@@ -33,20 +82,61 @@ export const tplApproved = (name: string) =>
   wrapper(
     "¡Tu cuenta fue aprobada!",
     `
-    Hola <b>${name}</b>,<br/><br/>
-    Buenas noticias: tu cuenta ha sido <span style="color:${brandColor}">aprobada</span>.
-    Ya podés iniciar sesión y disfrutar de la app.<br/><br/>
-    ¡Te esperamos!
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:18px;margin-bottom:8px">¡Excelentes noticias, <strong style="color:${brandColor}">${name}</strong>!</div>
+    </div>
+    
+    <p style="margin-bottom:20px">
+      Tu cuenta ha sido <strong style="color:${brandColor};background:rgba(212,175,55,0.1);padding:2px 8px;border-radius:4px">✅ APROBADA</strong> exitosamente.
+    </p>
+    
+    <p style="margin-bottom:24px">
+      Ya podés iniciar sesión en la aplicación y disfrutar de toda la experiencia que Last Dance tiene para ofrecerte.
+    </p>
+    
+    <div style="text-align:center;background:rgba(212,175,55,0.1);border-radius:12px;padding:20px;margin:24px 0">
+      <div style="color:${brandColor};font-weight:600;font-size:16px;margin-bottom:8px">🎉 ¡Bienvenido a Last Dance!</div>
+      <div style="color:${textColor};font-size:14px">Tu aventura culinaria comienza ahora</div>
+    </div>
+    
+    <div style="text-align:center;margin-top:32px">
+      <div style="color:${grayText};font-size:14px">¡Te esperamos!</div>
+      <div style="color:${brandColor};font-weight:600;margin-top:4px">El equipo de Last Dance</div>
+    </div>
     `
   );
 
 export const tplRejected = (name: string, reason?: string) =>
   wrapper(
-    "Tu registro fue rechazado",
+    "Actualización de tu registro",
     `
-    Hola <b>${name}</b>,<br/><br/>
-    Lamentablemente tu registro fue <span style="color:${brandColor}">rechazado</span>.
-    ${reason ? `<br/><br/><b>Motivo:</b> ${reason}` : ""}
-    <br/><br/>Si creés que se trata de un error, podés volver a intentarlo más adelante.
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:18px;margin-bottom:8px">Hola <strong style="color:${brandColor}">${name}</strong>,</div>
+    </div>
+    
+    <p style="margin-bottom:20px">
+      Lamentablemente, tu solicitud de registro no pudo ser <strong style="color:#ef4444;background:rgba(239,68,68,0.1);padding:2px 8px;border-radius:4px">❌ procesada</strong> en esta oportunidad.
+    </p>
+    
+    ${reason ? `
+    <div style="background:rgba(239,68,68,0.1);border-left:4px solid #ef4444;padding:16px;margin:20px 0;border-radius:0 8px 8px 0">
+      <div style="color:${textColor};font-weight:600;margin-bottom:8px">Motivo:</div>
+      <div style="color:${grayText};font-size:14px;line-height:1.5">${reason}</div>
+    </div>
+    ` : ""}
+    
+    <p style="margin-bottom:24px">
+      Si creés que se trata de un error o deseas intentarlo nuevamente, podés volver a registrarte más adelante.
+    </p>
+    
+    <div style="text-align:center;background:rgba(212,175,55,0.1);border-radius:12px;padding:20px;margin:24px 0">
+      <div style="color:${brandColor};font-weight:600;font-size:16px;margin-bottom:8px">¿Necesitas ayuda?</div>
+      <div style="color:${textColor};font-size:14px">Nuestro equipo está disponible para asistirte</div>
+    </div>
+    
+    <div style="text-align:center;margin-top:32px">
+      <div style="color:${grayText};font-size:14px">Gracias por tu interés en</div>
+      <div style="color:${brandColor};font-weight:600;margin-top:4px">Last Dance Restaurant</div>
+    </div>
     `
   );
