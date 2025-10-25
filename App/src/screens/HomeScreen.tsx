@@ -16,14 +16,17 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
 import { useAuth } from "../auth/useAuth";
 import { useFocusEffect } from "@react-navigation/native";
+import { useBottomNav } from "../context/BottomNavContext";
 import api from "../api/axios";
 import { Menu, User as UserIcon, Users, QrCode, UtensilsCrossed, Wine, BookOpen, CheckCircle, Clock, Search } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User";
 import ClientFlowNavigation from "../components/navigation/ClientFlowNavigation";
 import Sidebar from "../components/navigation/Sidebar";
+import BottomNavbar from "../components/navigation/BottomNavbar";
 import CartModal from "../components/cart/CartModal";
 import ActionCard from "../components/common/ActionCard";
+import UserProfileCard from "../components/common/UserProfileCard";
 import { getDishesForKitchen, getDrinksForBar, MenuItem } from "../services/menuService";
 import { getWaiterPendingPayments, confirmPayment } from "../api/orders";
 
@@ -31,6 +34,7 @@ type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
 export default function HomeScreen({ navigation, route }: Props) {
   const { user, token, logout, isLoading } = useAuth();
+  const { activeTab, setActiveTab } = useBottomNav();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [cartModalVisible, setCartModalVisible] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -49,6 +53,11 @@ export default function HomeScreen({ navigation, route }: Props) {
   const [clientRefreshTrigger, setClientRefreshTrigger] = useState(0);
   // Estado para pull-to-refresh
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Estados específicos para dueño/supervisor
+  const [pendingUsers, setPendingUsers] = useState<any[]>([]);
+  const [loadingPendingUsers, setLoadingPendingUsers] = useState(false);
+  
   // Estado para información del mozo (cuando cliente está esperando confirmación)
   const [waiterInfo, setWaiterInfo] = useState<{
     id: string;
@@ -196,7 +205,17 @@ export default function HomeScreen({ navigation, route }: Props) {
   };
 
   const handleOpenCart = () => {
+    if (isCliente) {
+      setActiveTab('cart');
+    }
     setCartModalVisible(true);
+  };
+
+  const handleCloseCart = () => {
+    setCartModalVisible(false);
+    if (isCliente && activeTab === 'cart') {
+      setActiveTab('home'); // Volver a home cuando se cierre el cart
+    }
   };
 
   const handleClientRefresh = () => {
@@ -216,6 +235,11 @@ export default function HomeScreen({ navigation, route }: Props) {
         await loadPendingPaymentTables();
       }
       
+      // Refrescar usuarios pendientes si es dueño/supervisor
+      if (user && ["dueno", "supervisor"].includes(user.profile_code)) {
+        await loadPendingUsers();
+      }
+      
       // Triggear refresh del cliente
       setClientRefreshTrigger(prev => prev + 1);
       
@@ -226,6 +250,74 @@ export default function HomeScreen({ navigation, route }: Props) {
       setRefreshing(false);
     }
   }, [checkWaitingListStatus, loadReadyItems, user]);
+
+  // Función para cargar usuarios pendientes (dueño/supervisor)
+  const loadPendingUsers = useCallback(async () => {
+    if (!user || !["dueno", "supervisor"].includes(user.profile_code)) return;
+    
+    try {
+      setLoadingPendingUsers(true);
+      const response = await api.get("/admin/clients?state=pendiente");
+      setPendingUsers(response.data || []);
+    } catch (error) {
+      console.error("Error cargando usuarios pendientes:", error);
+    } finally {
+      setLoadingPendingUsers(false);
+    }
+  }, [user]);
+
+  // Función para aprobar usuario
+  const approveUser = async (userId: string, userName: string) => {
+    try {
+      await api.post(`/admin/clients/${userId}/approve`);
+      ToastAndroid.show(`✅ Usuario ${userName} aprobado`, ToastAndroid.SHORT);
+      await loadPendingUsers(); // Recargar lista
+    } catch (error: any) {
+      console.error("Error aprobando usuario:", error);
+      ToastAndroid.show(
+        error.response?.data?.error || "Error al aprobar usuario", 
+        ToastAndroid.SHORT
+      );
+    }
+  };
+
+  // Función para rechazar usuario
+  const rejectUser = async (userId: string, userName: string, reason?: string) => {
+    try {
+      console.log("🔄 [FRONTEND] Iniciando rechazo de usuario:", { userId, userName, reason });
+      console.log("🔄 [FRONTEND] URL de la petición:", `${api.defaults.baseURL}/admin/clients/${userId}/reject`);
+      console.log("🔄 [FRONTEND] Body de la petición:", { reason: reason || "" });
+      
+      const response = await api.post(`/admin/clients/${userId}/reject`, { reason: reason || "" });
+      
+      console.log("✅ [FRONTEND] Respuesta recibida:", response.data);
+      ToastAndroid.show(`❌ Usuario ${userName} rechazado`, ToastAndroid.SHORT);
+      await loadPendingUsers(); // Recargar lista
+    } catch (error: any) {
+      console.error("❌ [FRONTEND] Error rechazando usuario:", error);
+      console.error("❌ [FRONTEND] Detalles del error:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          data: error.config?.data
+        }
+      });
+      ToastAndroid.show(
+        error.response?.data?.error || "Error al rechazar usuario", 
+        ToastAndroid.SHORT
+      );
+    }
+  };
+
+  // Cargar usuarios pendientes para dueño/supervisor
+  useEffect(() => {
+    if (user && ["dueno", "supervisor"].includes(user.profile_code)) {
+      loadPendingUsers();
+    }
+  }, [user, loadPendingUsers]);
 
   // Cargar información del mozo para clientes en confirm_pending
   useEffect(() => {
@@ -292,6 +384,30 @@ export default function HomeScreen({ navigation, route }: Props) {
       mode: "order_status",
       onScanSuccess: handleOrderStatusQRScan
     });
+  };
+
+  // Funciones para el BottomNavbar de clientes
+  const handleBottomNavHome = () => {
+    setActiveTab('home');
+    // Ya estamos en Home, solo cambiar tab
+  };
+
+  const handleBottomNavMenu = () => {
+    setActiveTab('menu');
+    navigation.navigate("Menu");
+  };
+
+  const handleBottomNavQR = () => {
+    navigateToQRScanner();
+  };
+
+  const handleBottomNavCart = () => {
+    setActiveTab('cart');
+    setCartModalVisible(true);
+  };
+
+  const handleBottomNavSidebar = () => {
+    setSidebarVisible(true);
   };
 
   const loadDishesMenu = async () => {
@@ -373,6 +489,15 @@ export default function HomeScreen({ navigation, route }: Props) {
     user?.profile_code === "cliente_registrado" ||
     user?.profile_code === "cliente_anonimo";
 
+  // Efecto para resetear activeTab cuando se vuelve a Home
+  useFocusEffect(
+    useCallback(() => {
+      if (isCliente) {
+        setActiveTab('home');
+      }
+    }, [isCliente])
+  );
+
   const getProfileLabel = (profileCode: string, positionCode?: string) => {
     const profileLabels: { [key: string]: string } = {
       dueno: "Dueño",
@@ -421,9 +546,36 @@ export default function HomeScreen({ navigation, route }: Props) {
       className="flex-1"
     >
       <View className="px-6 pt-14 pb-8 flex-1">
-        {/* Header con menú hamburguesa */}
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-          <View>
+        {/* Header con menú hamburguesa - Solo para empleados */}
+        {!isCliente && (
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+            <View>
+              <Text style={{ color: "white", fontSize: 24, fontWeight: "600" }}>
+                TheLastDance
+              </Text>
+              <Text style={{ color: "#9ca3af", fontSize: 14 }}>
+                {user ? `¡Hola, ${user.first_name}!` : "Bienvenido"}
+              </Text>
+            </View>
+            
+            <TouchableOpacity
+              onPress={() => setSidebarVisible(true)}
+              style={{
+                backgroundColor: "rgba(255,255,255,0.1)",
+                borderRadius: 12,
+                padding: 12,
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.2)",
+              }}
+            >
+              <Menu size={24} color="#d4af37" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Header simple para clientes */}
+        {isCliente && (
+          <View style={{ marginBottom: 24, alignItems: "center" }}>
             <Text style={{ color: "white", fontSize: 24, fontWeight: "600" }}>
               TheLastDance
             </Text>
@@ -431,70 +583,15 @@ export default function HomeScreen({ navigation, route }: Props) {
               {user ? `¡Hola, ${user.first_name}!` : "Bienvenido"}
             </Text>
           </View>
-          
-          <TouchableOpacity
-            onPress={() => setSidebarVisible(true)}
-            style={{
-              backgroundColor: "rgba(255,255,255,0.1)",
-              borderRadius: 12,
-              padding: 12,
-              borderWidth: 1,
-              borderColor: "rgba(255,255,255,0.2)",
-            }}
-          >
-            <Menu size={24} color="#d4af37" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Quick Stats Card */}
-        {user && (
-          <View style={{ marginBottom: 24 }}>
-            <LinearGradient
-              colors={["rgba(212, 175, 55, 0.2)", "rgba(212, 175, 55, 0.1)"]}
-              style={{
-                borderRadius: 16,
-                padding: 20,
-                borderWidth: 1,
-                borderColor: "rgba(212, 175, 55, 0.3)",
-              }}
-            >
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                <View>
-                  <Text style={{ color: "#d4af37", fontSize: 16, fontWeight: "600" }}>
-                    Estado actual
-                  </Text>
-                  <Text style={{ color: "white", fontSize: 14, marginTop: 4 }}>
-                    {getProfileLabel(user.profile_code, user.position_code || undefined)}
-                  </Text>
-                </View>
-                
-                <View style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
-                  backgroundColor: getProfileColor(user.profile_code),
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}>
-                  {user.photo_url ? (
-                    <Image
-                      source={{ uri: user.photo_url }}
-                      style={{ width: 48, height: 48, borderRadius: 24 }}
-                    />
-                  ) : (
-                    <UserIcon size={24} color="white" />
-                  )}
-                </View>
-              </View>
-            </LinearGradient>
-          </View>
         )}
-
+        
         {/* Contenido principal basado en rol */}
         <ScrollView 
           style={{ flex: 1 }}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 20 }}
+          contentContainerStyle={{ 
+            paddingBottom: isCliente ? 100 : 20  // Más padding para clientes por el navbar
+          }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -506,6 +603,12 @@ export default function HomeScreen({ navigation, route }: Props) {
         >
           {isCliente ? (
             <View>
+              {/* Card del usuario */}
+              <UserProfileCard 
+                user={user!} 
+                getProfileLabel={getProfileLabel} 
+              />
+              
               <ClientFlowNavigation 
                 onRefresh={handleClientRefresh} 
                 refreshTrigger={clientRefreshTrigger}
@@ -593,7 +696,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                     <ActivityIndicator size="small" color="#fbbf24" />
                     <Text style={{ 
                       color: "#fbbf24", 
-                      fontSize: 12,
+                      fontSize: 14, // Aumentado de 12 a 14
                       marginLeft: 8
                     }}>
                       Procesando...
@@ -614,19 +717,24 @@ export default function HomeScreen({ navigation, route }: Props) {
                 <Text style={{ color: "#d4af37", fontSize: 14, fontWeight: "600", marginBottom: 4 }}>
                   💡 Consejo
                 </Text>
-                <Text style={{ color: "white", fontSize: 12, lineHeight: 16 }}>
+                <Text style={{ color: "white", fontSize: 14, lineHeight: 18 }}>
                   También puedes acceder a estas funciones desde el menú lateral (☰) según tu estado actual
                 </Text>
               </View>
             </View>
           ) : user?.position_code === "cocinero" ? (
             <View>
+              {/* Card del usuario */}
+              <UserProfileCard 
+                user={user!} 
+                getProfileLabel={getProfileLabel} 
+              />
+
               {/* Panel de acceso rápido para cocinero */}
               <ActionCard
                 title="🍳 Panel de Cocina"
                 description="Ver pedidos pendientes y actualizar el estado de preparación"
                 icon={UtensilsCrossed}
-                variant="primary"
                 onPress={() => handleNavigate("KitchenDashboard")}
               />
 
@@ -665,12 +773,17 @@ export default function HomeScreen({ navigation, route }: Props) {
             </View>
           ) : user?.position_code === "bartender" ? (
             <View>
+              {/* Card del usuario */}
+              <UserProfileCard 
+                user={user!} 
+                getProfileLabel={getProfileLabel} 
+              />
+
               {/* Panel de acceso rápido para bartender */}
               <ActionCard
                 title="🍷 Panel de Bar"
                 description="Ver bebidas pendientes y actualizar el estado de preparación"
                 icon={Wine}
-                variant="primary"
                 onPress={() => handleNavigate("BartenderDashboard")}
               />
 
@@ -710,8 +823,55 @@ export default function HomeScreen({ navigation, route }: Props) {
                 </Text>
               </View>
             </View>
+          ) : user?.position_code === "maitre" ? (
+            <View>
+              {/* Card del usuario */}
+              <UserProfileCard 
+                user={user!} 
+                getProfileLabel={getProfileLabel} 
+              />
+
+              {/* Gestión de lista de espera */}
+              <ActionCard
+                title="📋 Gestionar Lista de Espera"
+                description="Administrar reservas y asignación de mesas"
+                icon={Users}
+                onPress={() => handleNavigate("ManageWaitingList")}
+              />
+
+              {/* Generar QR */}
+              <ActionCard
+                title="📱 Generar Código QR"
+                description="Crear QR para que clientes se unan a la lista"
+                icon={QrCode}
+                onPress={() => handleNavigate("GenerateWaitingListQR")}
+              />
+
+              {/* Info adicional para maître */}
+              <View style={{
+                backgroundColor: "rgba(168, 85, 247, 0.1)",
+                borderRadius: 12,
+                padding: 16,
+                marginTop: 16,
+                borderWidth: 1,
+                borderColor: "rgba(168, 85, 247, 0.3)",
+              }}>
+                <Text style={{ color: "#a855f7", fontSize: 14, fontWeight: "600", marginBottom: 4 }}>
+                  ℹ️ Información
+                </Text>
+                <Text style={{ color: "white", fontSize: 12, lineHeight: 16 }}>
+                  Como maître, gestionas el flujo de clientes, asignas mesas y coordinas la experiencia del cliente desde su llegada.
+                </Text>
+              </View>
+            </View>
           ) : user?.position_code === "mozo" ? (
             <View>
+              {/* Card del usuario */}
+              <UserProfileCard 
+                user={user!} 
+                getProfileLabel={getProfileLabel} 
+              />
+              
               {/* Lista de mesas con items ready */}
               {readyItems.length > 0 && (
                 <View style={{
@@ -933,8 +1093,8 @@ export default function HomeScreen({ navigation, route }: Props) {
 
               {/* Otros accesos del mozo */}
               <ActionCard
-                title="📋 Ver pedidos pendientes"
-                description="Gestionar pedidos que esperan aprobación"
+                title="📋 Panel del Mesero"
+                description="Gestionar tus mesas asignadas (máximo 3)"
                 icon={Clock}
                 onPress={() => handleNavigate("WaiterDashboard")}
               />
@@ -957,6 +1117,212 @@ export default function HomeScreen({ navigation, route }: Props) {
                 </Text>
               </View>
             </View>
+          ) : user?.profile_code === "dueno" || user?.profile_code === "supervisor" ? (
+            <View>
+              {/* Card del usuario */}
+              <UserProfileCard 
+                user={user!} 
+                getProfileLabel={getProfileLabel} 
+              />
+
+              {/* Usuarios Pendientes */}
+              {loadingPendingUsers ? (
+                <View style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  borderRadius: 12,
+                  padding: 20,
+                  marginBottom: 16,
+                  alignItems: "center"
+                }}>
+                  <ActivityIndicator size="small" color="#d4af37" />
+                  <Text style={{ color: "#fff", marginTop: 8 }}>
+                    Cargando usuarios pendientes...
+                  </Text>
+                </View>
+              ) : pendingUsers.length > 0 ? (
+                <View style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 16
+                }}>
+                  <View style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 16
+                  }}>
+                    <Users size={20} color="#d4af37" />
+                    <Text style={{
+                      color: "#d4af37",
+                      fontSize: 16,
+                      fontWeight: "600",
+                      marginLeft: 8
+                    }}>
+                      Usuarios Pendientes ({pendingUsers.length})
+                    </Text>
+                  </View>
+                  
+                  {pendingUsers.map((pendingUser: any, index: number) => (
+                    <View key={pendingUser.id} style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      paddingVertical: 12,
+                      borderTopWidth: index > 0 ? 1 : 0,
+                      borderTopColor: "#333"
+                    }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ 
+                          color: "white", 
+                          fontSize: 15, 
+                          fontWeight: "600",
+                          marginBottom: 2
+                        }}>
+                          {pendingUser.first_name} {pendingUser.last_name}
+                        </Text>
+                        <Text style={{ 
+                          color: "#999", 
+                          fontSize: 12
+                        }}>
+                          {new Date(pendingUser.created_at).toLocaleDateString()}
+                        </Text>
+                      </View>
+                      
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <TouchableOpacity
+                          onPress={() => approveUser(pendingUser.id, `${pendingUser.first_name} ${pendingUser.last_name}`)}
+                          style={{
+                            backgroundColor: "#22c55e",
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 6
+                          }}
+                        >
+                          <Text style={{ 
+                            color: "white", 
+                            fontSize: 12, 
+                            fontWeight: "600" 
+                          }}>
+                            ✓ Aprobar
+                          </Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity
+                          onPress={() => {
+                            Alert.alert(
+                              "Rechazar Usuario",
+                              `¿Estás seguro de que quieres rechazar a ${pendingUser.first_name} ${pendingUser.last_name}?`,
+                              [
+                                { text: "Cancelar", style: "cancel" },
+                                { 
+                                  text: "Rechazar sin motivo", 
+                                  style: "destructive",
+                                  onPress: () => rejectUser(
+                                    pendingUser.id, 
+                                    `${pendingUser.first_name} ${pendingUser.last_name}`,
+                                    ""
+                                  )
+                                },
+                                { 
+                                  text: "Rechazar con motivo", 
+                                  style: "destructive",
+                                  onPress: () => rejectUser(
+                                    pendingUser.id, 
+                                    `${pendingUser.first_name} ${pendingUser.last_name}`,
+                                    "Información incompleta o incorrecta"
+                                  )
+                                }
+                              ]
+                            );
+                          }}
+                          style={{
+                            backgroundColor: "#ef4444",
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 6
+                          }}
+                        >
+                          <Text style={{ 
+                            color: "white", 
+                            fontSize: 12, 
+                            fontWeight: "600" 
+                          }}>
+                            ✕ Rechazar
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={{
+                  backgroundColor: "rgba(34, 197, 94, 0.1)",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 16,
+                  alignItems: "center"
+                }}>
+                  <CheckCircle size={24} color="#22c55e" />
+                  <Text style={{ 
+                    color: "#22c55e", 
+                    fontSize: 14, 
+                    fontWeight: "600", 
+                    marginTop: 8,
+                    textAlign: "center"
+                  }}>
+                    ✨ No hay usuarios pendientes
+                  </Text>
+                  <Text style={{ 
+                    color: "white", 
+                    fontSize: 12, 
+                    marginTop: 4,
+                    textAlign: "center",
+                    opacity: 0.8
+                  }}>
+                  </Text>
+                </View>
+              )}
+
+              {/* Cards de Acciones Principales */}
+              <ActionCard
+                title={user?.profile_code === "dueno" ? "👥 Añadir Personal" : "👤 Añadir Empleado"}
+                description={user?.profile_code === "dueno" ? "Crear empleados y supervisores" : "Crear nuevos empleados"}
+                icon={UserIcon}
+                onPress={() => handleNavigate("AddStaff", { userRole: user?.profile_code })}
+              />
+
+              <ActionCard
+                title="🪑 Crear Mesa"
+                description="Agregar nueva mesa al restaurante"
+                icon={QrCode}
+                onPress={() => handleNavigate("CreateTable")}
+              />
+
+              <ActionCard
+                title="👨‍💼 Gestión de Meseros"
+                description="Supervisar meseros y sus mesas asignadas"
+                icon={Users}
+                onPress={() => handleNavigate("AllWaiters")}
+              />
+
+              {/* Info adicional */}
+              <View style={{
+                backgroundColor: "rgba(212, 175, 55, 0.1)",
+                borderRadius: 12,
+                padding: 16,
+                marginTop: 16,
+                borderWidth: 1,
+                borderColor: "rgba(212, 175, 55, 0.3)",
+              }}>
+                <Text style={{ color: "#d4af37", fontSize: 14, fontWeight: "600", marginBottom: 4 }}>
+                  💼 Panel de Administración
+                </Text>
+                <Text style={{ color: "white", fontSize: 12, lineHeight: 16 }}>
+                  Desde aquí puedes gestionar todo el restaurante: aprobar usuarios, crear personal, 
+                  configurar mesas y supervisar el equipo de trabajo.
+                </Text>
+              </View>
+            </View>
           ) : (
             <View style={{ flex: 1 }} />
           )}
@@ -976,7 +1342,7 @@ export default function HomeScreen({ navigation, route }: Props) {
       {/* Cart Modal */}
       <CartModal
         visible={cartModalVisible}
-        onClose={() => setCartModalVisible(false)}
+        onClose={handleCloseCart}
       />
 
       {/* Modal del Menú */}
@@ -1099,34 +1465,21 @@ export default function HomeScreen({ navigation, route }: Props) {
         </View>
       </Modal>
 
-      {/* Botón flotante para escanear QR y ver estado de productos (solo para clientes) */}
-      {user && !user.position_code && (
-        <TouchableOpacity
-          onPress={navigateToQRScanner}
-          style={{
-            position: 'absolute',
-            bottom: 80, // Subimos de 30 a 80 para evitar los botones del sistema
-            right: 30,
-            backgroundColor: '#d4af37',
-            borderRadius: 30,
-            width: 60,
-            height: 60,
-            justifyContent: 'center',
-            alignItems: 'center',
-            elevation: 8,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.25,
-            shadowRadius: 3.84,
-          }}
-        >
-          <QrCode size={28} color="#1a1a1a" />
-        </TouchableOpacity>
+      {/* BottomNavbar para clientes */}
+      {isCliente && (
+        <BottomNavbar
+          onNavigateHome={handleBottomNavHome}
+          onNavigateMenu={handleBottomNavMenu}
+          onScanQR={handleBottomNavQR}
+          onOpenCart={handleBottomNavCart}
+          onOpenSidebar={handleBottomNavSidebar}
+          activeTab={activeTab}
+        />
       )}
 
       <CartModal
         visible={cartModalVisible}
-        onClose={() => setCartModalVisible(false)}
+        onClose={handleCloseCart}
       />
     </LinearGradient>
   );

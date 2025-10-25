@@ -49,6 +49,11 @@ export async function approveClient(req: Request, res: Response) {
 }
 // POST /api/admin/clients/:id/reject
 export async function rejectClient(req: Request, res: Response) {
+  console.log("🚀 [BACKEND] PETICIÓN DE RECHAZO RECIBIDA!");
+  console.log("🚀 [BACKEND] Method:", req.method);
+  console.log("🚀 [BACKEND] URL:", req.url);
+  console.log("🚀 [BACKEND] Headers:", req.headers);
+  
   try {
     console.log("🔄 Iniciando rechazo de cliente - Controller");
     console.log("📥 Request params:", req.params);

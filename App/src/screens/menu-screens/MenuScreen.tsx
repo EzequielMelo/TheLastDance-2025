@@ -13,10 +13,12 @@ import {
   Modal,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
+import ClientLayout from "../../components/layout/ClientLayout";
+import { useBottomNav } from "../../context/BottomNavContext";
 import {
   ChefHat,
   Coffee,
@@ -42,8 +44,8 @@ import FloatingCart from "../../components/cart/FloatingCart";
 import CartModal from "../../components/cart/CartModal";
 
 const { width, height } = Dimensions.get("window");
-// Altura disponible por producto (dejamos espacio para la barra superior)
-const ITEM_VISIBLE_HEIGHT = Math.max(height - 180, 400);
+// Altura disponible por producto (reducida para mejor separación)
+const ITEM_VISIBLE_HEIGHT = Math.max(height - 220, 380);
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type MenuScreenRouteProp = RouteProp<RootStackParamList, "Menu">;
@@ -73,6 +75,7 @@ interface MenuItem {
 export default function MenuScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<MenuScreenRouteProp>();
+  const { setActiveTab } = useBottomNav();
   const {
     cartCount,
     addItem,
@@ -81,6 +84,14 @@ export default function MenuScreen() {
     hasPendingOrder,
     refreshOrders,
   } = useCart();
+
+  // Efecto para actualizar el tab activo cuando se enfoque la pantalla
+  useFocusEffect(
+    React.useCallback(() => {
+      setActiveTab('menu');
+    }, [setActiveTab])
+  );
+
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -441,17 +452,24 @@ export default function MenuScreen() {
   }
 
   return (
-    <LinearGradient
-      colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
-      style={{ flex: 1 }}
+    <ClientLayout
+      onOpenCart={() => setCartModalVisible(true)}
+      onOpenSidebar={() => {
+        // Lógica para abrir sidebar si es necesario
+        console.log("Abrir sidebar desde MenuScreen");
+      }}
     >
-      {/* Header */}
-      <View
-        style={{
-          paddingTop: 30,
-          paddingHorizontal: 24,
-          paddingBottom: 26,
-        }}
+      <LinearGradient
+        colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
+        style={{ flex: 1 }}
+      >
+        {/* Header */}
+        <View
+          style={{
+            paddingTop: 30,
+            paddingHorizontal: 24,
+            paddingBottom: 26,
+          }}
       >
         <View
           style={{
@@ -622,18 +640,18 @@ export default function MenuScreen() {
             colors={["#d4af37"]}
           />
         }
-        // Reservamos siempre espacio para el carrito para evitar huecos feos.
-        contentContainerStyle={{ paddingBottom: 120 }}
+
         renderItem={({ item }) => {
           const CategoryIcon = getCategoryIcon(item.category);
           const categoryColor = getCategoryColor(item.category);
           const isRejected = wasItemRejected(item.id);
 
-          // Reservamos espacio inferior para el carrito flotante / footer (constante para consistencia)
-          const RESERVED_BOTTOM = 120;
+          // Calculamos un espacio fijo para evitar saltos visuales
+          const RESERVED_BOTTOM = 120; // Espacio fijo para carrito + navbar + padding
+          
           const innerCardHeight = Math.max(
-            ITEM_VISIBLE_HEIGHT - RESERVED_BOTTOM + 20,
-            300,
+            ITEM_VISIBLE_HEIGHT - RESERVED_BOTTOM - 40, // Restamos espacio consistente
+            280, // Altura mínima
           );
 
           return (
@@ -643,7 +661,7 @@ export default function MenuScreen() {
                 width: "100%",
                 justifyContent: "flex-start",
                 paddingHorizontal: 24,
-                paddingBottom: 24,
+                paddingBottom: 32, // Más separación entre cards
               }}
             >
               <View
@@ -1050,6 +1068,7 @@ export default function MenuScreen() {
           />
         </>
       )}
+      </LinearGradient>
 
       {/* Modal para modificaciones o CartModal normal */}
       {isModifyMode ? (
@@ -1456,6 +1475,6 @@ export default function MenuScreen() {
           onClose={() => setCartModalVisible(false)}
         />
       )}
-    </LinearGradient>
+    </ClientLayout>
   );
 }

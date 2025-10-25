@@ -50,7 +50,7 @@ export default function ActionCard({
         <View style={{ flex: 1 }}>
           <Text style={{ 
             color: isPrimary ? "#d4af37" : "white", 
-            fontSize: isPrimary ? 18 : 16, 
+            fontSize: isPrimary ? 20 : 18, // Aumentado de 18:16 a 20:18
             fontWeight: isPrimary ? "700" : "600", 
             marginBottom: isPrimary ? 4 : 2 
           }}>
@@ -58,8 +58,8 @@ export default function ActionCard({
           </Text>
           <Text style={{ 
             color: isPrimary ? "white" : "#9ca3af", 
-            fontSize: isPrimary ? 14 : 12, 
-            lineHeight: isPrimary ? 20 : 16 
+            fontSize: isPrimary ? 16 : 14, // Aumentado de 14:12 a 16:14
+            lineHeight: isPrimary ? 22 : 20 // Aumentado proporcionalmente
           }}>
             {description}
           </Text>

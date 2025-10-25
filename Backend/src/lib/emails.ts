@@ -23,21 +23,25 @@ export async function sendApprovedEmail(to: string, name: string) {
 }
 
 export async function sendRejectedEmail(to: string, name: string, reason?: string) {
+  console.log("🔄 [DEBUG] sendRejectedEmail iniciado con:", { to, name, reason });
+  
+  const subject = "Estado de tu registro - The Last Dance";
+  console.log("🔄 [DEBUG] Subject generado:", subject);
+  
+  const html = tplRejected(name || "Cliente", reason);
+  console.log("🔄 [DEBUG] HTML template generado, longitud:", html.length);
+  
+  const text = htmlToText(html);
+  console.log("🔄 [DEBUG] Text generado, longitud:", text.length);
+  
+  console.log("🔄 [DEBUG] Llamando sendMail con parámetros:", { to, subject });
+  
   try {
-    console.log("📧 Iniciando sendRejectedEmail:", { to, name, reason });
-    
-    const subject = "Tu registro fue rechazado";
-    const html = tplRejected(name || "Cliente", reason);
-    const text = htmlToText(html);
-    
-    console.log("📧 Template generado, enviando email...");
     const result = await sendMail({ to, subject, html, text });
-    
-    console.log("✅ sendRejectedEmail completado exitosamente");
+    console.log("✅ [DEBUG] sendMail completado exitosamente:", result);
     return result;
-    
   } catch (error) {
-    console.error("❌ Error en sendRejectedEmail:", error);
+    console.error("❌ [DEBUG] sendMail falló:", error);
     throw error;
   }
 }

@@ -6,39 +6,65 @@ const grayText = "#9ca3af";
 const logoUrl = process.env['BRAND_LOGO_URL'] || "https://eahhbvsassnukebtvate.supabase.co/storage/v1/object/public/Icon/icono.png";
 
 const wrapper = (title: string, body: string) => `
-  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;background:linear-gradient(135deg, ${darkBg} 0%, ${brownBg} 50%, ${darkBg} 100%);min-height:100vh;padding:40px 20px">
-    <table align="center" width="100%" style="max-width:600px;background:${darkBg};border-radius:20px;padding:40px;box-shadow:0 20px 40px rgba(0,0,0,0.5);border:1px solid rgba(212,175,55,0.2)">
-      
+  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;
+              background:linear-gradient(135deg, ${darkBg} 0%, ${brownBg} 50%, ${darkBg} 100%);
+              min-height:100vh;
+              padding:40px 20px;
+              box-sizing:border-box;">
+    
+    <table align="center" width="100%" style="
+      max-width:600px;
+      background:${darkBg};
+      border-radius:20px;
+      padding:40px;
+      box-shadow:0 20px 40px rgba(0,0,0,0.5);
+      border:1px solid rgba(212,175,55,0.2);
+      box-sizing:border-box;
+    ">
+
+      <!-- Espacio superior interno -->
+      <tr><td style="height:10px"></td></tr>
+
       <!-- Logo y Header -->
       <tr>
         <td style="text-align:center;padding-bottom:32px">
           <img src="${logoUrl}" alt="Last Dance Logo" style="width:80px;height:80px;border-radius:16px;box-shadow:0 8px 16px rgba(212,175,55,0.3)"/>
         </td>
       </tr>
-      
-      <!-- Título con gradiente dorado -->
+
+      <!-- Título -->
       <tr>
         <td style="text-align:center;padding-bottom:24px">
-          <div style="background:linear-gradient(90deg, ${brandColor} 0%, #b8941f 50%, ${brandColor} 100%);color:${darkBg};border-radius:12px;padding:16px 24px;font-size:20px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase">
+          <div style="background:linear-gradient(90deg, ${brandColor} 0%, #b8941f 50%, ${brandColor} 100%);
+                      color:${darkBg};
+                      border-radius:12px;
+                      padding:20px 28px;
+                      font-size:20px;
+                      font-weight:700;
+                      letter-spacing:0.5px;
+                      text-transform:uppercase;">
             ${title}
           </div>
         </td>
       </tr>
-      
-      <!-- Contenido -->
+
+      <!-- Contenido con padding adicional -->
       <tr>
-        <td style="padding:24px 0;color:${textColor};font-size:16px;line-height:1.7;text-align:left">
+        <td style="padding:20px 8px;color:${textColor};font-size:16px;line-height:1.7;text-align:left">
           ${body}
         </td>
       </tr>
-      
-      <!-- Separador decorativo -->
+
+      <!-- Separador -->
       <tr>
-        <td style="padding:20px 0;text-align:center">
-          <div style="height:2px;background:linear-gradient(90deg, transparent 0%, ${brandColor} 50%, transparent 100%);width:60%;margin:0 auto;border-radius:1px"></div>
+        <td style="padding:24px 0;text-align:center">
+          <div style="height:2px;background:linear-gradient(90deg, transparent 0%, ${brandColor} 50%, transparent 100%);
+                      width:60%;
+                      margin:0 auto;
+                      border-radius:1px;"></div>
         </td>
       </tr>
-      
+
       <!-- Footer -->
       <tr>
         <td style="padding-top:24px;text-align:center;color:${grayText};font-size:14px">
@@ -50,7 +76,10 @@ const wrapper = (title: string, body: string) => `
           </div>
         </td>
       </tr>
-      
+
+      <!-- Espacio inferior interno -->
+      <tr><td style="height:10px"></td></tr>
+
     </table>
   </div>
 `;
@@ -63,7 +92,7 @@ export const tplPending = (name: string) =>
       <div style="font-size:18px;margin-bottom:8px">¡Hola <strong style="color:${brandColor}">${name}</strong>!</div>
     </div>
     
-    <p style="margin-bottom:20px">
+    <p style="color:${textColor};margin-bottom:20px">
       Tu cuenta ha sido creada exitosamente y está <strong style="color:${brandColor};background:rgba(212,175,55,0.1);padding:2px 8px;border-radius:4px">pendiente de aprobación</strong>.
     </p>
     
@@ -86,11 +115,11 @@ export const tplApproved = (name: string) =>
       <div style="font-size:18px;margin-bottom:8px">¡Excelentes noticias, <strong style="color:${brandColor}">${name}</strong>!</div>
     </div>
     
-    <p style="margin-bottom:20px">
+    <p style="color:${textColor};margin-bottom:20px">
       Tu cuenta ha sido <strong style="color:${brandColor};background:rgba(212,175,55,0.1);padding:2px 8px;border-radius:4px">✅ APROBADA</strong> exitosamente.
     </p>
     
-    <p style="margin-bottom:24px">
+    <p style="color:${textColor};margin-bottom:24px">
       Ya podés iniciar sesión en la aplicación y disfrutar de toda la experiencia que Last Dance tiene para ofrecerte.
     </p>
     
@@ -110,12 +139,12 @@ export const tplRejected = (name: string, reason?: string) =>
   wrapper(
     "Actualización de tu registro",
     `
-    <div style="text-align:center;margin-bottom:24px">
+    <div style="color:${textColor};text-align:center;margin-bottom:24px">
       <div style="font-size:18px;margin-bottom:8px">Hola <strong style="color:${brandColor}">${name}</strong>,</div>
     </div>
     
-    <p style="margin-bottom:20px">
-      Lamentablemente, tu solicitud de registro no pudo ser <strong style="color:#ef4444;background:rgba(239,68,68,0.1);padding:2px 8px;border-radius:4px">❌ procesada</strong> en esta oportunidad.
+    <p style="color:${textColor};margin-bottom:20px">
+      Lamentablemente, tu solicitud de registro fue <strong style="color:#ef4444;background:rgba(239,68,68,0.1);padding:2px 8px;border-radius:4px;">❌ rechazada</strong> en esta oportunidad.
     </p>
     
     ${reason ? `
@@ -125,7 +154,7 @@ export const tplRejected = (name: string, reason?: string) =>
     </div>
     ` : ""}
     
-    <p style="margin-bottom:24px">
+    <p style="color:${textColor};margin-bottom:24px">
       Si creés que se trata de un error o deseas intentarlo nuevamente, podés volver a registrarte más adelante.
     </p>
     

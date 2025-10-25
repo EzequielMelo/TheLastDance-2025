@@ -459,19 +459,19 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
             <Text style={{ fontSize: 24, fontWeight: "700", color: "#d4af37" }}>
               {stats.accepted}
             </Text>
-            <Text style={{ fontSize: 12, color: "#999" }}>Pendientes</Text>
+            <Text style={{ fontSize: 14, color: "#999" }}>Pendientes</Text>
           </View>
           <View style={{ alignItems: "center" }}>
             <Text style={{ fontSize: 24, fontWeight: "700", color: "#3b82f6" }}>
               {stats.preparing}
             </Text>
-            <Text style={{ fontSize: 12, color: "#999" }}>Preparando</Text>
+            <Text style={{ fontSize: 14, color: "#999" }}>Preparando</Text>
           </View>
           <View style={{ alignItems: "center" }}>
-            <Text style={{ fontSize: 24, fontWeight: "700", color: "#10b981" }}>
+            <Text style={{ fontSize: 24, fontWeight: "700", color: "#22c55e" }}>
               {stats.ready}
             </Text>
-            <Text style={{ fontSize: 12, color: "#999" }}>Listos</Text>
+            <Text style={{ fontSize: 14, color: "#999" }}>Listos</Text>
           </View>
         </View>
       </View>

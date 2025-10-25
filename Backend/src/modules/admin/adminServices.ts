@@ -140,26 +140,12 @@ export async function sendClientRejectionEmail(
   firstName: string,
   reason: string = "",
 ): Promise<void> {
-  try {
-    console.log("🔄 Iniciando sendClientRejectionEmail:", { id, firstName, reason });
-    
-    console.log("🔄 Obteniendo email de Supabase Auth...");
-    const email = await getAuthEmailById(id);
-    if (!email) {
-      console.error("❌ Email no encontrado en Auth para ID:", id);
-      throw new Error("Email no encontrado en Auth");
-    }
-    
-    console.log("📧 Email obtenido:", email);
-    console.log("🔄 Enviando email de rechazo...");
-    
-    await sendRejectedEmail(email, firstName, reason);
-    console.log("✅ Email de rechazo enviado exitosamente");
-    
-  } catch (error) {
-    console.error("❌ Error en sendClientRejectionEmail:", error);
-    throw error;
+  const email = await getAuthEmailById(id);
+  if (!email) {
+    throw new Error("Email no encontrado en Auth");
   }
+
+  await sendRejectedEmail(email, firstName, reason);
 }
 
 // Servicio completo para aprobar cliente (actualizar estado + enviar email + push notification)

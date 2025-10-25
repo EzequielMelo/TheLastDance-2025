@@ -232,15 +232,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
       positions: ["mozo"],
     },
 
-    // Gestión usuarios (Dueño/Supervisor)
-    {
-      id: "manage-users",
-      title: "Gestionar Usuarios Pendientes",
-      subtitle: "Administrá usuarios y solicitudes pendientes",
-      icon: <Image source={IMGS.user_pending} style={{ width: 20, height: 20 }} />,
-      onPress: () => onNavigate("Clients"),
-      roles: ["dueno", "supervisor"],
-    },
+    // Gestión de Meseros (Dueño/Supervisor) - Solo esta opción, no la de usuarios pendientes
     {
       id: "manage-waiters",
       title: "Gestión de Meseros",
@@ -501,10 +493,10 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
           {statusInfo.icon}
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ color: "white", fontSize: 14, fontWeight: "600" }}>
+          <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
             {statusInfo.title}
           </Text>
-          <Text style={{ color: "#9ca3af", fontSize: 12, marginTop: 2 }}>
+          <Text style={{ color: "#9ca3af", fontSize: 14, marginTop: 2 }}>
             {statusInfo.subtitle}
           </Text>
         </View>
@@ -556,7 +548,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
               }}
             >
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                <Text style={{ color: "white", fontSize: 20, fontWeight: "600" }}>
+                <Text style={{ color: "white", fontSize: 22, fontWeight: "600" }}>
                   Menú
                 </Text>
                 <TouchableOpacity
@@ -629,7 +621,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
 
                     {/* User Info */}
                     <View style={{ marginLeft: 12, flex: 1 }}>
-                      <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
+                      <Text style={{ color: "white", fontSize: 18, fontWeight: "600" }}>
                         {user.first_name} {user.last_name}
                       </Text>
                       <View
@@ -642,12 +634,12 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
                           alignSelf: "flex-start",
                         }}
                       >
-                        <Text style={{ color: "white", fontSize: 10, fontWeight: "500" }}>
+                        <Text style={{ color: "white", fontSize: 12, fontWeight: "500" }}>
                           {getProfileLabel(user.profile_code, user.position_code || undefined)}
                         </Text>
                       </View>
                       {user.email && (
-                        <Text style={{ color: "#9ca3af", fontSize: 12, marginTop: 4 }}>
+                        <Text style={{ color: "#9ca3af", fontSize: 14, marginTop: 4 }}>
                           {user.email}
                         </Text>
                       )}
@@ -662,7 +654,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
               <View style={{ marginBottom: 20 }}>
                 <Text style={{
                   color: "#9ca3af",
-                  fontSize: 14,
+                  fontSize: 16,
                   fontWeight: "600",
                   marginBottom: 12,
                   textTransform: "uppercase",
@@ -687,7 +679,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
             <ScrollView style={{ flex: 1, paddingHorizontal: 20 }}>
               <Text style={{
                 color: "#9ca3af",
-                fontSize: 14,
+                fontSize: 16,
                 fontWeight: "600",
                 marginBottom: 12,
                 textTransform: "uppercase",
@@ -725,10 +717,10 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
                       {action.icon}
                     </View>
                     <View style={{ marginLeft: 12, flex: 1 }}>
-                      <Text style={{ color: "white", fontSize: 14, fontWeight: "600" }}>
+                      <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
                         {action.title}
                       </Text>
-                      <Text style={{ color: "#9ca3af", fontSize: 12, marginTop: 2 }}>
+                      <Text style={{ color: "#9ca3af", fontSize: 14, marginTop: 2 }}>
                         {action.subtitle}
                       </Text>
                     </View>
@@ -765,7 +757,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
                 }}
               >
                 <LogOut size={18} color="#ef4444" />
-                <Text style={{ color: "#ef4444", marginLeft: 8, fontWeight: "600" }}>
+                <Text style={{ color: "#ef4444", marginLeft: 8, fontWeight: "600", fontSize: 16 }}>
                   Cerrar sesión
                 </Text>
               </TouchableOpacity>

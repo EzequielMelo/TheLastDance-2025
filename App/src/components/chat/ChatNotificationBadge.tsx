@@ -70,12 +70,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   textSmall: {
-    fontSize: 10,
+    fontSize: 12, // Aumentado de 10 a 12
   },
   textMedium: {
-    fontSize: 12,
+    fontSize: 14, // Aumentado de 12 a 14
   },
   textLarge: {
-    fontSize: 14,
+    fontSize: 16, // Aumentado de 14 a 16
   },
 });

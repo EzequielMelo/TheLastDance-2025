@@ -24,6 +24,7 @@ import MenuScreen from "../screens/menu-screens/MenuScreen";
 import GamesScreen from "../screens/games/GamesScreen";
 import SurveyScreen from "../screens/SurveyScreen";
 import { CartProvider } from "../context/CartContext";
+import { BottomNavProvider } from "../context/BottomNavContext";
 import WaiterDashboardScreen from "../screens/waiter-screens/WaiterDashboardScreen";
 import AllWaitersScreen from "../screens/admin-screens/AllWaitersScreen";
 import TableChatScreen from "../screens/chat/TableChatScreen";
@@ -227,7 +228,9 @@ export default function RootNavigator() {
   return (
     <NavigationContainer>
       <CartProvider>
-        <NavigatorContent />
+        <BottomNavProvider>
+          <NavigatorContent />
+        </BottomNavProvider>
       </CartProvider>
     </NavigationContainer>
   );

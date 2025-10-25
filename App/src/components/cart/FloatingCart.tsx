@@ -27,7 +27,7 @@ export default function FloatingCart({ onPress }: FloatingCartProps) {
       disabled={hasPendingOrder}
       style={{
         position: "absolute",
-        bottom: 20,
+        bottom: 5,
         left: 20,
         right: 20,
         backgroundColor: isEmpty ? "rgba(212,175,55,0.12)" : "#d4af37",
