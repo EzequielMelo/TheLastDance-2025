@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,10 @@ import {
   Alert,
   ToastAndroid,
   Modal,
+  Image,
+  Animated,
+  PanResponder,
+  Dimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
@@ -51,11 +55,13 @@ export default function ManageWaitingListScreen() {
     null,
   );
   const [assigningTable, setAssigningTable] = useState(false);
+  const [scrollOffset, setScrollOffset] = useState(0);
   const [freeingTable, setFreeingTable] = useState<string | null>(null);
   const [averageWaitTime, setAverageWaitTime] = useState<number | undefined>();
   const [totalWaiting, setTotalWaiting] = useState(0);
   const [occupiedCount, setOccupiedCount] = useState(0);
   const [availableCount, setAvailableCount] = useState(0);
+  const [showTablesModal, setShowTablesModal] = useState(false);
 
   // Verificar permisos
   const canManage =
@@ -100,6 +106,102 @@ export default function ManageWaitingListScreen() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Animated pan responder para permitir arrastrar el modal hacia abajo y cerrarlo
+  const pan = useRef(new Animated.Value(0)).current;
+  const screenHeight = Dimensions.get("window").height;
+  const [isPanning, setIsPanning] = useState(false);
+  const panValue = useRef(0);
+
+  // Mantener un listener para conocer el valor actual de `pan` desde JS
+  useEffect(() => {
+    const id = pan.addListener(({ value }) => {
+      panValue.current = value;
+    });
+    return () => {
+      pan.removeListener(id);
+    };
+  }, [pan]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        const { dy, dx } = gestureState;
+        // Solo activar si:
+        // 1. El movimiento es principalmente vertical (más dy que dx)
+        // 2. El movimiento es hacia abajo (dy > 0)
+        // 3. El ScrollView está en el tope (scrollOffset <= 0)
+        // 4. Supera un umbral mínimo
+        const isVertical = Math.abs(dy) > Math.abs(dx);
+        const isDownward = dy > 3;
+        const isScrollAtTop = scrollOffset <= 0;
+
+        return isVertical && isDownward && isScrollAtTop;
+      },
+      onPanResponderGrant: () => {
+        pan.stopAnimation();
+        const current = panValue.current || 0;
+        pan.setOffset(current);
+        pan.setValue(0);
+        setIsPanning(true);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const { dy } = gestureState;
+        if (dy > 0) {
+          const clamped = Math.max(0, Math.min(dy, screenHeight));
+          pan.setValue(clamped);
+        } else {
+          pan.setValue(0);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const { dy, vy } = gestureState;
+        const shouldClose = dy > 120 || vy > 0.8;
+
+        pan.flattenOffset();
+
+        if (shouldClose) {
+          Animated.timing(pan, {
+            toValue: screenHeight,
+            duration: 180,
+            useNativeDriver: true,
+          }).start(() => {
+            pan.setValue(0);
+            pan.setOffset(0);
+            setShowAssignModal(false);
+            setSelectedClient(null);
+            setIsPanning(false);
+          });
+        } else {
+          Animated.spring(pan, {
+            toValue: 0,
+            friction: 8,
+            useNativeDriver: true,
+          }).start(() => {
+            pan.setValue(0);
+            pan.setOffset(0);
+            setIsPanning(false);
+          });
+        }
+      },
+    }),
+  ).current;
+
+  // Resetear la animación cuando se abra/cierre el modal
+  useEffect(() => {
+    pan.setValue(0);
+    pan.setOffset(0);
+  }, [showAssignModal]);
+
+  // translateY derivado de pan pero clampado entre 0 y screenHeight
+  const translateY = pan.interpolate
+    ? pan.interpolate({
+        inputRange: [0, screenHeight],
+        outputRange: [0, screenHeight],
+        extrapolate: "clamp",
+      })
+    : pan;
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -251,6 +353,245 @@ export default function ManageWaitingListScreen() {
   );
   const occupiedTables = tables.filter(table => table.is_occupied);
 
+  function TablesStatusModal({
+    visible,
+    onClose,
+    tables,
+    onFreeTable,
+    freeingTable,
+  }: {
+    visible: boolean;
+    onClose: () => void;
+    tables: TableStatus[];
+    onFreeTable: (tableId: string) => void;
+    freeingTable: string | null;
+  }) {
+    const pan = useRef(new Animated.Value(0)).current;
+    const screenHeight = Dimensions.get("window").height;
+    const [isPanning, setIsPanning] = useState(false);
+    const [scrollOffset, setScrollOffset] = useState(0);
+    const panValue = useRef(0);
+
+    useEffect(() => {
+      const id = pan.addListener(({ value }) => {
+        panValue.current = value;
+      });
+      return () => {
+        pan.removeListener(id);
+      };
+    }, [pan]);
+
+    const panResponder = useRef(
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          const { dy, dx } = gestureState;
+          const isVertical = Math.abs(dy) > Math.abs(dx);
+          const isDownward = dy > 3;
+          const isScrollAtTop = scrollOffset <= 0;
+
+          return isVertical && isDownward && isScrollAtTop;
+        },
+        onPanResponderGrant: () => {
+          pan.stopAnimation();
+          const current = panValue.current || 0;
+          pan.setOffset(current);
+          pan.setValue(0);
+          setIsPanning(true);
+        },
+        onPanResponderMove: (_, gestureState) => {
+          const { dy } = gestureState;
+          if (dy > 0) {
+            const clamped = Math.max(0, Math.min(dy, screenHeight));
+            pan.setValue(clamped);
+          } else {
+            pan.setValue(0);
+          }
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          const { dy, vy } = gestureState;
+          const shouldClose = dy > 120 || vy > 0.8;
+
+          pan.flattenOffset();
+
+          if (shouldClose) {
+            Animated.timing(pan, {
+              toValue: screenHeight,
+              duration: 180,
+              useNativeDriver: true,
+            }).start(() => {
+              pan.setValue(0);
+              pan.setOffset(0);
+              onClose();
+              setIsPanning(false);
+            });
+          } else {
+            Animated.spring(pan, {
+              toValue: 0,
+              friction: 8,
+              useNativeDriver: true,
+            }).start(() => {
+              pan.setValue(0);
+              pan.setOffset(0);
+              setIsPanning(false);
+            });
+          }
+        },
+      }),
+    ).current;
+
+    useEffect(() => {
+      pan.setValue(0);
+      pan.setOffset(0);
+    }, [visible]);
+
+    const translateY = pan.interpolate
+      ? pan.interpolate({
+          inputRange: [0, screenHeight],
+          outputRange: [0, screenHeight],
+          extrapolate: "clamp",
+        })
+      : pan;
+
+    const availableTables = tables.filter(
+      table => !table.is_occupied && !table.client,
+    );
+    const assignedTables = tables.filter(
+      table => !table.is_occupied && table.client,
+    );
+    const occupiedTables = tables.filter(table => table.is_occupied);
+
+    return (
+      <Modal
+        visible={visible}
+        transparent={false}
+        animationType="none"
+        onRequestClose={onClose}
+      >
+        <Animated.View
+          className="flex-1 bg-[#1a1a1a]"
+          style={{
+            transform: [{ translateY: translateY }],
+          }}
+        >
+          {/* Header draggable */}
+          <View
+            {...panResponder.panHandlers}
+            className="bg-[#1a1a1a] px-6 pt-12 pb-4"
+          >
+            {/* Indicador de arrastre */}
+            <View className="items-center mb-4">
+              <View className="w-12 h-1.5 rounded-full bg-gray-600" />
+            </View>
+
+            <View className="flex-row items-center justify-between mb-4">
+              <View className="flex-row items-center">
+                <TableIcon size={24} color="#d4af37" />
+                <Text className="text-white text-xl font-semibold ml-2">
+                  Estado de Mesas
+                </Text>
+              </View>
+              <TouchableOpacity onPress={onClose}>
+                <XCircle size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Estadísticas rápidas */}
+            <View className="flex-row gap-2 mb-4">
+              <View className="flex-1 bg-green-500/20 rounded-xl p-3 border border-green-500/30">
+                <Text className="text-green-400 text-2xl font-bold">
+                  {availableTables.length}
+                </Text>
+                <Text className="text-green-400 text-xs">Disponibles</Text>
+              </View>
+              <View className="flex-1 bg-yellow-500/20 rounded-xl p-3 border border-yellow-500/30">
+                <Text className="text-yellow-400 text-2xl font-bold">
+                  {assignedTables.length}
+                </Text>
+                <Text className="text-yellow-400 text-xs">Asignadas</Text>
+              </View>
+              <View className="flex-1 bg-red-500/20 rounded-xl p-3 border border-red-500/30">
+                <Text className="text-red-400 text-2xl font-bold">
+                  {occupiedTables.length}
+                </Text>
+                <Text className="text-red-400 text-xs">Ocupadas</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* ScrollView - contenido */}
+          <ScrollView
+            className="flex-1 px-6"
+            scrollEnabled={!isPanning}
+            onScroll={e => setScrollOffset(e.nativeEvent.contentOffset.y)}
+            scrollEventThrottle={16}
+            showsVerticalScrollIndicator={true}
+          >
+            {/* Mesas Ocupadas */}
+            {occupiedTables.length > 0 && (
+              <View className="mb-6">
+                <Text className="text-white text-base font-semibold mb-3">
+                  Mesas Ocupadas ({occupiedTables.length})
+                </Text>
+                <View className="flex-row flex-wrap gap-1">
+                  {occupiedTables.map(table => (
+                    <TableCard
+                      key={table.id}
+                      table={table}
+                      onFree={() => onFreeTable(table.id)}
+                      isFreeing={freeingTable === table.id}
+                    />
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Mesas Asignadas */}
+            {assignedTables.length > 0 && (
+              <View className="mb-6">
+                <Text className="text-white text-base font-semibold mb-3">
+                  Mesas Asignadas ({assignedTables.length})
+                </Text>
+                <View className="flex-row flex-wrap gap-1">
+                  {assignedTables.map(table => (
+                    <TableCard
+                      key={table.id}
+                      table={table}
+                      onFree={() => onFreeTable(table.id)}
+                      isFreeing={freeingTable === table.id}
+                    />
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Mesas Disponibles */}
+            {availableTables.length > 0 && (
+              <View className="mb-6">
+                <Text className="text-white text-base font-semibold mb-3">
+                  Mesas Disponibles ({availableTables.length})
+                </Text>
+                <View className="flex-row flex-wrap gap-1">
+                  {availableTables.map(table => (
+                    <TableCard
+                      key={table.id}
+                      table={table}
+                      onFree={() => onFreeTable(table.id)}
+                      isFreeing={freeingTable === table.id}
+                    />
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Espaciado al final */}
+            <View className="h-8" />
+          </ScrollView>
+        </Animated.View>
+      </Modal>
+    );
+  }
+
   return (
     <LinearGradient
       colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
@@ -300,6 +641,26 @@ export default function ManageWaitingListScreen() {
           </View>
         )}
 
+        <TouchableOpacity
+          onPress={() => setShowTablesModal(true)}
+          className="bg-[#d4af37] rounded-xl p-4 mb-6 flex-row items-center justify-between"
+        >
+          <View className="flex-row items-center">
+            <TableIcon size={20} color="#1a1a1a" />
+            <Text className="text-black text-base font-semibold ml-2">
+              Ver Estado de Mesas
+            </Text>
+          </View>
+          <View className="flex-row items-center">
+            <View className="bg-black/10 rounded-full px-2 py-1 mr-2">
+              <Text className="text-black text-xs font-bold">
+                {tables.length}
+              </Text>
+            </View>
+            <ArrowRight size={20} color="#1a1a1a" />
+          </View>
+        </TouchableOpacity>
+
         {/* VIP Clients Section */}
         {vipClients.length > 0 && (
           <Section
@@ -340,24 +701,6 @@ export default function ManageWaitingListScreen() {
             </View>
           )}
         </Section>
-
-        {/* Tables Status Section */}
-        <Section
-          title="Estado de Mesas"
-          icon={<TableIcon size={20} color="#d4af37" />}
-        >
-          <View className="flex-row flex-wrap gap-2">
-            {tables.map(table => (
-              <TableCard
-                key={table.id}
-                table={table}
-                onFree={() => handleFreeTable(table.id)}
-                isFreeing={freeingTable === table.id}
-              />
-            ))}
-          </View>
-        </Section>
-
         <View className="h-8" />
       </ScrollView>
 
@@ -376,15 +719,38 @@ export default function ManageWaitingListScreen() {
         <QrCode size={24} color="#1a1a1a" />
       </TouchableOpacity>
 
+      {/* Modal de Estado de Mesas */}
+      <TablesStatusModal
+        visible={showTablesModal}
+        onClose={() => setShowTablesModal(false)}
+        tables={tables}
+        onFreeTable={handleFreeTable}
+        freeingTable={freeingTable}
+      />
+
       {/* Assign Table Modal */}
       <Modal
         visible={showAssignModal}
         transparent={true}
-        animationType="slide"
+        animationType="none"
         onRequestClose={() => setShowAssignModal(false)}
       >
-        <View className="flex-1 bg-black/70 justify-end">
-          <View className="bg-[#1a1a1a] rounded-t-3xl p-6 max-h-[70%]">
+        <Animated.View
+          className="flex-1 bg-[#1a1a1a]"
+          style={{
+            transform: [{ translateY: translateY }],
+          }}
+        >
+          {/* Header draggable */}
+          <View
+            {...panResponder.panHandlers}
+            className="bg-[#1a1a1a] px-6 pt-12 pb-4"
+          >
+            {/* Indicador de arrastre (handle) */}
+            <View className="items-center mb-4">
+              <View className="w-12 h-1.5 rounded-full bg-gray-600" />
+            </View>
+
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-white text-xl font-semibold">
                 Asignar Mesa
@@ -396,69 +762,119 @@ export default function ManageWaitingListScreen() {
 
             {selectedClient && (
               <View className="bg-white/5 rounded-xl p-4 mb-4">
-                <Text className="text-white font-medium">
-                  {selectedClient.users.first_name}{" "}
-                  {selectedClient.users.last_name}
-                </Text>
-                <Text className="text-gray-400">
-                  {selectedClient.party_size} personas •{" "}
-                  {selectedClient.preferred_table_type || "Sin preferencia"}
-                </Text>
+                <View className="flex-row items-center">
+                  {selectedClient.users.profile_image ? (
+                    <Image
+                      source={{ uri: selectedClient.users.profile_image }}
+                      className="w-12 h-12 rounded-full mr-3"
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 24,
+                        marginRight: 12,
+                      }}
+                    />
+                  ) : (
+                    <View
+                      className="w-12 h-12 rounded-full mr-3 bg-gray-700 items-center justify-center"
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 24,
+                        marginRight: 12,
+                      }}
+                    >
+                      <Text className="text-white font-bold">
+                        {`${(selectedClient.users.first_name || "").charAt(0)}${(selectedClient.users.last_name || "").charAt(0)}`.toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+
+                  <View className="flex-1">
+                    <Text
+                      className="text-white font-medium"
+                      style={{ fontSize: 16 }}
+                    >
+                      {selectedClient.users.first_name}{" "}
+                      {selectedClient.users.last_name}
+                    </Text>
+                    <Text className="text-gray-400" style={{ marginTop: 2 }}>
+                      {selectedClient.party_size} personas •{" "}
+                      {selectedClient.preferred_table_type || "Sin preferencia"}
+                    </Text>
+                  </View>
+                </View>
+
                 {selectedClient.special_requests && (
-                  <Text className="text-gray-400 italic mt-1">
+                  <Text className="text-gray-400 italic mt-3">
                     "{selectedClient.special_requests}"
                   </Text>
                 )}
               </View>
             )}
 
-            <Text className="text-white mb-3">Mesas Disponibles:</Text>
-            <ScrollView className="max-h-80">
-              {availableTables.length > 0 ? (
-                availableTables
-                  .filter(
-                    table =>
-                      !selectedClient ||
-                      table.capacity >= selectedClient.party_size,
-                  )
-                  .map(table => (
-                    <TouchableOpacity
-                      key={table.id}
-                      onPress={() => confirmAssignTable(table.id)}
-                      disabled={assigningTable}
-                      className={`bg-white/10 rounded-xl p-4 mb-2 flex-row items-center justify-between ${
-                        assigningTable ? "opacity-50" : ""
-                      }`}
-                    >
-                      <View>
-                        <Text className="text-white font-medium">
-                          Mesa {table.number}
-                        </Text>
-                        <Text className="text-gray-400">
-                          {table.capacity} personas • {table.type}
-                        </Text>
-                      </View>
-                      <ArrowRight size={20} color="#d4af37" />
-                    </TouchableOpacity>
-                  ))
-              ) : (
-                <View className="py-8 items-center">
-                  <AlertCircle size={32} color="#6b7280" />
-                  <Text className="text-gray-400 text-center mt-2">
-                    No hay mesas disponibles
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
+            <Text className="text-white text-base font-medium">
+              Mesas Disponibles:
+            </Text>
+          </View>
 
-            {assigningTable && (
-              <View className="items-center mt-4">
-                <RefreshCw size={20} color="#d4af37" />
-                <Text className="text-gray-400 mt-2">Asignando mesa...</Text>
+          {/* ScrollView - resto del contenido */}
+          <ScrollView
+            className="flex-1 px-6"
+            scrollEnabled={!isPanning}
+            onScroll={e => setScrollOffset(e.nativeEvent.contentOffset.y)}
+            scrollEventThrottle={16}
+            showsVerticalScrollIndicator={true}
+          >
+            {availableTables.length > 0 ? (
+              availableTables
+                .filter(
+                  table =>
+                    !selectedClient ||
+                    table.capacity >= selectedClient.party_size,
+                )
+                .map(table => (
+                  <TouchableOpacity
+                    key={table.id}
+                    onPress={() => confirmAssignTable(table.id)}
+                    disabled={assigningTable}
+                    className={`bg-white/10 rounded-xl p-4 mb-3 flex-row items-center justify-between ${
+                      assigningTable ? "opacity-50" : ""
+                    }`}
+                  >
+                    <View>
+                      <Text className="text-white font-medium text-base">
+                        Mesa {table.number}
+                      </Text>
+                      <Text className="text-gray-400 text-sm">
+                        {table.capacity} personas • {table.type}
+                      </Text>
+                    </View>
+                    <ArrowRight size={20} color="#d4af37" />
+                  </TouchableOpacity>
+                ))
+            ) : (
+              <View className="py-12 items-center">
+                <AlertCircle size={40} color="#6b7280" />
+                <Text className="text-gray-400 text-center mt-3 text-base">
+                  No hay mesas disponibles
+                </Text>
               </View>
             )}
-          </View>
-        </View>
+
+            {/* Espaciado al final */}
+            <View className="h-8" />
+          </ScrollView>
+
+          {assigningTable && (
+            <View className="items-center py-6 bg-[#1a1a1a]">
+              <RefreshCw size={24} color="#d4af37" />
+              <Text className="text-gray-400 mt-2 text-base">
+                Asignando mesa...
+              </Text>
+            </View>
+          )}
+        </Animated.View>
       </Modal>
     </LinearGradient>
   );
@@ -528,53 +944,92 @@ function ClientCard({
       className={`rounded-xl p-4 mb-3 ${isVip ? "bg-yellow-500/10 border border-yellow-500/30" : "bg-white/5"}`}
     >
       <View className="flex-row items-start justify-between">
-        <View className="flex-1">
-          <View className="flex-row items-center">
-            {isVip && <Crown size={16} color="#d4af37" />}
-            <Text
-              className={`font-semibold ${isVip ? "text-yellow-400 ml-1" : "text-white"}`}
+        <View className="flex-row flex-1">
+          {/* Avatar */}
+          {client.users.profile_image ? (
+            <Image
+              source={{ uri: client.users.profile_image }}
+              className="w-14 h-14 rounded-full mr-4"
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                marginRight: 12,
+              }}
+            />
+          ) : (
+            <View
+              className="w-14 h-14 rounded-full mr-4 bg-gray-700 items-center justify-center"
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                marginRight: 12,
+              }}
             >
-              {client.users.first_name} {client.users.last_name}
-            </Text>
-            {client.users.profile_code === "cliente_anonimo" && (
-              <View className="bg-orange-500/20 rounded-full px-2 py-1 ml-2">
-                <Text className="text-orange-400 text-xs font-medium">ANÓNIMO</Text>
-              </View>
-            )}
-            {!isVip && position && (
-              <View className="bg-gray-600 rounded-full px-2 py-1 ml-2">
-                <Text className="text-white text-xs">#{position}</Text>
-              </View>
-            )}
-          </View>
-
-          <View className="flex-row items-center mt-1 flex-wrap">
-            <View className="flex-row items-center mr-4">
-              <User size={14} color="#9ca3af" />
-              <Text className="text-gray-400 text-sm ml-1">
-                {client.party_size}
+              <Text className="text-white font-bold">
+                {`${(client.users.first_name || "").charAt(0)}${(client.users.last_name || "").charAt(0)}`.toUpperCase()}
               </Text>
             </View>
+          )}
 
-            <View className="flex-row items-center mr-4">
-              <Clock size={14} color="#9ca3af" />
-              <Text className="text-gray-400 text-sm ml-1">
-                {waitingTime}min
+          <View className="flex-1">
+            <View className="flex-row items-center">
+              {isVip && <Crown size={18} color="#d4af37" />}
+              <Text
+                className={`font-bold ${isVip ? "text-yellow-400 ml-2 text-lg" : "text-white text-lg ml-2"}`}
+                style={{ fontSize: 18 }}
+              >
+                {client.users.first_name} {client.users.last_name}
               </Text>
+              {client.users.profile_code === "cliente_anonimo" && (
+                <View className="bg-orange-500/20 rounded-full px-2 py-1 ml-2">
+                  <Text className="text-orange-400 text-xs font-medium">
+                    ANÓNIMO
+                  </Text>
+                </View>
+              )}
+              {!isVip && position && (
+                <View className="bg-gray-600 rounded-full px-2 py-1 ml-2">
+                  <Text className="text-white text-xs">#{position}</Text>
+                </View>
+              )}
             </View>
+
+            <View className="flex-row items-center py-1 flex-wrap">
+              <View className="flex-row items-center mr-4 mb-2">
+                <User size={16} color="#9ca3af" />
+                <Text
+                  className="text-gray-100 text-sm ml-2"
+                  style={{ fontSize: 14 }}
+                >
+                  {client.party_size} •{" "}
+                  {client.preferred_table_type
+                    ? client.preferred_table_type
+                    : "—"}
+                </Text>
+              </View>
+
+              <View className="flex-row items-center mr-4">
+                <Clock size={16} color="#9ca3af" />
+                <Text
+                  className="text-gray-100 text-sm ml-2"
+                  style={{ fontSize: 14 }}
+                >
+                  {waitingTime} min
+                </Text>
+              </View>
+            </View>
+
+            {client.special_requests && (
+              <Text
+                className="text-gray-100 text-sm mt-2 italic"
+                style={{ fontSize: 13 }}
+              >
+                "{client.special_requests}"
+              </Text>
+            )}
           </View>
-
-          {client.preferred_table_type && (
-            <Text className="text-gray-400 text-sm mt-1">
-              Prefiere: {client.preferred_table_type}
-            </Text>
-          )}
-
-          {client.special_requests && (
-            <Text className="text-gray-400 text-sm mt-1 italic">
-              "{client.special_requests}"
-            </Text>
-          )}
         </View>
 
         <View className="ml-3">
