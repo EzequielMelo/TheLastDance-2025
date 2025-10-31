@@ -154,7 +154,7 @@ export default function WaiterOrdersScreen() {
     const rejectedItemIds = selectedItems[batchKey] || [];
 
     if (rejectedItemIds.length === 0) {
-      ToastAndroid.show("⚠️ Selecciona al menos un item que no está disponible", ToastAndroid.SHORT);
+      ToastAndroid.show("⚠️ Selecciona al menos un producto que no está disponible", ToastAndroid.SHORT);
       return;
     }
 
@@ -259,24 +259,6 @@ export default function WaiterOrdersScreen() {
               Panel del Mozo
             </Text>
           </View>
-
-          <TouchableOpacity
-            onPress={() => fetchOrders(true)}
-            disabled={refreshing}
-            style={{
-              backgroundColor: "rgba(212,175,55,0.2)",
-              borderRadius: 12,
-              padding: 12,
-            }}
-          >
-            <RefreshCw
-              size={20}
-              color="#d4af37"
-              style={{
-                transform: refreshing ? [{ rotate: "360deg" }] : [],
-              }}
-            />
-          </TouchableOpacity>
         </View>
 
         <View
@@ -932,7 +914,7 @@ export default function WaiterOrdersScreen() {
                             fontSize: 12,
                           }}
                         >
-                          {order.order_items.length} item
+                          {order.order_items.length} producto
                           {order.order_items.length > 1 ? "s" : ""}
                         </Text>
                       </View>

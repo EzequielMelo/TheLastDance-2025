@@ -68,13 +68,6 @@ export default function GamesScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.popTo("Home")}
-          style={styles.backButton}
-        >
-          <ArrowLeft size={22} color="#d4af37" />
-        </TouchableOpacity>
-
         <View style={styles.headerContent}>
           <Gamepad2 size={28} color="#d4af37" />
           <Text style={styles.headerTitle}>Juegos</Text>
@@ -125,10 +118,10 @@ export default function GamesScreen() {
 
       <View style={styles.bottomActions}>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation.popTo("Home")}
           style={styles.primaryButton}
         >
-          <Text style={styles.primaryButtonText}>Volver al Menú</Text>
+          <Text style={styles.primaryButtonText}>Volver al Inicio</Text>
         </TouchableOpacity>
       </View>
     </LinearGradient>
@@ -154,7 +147,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: -40,
   },
   headerTitle: {
     fontSize: 22,

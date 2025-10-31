@@ -405,6 +405,8 @@ export async function notifyClientTableAssigned(
   }
 }
 
+// ========== FUNCIONES DE CHAT MEJORADAS (TIPO WHATSAPP) ==========
+
 // Función para notificar a todos los mozos sobre una nueva consulta de cliente (solo el primer mensaje)
 export async function notifyWaitersNewClientMessage(
   clientName: string,
@@ -477,6 +479,89 @@ export async function notifyClientWaiterResponse(
   } catch (error) {
     console.error(
       "❌ Error al enviar notificación de respuesta de mozo:",
+      error,
+    );
+  }
+}
+
+// NUEVA: Función para notificar al mozo específico cuando el cliente le envía un mensaje (tipo WhatsApp)
+export async function notifyWaiterClientMessage(
+  waiterId: string,
+  clientName: string,
+  tableNumber: string,
+  message: string,
+  chatId: string,
+) {
+  try {
+    const token = await getWaiterToken(waiterId);
+
+    if (!token) {
+      return;
+    }
+
+    // Truncar mensaje si es muy largo
+    const truncatedMessage =
+      message.length > 50 ? message.substring(0, 47) + "..." : message;
+
+    const notificationData: PushNotificationData = {
+      title: `${clientName} - Mesa #${tableNumber}`,
+      body: truncatedMessage,
+      data: {
+        type: "chat_message_client",
+        tableNumber,
+        clientName,
+        message,
+        chatId,
+        waiterId,
+        screen: "WaiterChat",
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación de mensaje de cliente al mozo:",
+      error,
+    );
+  }
+}
+
+// NUEVA: Función para notificar al cliente cuando el mozo le envía un mensaje (tipo WhatsApp)
+export async function notifyClientWaiterMessage(
+  clientId: string,
+  waiterName: string,
+  tableNumber: string,
+  message: string,
+  chatId: string,
+) {
+  try {
+    const token = await getClientToken(clientId);
+
+    if (!token) {
+      return;
+    }
+
+    // Truncar mensaje si es muy largo
+    const truncatedMessage =
+      message.length > 50 ? message.substring(0, 47) + "..." : message;
+
+    const notificationData: PushNotificationData = {
+      title: `${waiterName} - Mesa #${tableNumber}`,
+      body: truncatedMessage,
+      data: {
+        type: "chat_message_waiter",
+        tableNumber,
+        waiterName,
+        message,
+        chatId,
+        screen: "ClientChat",
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación de mensaje de mozo al cliente:",
       error,
     );
   }
@@ -741,6 +826,47 @@ export async function notifyClientPaymentConfirmation(
   } catch (error) {
     console.error(
       "❌ Error al enviar notificación de confirmación de pago:",
+      error,
+    );
+  }
+}
+
+// Función para notificar al cliente cuando el mozo confirma su pedido
+export async function notifyClientOrderConfirmed(
+  clientId: string,
+  waiterName: string,
+  tableNumber: string,
+  itemsCount: number,
+  estimatedTime?: number,
+) {
+  try {
+    const token = await getClientToken(clientId);
+
+    if (!token) {
+      return;
+    }
+
+    const timeText = estimatedTime 
+      ? ` Tiempo estimado: ${estimatedTime} minutos.`
+      : '';
+
+    const notificationData: PushNotificationData = {
+      title: `✅ Pedido confirmado - Mesa #${tableNumber}`,
+      body: `${waiterName} confirmó tu pedido (${itemsCount} items).${timeText} ¡Ya está siendo preparado!`,
+      data: {
+        type: "order_confirmed",
+        tableNumber,
+        waiterName,
+        itemsCount,
+        estimatedTime,
+        screen: "OrderStatus",
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación de pedido confirmado:",
       error,
     );
   }

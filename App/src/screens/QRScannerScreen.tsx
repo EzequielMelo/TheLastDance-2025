@@ -69,35 +69,6 @@ export default function QRScannerScreen({ navigation, route }: Props) {
     }
   };
 
-  const getModeTitle = () => {
-    switch (mode) {
-      case 'order_status':
-        return 'Escanea el QR de tu mesa';
-      case 'confirm_arrival':
-        return 'Confirmar llegada a mesa';
-      case 'confirm_delivery':
-        return 'Confirmar entrega de pedido';
-      case 'payment':
-        return 'Escanear para pagar';
-      default:
-        return 'Escanear código QR';
-    }
-  };
-
-  const getModeDescription = () => {
-    switch (mode) {
-      case 'order_status':
-        return 'Escanea el código QR de TU mesa (debe ser la misma donde estás sentado) para consultar el estado de tus productos';
-      case 'confirm_arrival':
-        return 'Escanea el código QR de la mesa asignada para confirmar tu llegada';
-      case 'confirm_delivery':
-        return 'Escanea el código QR para confirmar que recibiste tu pedido';
-      case 'payment':
-        return 'Escanea el código QR para proceder con el pago';
-      default:
-        return 'Apunta la cámara al código QR';
-    }
-  };
 
   if (!permission) {
     return (
@@ -149,10 +120,6 @@ export default function QRScannerScreen({ navigation, route }: Props) {
           >
             <ArrowLeft size={24} color="#ffffff" />
           </TouchableOpacity>
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.headerTitle}>{getModeTitle()}</Text>
-            <Text style={styles.headerSubtitle}>{getModeDescription()}</Text>
-          </View>
         </LinearGradient>
 
         {/* Scanner frame */}

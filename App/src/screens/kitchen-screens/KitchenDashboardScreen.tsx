@@ -105,12 +105,12 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
         // Recargar datos
         await loadKitchenOrders();
       } else {
-        ToastAndroid.show("Error actualizando item", ToastAndroid.SHORT);
+        ToastAndroid.show("Error actualizando producto", ToastAndroid.SHORT);
       }
     } catch (error: any) {
       console.error("Error updating item status:", error);
       ToastAndroid.show(
-        error.response?.data?.message || "Error actualizando item",
+        error.response?.data?.message || "Error actualizando producto",
         ToastAndroid.SHORT
       );
     } finally {

@@ -37,6 +37,7 @@ import type { CreateOrderDTO, OrderItemStatus } from "./orders.types";
 import { 
   notifyWaiterNewOrder,
   notifyClientOrderRejectedForModification,
+  notifyClientOrderConfirmed,
   notifyKitchenNewItems,
   notifyBartenderNewItems,
   notifyManagementPaymentReceived,
@@ -493,6 +494,29 @@ export async function waiterOrderActionHandler(
                 tableData.number.toString(),
                 drinkItems,
                 clientName
+              );
+            }
+
+            // Notificar al cliente que su pedido fue confirmado
+            const totalItemsCount = dishItems.length + drinkItems.length;
+            if (totalItemsCount > 0) {
+              // Obtener información del mozo que aceptó el pedido
+              const { data: waiterData, error: waiterError } = await supabaseAdmin
+                .from("users")
+                .select("first_name, last_name")
+                .eq("id", req.user.appUserId)
+                .single();
+
+              const waiterName = waiterData && !waiterError
+                ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
+                : "Mozo";
+
+              await notifyClientOrderConfirmed(
+                orderData.id_client,
+                waiterName,
+                tableData.number.toString(),
+                totalItemsCount,
+                result.estimated_time
               );
             }
           }

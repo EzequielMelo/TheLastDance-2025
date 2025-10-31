@@ -13,6 +13,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
 import ChefLoading from "../../components/common/ChefLoading";
+import CustomAlert from "../../components/common/CustomAlert";
 import {
   Users,
   User,
@@ -50,6 +51,33 @@ export default function JoinWaitingListScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [qrExpired, setQrExpired] = useState(false);
 
+  // Estados para alertas personalizadas
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    title: "",
+    message: "",
+    type: "info" as "success" | "error" | "warning" | "info",
+    buttons: [] as Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "default" | "cancel" | "destructive";
+    }>,
+  });
+
+  const showCustomAlert = (
+    title: string,
+    message: string,
+    type: "success" | "error" | "warning" | "info" = "info",
+    buttons: Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "default" | "cancel" | "destructive";
+    }> = [{ text: "OK" }]
+  ) => {
+    setAlertConfig({ title, message, type, buttons });
+    setAlertVisible(true);
+  };
+
   useEffect(() => {
     // Verificar si el QR ha expirado
     if (qrData && qrData.expires_at && Date.now() > qrData.expires_at) {
@@ -61,14 +89,19 @@ export default function JoinWaitingListScreen() {
     // Validaciones
     const partySizeNum = parseInt(partySize);
     if (!partySizeNum || partySizeNum < 1 || partySizeNum > 20) {
-      Alert.alert("Error", "El número de personas debe ser entre 1 y 20");
+      showCustomAlert(
+        "Error",
+        "El número de personas debe ser entre 1 y 20",
+        "error"
+      );
       return;
     }
 
     if (qrData && qrExpired) {
-      Alert.alert(
+      showCustomAlert(
         "QR Expirado",
         "Este código QR ya no es válido. Solicita uno nuevo al maitre.",
+        "warning"
       );
       return;
     }
@@ -86,9 +119,10 @@ export default function JoinWaitingListScreen() {
 
       await api.post("/tables/waiting-list", data);
 
-      Alert.alert(
+      showCustomAlert(
         "¡Agregado a la lista!",
         `Te hemos agregado a la lista de espera con ${partySizeNum} persona${partySizeNum > 1 ? "s" : ""}. Te notificaremos cuando tu mesa esté lista.`,
+        "success",
         [
           {
             text: "Ver mi posición",
@@ -103,7 +137,7 @@ export default function JoinWaitingListScreen() {
               });
             },
           },
-        ],
+        ]
       );
     } catch (error: any) {
       console.error("Error joining waiting list:", error);
@@ -111,19 +145,20 @@ export default function JoinWaitingListScreen() {
         error.response?.data?.error || "Error al unirse a la lista de espera";
 
       if (message.includes("ya está en la lista")) {
-        Alert.alert(
+        showCustomAlert(
           "Ya estás en la lista",
           "Ya te encuentras en la lista de espera. ¿Quieres ver tu posición actual?",
+          "warning",
           [
             { text: "No", style: "cancel" },
             {
               text: "Ver posición",
               onPress: () => navigation.navigate("MyWaitingPosition"),
             },
-          ],
+          ]
         );
       } else {
-        Alert.alert("Error", message);
+        showCustomAlert("Error", message, "error");
       }
     } finally {
       setSubmitting(false);
@@ -190,7 +225,7 @@ export default function JoinWaitingListScreen() {
             <Users size={32} color="#1a1a1a" />
           </View>
           <Text className="text-white text-2xl font-bold mb-2">
-            Unirse a Lista de Espera
+            Unirse a lista de espera
           </Text>
           <Text className="text-gray-400 text-center">
             Completa los datos para reservar tu mesa en The Last Dance
@@ -341,6 +376,16 @@ export default function JoinWaitingListScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertVisible}
+        onClose={() => setAlertVisible(false)}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+      />
     </LinearGradient>
   );
 }

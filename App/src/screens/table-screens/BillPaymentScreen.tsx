@@ -22,7 +22,8 @@ import {
 import { useAuth } from "../../auth/useAuth";
 import api from "../../api/axios";
 import { payOrder } from "../../api/orders";
-import { clearDiscount } from "../../storage/discountStorage";
+import { clearDiscount, getDiscount } from "../../storage/discountStorage";
+import CustomAlert from "../../components/common/CustomAlert";
 
 interface BillItem {
   id: string;
@@ -76,10 +77,25 @@ const BillPaymentScreen: React.FC = () => {
     useState<SatisfactionLevel>(satisfactionLevels[0]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showPaymentAlert, setShowPaymentAlert] = useState(false);
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [currentDiscount, setCurrentDiscount] = useState<{ amount: number; received: boolean } | null>(null);
 
   useEffect(() => {
     loadBillData();
+    loadCurrentDiscount();
   }, []);
+
+  const loadCurrentDiscount = async () => {
+    try {
+      const discount = await getDiscount();
+      if (discount && discount.received) {
+        setCurrentDiscount(discount);
+      }
+    } catch (error) {
+      console.error("Error loading current discount:", error);
+    }
+  };
 
   const loadBillData = async () => {
     try {
@@ -120,28 +136,24 @@ const BillPaymentScreen: React.FC = () => {
     );
   };
 
+  const calculateGameDiscountAmount = (): number => {
+    if (!billData || !currentDiscount) return 0;
+    return Math.round((billData.subtotal * currentDiscount.amount) / 100);
+  };
+
   const getTotalWithTip = (): number => {
     if (!billData) return 0;
-    return billData.finalTotal + calculateTipAmount();
+    const gameDiscountAmount = calculateGameDiscountAmount();
+    const totalAfterDiscount = billData.finalTotal - gameDiscountAmount;
+    return totalAfterDiscount + calculateTipAmount();
   };
 
   const handlePayment = async () => {
     try {
       if (!billData) return;
-
-      const tipAmount = calculateTipAmount();
-      const totalAmount = getTotalWithTip();
-
-      // Mostrar información del pago y proceder directamente
-      ToastAndroid.show(
-        `💰 Total: $${billData.finalTotal.toLocaleString()} + Propina: $${tipAmount.toLocaleString()} = $${totalAmount.toLocaleString()}`,
-        ToastAndroid.LONG
-      );
       
-      // Proceder con el pago después de un breve delay para que se vea el toast
-      setTimeout(() => {
-        processPay(totalAmount, tipAmount);
-      }, 1000);
+      // Mostrar el alert de confirmación con el resumen del pago
+      setShowPaymentAlert(true);
       
     } catch (err) {
       console.error("Error handling payment:", err);
@@ -149,33 +161,51 @@ const BillPaymentScreen: React.FC = () => {
     }
   };
 
-  const processPay = async (totalAmount: number, tipAmount: number) => {
+  const getPaymentSummaryMessage = (): string => {
+    if (!billData) return "";
+    
+    const tipAmount = calculateTipAmount();
+    const gameDiscountAmount = calculateGameDiscountAmount();
+    const totalAmount = getTotalWithTip();
+    
+    let message = `Subtotal: $${billData.subtotal.toLocaleString()}\n`;
+    message += `Propina (${selectedSatisfaction.tipPercentage}%): $${tipAmount.toLocaleString()}\n`;
+    
+    if (currentDiscount && gameDiscountAmount > 0) {
+      message += `Descuento por juegos (${currentDiscount.amount}%): -$${gameDiscountAmount.toLocaleString()}\n`;
+    }
+    
+    message += `\nTOTAL A PAGAR: $${totalAmount.toLocaleString()}`;
+    
+    return message;
+  };
+
+  const processPay = async () => {
     try {
       if (!billData) return;
-      // Log de los datos enviados a payOrder
-      console.log("Datos enviados a payOrder:", {
-        tableId: billData.tableId,
-        idClient: billData.idClient,
+      
+      const tipAmount = calculateTipAmount();
+      const gameDiscountAmount = calculateGameDiscountAmount();
+      const totalAmount = getTotalWithTip();
+      
+      // Preparar datos de pago
+      const paymentData = {
         totalAmount,
         tipAmount,
-        selectedSatisfaction,
-      });
-      // Llamar a la API para procesar el pago
-      await payOrder(billData.tableId, billData.idClient);
+        gameDiscountAmount,
+        gameDiscountPercentage: currentDiscount?.amount || 0,
+        satisfactionLevel: `${selectedSatisfaction.percentage}% - ${selectedSatisfaction.label}`,
+      };
+      
+      // Llamar a la API para procesar el pago con todos los datos
+      await payOrder(billData.tableId, billData.idClient, paymentData);
       
       // ✅ Resetear descuentos de juegos después del pago exitoso
       const discountCleared = await clearDiscount();
       console.log("🎮 Game discount reset:", discountCleared ? "✅ Success" : "❌ Failed");
       
-      ToastAndroid.show(
-        "🎉 ¡Pago procesado exitosamente! Gracias por tu visita",
-        ToastAndroid.LONG
-      );
-      
-      // Navegar al home después de un breve delay
-      setTimeout(() => {
-        navigation.navigate("Home");
-      }, 2000);
+      // Mostrar alert de éxito en lugar de toast
+      setShowSuccessAlert(true);
       
     } catch (err) {
       console.error("Error processing payment:", err);
@@ -366,6 +396,52 @@ const BillPaymentScreen: React.FC = () => {
           <Text className="text-white text-lg font-bold ml-2">Pagar</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Custom Alert para confirmación de pago */}
+      <CustomAlert
+        visible={showPaymentAlert}
+        onClose={() => setShowPaymentAlert(false)}
+        title="Confirmar Pago"
+        message={getPaymentSummaryMessage()}
+        type="info"
+        buttons={[
+          {
+            text: "Cancelar",
+            style: "cancel",
+            onPress: () => setShowPaymentAlert(false),
+          },
+          {
+            text: "Confirmar Pago",
+            style: "default",
+            onPress: () => {
+              setShowPaymentAlert(false);
+              processPay();
+            },
+          },
+        ]}
+      />
+
+      {/* Custom Alert para pago exitoso */}
+      <CustomAlert
+        visible={showSuccessAlert}
+        onClose={() => {
+          setShowSuccessAlert(false);
+          navigation.navigate("Home");
+        }}
+        title="¡Pago Exitoso!"
+        message="¡Pago procesado exitosamente! Gracias por tu visita a TheLastDance."
+        type="success"
+        buttons={[
+          {
+            text: "Continuar",
+            style: "default",
+            onPress: () => {
+              setShowSuccessAlert(false);
+              navigation.navigate("Home");
+            },
+          },
+        ]}
+      />
     </View>
   );
 };

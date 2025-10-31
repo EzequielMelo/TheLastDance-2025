@@ -51,7 +51,6 @@ export const useChat = ({ tableId, onError, onUserJoined }: UseChatProps) => {
   const loadMessages = useCallback(
     async (chatId: string) => {
       try {
-        Logger.info(`🔄 Cargando mensajes para chat: ${chatId}`);
         const response = await fetch(
           `${API_BASE_URL}/chat/${chatId}/messages`,
           {
@@ -74,9 +73,6 @@ export const useChat = ({ tableId, onError, onUserJoined }: UseChatProps) => {
             timestamp: msg.created_at,
             isRead: msg.is_read,
           }));
-          Logger.info(
-            `📥 Mensajes cargados desde BD: ${formattedMessages.length}`,
-          );
           setMessages(formattedMessages);
           return formattedMessages;
         }
@@ -154,11 +150,6 @@ export const useChat = ({ tableId, onError, onUserJoined }: UseChatProps) => {
 
         // Eventos de chat
         socketInstance.on("new_message", (message: ChatMessage) => {
-          Logger.info("📨 Nuevo mensaje recibido:", message);
-          Logger.info(`💬 De: ${message.senderName} (${message.senderType})`);
-          Logger.info(
-            `📝 Contenido: "${message.message.substring(0, 50)}${message.message.length > 50 ? "..." : ""}"`,
-          );
 
           // Usar callback para asegurar que se base en el estado más actual
           setMessages(prevMessages => {
@@ -172,9 +163,6 @@ export const useChat = ({ tableId, onError, onUserJoined }: UseChatProps) => {
             }
 
             const newMessages = [...prevMessages, message];
-            Logger.info(
-              `📊 Total mensajes después de agregar: ${newMessages.length}`,
-            );
             return newMessages;
           });
         });
@@ -213,14 +201,6 @@ export const useChat = ({ tableId, onError, onUserJoined }: UseChatProps) => {
             Logger.info(
               `✅ Te uniste exitosamente a la sala: ${data.roomName} con ${data.userCount} usuarios`,
             );
-          },
-        );
-
-        // Confirmación de mensaje enviado
-        socketInstance.on(
-          "message_sent",
-          (data: { messageId: string; success: boolean }) => {
-            Logger.info(`✅ Mensaje enviado confirmado: ${data.messageId}`);
           },
         );
 
@@ -273,14 +253,6 @@ export const useChat = ({ tableId, onError, onUserJoined }: UseChatProps) => {
         );
         return false;
       }
-
-      Logger.info("📤 Enviando mensaje:", {
-        chatId: chatInfo.id,
-        message: message.trim(),
-        tableId: tableId,
-        socketConnected: isConnected,
-        socketId: socket.id,
-      });
 
       socket.emit("send_message", {
         chatId: chatInfo.id,

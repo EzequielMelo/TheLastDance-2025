@@ -98,7 +98,7 @@ export default function HomeScreen({ navigation, route }: Props) {
     } catch (error: any) {
       console.error("Error loading ready items:", error);
       ToastAndroid.show(
-        error.response?.data?.error || "Error al cargar items listos", 
+        error.response?.data?.error || "Error al cargar productos listos", 
         ToastAndroid.SHORT
       );
     } finally {
@@ -285,11 +285,7 @@ export default function HomeScreen({ navigation, route }: Props) {
 
   // Función para rechazar usuario
   const rejectUser = async (userId: string, userName: string, reason?: string) => {
-    try {
-      console.log("🔄 [FRONTEND] Iniciando rechazo de usuario:", { userId, userName, reason });
-      console.log("🔄 [FRONTEND] URL de la petición:", `${api.defaults.baseURL}/admin/clients/${userId}/reject`);
-      console.log("🔄 [FRONTEND] Body de la petición:", { reason: reason || "" });
-      
+    try {     
       const response = await api.post(`/admin/clients/${userId}/reject`, { reason: reason || "" });
       
       console.log("✅ [FRONTEND] Respuesta recibida:", response.data);
@@ -426,7 +422,7 @@ export default function HomeScreen({ navigation, route }: Props) {
       
       await api.put(`/orders/waiter/item/${itemId}/delivered`);
       
-      ToastAndroid.show("✅ Item marcado como entregado", ToastAndroid.SHORT);
+      ToastAndroid.show("✅ Producto marcado como entregado", ToastAndroid.SHORT);
       
       // Recargar la lista de items listos y pagos pendientes
       await loadReadyItems();

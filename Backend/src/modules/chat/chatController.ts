@@ -3,7 +3,8 @@ import { ChatServices } from "./chatServices";
 import { supabaseAdmin } from "../../config/supabase";
 import { 
   notifyWaitersNewClientMessage,
-  notifyClientWaiterResponse 
+  notifyWaiterClientMessage,
+  notifyClientWaiterMessage
 } from "../../services/pushNotificationService";
 
 export class ChatController {
@@ -204,21 +205,10 @@ export class ChatController {
         tableData.id_waiter,
       );
 
-      // Verificar si es el primer mensaje del cliente para enviar notificación a mozos
-      const isFirstClientMessage = senderType === 'client';
-      
-      if (isFirstClientMessage) {
-        // Verificar si hay mensajes previos del cliente en este chat
-        const { data: previousMessages } = await supabaseAdmin
-          .from("messages")
-          .select("id")
-          .eq("chat_id", chat.id)
-          .eq("sender_type", "client")
-          .limit(1);
-
-        const isFirstMessage = !previousMessages || previousMessages.length === 0;
-
-        if (isFirstMessage) {
+      // NOTIFICACIONES TIPO WHATSAPP - Siempre enviar notificación en cada mensaje
+      if (senderType === 'client') {
+        // Cliente envía mensaje al mozo específico
+        try {
           // Obtener nombre del cliente para la notificación
           const { data: clientData } = await supabaseAdmin
             .from("users")
@@ -228,24 +218,39 @@ export class ChatController {
 
           const clientName = clientData?.name || "Cliente";
 
-          // Enviar notificación a todos los mozos (solo el primer mensaje)
-          try {
+          // Enviar notificación al mozo específico de la mesa
+          await notifyWaiterClientMessage(
+            tableData.id_waiter,
+            clientName,
+            tableData.number.toString(),
+            message,
+            chat.id
+          );
+
+          // Si es el primer mensaje del cliente, también notificar a todos los mozos
+          const { data: previousMessages } = await supabaseAdmin
+            .from("messages")
+            .select("id")
+            .eq("chat_id", chat.id)
+            .eq("sender_type", "client")
+            .limit(1);
+
+          const isFirstMessage = !previousMessages || previousMessages.length === 0;
+
+          if (isFirstMessage) {
+            // Enviar notificación a todos los mozos (solo el primer mensaje)
             await notifyWaitersNewClientMessage(
               clientName,
               tableData.number.toString(),
               message
             );
-          } catch (notifyError) {
-            console.error("Error enviando notificación a mozos:", notifyError);
-            // No bloqueamos el envío del mensaje por error de notificación
           }
+        } catch (notifyError) {
+          console.error("Error enviando notificaciones de cliente:", notifyError);
+          // No bloqueamos el envío del mensaje por error de notificación
         }
-      }
-
-      // Verificar si es un mensaje del mozo para enviar notificación al cliente
-      const isWaiterMessage = senderType === 'waiter';
-      
-      if (isWaiterMessage) {
+      } else if (senderType === 'waiter') {
+        // Mozo envía mensaje al cliente
         try {
           // Obtener nombre del mozo para la notificación
           const { data: waiterData } = await supabaseAdmin
@@ -258,15 +263,16 @@ export class ChatController {
             ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
             : "Mesero";
 
-          // Enviar notificación al cliente
-          await notifyClientWaiterResponse(
+          // Enviar notificación al cliente específico (tipo WhatsApp)
+          await notifyClientWaiterMessage(
             tableData.id_client,
             waiterName,
             tableData.number.toString(),
-            message
+            message,
+            chat.id
           );
         } catch (notifyError) {
-          console.error("Error enviando notificación al cliente:", notifyError);
+          console.error("Error enviando notificación de mozo:", notifyError);
           // No bloqueamos el envío del mensaje por error de notificación
         }
       }

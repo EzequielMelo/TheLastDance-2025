@@ -412,30 +412,6 @@ export default function ScanOrderQRScreen() {
             paddingBottom: 32,
           }}
         >
-          <View style={{ alignItems: "center", paddingHorizontal: 24 }}>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginBottom: 16,
-              }}
-            >
-              <Package size={24} color="#d4af37" />
-              <Text
-                style={{
-                  color: "white",
-                  fontSize: 20,
-                  fontWeight: "600",
-                  marginLeft: 8,
-                }}
-              >
-                Escanear Mesa
-              </Text>
-            </View>
-            <Text style={{ color: "#d1d5db", textAlign: "center" }}>
-              Escanea el código QR de tu mesa para confirmar recepción de pedido o proceder con el pago
-            </Text>
-          </View>
         </LinearGradient>
 
         {/* Scanning frame */}
@@ -553,28 +529,6 @@ export default function ScanOrderQRScreen() {
           }}
         >
           <View style={{ alignItems: "center", paddingHorizontal: 24 }}>
-            {/* Opciones disponibles tras confirmar */}
-            <View style={{ flexDirection: "row", justifyContent: "space-around", width: "100%", marginBottom: 24 }}>
-              <View style={{ alignItems: "center" }}>
-                <View style={{ backgroundColor: "rgba(212, 175, 55, 0.2)", padding: 12, borderRadius: 12, marginBottom: 8 }}>
-                  <Gamepad2 size={24} color="#d4af37" />
-                </View>
-                <Text style={{ color: "#d4af37", fontSize: 12, fontWeight: "600" }}>Juegos</Text>
-              </View>
-              <View style={{ alignItems: "center" }}>
-                <View style={{ backgroundColor: "rgba(212, 175, 55, 0.2)", padding: 12, borderRadius: 12, marginBottom: 8 }}>
-                  <FileText size={24} color="#d4af37" />
-                </View>
-                <Text style={{ color: "#d4af37", fontSize: 12, fontWeight: "600" }}>Encuesta</Text>
-              </View>
-              <View style={{ alignItems: "center" }}>
-                <View style={{ backgroundColor: "rgba(212, 175, 55, 0.2)", padding: 12, borderRadius: 12, marginBottom: 8 }}>
-                  <Receipt size={24} color="#d4af37" />
-                </View>
-                <Text style={{ color: "#d4af37", fontSize: 12, fontWeight: "600" }}>La Cuenta</Text>
-              </View>
-            </View>
-
             {scanned && !processing && (
               <TouchableOpacity
                 onPress={() => setScanned(false)}

@@ -118,7 +118,7 @@ function NavigatorContent() {
           <Stack.Screen
             name="ScanOrderQR"
             component={ScanOrderQRScreen}
-            options={{ title: "Confirmar Pedido", headerBackTitle: "Volver" }}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="QRScanner"

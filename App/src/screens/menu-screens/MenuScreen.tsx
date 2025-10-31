@@ -16,6 +16,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import ChefLoading from "../../components/common/ChefLoading";
+import CustomAlert from "../../components/common/CustomAlert";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
@@ -25,10 +26,8 @@ import {
   ChefHat,
   Coffee,
   Clock,
-  ArrowLeft,
   Utensils,
   Filter,
-  RefreshCw,
   Plus,
   Minus,
   Lock,
@@ -114,6 +113,30 @@ export default function MenuScreen() {
   }>({});
   const [isSubmittingChanges, setIsSubmittingChanges] = useState(false);
 
+  // Estados para CustomAlert
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    type: 'info' as 'success' | 'error' | 'warning' | 'info',
+    title: '',
+    message: '',
+    buttons: [] as Array<{text: string, onPress?: () => void, style?: 'default' | 'cancel' | 'destructive'}>
+  });
+
+  const showCustomAlert = (
+    title: string,
+    message: string,
+    buttons?: Array<{text: string, onPress?: () => void, style?: 'default' | 'cancel' | 'destructive'}>,
+    type: 'success' | 'error' | 'warning' | 'info' = 'info'
+  ) => {
+    setAlertConfig({
+      type,
+      title,
+      message,
+      buttons: buttons || [{text: 'OK'}]
+    });
+    setShowAlert(true);
+  };
+
   useEffect(() => {
     loadMenuItems();
   }, [selectedCategory]);
@@ -181,7 +204,7 @@ export default function MenuScreen() {
     if (hasPendingOrder) {
       Alert.alert(
         "Pedido en proceso",
-        "Tienes un pedido enviado esperando confirmación. No puedes agregar más items hasta que sea procesado.",
+        "Tienes un pedido enviado esperando confirmación. No puedes agregar más productos hasta que sea procesado.",
         [{ text: "Entendido" }],
       );
       return;
@@ -393,7 +416,7 @@ export default function MenuScreen() {
               );
 
               if (rejectedItemIds.length === 0) {
-                Alert.alert("Error", "No hay items rechazados para eliminar.");
+                Alert.alert("Error", "No hay productos rechazados para eliminar.");
                 return;
               }
 
@@ -480,18 +503,6 @@ export default function MenuScreen() {
             marginBottom: 16,
           }}
         >
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={{
-              backgroundColor: "rgba(255,255,255,0.1)",
-              borderRadius: 12,
-              padding: 8,
-              marginRight: 16,
-            }}
-          >
-            <ArrowLeft size={24} color="white" />
-          </TouchableOpacity>
-
           <View style={{ flex: 1, alignItems: "center" }}>
             <View
               style={{
@@ -518,17 +529,6 @@ export default function MenuScreen() {
                 : "Explora nuestros deliciosos platos y bebidas"}
             </Text>
           </View>
-
-          <TouchableOpacity
-            onPress={onRefresh}
-            style={{
-              backgroundColor: "rgba(255,255,255,0.1)",
-              borderRadius: 12,
-              padding: 8,
-            }}
-          >
-            <RefreshCw size={20} color="#d4af37" />
-          </TouchableOpacity>
         </View>
 
         {/* Información compacta de items rechazados */}
@@ -870,6 +870,7 @@ export default function MenuScreen() {
                       paddingTop: 12,
                       borderTopWidth: 1,
                       borderTopColor: "rgba(255,255,255,0.1)",
+                      minHeight: 48, // Altura mínima para evitar superposición
                     }}
                   >
                     <View
@@ -877,6 +878,7 @@ export default function MenuScreen() {
                         flexDirection: "row",
                         alignItems: "center",
                         flex: 1,
+                        marginRight: 12, // Espacio entre tiempo y botones
                       }}
                     >
                       <Clock size={16} color="#d4af37" />
@@ -893,7 +895,11 @@ export default function MenuScreen() {
                     </View>
 
                     <View
-                      style={{ flexDirection: "row", alignItems: "center" }}
+                      style={{ 
+                        flexDirection: "row", 
+                        alignItems: "center",
+                        flexShrink: 0, // Evita que se comprima
+                      }}
                     >
                       {getCurrentItemQuantity(item.id) > 0 ? (
                         <View
@@ -1531,8 +1537,19 @@ export default function MenuScreen() {
         <CartModal
           visible={cartModalVisible}
           onClose={() => setCartModalVisible(false)}
+          showCustomAlert={showCustomAlert}
         />
       )}
+
+      {/* CustomAlert */}
+      <CustomAlert
+        visible={showAlert}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        buttons={alertConfig.buttons}
+        onClose={() => setShowAlert(false)}
+      />
     </ClientLayout>
   );
 }

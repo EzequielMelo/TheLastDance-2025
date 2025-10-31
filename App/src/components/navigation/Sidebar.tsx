@@ -24,7 +24,7 @@ import {
   MessageCircle,
   UtensilsCrossed,
   Wine,
-  ShoppingCart,
+  Gamepad2,
 } from "lucide-react-native";
 import { User } from "../../types/User";
 import { useClientState } from "../../Hooks/useClientState";
@@ -318,46 +318,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
         break;
 
       case "seated":
-        clientActions.push(
-          {
-            id: "view-menu",
-            title: "Ver Menú",
-            subtitle: "Explora nuestra carta y haz tu pedido",
-            icon: <UtensilsCrossed size={20} color="#374151" />,
-            onPress: () => onNavigate("Menu"),
-            roles: ["cliente_registrado", "cliente_anonimo"],
-          }
-        );
-
-        // Agregar acción del carrito si hay items o si existe la función
-        if (onOpenCart) {
-          let cartSubtitle = "Revisa y confirma tus pedidos";
-          
-          const totalCount = cartCount + pendingOrderCount;
-          if (totalCount > 0) {
-            const parts = [];
-            if (cartCount > 0) {
-              parts.push(`${cartCount} en carrito`);
-            }
-            if (pendingOrderCount > 0) {
-              parts.push(`${pendingOrderCount} enviado${pendingOrderCount === 1 ? '' : 's'}`);
-            }
-            cartSubtitle = parts.join(', ');
-          }
-
-          clientActions.push({
-            id: "view-cart",
-            title: "Ver Mi Carrito",
-            subtitle: cartSubtitle,
-            icon: <ShoppingCart size={20} color="#374151" />,
-            onPress: () => {
-              onOpenCart();
-              onClose();
-            },
-            roles: ["cliente_registrado", "cliente_anonimo"],
-          });
-        }
-        
+        // Chat con mesero si hay mesa ocupada
         if (occupiedTable) {
           clientActions.push({
             id: "table-chat",
@@ -368,6 +329,16 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
             roles: ["cliente_registrado", "cliente_anonimo"],
           });
         }
+
+        // Agregar opción de juegos para clientes sentados
+        clientActions.push({
+          id: "games",
+          title: "Juegos",
+          subtitle: "Disfruta mientras esperas tu pedido y gana descuentos",
+          icon: <Gamepad2 size={20} color="#374151" />,
+          onPress: () => onNavigate("Games"),
+          roles: ["cliente_registrado", "cliente_anonimo"],
+        });
         break;
 
       case "displaced":

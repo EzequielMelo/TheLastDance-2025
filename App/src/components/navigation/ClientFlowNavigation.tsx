@@ -222,41 +222,67 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                 <Text className="text-green-400 text-lg font-semibold mb-4">
                   Acceso completo desbloqueado
                 </Text>
-                <Text className="text-gray-300 text-center mb-6">
-                  ¡Perfecto! Ahora puedes acceder a todas las opciones disponibles.
+                <Text className="text-gray-300 text-center mb-8">
+                  Si todavía no has jugado, ¡ahora es tu oportunidad! Si lográs ganar en tu primera victoria, desbloquearás un descuento para tu cuenta.
                 </Text>
                 
-                {/* Botones para acceder a las opciones post-confirmación */}
-                <View className="flex-row gap-2 mb-4">
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate("Games")}
-                    className="bg-purple-600 px-6 py-3 rounded-lg flex-row items-center"
-                  >
-                    <Gamepad2 size={16} color="white" className="mr-1" />
-                    <Text className="text-white font-semibold">Juegos</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate("Survey")}
-                    className="bg-blue-600 px-6 py-3 rounded-lg flex-row items-center"
-                  >
-                    <FileText size={16} color="white" className="mr-1" />
-                    <Text className="text-white font-semibold">Encuesta</Text>
-                  </TouchableOpacity>
+                {/* Botones circulares estilo MercadoPago */}
+                <View className="flex-row justify-around items-start px-4 mb-6">
+                  {/* Juegos */}
+                  <View className="items-center flex-1">
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate("Games")}
+                      className="bg-violet-600 w-16 h-16 rounded-full items-center justify-center mb-3"
+                      style={{ elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 }}
+                    >
+                      <Gamepad2 size={24} color="white" />
+                    </TouchableOpacity>
+                    <View style={{ height: 32, justifyContent: 'flex-start' }}>
+                      <Text className="text-white text-center text-sm font-medium leading-4">
+                        Juegos
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Encuesta */}
+                  <View className="items-center flex-1">
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate("Survey")}
+                      className="bg-green-600 w-16 h-16 rounded-full items-center justify-center mb-3"
+                      style={{ elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 }}
+                    >
+                      <FileText size={24} color="white" />
+                    </TouchableOpacity>
+                    <View style={{ height: 32, justifyContent: 'flex-start' }}>
+                      <Text className="text-white text-center text-sm font-medium leading-4">
+                        Encuesta
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Pedir la Cuenta */}
+                  <View className="items-center flex-1">
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (occupiedTable) {
+                          navigation.navigate("TableChat", {
+                            tableId: occupiedTable.id,
+                            autoMessage: "Pedir la cuenta."
+                          });
+                        }
+                      }}
+                      className="bg-green-600 w-16 h-16 rounded-full items-center justify-center mb-3"
+                      style={{ elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 }}
+                    >
+                      <Receipt size={24} color="white" />
+                    </TouchableOpacity>
+                    <View style={{ height: 32, justifyContent: 'flex-start' }}>
+                      <Text className="text-white text-center text-sm font-medium leading-4">
+                        Pedir la{'\n'}cuenta
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-                <TouchableOpacity
-                  onPress={() => {
-                    if (occupiedTable) {
-                      navigation.navigate("TableChat", {
-                        tableId: occupiedTable.id,
-                        autoMessage: "Pedir la cuenta."
-                      });
-                    }
-                  }}
-                  className="bg-green-600 px-8 py-3 rounded-lg flex-row items-center mb-4"
-                >
-                  <Receipt size={16} color="white" className="mr-2" />
-                  <Text className="text-white font-semibold">Pedir la Cuenta</Text>
-                </TouchableOpacity>
               </>
             ) : (
               <>
@@ -273,7 +299,7 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                       Mesa {occupiedTable?.number}
                     </Text>
                     <Text className="text-green-400 text-lg font-semibold mb-4">
-                      {deliveryStatus.totalItems} items entregados
+                      {deliveryStatus.totalItems} Productos entregados
                     </Text>
                     <Text className="text-gray-300 text-center mb-6">
                       Tu pedido está completo. Confirma que has recibido todo para desbloquear juegos y encuestas.

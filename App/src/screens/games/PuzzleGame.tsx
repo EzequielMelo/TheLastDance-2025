@@ -44,12 +44,19 @@ export default function PuzzleGame() {
   const handleWin = async () => {
     const res = await awardIfFirstWin(true, DISCOUNT);
     if (res.awarded) {
-      ToastAndroid.show(`🎉 ¡Ganaste! Obtuviste ${DISCOUNT}% de descuento`, ToastAndroid.LONG);
+      const currentDiscount = res.discount?.amount || DISCOUNT;
+      if (currentDiscount > DISCOUNT) {
+        ToastAndroid.show(`🎉 ¡Ganaste! Mantienes tu descuento de ${currentDiscount}%`, ToastAndroid.LONG);
+      } else {
+        ToastAndroid.show(`🎉 ¡Ganaste! Obtuviste ${DISCOUNT}% de descuento`, ToastAndroid.LONG);
+      }
     } else {
-      const message = res.discount
-        ? "🎮 Ganaste, pero ya tenés un descuento aplicado"
-        : "🎮 Ganaste, pero ya no hay premio disponible";
-      ToastAndroid.show(message, ToastAndroid.LONG);
+      const currentDiscount = res.discount?.amount || 0;
+      if (currentDiscount >= DISCOUNT) {
+        ToastAndroid.show(`🎮 Ganaste, pero ya tenés ${currentDiscount}% de descuento (mayor o igual)`, ToastAndroid.LONG);
+      } else {
+        ToastAndroid.show("🎮 Ganaste, pero ya no hay premio disponible", ToastAndroid.LONG);
+      }
     }
     
     // Navegar después de mostrar el toast

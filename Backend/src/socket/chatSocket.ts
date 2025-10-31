@@ -2,6 +2,11 @@ import { Server } from "socket.io";
 import { Server as HttpServer } from "http";
 import { supabaseAdmin } from "../config/supabase";
 import { ChatServices } from "../modules/chat/chatServices";
+import { 
+  notifyWaitersNewClientMessage,
+  notifyWaiterClientMessage,
+  notifyClientWaiterMessage
+} from "../services/pushNotificationService";
 
 interface SocketUser {
   appUserId: string;
@@ -244,6 +249,70 @@ export const setupSocketIO = (httpServer: HttpServer) => {
             messageId: newMessage.id,
             success: true,
           });
+
+          // ENVIAR NOTIFICACIONES PUSH TIPO WHATSAPP
+          try {
+            // Obtener información de la mesa y usuarios
+            const { data: tableData, error: tableError } = await supabaseAdmin
+              .from("tables")
+              .select(`
+                number,
+                id_client,
+                id_waiter,
+                users!tables_id_client_fkey(name)
+              `)
+              .eq("id", tableId)
+              .single();
+
+            if (!tableError && tableData) {
+              if (senderType === 'client') {
+                // Cliente envía mensaje al mozo específico
+                const clientData = (tableData as any).users;
+                const clientName = clientData?.name || "Cliente";
+
+                // Enviar notificación al mozo específico de la mesa
+                await notifyWaiterClientMessage(
+                  tableData.id_waiter,
+                  clientName,
+                  tableData.number.toString(),
+                  message.trim(),
+                  chatId
+                );
+
+                // Si es el primer mensaje del cliente, también notificar a todos los mozos
+                const { data: previousMessages } = await supabaseAdmin
+                  .from("messages")
+                  .select("id")
+                  .eq("chat_id", chatId)
+                  .eq("sender_type", "client")
+                  .limit(2); // Buscar 2 porque el actual ya está guardado
+
+                const isFirstMessage = !previousMessages || previousMessages.length <= 1;
+
+                if (isFirstMessage) {
+                  await notifyWaitersNewClientMessage(
+                    clientName,
+                    tableData.number.toString(),
+                    message.trim()
+                  );
+                }
+              } else if (senderType === 'waiter') {
+                // Mozo envía mensaje al cliente
+                const waiterName = `${user.first_name} ${user.last_name}`.trim();
+
+                await notifyClientWaiterMessage(
+                  tableData.id_client,
+                  waiterName,
+                  tableData.number.toString(),
+                  message.trim(),
+                  chatId
+                );
+              }
+            }
+          } catch (notifyError) {
+            console.error("❌ Error enviando notificaciones push:", notifyError);
+            // No bloqueamos el mensaje por error de notificación
+          }
 
           // Debug: verificar cuántos usuarios recibieron el mensaje
           const roomClients = io.sockets.adapter.rooms.get(roomName);

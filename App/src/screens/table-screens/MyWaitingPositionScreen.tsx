@@ -14,6 +14,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
+import CustomAlert from "../../components/common/CustomAlert";
 import {
   Clock,
   Users,
@@ -53,6 +54,33 @@ export default function MyWaitingPositionScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Estados para alertas personalizadas
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    title: "",
+    message: "",
+    type: "info" as "success" | "error" | "warning" | "info",
+    buttons: [] as Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "default" | "cancel" | "destructive";
+    }>,
+  });
+
+  const showCustomAlert = (
+    title: string,
+    message: string,
+    type: "success" | "error" | "warning" | "info" = "info",
+    buttons: Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "default" | "cancel" | "destructive";
+    }> = [{ text: "OK" }]
+  ) => {
+    setAlertConfig({ title, message, type, buttons });
+    setAlertVisible(true);
+  };
 
   // Función para navegar al Home
   const navigateToHome = useCallback(() => {
@@ -168,9 +196,10 @@ export default function MyWaitingPositionScreen() {
   }, [loadData]);
 
   const handleCancel = () => {
-    Alert.alert(
+    showCustomAlert(
       "Cancelar Reserva",
       "¿Estás seguro que quieres salir de la lista de espera?",
+      "warning",
       [
         { text: "No", style: "cancel" },
         {
@@ -204,7 +233,7 @@ export default function MyWaitingPositionScreen() {
             }
           },
         },
-      ],
+      ]
     );
   };
 
@@ -459,6 +488,16 @@ export default function MyWaitingPositionScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertVisible}
+        onClose={() => setAlertVisible(false)}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+      />
     </LinearGradient>
     </SafeAreaView>
   );

@@ -19,11 +19,25 @@ export interface WaiterOrderActionResponse {
 export const payOrder = async (
   orderId: string,
   idClient: string,
+  paymentData?: {
+    totalAmount: number;
+    tipAmount: number;
+    gameDiscountAmount?: number;
+    gameDiscountPercentage?: number;
+    satisfactionLevel?: string;
+  }
 ): Promise<Order> => {
   try {
-    const response = await api.put(`/orders/${orderId}/pay`, {
+    const requestBody: any = {
       idClient,
-    });
+    };
+
+    // Agregar datos de pago si están disponibles
+    if (paymentData) {
+      requestBody.paymentDetails = paymentData;
+    }
+
+    const response = await api.put(`/orders/${orderId}/pay`, requestBody);
     console.log("Response from payOrder:", response.data);
     return response.data.order;
   } catch (error: any) {
@@ -253,7 +267,7 @@ export const updateKitchenItemStatus = async (
   } catch (error: any) {
     console.error("Error actualizando status de item:", error);
     throw new Error(
-      error.response?.data?.error || "Error actualizando status de item",
+      error.response?.data?.error || "Error actualizando status de producto",
     );
   }
 };
@@ -372,7 +386,7 @@ export const updateBartenderItemStatus = async (
   } catch (error: any) {
     console.error("Error actualizando status de item de bar:", error);
     throw new Error(
-      error.response?.data?.error || "Error actualizando status de item de bar",
+      error.response?.data?.error || "Error actualizando status de producto de bar",
     );
   }
 };

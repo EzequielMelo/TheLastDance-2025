@@ -55,14 +55,26 @@ export async function awardIfFirstWin(
 ): Promise<{ awarded: boolean; discount: Discount | null }> {
   try {
     const current = await getDiscount();
-    if (current && current.received) {
+    
+    if (isWin) {
+      // Si no hay descuento actual, otorgar el nuevo
+      if (!current || !current.received) {
+        const newDiscount: Discount = { amount: amountIfWin, received: true };
+        await AsyncStorage.setItem(DISCOUNT_KEY, JSON.stringify(newDiscount));
+        return { awarded: true, discount: newDiscount };
+      }
+      
+      // Si ya hay un descuento, pero el nuevo es mayor, actualizar
+      if (amountIfWin > current.amount) {
+        const newDiscount: Discount = { amount: amountIfWin, received: true };
+        await AsyncStorage.setItem(DISCOUNT_KEY, JSON.stringify(newDiscount));
+        return { awarded: true, discount: newDiscount };
+      }
+      
+      // Si el descuento actual es igual o mayor, no otorgar nuevo descuento
       return { awarded: false, discount: current };
     }
-    if (isWin) {
-      const newDiscount: Discount = { amount: amountIfWin, received: true };
-      await AsyncStorage.setItem(DISCOUNT_KEY, JSON.stringify(newDiscount));
-      return { awarded: true, discount: newDiscount };
-    }
+    
     return { awarded: false, discount: current ?? null };
   } catch (e) {
     console.warn("[discount] awardIfFirstWin", e);
