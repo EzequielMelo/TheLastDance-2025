@@ -295,7 +295,7 @@ export default function CartModal({ visible, onClose }: CartModalProps) {
                 ? `${cartCount} ${cartCount === 1 ? "producto" : "productos"} • Se agregará a tu pedido existente`
                 : `${cartCount} ${cartCount === 1 ? "producto" : "productos"} • Tiempo estimado: ${cartTime} min`
               : hasActiveOrder
-                ? "Revisa el estado de tu pedido actual"
+                ? "Revisá el estado de tu pedido actual"
                 : "Tu carrito está vacío"}
           </Text>
         </View>

@@ -14,6 +14,7 @@ import React, { useState, useRef, useMemo } from "react";
 import FormLayout from "../../Layouts/formLayout";
 import TextField from "../../components/form/TextField";
 import ImageField from "../../components/form/ImageField";
+import CUILField from "../../components/form/CUILField";
 import { Picker } from "@react-native-picker/picker";
 import api from "../../api/axios";
 import { RootStackParamList } from "../../navigation/RootStackParamList";
@@ -27,6 +28,7 @@ interface FormData {
   cuil: string;
   email: string;
   password: string;
+  confirmPassword: string;
   profile_code: "empleado" | "supervisor";
   position_code: "cocinero" | "bartender" | "maitre" | "mozo" | "";
   file: any;
@@ -52,6 +54,7 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
     cuil: "",
     email: "",
     password: "",
+    confirmPassword: "",
     profile_code: "empleado",
     position_code: "cocinero",
     file: null,
@@ -97,6 +100,18 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
+    
+    // Si cambió la contraseña, re-validar confirmPassword si tiene errores
+    if (field === "password" && errors.confirmPassword) {
+      const confirmPasswordError = formData.confirmPassword !== value ? "Las contraseñas no coinciden" : "";
+      setErrors((prev) => ({ ...prev, confirmPassword: confirmPasswordError }));
+    }
+    
+    // Si cambió confirmPassword, validar inmediatamente
+    if (field === "confirmPassword") {
+      const confirmPasswordError = value !== formData.password ? "Las contraseñas no coinciden" : "";
+      setErrors((prev) => ({ ...prev, confirmPassword: confirmPasswordError }));
+    }
   };
 
   const validateForm = (): boolean => {
@@ -141,6 +156,13 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
       newErrors.password = "La contraseña es obligatoria";
     } else if (formData.password.length < 6) {
       newErrors.password = "La contraseña debe tener al menos 6 caracteres";
+    }
+
+    // Validar confirmación de contraseña
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = "La confirmación es obligatoria";
+    } else if (formData.confirmPassword !== formData.password) {
+      newErrors.confirmPassword = "Las contraseñas no coinciden";
     }
 
     // Validar perfil y posición
@@ -241,7 +263,15 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
 
     if (dni) {
       handleInputChange("dni", dni);
-      const cuilFormat = `__-${dni}-_`;
+      
+      // Obtener el CUIL actual para preservar el primer y último dígito si ya están completados
+      const currentCuil = formData.cuil || "--";
+      const cuilParts = currentCuil.split("-");
+      const firstDigits = cuilParts[0] || "";
+      const lastDigit = cuilParts[2] || "";
+      
+      // Crear el formato de CUIL con el DNI en el medio, preservando lo que ya estaba
+      const cuilFormat = `${firstDigits}-${dni}-${lastDigit}`;
       handleInputChange("cuil", cuilFormat);
 
       if (firstName) {
@@ -333,6 +363,27 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
     ]);
   };
 
+  const selectPhotoOption = () => {
+    Alert.alert("Seleccionar foto", "¿Cómo deseas agregar la foto?", [
+      {
+        text: "Tomar foto",
+        onPress: () => openCamera("photo"),
+      },
+      {
+        text: "Galería",
+        onPress: pickImageFromGallery,
+      },
+      {
+        text: "Cancelar",
+        style: "cancel",
+      },
+    ]);
+  };
+
+  const toggleCameraType = () => {
+    setFacing(current => (current === "back" ? "front" : "back"));
+  };
+
   const pickImageFromGallery = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -364,23 +415,6 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
       console.error("Error seleccionando imagen:", error);
       ToastAndroid.show("Error al seleccionar la imagen", ToastAndroid.SHORT);
     }
-  };
-
-  const showPhotoOptions = () => {
-    Alert.alert("Seleccionar foto", "¿Cómo deseas agregar la foto?", [
-      {
-        text: "Tomar foto",
-        onPress: () => openCamera("photo"),
-      },
-      {
-        text: "Galería",
-        onPress: pickImageFromGallery,
-      },
-      {
-        text: "Cancelar",
-        style: "cancel",
-      },
-    ]);
   };
 
   const handleSubmit = async () => {
@@ -444,137 +478,151 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
         bottomLinkText=""
         onBottomLinkPress={() => {}}
       >
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <TextField
-            placeholder="Nombre"
-            value={formData.first_name}
-            onChangeText={(v) => handleInputChange("first_name", v)}
-            focused={focused === "first_name"}
-            onFocus={() => setFocused("first_name")}
-            error={errors.first_name}
-          />
-
-          <TextField
-            placeholder="Apellido"
-            value={formData.last_name}
-            onChangeText={(v) => handleInputChange("last_name", v)}
-            focused={focused === "last_name"}
-            onFocus={() => setFocused("last_name")}
-            error={errors.last_name}
-          />
-
-          <View>
-            <View className="flex-row items-center justify-between mb-2">
-              <Text className="text-white text-sm font-medium">DNI</Text>
-              <TouchableOpacity
-                onPress={showDNIOptions}
-                className="bg-blue-500 px-3 py-1 rounded"
-              >
-                <Text className="text-white text-xs">Escanear DNI</Text>
-              </TouchableOpacity>
+        {/* Botón de Escanear DNI - Opción más pequeña */}
+        <View className="mb-4">
+          <TouchableOpacity
+            onPress={showDNIOptions}
+            className="bg-blue-600/20 px-4 py-2 rounded-lg border border-blue-500/30 self-start"
+          >
+            <View className="flex-row items-center">
+              <Text className="text-blue-300 text-lg font-medium">Escanear DNI</Text>
             </View>
+          </TouchableOpacity>
+        </View>
 
+        {/* Layout con Nombre/Apellido y Foto */}
+        <View className="flex-row mb-4 gap-3" style={{ minHeight: 140 }}>
+          {/* Columna izquierda: Nombre y Apellido */}
+          <View className="flex-1">
+            <Text className="text-white text-sm font-medium mb-1">Nombre</Text>
             <TextField
-              placeholder="DNI"
-              value={formData.dni}
-              onChangeText={(v) => handleInputChange("dni", v)}
-              keyboardType="phone-pad"
-              focused={focused === "dni"}
-              onFocus={() => setFocused("dni")}
-              error={errors.dni}
+              placeholder="Nombre"
+              value={formData.first_name}
+              onChangeText={v => handleInputChange("first_name", v)}
+              focused={focused === "first_name"}
+              onFocus={() => setFocused("first_name")}
+              error={errors.first_name}
+            />
+            <Text className="text-white text-sm font-medium mb-1">Apellido</Text>
+            <TextField
+              placeholder="Apellido"
+              value={formData.last_name}
+              onChangeText={v => handleInputChange("last_name", v)}
+              focused={focused === "last_name"}
+              onFocus={() => setFocused("last_name")}
+              error={errors.last_name}
             />
           </View>
 
-          <View>
-            <Text className="text-white text-sm font-medium mb-1">CUIL</Text>
-            <Text className="text-gray-400 text-xs mb-2">
-              Formato: XX-XXXXXXXX-X (completa los dígitos faltantes)
-            </Text>
-            <TextField
-              placeholder="Ej: 20-12345678-9"
-              value={formData.cuil}
-              onChangeText={(v) => handleInputChange("cuil", v)}
-              keyboardType="phone-pad"
-              focused={focused === "cuil"}
-              onFocus={() => setFocused("cuil")}
-              error={errors.cuil}
+          {/* Columna derecha: Foto (ocupa altura de ambos campos) */}
+          <View className="flex-1">
+            <ImageField
+              label="Foto"
+              image={formData.file}
+              onPick={selectPhotoOption}
+              onClear={() => {
+                handleInputChange("file", null);
+              }}
+              error={errors.file}
+              focused={focused === "file"}
             />
           </View>
+        </View>
 
-          <TextField
-            placeholder="Correo electrónico"
-            value={formData.email}
-            onChangeText={(v) => handleInputChange("email", v)}
-            keyboardType="email-address"
-            focused={focused === "email"}
-            onFocus={() => setFocused("email")}
-            error={errors.email}
-          />
+        <Text className="text-white text-sm font-medium mb-1">DNI</Text>
+        <TextField
+          placeholder="DNI"
+          value={formData.dni}
+          onChangeText={v => handleInputChange("dni", v)}
+          keyboardType="phone-pad"
+          focused={focused === "dni"}
+          onFocus={() => setFocused("dni")}
+          error={errors.dni}
+        />
 
-          <TextField
-            placeholder="Contraseña"
-            value={formData.password}
-            onChangeText={(v) => handleInputChange("password", v)}
-            secureTextEntry
-            focused={focused === "password"}
-            onFocus={() => setFocused("password")}
-            error={errors.password}
-          />
+        <CUILField
+          value={formData.cuil}
+          onChangeText={v => handleInputChange("cuil", v)}
+          focused={focused === "cuil"}
+          onFocus={() => setFocused("cuil")}
+          error={errors.cuil}
+        />
+        
+        <TextField
+          placeholder="Correo electrónico"
+          value={formData.email}
+          onChangeText={v => handleInputChange("email", v)}
+          keyboardType="email-address"
+          focused={focused === "email"}
+          onFocus={() => setFocused("email")}
+          error={errors.email}
+        />
 
+        <TextField
+          placeholder="Contraseña"
+          value={formData.password}
+          onChangeText={v => handleInputChange("password", v)}
+          secureTextEntry
+          focused={focused === "password"}
+          onFocus={() => setFocused("password")}
+          error={errors.password}
+        />
+
+        <TextField
+          placeholder="Confirmar contraseña"
+          value={formData.confirmPassword}
+          onChangeText={v => handleInputChange("confirmPassword", v)}
+          secureTextEntry
+          focused={focused === "confirmPassword"}
+          onFocus={() => setFocused("confirmPassword")}
+          error={errors.confirmPassword}
+        />
+
+        <View className="mb-4">
+          <Text className="text-white text-sm font-medium mb-2">Perfil</Text>
+          <View className={`rounded-lg border ${userRole === "supervisor" ? "bg-gray-700 border-gray-500" : "bg-gray-800 border-gray-600"}`}>
+            <Picker
+              selectedValue={formData.profile_code}
+              onValueChange={(value) => handleInputChange("profile_code", value)}
+              style={{ color: userRole === "supervisor" ? "#9ca3af" : "white" }}
+              dropdownIconColor={userRole === "supervisor" ? "#9ca3af" : "white"}
+              enabled={userRole === "dueno"}
+            >
+              {availableProfiles.map((profile) => (
+                <Picker.Item 
+                  key={profile.value} 
+                  label={profile.label} 
+                  value={profile.value} 
+                />
+              ))}
+            </Picker>
+          </View>
+          {errors.profile_code && (
+            <Text className="text-red-400 text-xs mt-1">{errors.profile_code}</Text>
+          )}
+        </View>
+
+        {formData.profile_code === "empleado" && (
           <View className="mb-4">
-            <Text className="text-white text-sm font-medium mb-2">Perfil</Text>
+            <Text className="text-white text-sm font-medium mb-2">Posición</Text>
             <View className="bg-gray-800 rounded-lg border border-gray-600">
               <Picker
-                selectedValue={formData.profile_code}
-                onValueChange={(value) => handleInputChange("profile_code", value)}
+                selectedValue={formData.position_code}
+                onValueChange={(value) => handleInputChange("position_code", value)}
                 style={{ color: "white" }}
                 dropdownIconColor="white"
               >
-                {availableProfiles.map((profile) => (
-                  <Picker.Item 
-                    key={profile.value} 
-                    label={profile.label} 
-                    value={profile.value} 
-                  />
-                ))}
+                <Picker.Item label="Cocinero" value="cocinero" />
+                <Picker.Item label="Bartender" value="bartender" />
+                <Picker.Item label="Maitre" value="maitre" />
+                <Picker.Item label="Mozo" value="mozo" />
               </Picker>
             </View>
-            {errors.profile_code && (
-              <Text className="text-red-400 text-xs mt-1">{errors.profile_code}</Text>
+            {errors.position_code && (
+              <Text className="text-red-400 text-xs mt-1">{errors.position_code}</Text>
             )}
           </View>
-
-          {formData.profile_code === "empleado" && (
-            <View className="mb-4">
-              <Text className="text-white text-sm font-medium mb-2">Posición</Text>
-              <View className="bg-gray-800 rounded-lg border border-gray-600">
-                <Picker
-                  selectedValue={formData.position_code}
-                  onValueChange={(value) => handleInputChange("position_code", value)}
-                  style={{ color: "white" }}
-                  dropdownIconColor="white"
-                >
-                  <Picker.Item label="Cocinero" value="cocinero" />
-                  <Picker.Item label="Bartender" value="bartender" />
-                  <Picker.Item label="Maitre" value="maitre" />
-                  <Picker.Item label="Mozo" value="mozo" />
-                </Picker>
-              </View>
-              {errors.position_code && (
-                <Text className="text-red-400 text-xs mt-1">{errors.position_code}</Text>
-              )}
-            </View>
-          )}
-
-          <ImageField
-            label="Foto Personal"
-            image={formData.file}
-            onPick={showPhotoOptions}
-            onClear={() => handleInputChange("file", null)}
-            error={errors.file}
-            focused={focused === "file"}
-          />
-        </ScrollView>
+        )}
       </FormLayout>
 
       <Modal visible={showCamera} animationType="slide">
@@ -614,7 +662,11 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
                 <CameraView
                   ref={cameraRef}
                   facing={facing}
-                  style={{ flex: 1 }}
+                  style={{
+                    flex: 1,
+                    width: "100%",
+                    height: "100%",
+                  }}
                 >
                   <View className="flex-1 justify-end pb-8">
                     <View className="flex-row justify-around items-center">
@@ -634,7 +686,7 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
                       />
 
                       <TouchableOpacity
-                        onPress={() => setFacing((current) => (current === "back" ? "front" : "back"))}
+                        onPress={toggleCameraType}
                         className="bg-gray-500 p-4 rounded-full"
                       >
                         <Text className="text-white font-bold">Voltear</Text>

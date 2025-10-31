@@ -6,7 +6,6 @@ import {
   FlatList,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,6 +13,7 @@ import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../../auth/useAuth";
 import { API_BASE_URL } from "../../api/config";
 import { Logger } from "../../utils/Logger";
+import ChefLoading from "../../components/common/ChefLoading";
 import { useChatNotifications } from "../../Hooks/useChatNotifications";
 import { ChatNotificationBadge } from "../../components/chat/ChatNotificationBadge";
 
@@ -311,7 +311,7 @@ export default function WaiterDashboardScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#d4af37" />
+        <ChefLoading size="large" />
       </SafeAreaView>
     );
   }

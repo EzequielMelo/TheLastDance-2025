@@ -6,11 +6,11 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ActivityIndicator,
   Keyboard,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { ChefHat } from "lucide-react-native";
+import ChefLoading from "../components/common/ChefLoading";
 
 type Props = {
   title: string;
@@ -90,7 +90,7 @@ export default function FormLayout({
               {title}
             </Text>
             {subtitle ? (
-              <Text className="text-gray-300 text-sm mt-2 text-center">
+              <Text className="text-gray-300 text-base mt-2 text-center">
                 {subtitle}
               </Text>
             ) : null}
@@ -113,7 +113,7 @@ export default function FormLayout({
               className="h-14 justify-center items-center shadow-lg"
             >
               {loading ? (
-                <ActivityIndicator size={35} color="#1a1a1a" />
+                <ChefLoading size="small" />
               ) : (
                 <Text className="text-[#1a1a1a] text-lg font-semibold tracking-wide">
                   {submitLabel}
@@ -155,13 +155,7 @@ export default function FormLayout({
       {loading && (
         <View className="absolute inset-0 bg-black/80 justify-center items-center z-50">
           <View className="bg-gray-800 rounded-2xl p-8 items-center justify-center shadow-2xl mx-4">
-            {/* Spinner */}
-            <ActivityIndicator size="large" color="#d4af37" />
-
-            {/* Texto */}
-            <Text className="text-white text-lg mt-4 font-bold">
-              Procesando...
-            </Text>
+            <ChefLoading size="large" text="Procesando..." />
             <Text className="text-gray-300 text-sm mt-1">Por favor espera</Text>
 
             {/* Barra de progreso animada */}

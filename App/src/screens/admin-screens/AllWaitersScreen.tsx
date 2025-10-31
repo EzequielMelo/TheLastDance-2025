@@ -4,11 +4,11 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  ActivityIndicator,
   RefreshControl,
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import ChefLoading from "../../components/common/ChefLoading";
 import { useAuth } from "../../auth/useAuth";
 import { API_BASE_URL } from "../../api/config";
 import { Logger } from "../../utils/Logger";
@@ -99,7 +99,7 @@ export default function AllWaitersScreen() {
             ]}
           >
             {item.available_slots > 0
-              ? `${item.available_slots} libres`
+              ? `${item.available_slots} Libres`
               : "Completo"}
           </Text>
         </View>
@@ -111,7 +111,7 @@ export default function AllWaitersScreen() {
           {item.assigned_tables.map(table => (
             <View key={table.id} style={styles.tableRow}>
               <Text style={styles.tableInfo}>
-                Mesa {table.number} ({table.capacity}p, {table.type})
+                Mesa {table.number} ({table.capacity} personas, {table.type})
               </Text>
               <Text
                 style={[
@@ -143,7 +143,7 @@ export default function AllWaitersScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#d4af37" />
+        <ChefLoading size="large" />
       </SafeAreaView>
     );
   }
@@ -151,7 +151,7 @@ export default function AllWaitersScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Gestión de Meseros</Text>
+        <Text style={styles.title}>Distribución de Meseros</Text>
         <Text style={styles.subtitle}>
           {waiters.length} mesero{waiters.length !== 1 ? "s" : ""} en total
         </Text>
@@ -225,11 +225,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   statText: {
-    fontSize: 14,
+    fontSize: 16,
     color: "#ccc",
   },
   availabilityText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "bold",
   },
   available: {
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   tablesTitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: "#d4af37",
     fontWeight: "bold",
     marginBottom: 8,
@@ -258,12 +258,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   tableInfo: {
-    fontSize: 13,
+    fontSize: 14,
     color: "#fff",
     flex: 1,
   },
   tableStatus: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "bold",
   },
   occupiedStatus: {
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
     color: "#38a169",
   },
   noTablesText: {
-    fontSize: 14,
+    fontSize: 16,
     color: "#666",
     fontStyle: "italic",
     textAlign: "center",

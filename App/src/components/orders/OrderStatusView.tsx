@@ -171,7 +171,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
               </Text>
               <Text
                 style={{
-                  fontSize: 12,
+                  fontSize: 14,
                   color: "#6b7280",
                   marginTop: 2,
                 }}
@@ -183,7 +183,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
 
           <Text
             style={{
-              fontSize: 14,
+              fontSize: 16,
               color: "#1e40af",
               textAlign: "center",
               fontStyle: "italic",
@@ -237,7 +237,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             </Text>
             <Text
               style={{
-                fontSize: 12,
+                fontSize: 14,
                 color: "#6b7280",
                 marginTop: 2,
               }}
@@ -252,7 +252,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           <View style={{ marginBottom: 16 }}>
             <Text
               style={{
-                fontSize: 15,
+                fontSize: 17,
                 fontWeight: "600",
                 color: "#ef4444",
                 marginBottom: 8,
@@ -279,7 +279,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                 <View style={{ flex: 1 }}>
                   <Text
                     style={{
-                      fontSize: 14,
+                      fontSize: 16,
                       fontWeight: "500",
                       color: "#ef4444",
                       textDecorationLine: "line-through",
@@ -289,7 +289,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                   </Text>
                   <Text
                     style={{
-                      fontSize: 12,
+                      fontSize: 14,
                       color: "#dc2626",
                     }}
                   >
@@ -298,7 +298,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                 </View>
                 <Text
                   style={{
-                    fontSize: 13,
+                    fontSize: 15,
                     fontWeight: "600",
                     color: "#ef4444",
                     backgroundColor: "rgba(239, 68, 68, 0.2)",
@@ -319,7 +319,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           <View style={{ marginBottom: 16 }}>
             <Text
               style={{
-                fontSize: 15,
+                fontSize: 17,
                 fontWeight: "600",
                 color: "#22c55e",
                 marginBottom: 8,
@@ -346,7 +346,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                 <View style={{ flex: 1 }}>
                   <Text
                     style={{
-                      fontSize: 14,
+                      fontSize: 16,
                       fontWeight: "500",
                       color: "#16a34a",
                     }}
@@ -355,7 +355,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                   </Text>
                   <Text
                     style={{
-                      fontSize: 12,
+                      fontSize: 14,
                       color: "#15803d",
                     }}
                   >
@@ -364,7 +364,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                 </View>
                 <Text
                   style={{
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: "600",
                     color: "#22c55e",
                     backgroundColor: "rgba(34, 197, 94, 0.2)",
@@ -386,7 +386,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             <View style={{ marginBottom: 16 }}>
               <Text
                 style={{
-                  fontSize: 15,
+                  fontSize: 17,
                   fontWeight: "600",
                   color: "#6b7280",
                   marginBottom: 8,
@@ -413,16 +413,16 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                   <View style={{ flex: 1 }}>
                     <Text
                       style={{
-                        fontSize: 14,
-                        fontWeight: "500",
+                        fontSize: 16,
+                        fontWeight: "600",
                         color: "#6b7280",
                       }}
                     >
-                      {item.menu_item?.name}
+                      ${item.subtotal}
                     </Text>
                     <Text
                       style={{
-                        fontSize: 12,
+                        fontSize: 14,
                         color: "#9ca3af",
                       }}
                     >
@@ -456,7 +456,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
         >
           <Text
             style={{
-              fontSize: 14,
+              fontSize: 16,
               fontWeight: "600",
               color: "#3b82f6",
               marginBottom: 4,
@@ -466,7 +466,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           </Text>
           <Text
             style={{
-              fontSize: 12,
+              fontSize: 14,
               color: "#1e40af",
               lineHeight: 16,
             }}
@@ -493,7 +493,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             style={{
               color: "#1a1a1a",
               fontWeight: "700",
-              fontSize: 15,
+              fontSize: 17,
             }}
           >
             🔄 Modificar Selección
@@ -569,7 +569,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             </Text>
             <Text
               style={{
-                fontSize: 12,
+                fontSize: 14,
                 color: "#6b7280",
                 marginTop: 2,
               }}
@@ -599,7 +599,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             <View style={{ flex: 1 }}>
               <Text
                 style={{
-                  fontSize: 14,
+                  fontSize: 16,
                   fontWeight: "500",
                   color: "#ef4444",
                   textDecorationLine: "line-through",
@@ -609,7 +609,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
               </Text>
               <Text
                 style={{
-                  fontSize: 12,
+                  fontSize: 14,
                   color: "#dc2626",
                 }}
               >
@@ -618,7 +618,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             </View>
             <Text
               style={{
-                fontSize: 12,
+                fontSize: 14,
                 fontWeight: "600",
                 color: "#ef4444",
                 backgroundColor: "rgba(239, 68, 68, 0.2)",
@@ -696,7 +696,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           <View style={{ flex: 1, marginLeft: 8 }}>
             <Text
               style={{
-                fontSize: 16,
+                fontSize: 18,
                 fontWeight: "600",
                 color: "#ffffff", // Texto blanco para mejor contraste
               }}
@@ -705,7 +705,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             </Text>
             <Text
               style={{
-                fontSize: 12,
+                fontSize: 14,
                 color: "#e5e7eb", // Texto gris claro para descripción
                 marginTop: 2,
               }}
@@ -731,7 +731,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             <View style={{ flex: 1 }}>
               <Text
                 style={{
-                  fontSize: 14,
+                  fontSize: 16,
                   fontWeight: "500",
                   color: "#ffffff", // Texto blanco para mejor contraste
                 }}
@@ -740,7 +740,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
               </Text>
               <Text
                 style={{
-                  fontSize: 12,
+                  fontSize: 14,
                   color: "#d1d5db", // Gris claro para subtexto
                 }}
               >
@@ -749,7 +749,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             </View>
             <Text
               style={{
-                fontSize: 14,
+                fontSize: 16,
                 fontWeight: "600",
                 color: "#ffffff", // Texto blanco para precio
               }}
@@ -787,16 +787,16 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
         style={{
           fontSize: 20,
           fontWeight: "bold",
-          color: "#111827",
+          color: "#ebe8e8",
           marginBottom: 16,
         }}
       >
-        Estado de tu Pedido
+        Estado de tu pedido
       </Text>
 
       <Text
         style={{
-          fontSize: 12,
+          fontSize: 14,
           color: "#6b7280",
           marginBottom: 16,
         }}
@@ -832,7 +832,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             style={{
               color: "white",
               fontWeight: "600",
-              fontSize: 16,
+              fontSize: 18,
             }}
           >
             Agregar Más Productos
@@ -851,7 +851,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
       >
         <Text
           style={{
-            fontSize: 12,
+            fontSize: 14,
             color: "#6b7280",
             textAlign: "center",
           }}
@@ -877,14 +877,14 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           style={{
             fontSize: 16,
             fontWeight: "600",
-            color: "#111827",
+            color: "#ebe8e8",
           }}
         >
-          Total del Pedido:
+          Total del pedido:
         </Text>
         <Text
           style={{
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: "bold",
             color: "#22c55e",
           }}

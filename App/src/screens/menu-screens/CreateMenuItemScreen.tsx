@@ -181,7 +181,7 @@ export default function CreateMenuItemScreen({ navigation }: any) {
         loading={false}
         showDivider={false}
       >
-        <Text className="text-gray-300 text-base">
+        <Text className="text-gray-300 text-lg">
           Solo <Text className="text-[#d4af37]">Cocinero</Text> puede crear <Text className="text-[#d4af37]">platos</Text> y{" "}
           <Text className="text-[#d4af37]">Bartender</Text> puede crear <Text className="text-[#d4af37]">bebidas</Text>.
         </Text>
@@ -202,74 +202,32 @@ export default function CreateMenuItemScreen({ navigation }: any) {
       onBottomLinkPress={() => {}}
       showDivider={false}
     >
-      {/* Categoría (bloqueada según rol) */}
-      <View className="mb-3">
-        <Text className="text-gray-300 mb-1">Categoría</Text>
-        <View className="flex-row gap-2">
-          <Tag
-            label="Plato"
-            active={effectiveCategory === "plato"}
-            disabled={lockedCategory !== null && lockedCategory !== "plato"}
-            onPress={() => setCategory("plato")}
-          />
-          <Tag
-            label="Bebida"
-            active={effectiveCategory === "bebida"}
-            disabled={lockedCategory !== null && lockedCategory !== "bebida"}
-            onPress={() => setCategory("bebida")}
-          />
-        </View>
-        {lockedCategory && <Text className="text-xs text-gray-400 mt-1">Fijado por rol: {lockedCategory}</Text>}
-      </View>
-
-      {/* Nombre */}
       <InputRow placeholder="Nombre" value={name} onChangeText={setName} />
 
-      {/* Descripción */}
       <InputRow placeholder="Descripción" value={description} onChangeText={setDescription} multiline numberOfLines={3} />
 
-      {/* Tiempo preparación y precio */}
       <View className="flex-row gap-3">
         <View className="flex-1">
-          <InputRow placeholder="Min. preparación" value={prepMinutes} onChangeText={setPrepMinutes} keyboardType="numeric" />
+          <InputRow placeholder="Tiempo (min)" value={prepMinutes} onChangeText={setPrepMinutes} keyboardType="numeric" />
         </View>
         <View className="flex-1">
           <InputRow placeholder="Precio" value={price} onChangeText={setPrice} keyboardType="numeric" />
         </View>
       </View>
 
-      {/* Imágenes (3) */}
-      <Text className="text-gray-300 mt-4 mb-2">Imágenes (3)</Text>
-      <View className="flex-row gap-3">
+      <Text className="text-gray-300 mt-4 mb-2 text-base font-bold">Imágenes (3)</Text>
+      <View className="flex-row gap-3 mb-2">
         {[0, 1, 2].map((i) => (
-          <ImageSlotView
-            key={i}
-            slot={images[i as 0 | 1 | 2]}
-            onPick={() => pickAt(i as 0 | 1 | 2)}
-            onRemove={() => removeAt(i as 0 | 1 | 2)}
-          />
+          <View key={i} className="flex-1">
+            <ImageSlotView
+              slot={images[i as 0 | 1 | 2]}
+              onPick={() => pickAt(i as 0 | 1 | 2)}
+              onRemove={() => removeAt(i as 0 | 1 | 2)}
+            />
+          </View>
         ))}
       </View>
     </FormLayout>
-  );
-}
-
-function Tag({label, active, onPress, disabled,}: {
-  label: string;
-  active?: boolean;
-  onPress: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <TouchableOpacity
-      disabled={disabled}
-      onPress={onPress}
-      className={`px-4 py-2 rounded-full border ${
-        active ? "bg-[#d4af37] border-[#d4af37]" : "bg-white/10 border-white/20"
-      } ${disabled ? "opacity-40" : ""}`}
-    >
-      <Text className={active ? "text-black" : "text-white"}>{label}</Text>
-    </TouchableOpacity>
   );
 }
 
@@ -285,7 +243,7 @@ function InputRow({placeholder, value, onChangeText, keyboardType = "default", m
     <View className="mb-3">
       <View className="rounded-xl border px-4 bg-white/10 border-white/20">
         <TextInput
-          className="text-white text-base py-3"
+          className="text-white text-lg py-3"
           placeholder={placeholder}
           placeholderTextColor="#888"
           value={value}
@@ -305,7 +263,7 @@ function ImageSlotView({slot, onPick, onRemove,}: {
   onRemove: () => void;
 }) {
   return (
-    <View className="w-24 h-24 rounded-xl overflow-hidden bg-white/10 border border-white/20 items-center justify-center">
+    <View className="w-full aspect-square rounded-xl overflow-hidden bg-white/10 border border-white/20 items-center justify-center">
       {slot ? (
         <>
           <Image source={{ uri: slot.uri }} className="w-full h-full" />

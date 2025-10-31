@@ -232,10 +232,9 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
       positions: ["mozo"],
     },
 
-    // Gestión de Meseros (Dueño/Supervisor) - Solo esta opción, no la de usuarios pendientes
     {
       id: "manage-waiters",
-      title: "Gestión de Meseros",
+      title: "Distribución de Meseros",
       subtitle: "Ver y supervisar meseros y sus mesas asignadas",
       icon: <Image source={IMGS.mozo} style={{ width: 20, height: 20 }} />,
       onPress: () => onNavigate("AllWaiters"),

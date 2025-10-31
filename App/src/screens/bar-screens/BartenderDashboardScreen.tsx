@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   RefreshControl,
   ToastAndroid,
-  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -14,6 +13,7 @@ import type { RootStackParamList } from "../../navigation/RootStackParamList";
 import { ArrowLeft, Clock, Users, Wine, CheckCircle } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import api from "../../api/axios";
+import ChefLoading from "../../components/common/ChefLoading";
 
 type Props = NativeStackScreenProps<RootStackParamList, "BartenderDashboard">;
 
@@ -58,13 +58,9 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
 
   const fetchBartenderOrders = useCallback(async () => {
     try {
-      console.log("📋 Cargando órdenes de bar...");
-      const response = await api.get("/orders/bar/pending");
-      console.log("📊 Respuesta del servidor:", response.data);
-      
+      const response = await api.get("/orders/bar/pending");   
       const ordersData = response.data?.data || [];
       setOrders(ordersData);
-      console.log(`✅ Se cargaron ${ordersData.length} órdenes para bar`);
     } catch (error: any) {
       console.error("❌ Error cargando órdenes de bar:", error);
       ToastAndroid.show("❌ No se pudieron cargar las órdenes", ToastAndroid.SHORT);
@@ -200,7 +196,7 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
             }}
           >
             <Wine size={16} color="#000" />
-            <Text style={{ color: "#000", fontWeight: "600", marginLeft: 8 }}>
+            <Text style={{ color: "#000",  fontSize: 16, fontWeight: "600", marginLeft: 8 }}>
               Empezar preparación
             </Text>
           </TouchableOpacity>
@@ -220,7 +216,7 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
             }}
           >
             <CheckCircle size={16} color="#fff" />
-            <Text style={{ color: "#fff", fontWeight: "600", marginLeft: 8 }}>
+            <Text style={{ color: "#fff",  fontSize: 16, fontWeight: "600", marginLeft: 8 }}>
               Marcar como lista
             </Text>
           </TouchableOpacity>
@@ -253,8 +249,7 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#0f0f0f" }}>
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <ActivityIndicator size="large" color="#d4af37" />
-          <Text style={{ marginTop: 16, color: "#d4af37" }}>Cargando órdenes de bar...</Text>
+          <ChefLoading size="large" text="Cargando órdenes de bar..." />
         </View>
       </SafeAreaView>
     );
@@ -315,19 +310,19 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
             <Text style={{ fontSize: 24, fontWeight: "700", color: "#d4af37" }}>
               {stats.accepted}
             </Text>
-            <Text style={{ fontSize: 12, color: "#999" }}>Pendientes</Text>
+            <Text style={{ fontSize: 14, color: "#999" }}>Pendientes</Text>
           </View>
           <View style={{ alignItems: "center" }}>
             <Text style={{ fontSize: 24, fontWeight: "700", color: "#8B4513" }}>
               {stats.preparing}
             </Text>
-            <Text style={{ fontSize: 12, color: "#999" }}>Preparando</Text>
+            <Text style={{ fontSize: 14, color: "#999" }}>Preparando</Text>
           </View>
           <View style={{ alignItems: "center" }}>
             <Text style={{ fontSize: 24, fontWeight: "700", color: "#228B22" }}>
               {stats.ready}
             </Text>
-            <Text style={{ fontSize: 12, color: "#999" }}>Listas</Text>
+            <Text style={{ fontSize: 14, color: "#999" }}>Listas</Text>
           </View>
         </View>
       </View>

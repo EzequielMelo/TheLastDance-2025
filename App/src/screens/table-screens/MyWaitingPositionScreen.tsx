@@ -84,8 +84,6 @@ export default function MyWaitingPositionScreen() {
       const statusResponse = await api.get("/tables/my-status");
       const status = statusResponse.data.status;
 
-      console.log("Estado del cliente:", status, statusResponse.data);
-
       if (status === "assigned") {
         // El cliente ya fue asignado a una mesa
         setPosition(null);

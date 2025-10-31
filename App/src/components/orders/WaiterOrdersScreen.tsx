@@ -414,8 +414,8 @@ export default function WaiterOrdersScreen() {
                               <Image
                                 source={{ uri: batch.order.user.profile_image }}
                                 style={{
-                                  width: 32,
-                                  height: 32,
+                                  width: 48,
+                                  height: 48,
                                   borderRadius: 16,
                                   marginRight: 8,
                                 }}
@@ -423,8 +423,8 @@ export default function WaiterOrdersScreen() {
                             ) : (
                               <View
                                 style={{
-                                  width: 32,
-                                  height: 32,
+                                  width: 48,
+                                  height: 48,
                                   borderRadius: 16,
                                   backgroundColor: "#3b82f6",
                                   alignItems: "center",
@@ -436,7 +436,7 @@ export default function WaiterOrdersScreen() {
                                   style={{
                                     color: "white",
                                     fontWeight: "600",
-                                    fontSize: 14,
+                                    fontSize: 16,
                                   }}
                                 >
                                   {batch.order.user?.first_name
@@ -459,7 +459,7 @@ export default function WaiterOrdersScreen() {
                               <Text
                                 style={{
                                   color: "#d1d5db",
-                                  fontSize: 12,
+                                  fontSize: 14,
                                 }}
                               >
                                 {batch.order.user
@@ -544,7 +544,7 @@ export default function WaiterOrdersScreen() {
                           <Text
                             style={{
                               color: "#3b82f6",
-                              fontSize: 14,
+                              fontSize: 16,
                               fontWeight: "600",
                             }}
                           >
@@ -617,7 +617,7 @@ export default function WaiterOrdersScreen() {
                                         padding: 2,
                                       }}
                                     >
-                                      <XCircle size={12} color="white" />
+                                      <XCircle size={14} color="white" />
                                     </View>
                                   ) : (
                                     <Square size={16} color="#6b7280" />
@@ -649,7 +649,7 @@ export default function WaiterOrdersScreen() {
                                 <Text
                                   style={{
                                     color: "#9ca3af",
-                                    fontSize: 12,
+                                    fontSize: 14,
                                   }}
                                 >
                                   Cantidad: {item.quantity} •{" "}

@@ -41,7 +41,9 @@ export type RootStackParamList = {
   TableChat: { tableId: string; autoMessage?: string }; // Chat entre cliente y mesero
   BillPayment: { tableNumber?: number; tableId?: string }; // Pantalla de pago de cuenta
   KitchenDashboard: undefined; // Panel de cocina para cocineros
+  KitchenMenu: undefined; // Menú de platos para cocineros (solo vista)
   BartenderDashboard: undefined; // Panel de bar para bartenders
+  BarMenu: undefined; // Menú de bebidas para bartenders (solo vista)
 };
 
 export type RootStackNavigationProp = StackNavigationProp<RootStackParamList>;

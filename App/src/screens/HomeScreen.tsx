@@ -3,7 +3,6 @@ import {
   View,
   Text,
   Image,
-  ActivityIndicator,
   TouchableOpacity,
   ToastAndroid,
   Modal,
@@ -14,11 +13,12 @@ import {
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
+import ChefLoading from "../components/common/ChefLoading";
 import { useAuth } from "../auth/useAuth";
 import { useFocusEffect } from "@react-navigation/native";
 import { useBottomNav } from "../context/BottomNavContext";
 import api from "../api/axios";
-import { Menu, User as UserIcon, Users, QrCode, UtensilsCrossed, Wine, BookOpen, CheckCircle, Clock, Search } from "lucide-react-native";
+import { Menu, User as UserIcon, Users, QrCode, UtensilsCrossed, Wine, BookOpen, CheckCircle, Clock, BottleWine, Hamburger } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User";
 import ClientFlowNavigation from "../components/navigation/ClientFlowNavigation";
@@ -49,6 +49,8 @@ export default function HomeScreen({ navigation, route }: Props) {
   // Estados para mesas con pago pendiente (mozos)
   const [pendingPaymentTables, setPendingPaymentTables] = useState<any[]>([]);
   const [loadingPaymentTables, setLoadingPaymentTables] = useState(false);
+  const [confirmingPayments, setConfirmingPayments] = useState<Set<string>>(new Set());
+  const [deliveringTables, setDeliveringTables] = useState<Set<string>>(new Set());
   // Estado para manejar refresh del cliente
   const [clientRefreshTrigger, setClientRefreshTrigger] = useState(0);
   // Estado para pull-to-refresh
@@ -320,15 +322,10 @@ export default function HomeScreen({ navigation, route }: Props) {
   }, [user, loadPendingUsers]);
 
   // Cargar información del mozo para clientes en confirm_pending
-  useEffect(() => {
-    console.log("🔍 useEffect mozo - user:", user?.id, "position_code:", user?.position_code);
-    console.log("🔍 useEffect mozo - waitingListStatus:", waitingListStatus);
-    
+  useEffect(() => { 
     if (user && !user.position_code && waitingListStatus === "confirm_pending") {
-      console.log("✅ Condiciones cumplidas - cargando info del mozo");
       loadWaiterInfo();
     } else if (waitingListStatus !== "confirm_pending") {
-      console.log("❌ Estado no es confirm_pending - limpiando waiterInfo");
       setWaiterInfo(null);
     }
   }, [user, waitingListStatus, loadWaiterInfo]);
@@ -410,28 +407,14 @@ export default function HomeScreen({ navigation, route }: Props) {
     setSidebarVisible(true);
   };
 
-  const loadDishesMenu = async () => {
-    try {
-      const dishes = await getDishesForKitchen();
-      setMenuItems(dishes);
-      setMenuType("platos");
-      setShowMenu(true);
-    } catch (error) {
-      console.error("Error loading dishes:", error);
-      ToastAndroid.show("Error al cargar el menú de platos", ToastAndroid.SHORT);
-    }
+  const loadDishesMenu = () => {
+    // Navegar directamente a la pantalla de menú de platos
+    handleNavigate("KitchenMenu");
   };
 
-  const loadDrinksMenu = async () => {
-    try {
-      const drinks = await getDrinksForBar();
-      setMenuItems(drinks);
-      setMenuType("bebidas");
-      setShowMenu(true);
-    } catch (error) {
-      console.error("Error loading drinks:", error);
-      ToastAndroid.show("Error al cargar el menú de bebidas", ToastAndroid.SHORT);
-    }
+  const loadDrinksMenu = () => {
+    // Navegar directamente a la pantalla de menú de bebidas
+    handleNavigate("BarMenu");
   };
 
   // Función para marcar item como entregado
@@ -464,13 +447,60 @@ export default function HomeScreen({ navigation, route }: Props) {
     }
   };
 
+  // Función para entregar todos los items de una mesa
+  const handleDeliverAllItems = async (tableId: string, items: any[], customerName: string, tableNumber: string) => {
+    try {
+      setDeliveringTables(prev => new Set([...prev, tableId]));
+      
+      // Entregar todos los items de la mesa
+      for (const item of items) {
+        await api.put(`/orders/waiter/item/${item.id}/delivered`);
+      }
+      
+      // Mostrar confirmación con ChefLoading por 2 segundos
+      setTimeout(() => {
+        setDeliveringTables(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(tableId);
+          return newSet;
+        });
+        ToastAndroid.show(`✅ Pedido completo entregado - Mesa ${tableNumber}`, ToastAndroid.SHORT);
+      }, 2000);
+      
+      // Recargar la lista de items listos y pagos pendientes
+      await loadReadyItems();
+      await loadPendingPaymentTables();
+              
+    } catch (error: any) {
+      console.error("Error delivering all items:", error);
+      setDeliveringTables(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(tableId);
+        return newSet;
+      });
+      ToastAndroid.show(
+        error.response?.data?.error || "Error al entregar pedido completo",
+        ToastAndroid.SHORT
+      );
+    }
+  };
+
   // Función para confirmar pago de una mesa
   const handleConfirmPayment = async (tableId: string, tableName: string, customerName: string) => {
     try {
-      ToastAndroid.show(`💰 Confirmando pago de ${customerName} - Mesa ${tableName}...`, ToastAndroid.SHORT);
+      setConfirmingPayments(prev => new Set([...prev, tableId]));
       
       await confirmPayment(tableId);
-      ToastAndroid.show("✅ Pago confirmado y mesa liberada", ToastAndroid.SHORT);
+      
+      // Mostrar confirmación con ChefLoading por 2 segundos
+      setTimeout(() => {
+        setConfirmingPayments(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(tableId);
+          return newSet;
+        });
+        ToastAndroid.show("✅ Pago confirmado y mesa liberada", ToastAndroid.SHORT);
+      }, 2000);
       
       // Recargar las listas
       await loadReadyItems();
@@ -478,6 +508,11 @@ export default function HomeScreen({ navigation, route }: Props) {
               
     } catch (error: any) {
       console.error("Error confirmando pago:", error);
+      setConfirmingPayments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(tableId);
+        return newSet;
+      });
       ToastAndroid.show(
         error.message || "Error al confirmar pago", 
         ToastAndroid.SHORT
@@ -521,21 +556,10 @@ export default function HomeScreen({ navigation, route }: Props) {
     return label;
   };
 
-  const getProfileColor = (profileCode: string) => {
-    const colors: { [key: string]: string } = {
-      dueno: "#430fa6", // aura
-      supervisor: "#ea580c", // naranja
-      empleado: "#2563eb", // azul
-      cliente_registrado: "#16a34a", // verde
-      cliente_anonimo: "#6b7280", // gris
-    };
-    return colors[profileCode] || "#6b7280";
-  };
-
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-black">
-        <ActivityIndicator />
+        <ChefLoading size="large" />
       </View>
     );
   }
@@ -693,7 +717,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                     alignItems: "center",
                     marginTop: 12
                   }}>
-                    <ActivityIndicator size="small" color="#fbbf24" />
+                    <ChefLoading size="small" />
                     <Text style={{ 
                       color: "#fbbf24", 
                       fontSize: 14, // Aumentado de 12 a 14
@@ -732,7 +756,7 @@ export default function HomeScreen({ navigation, route }: Props) {
 
               {/* Panel de acceso rápido para cocinero */}
               <ActionCard
-                title="🍳 Panel de Cocina"
+                title="Panel de Cocina"
                 description="Ver pedidos pendientes y actualizar el estado de preparación"
                 icon={UtensilsCrossed}
                 onPress={() => handleNavigate("KitchenDashboard")}
@@ -742,7 +766,7 @@ export default function HomeScreen({ navigation, route }: Props) {
               <ActionCard
                 title="Agregar plato al menú"
                 description="Crear nuevos platos para el restaurante"
-                icon={QrCode}
+                icon={Hamburger}
                 onPress={() => handleNavigate("CreateMenuItem", { initialCategory: "plato" })}
               />
 
@@ -781,7 +805,7 @@ export default function HomeScreen({ navigation, route }: Props) {
 
               {/* Panel de acceso rápido para bartender */}
               <ActionCard
-                title="🍷 Panel de Bar"
+                title="Panel de Bar"
                 description="Ver bebidas pendientes y actualizar el estado de preparación"
                 icon={Wine}
                 onPress={() => handleNavigate("BartenderDashboard")}
@@ -792,7 +816,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                 variant="secondary"
                 title="Agregar bebida al menú"
                 description="Crear nuevas bebidas para el restaurante"
-                icon={QrCode}
+                icon={BottleWine}
                 onPress={() => handleNavigate("CreateMenuItem", { initialCategory: "bebida" })}
                 style={{ marginBottom: 12 }}
               />
@@ -925,6 +949,41 @@ export default function HomeScreen({ navigation, route }: Props) {
                           </View>
                         </View>
 
+                        {/* Botón entregar todo (solo si hay más de un item) */}
+                        {table.items.length > 1 && (
+                          <TouchableOpacity
+                            onPress={async () => await handleDeliverAllItems(table.table_id, table.items, table.customer_name, table.table_number.toString())}
+                            disabled={deliveringTables.has(table.table_id)}
+                            style={{
+                              backgroundColor: deliveringTables.has(table.table_id) ? "#10b981aa" : "#10b981",
+                              paddingHorizontal: 16,
+                              paddingVertical: 12,
+                              borderRadius: 8,
+                              flexDirection: "row",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginBottom: 12,
+                              opacity: deliveringTables.has(table.table_id) ? 0.7 : 1,
+                            }}
+                          >
+                            {deliveringTables.has(table.table_id) ? (
+                              <ChefLoading size="small" />
+                            ) : (
+                              <>
+                                <CheckCircle size={18} color="white" />
+                                <Text style={{ 
+                                  color: "white", 
+                                  fontSize: 14, 
+                                  marginLeft: 8, 
+                                  fontWeight: "600" 
+                                }}>
+                                  Entregar Todo
+                                </Text>
+                              </>
+                            )}
+                          </TouchableOpacity>
+                        )}
+
                         {/* Lista de items de la mesa */}
                         {table.items.map((item: any, index: number) => (
                           <View key={item.id} style={{
@@ -990,7 +1049,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                               }}
                             >
                               {deliveringItems.has(item.id) ? (
-                                <ActivityIndicator size="small" color="white" />
+                                <ChefLoading size="small" />
                               ) : (
                                 <>
                                   <CheckCircle size={16} color="white" />
@@ -1041,7 +1100,21 @@ export default function HomeScreen({ navigation, route }: Props) {
                         marginBottom: 12,
                         borderLeftWidth: 4,
                         borderLeftColor: "#fbbf24",
-                      }}><Text>#$</Text>
+                      }}>
+                        {/* Monto total del pedido */}
+                        <View style={{ 
+                          alignItems: "flex-end", 
+                          marginBottom: 8 
+                        }}>
+                          <Text style={{ 
+                            color: "#fbbf24", 
+                            fontSize: 16, 
+                            fontWeight: "700" 
+                          }}>
+                            Total: ${table.total_amount || 0}
+                          </Text>
+                        </View>
+                        
                         {/* Header de la mesa */}
                         <View style={{ 
                           flexDirection: "row", 
@@ -1073,16 +1146,23 @@ export default function HomeScreen({ navigation, route }: Props) {
                               table.table_number.toString(), 
                               table.customer_name
                             )}
+                            disabled={confirmingPayments.has(table.table_id)}
                             style={{
-                              backgroundColor: "#fbbf24",
+                              backgroundColor: confirmingPayments.has(table.table_id) ? "#fbbf24aa" : "#fbbf24",
                               paddingHorizontal: 20,
                               paddingVertical: 12,
                               borderRadius: 8,
                               flexDirection: "row",
                               alignItems: "center",
+                              justifyContent: "center",
+                              minWidth: 80,
                             }}
                           >
-                            <CheckCircle size={18} color="white" />
+                            {confirmingPayments.has(table.table_id) ? (
+                              <ChefLoading size="small" />
+                            ) : (
+                              <CheckCircle size={18} color="white" />
+                            )}
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -1094,7 +1174,7 @@ export default function HomeScreen({ navigation, route }: Props) {
               {/* Otros accesos del mozo */}
               <ActionCard
                 title="📋 Panel del Mesero"
-                description="Gestionar tus mesas asignadas (máximo 3)"
+                description="Gestionar tus mesas asignadas"
                 icon={Clock}
                 onPress={() => handleNavigate("WaiterDashboard")}
               />
@@ -1134,10 +1214,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                   marginBottom: 16,
                   alignItems: "center"
                 }}>
-                  <ActivityIndicator size="small" color="#d4af37" />
-                  <Text style={{ color: "#fff", marginTop: 8 }}>
-                    Cargando usuarios pendientes...
-                  </Text>
+                  <ChefLoading size="small" text="Cargando usuarios pendientes..." />
                 </View>
               ) : pendingUsers.length > 0 ? (
                 <View style={{
@@ -1299,7 +1376,7 @@ export default function HomeScreen({ navigation, route }: Props) {
               />
 
               <ActionCard
-                title="👨‍💼 Gestión de Meseros"
+                title="👨‍💼 Distribución de Meseros"
                 description="Supervisar meseros y sus mesas asignadas"
                 icon={Users}
                 onPress={() => handleNavigate("AllWaiters")}

@@ -2,13 +2,13 @@ import React, { useEffect, useState, useContext } from "react";
 import {
   View,
   Text,
-  ActivityIndicator,
   FlatList,
   Image,
   TouchableOpacity,
   ToastAndroid,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import ChefLoading from "../../components/common/ChefLoading";
 import { Check, X } from "lucide-react-native";
 import api from "../../api/axios";
 import { AuthContext } from "../../auth/AuthContext";
@@ -72,7 +72,7 @@ export default function ClientsScreen({}: Props) {
         colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
         className="flex-1 items-center justify-center"
       >
-        <ActivityIndicator size="large" color="#fff" />
+        <ChefLoading size="large" />
       </LinearGradient>
     );
   }

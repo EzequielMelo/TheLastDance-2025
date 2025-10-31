@@ -453,9 +453,7 @@ export const confirmPayment = async (
   message: string;
 }> => {
   try {
-    console.log("💰 API: Confirmando pago para mesa:", tableId);
     const response = await api.put(`/orders/table/${tableId}/confirm-payment`);
-    console.log("✅ API: Respuesta confirmación pago:", response.data);
     return response.data;
   } catch (error: any) {
     console.error("❌ API: Error confirmando pago:", error);
@@ -468,9 +466,7 @@ export const confirmPayment = async (
 // Obtener mesas con pago pendiente de confirmación (para mozos)
 export const getWaiterPendingPayments = async (): Promise<any[]> => {
   try {
-    console.log("💰 API: Obteniendo mesas con pago pendiente");
     const response = await api.get("/orders/waiter/pending-payments");
-    console.log("💰 API: Mesas con pago pendiente:", response.data);
     return response.data.data || [];
   } catch (error: any) {
     console.error("❌ API: Error obteniendo pagos pendientes:", error);

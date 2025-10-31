@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   Alert,
   ToastAndroid,
-  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
+import ChefLoading from "../../components/common/ChefLoading";
 import {
   Users,
   User,
@@ -313,7 +313,7 @@ export default function JoinWaitingListScreen() {
           <View className="flex-row items-center justify-center">
             {submitting ? (
               <>
-                <ActivityIndicator size="small" color="white" />
+                <ChefLoading size="small" />
                 <Text className="text-white font-semibold text-lg ml-2">
                   Agregando...
                 </Text>

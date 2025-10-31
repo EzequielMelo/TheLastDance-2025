@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -6,14 +6,16 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  ActivityIndicator,
   Alert,
   RefreshControl,
   Dimensions,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
+import ChefLoading from "../../components/common/ChefLoading";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
@@ -44,8 +46,8 @@ import FloatingCart from "../../components/cart/FloatingCart";
 import CartModal from "../../components/cart/CartModal";
 
 const { width, height } = Dimensions.get("window");
-// Altura disponible por producto (reducida para mejor separación)
-const ITEM_VISIBLE_HEIGHT = Math.max(height - 220, 380);
+// Altura disponible por producto (optimizada para dispositivos reales)
+const ITEM_VISIBLE_HEIGHT = Math.max(height - 180, 460);
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type MenuScreenRouteProp = RouteProp<RootStackParamList, "Menu">;
@@ -99,6 +101,9 @@ export default function MenuScreen() {
     "all" | "plato" | "bebida"
   >("all");
   const [cartModalVisible, setCartModalVisible] = useState(false);
+  
+  // Estado para manejar los indicadores de imagen
+  const [currentImageIndex, setCurrentImageIndex] = useState<{[key: string]: number}>({});
 
   // Modo de modificación de productos rechazados
   const isModifyMode = route.params?.mode === "modify-rejected";
@@ -443,10 +448,7 @@ export default function MenuScreen() {
         colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
         style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
       >
-        <ActivityIndicator size="large" color="#d4af37" />
-        <Text style={{ color: "white", fontSize: 18, marginTop: 16 }}>
-          Cargando menú...
-        </Text>
+        <ChefLoading size="large" text="Cargando menú..." />
       </LinearGradient>
     );
   }
@@ -640,19 +642,33 @@ export default function MenuScreen() {
             colors={["#d4af37"]}
           />
         }
-
+        contentContainerStyle={{ 
+          paddingBottom: 140 // Espacio optimizado para carrito flotante + navbar
+        }}
         renderItem={({ item }) => {
           const CategoryIcon = getCategoryIcon(item.category);
           const categoryColor = getCategoryColor(item.category);
           const isRejected = wasItemRejected(item.id);
 
-          // Calculamos un espacio fijo para evitar saltos visuales
-          const RESERVED_BOTTOM = 120; // Espacio fijo para carrito + navbar + padding
+          // Calculamos un espacio más optimizado para dispositivos reales
+          const RESERVED_BOTTOM = 130; // Optimizado para mejor aprovechamiento
           
           const innerCardHeight = Math.max(
-            ITEM_VISIBLE_HEIGHT - RESERVED_BOTTOM - 40, // Restamos espacio consistente
-            280, // Altura mínima
+            ITEM_VISIBLE_HEIGHT - RESERVED_BOTTOM - 15, // Menos agresivo en la reducción
+            360, // Altura mínima aumentada para garantizar espacio
           );
+
+          // Función para manejar el scroll de imágenes
+          const handleImageScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+            const scrollPosition = event.nativeEvent.contentOffset.x;
+            const imageIndex = Math.round(scrollPosition / (width - 48));
+            setCurrentImageIndex(prev => ({
+              ...prev,
+              [item.id]: imageIndex
+            }));
+          };
+
+          const currentImageIdx = currentImageIndex[item.id] || 0;
 
           return (
             <View
@@ -661,7 +677,7 @@ export default function MenuScreen() {
                 width: "100%",
                 justifyContent: "flex-start",
                 paddingHorizontal: 24,
-                paddingBottom: 32, // Más separación entre cards
+                paddingBottom: 20, // Reducido para mejor aprovechamiento del espacio
               }}
             >
               <View
@@ -701,7 +717,7 @@ export default function MenuScreen() {
 
                 {/* Images Section */}
                 {item.menu_item_images && item.menu_item_images.length > 0 && (
-                  <View style={{ height: innerCardHeight * 0.55 }}>
+                  <View style={{ height: innerCardHeight * 0.5, position: 'relative' }}>
                     <FlatList
                       data={item.menu_item_images.sort(
                         (a, b) => a.position - b.position,
@@ -712,22 +728,52 @@ export default function MenuScreen() {
                       decelerationRate="fast"
                       snapToInterval={width - 48}
                       showsHorizontalScrollIndicator={false}
+                      onScroll={handleImageScroll}
+                      scrollEventThrottle={16}
                       renderItem={({ item: imgItem }) => (
                         <Image
                           source={{ uri: imgItem.image_url }}
                           style={{
                             width: width - 48,
-                            height: innerCardHeight * 0.55,
+                            height: innerCardHeight * 0.5,
                             resizeMode: "cover",
                           }}
                         />
                       )}
                     />
+                    
+                    {/* Indicadores de página para las imágenes */}
+                    {item.menu_item_images.length > 1 && (
+                      <View
+                        style={{
+                          position: 'absolute',
+                          bottom: 12,
+                          left: 0,
+                          right: 0,
+                          flexDirection: 'row',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}
+                      >
+                        {item.menu_item_images.map((_, index) => (
+                          <View
+                            key={index}
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: 4,
+                              backgroundColor: currentImageIdx === index ? '#d4af37' : 'rgba(255,255,255,0.4)',
+                              marginHorizontal: 4,
+                            }}
+                          />
+                        ))}
+                      </View>
+                    )}
                   </View>
                 )}
 
                 {/* Content Section */}
-                <View style={{ padding: 20 }}>
+                <View style={{ flex: 1, padding: 20, paddingBottom: 10 }}>
                   <View
                     style={{
                       flexDirection: "row",
@@ -785,7 +831,7 @@ export default function MenuScreen() {
                   <Text
                     style={{
                       color: "white",
-                      fontSize: 24,
+                      fontSize: 22,
                       fontWeight: "700",
                       marginBottom: 8,
                     }}
@@ -793,16 +839,28 @@ export default function MenuScreen() {
                     {item.name}
                   </Text>
 
-                  <Text
+                  {/* Descripción scrolleable limitada a 3 líneas de altura */}
+                  <ScrollView
                     style={{
-                      color: "#d1d5db",
-                      fontSize: 14,
-                      lineHeight: 20,
+                      maxHeight: 60,
                       marginBottom: 16,
                     }}
+                    contentContainerStyle={{
+                      paddingRight: 4,
+                    }}
+                    showsVerticalScrollIndicator={true} // Mostrar barra para indicar que es scrolleable
+                    nestedScrollEnabled={true}
                   >
-                    {item.description}
-                  </Text>
+                    <Text
+                      style={{
+                        color: "#d1d5db",
+                        fontSize: 14,
+                        lineHeight: 20,
+                      }}
+                    >
+                      {item.description}
+                    </Text>
+                  </ScrollView>
 
                   <View
                     style={{
@@ -903,7 +961,7 @@ export default function MenuScreen() {
                                 : "#d4af37",
                             borderRadius: 8,
                             paddingHorizontal: 16,
-                            paddingVertical: 8,
+                            paddingVertical: 10,
                             flexDirection: "row",
                             alignItems: "center",
                             opacity: isRejected

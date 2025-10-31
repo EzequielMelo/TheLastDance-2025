@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   RefreshControl,
   ToastAndroid,
-  ActivityIndicator,
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,6 +13,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
 import { ArrowLeft, Clock, Users, Utensils, CheckCircle } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import ChefLoading from "../../components/common/ChefLoading";
 import api from "../../api/axios";
 
 type Props = NativeStackScreenProps<RootStackParamList, "KitchenDashboard">;
@@ -271,11 +271,11 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
             disabled={updatingItems.has(item.id)}
           >
             {updatingItems.has(item.id) ? (
-              <ActivityIndicator size="small" color="#000" />
+              <ChefLoading size="small" />
             ) : (
               <>
                 <Utensils size={16} color="#000" />
-                <Text style={{ color: "#000", fontWeight: "600", marginLeft: 8 }}>
+                <Text style={{ color: "#000", fontSize: 16, fontWeight: "600", marginLeft: 8 }}>
                   Empezar preparación
                 </Text>
               </>
@@ -298,7 +298,7 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
             disabled={updatingItems.has(item.id)}
           >
             {updatingItems.has(item.id) ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ChefLoading size="small" />
             ) : (
               <>
                 <CheckCircle size={16} color="#fff" />
@@ -365,7 +365,7 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
               </View>
               
               {updatingItems.has(item.id) ? (
-                <ActivityIndicator size="small" color="#d4af37" />
+                <ChefLoading size="small" />
               ) : (
                 <Text style={styles.actionHint}>
                   {item.status === "accepted" ? "Tocar para empezar" : 
@@ -410,8 +410,7 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#d4af37" />
-          <Text style={styles.loadingText}>Cargando pedidos...</Text>
+          <ChefLoading size="large" text="Cargando pedidos..." />
         </View>
       </SafeAreaView>
     );

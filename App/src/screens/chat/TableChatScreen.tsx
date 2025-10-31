@@ -7,13 +7,13 @@ import {
   FlatList,
   StyleSheet,
   ToastAndroid,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RouteProp, useRoute, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import ChefLoading from "../../components/common/ChefLoading";
 import { MessageCircle, Send, ArrowLeft, Users } from "lucide-react-native";
 import { useChat, ChatMessage } from "../../Hooks/useChat";
 import { useAuth } from "../../auth/useAuth";
@@ -165,8 +165,7 @@ export default function TableChatScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#d4af37" />
-          <Text style={styles.loadingText}>Conectando al chat...</Text>
+          <ChefLoading size="large" text="Conectando al chat..." />
         </View>
       </SafeAreaView>
     );

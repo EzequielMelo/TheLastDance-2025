@@ -1913,9 +1913,6 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
     });
 
     const ordersArray = Array.from(ordersMap.values());
-    console.log(`🍷 Encontradas ${ordersArray.length} órdenes con items para bar`);
-    console.log("🍷 Estructura de primera orden:", JSON.stringify(ordersArray[0], null, 2));
-
     return ordersArray;
   } catch (error) {
     console.error("❌ Error en getBartenderPendingOrders:", error);
@@ -2589,6 +2586,14 @@ export async function getWaiterPendingPayments(waiterId: string): Promise<any[]>
           .eq("id", table.id_client)
           .single();
 
+        // Obtener el total amount de las órdenes de la mesa
+        const { data: orders } = await supabaseAdmin
+          .from("orders")
+          .select("total_amount")
+          .eq("table_id", table.id); // Sin filtrar por is_paid ya que están esperando confirmación
+
+        const totalAmount = (orders || []).reduce((sum, order) => sum + (order.total_amount || 0), 0);
+
         result.push({
           table_id: table.id,
           table_number: table.number,
@@ -2596,6 +2601,7 @@ export async function getWaiterPendingPayments(waiterId: string): Promise<any[]>
             ? `${user.first_name} ${user.last_name}` 
             : "Cliente desconocido",
           customer_id: table.id_client,
+          total_amount: totalAmount,
         });
       }
     }

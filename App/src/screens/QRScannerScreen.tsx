@@ -5,13 +5,13 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   ToastAndroid,
-  ActivityIndicator 
 } from 'react-native';
 import { Camera, CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, QrCode } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/RootStackParamList';
+import ChefLoading from '../components/common/ChefLoading';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'QRScanner'>;
 
@@ -103,8 +103,7 @@ export default function QRScannerScreen({ navigation, route }: Props) {
     return (
       <LinearGradient colors={["#1a1a1a", "#2d1810", "#1a1a1a"]} style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#d4af37" />
-          <Text style={styles.loadingText}>Cargando cámara...</Text>
+          <ChefLoading size="large" text="Cargando cámara..." />
         </View>
       </LinearGradient>
     );
@@ -169,8 +168,7 @@ export default function QRScannerScreen({ navigation, route }: Props) {
         {/* Processing overlay */}
         {processing && (
           <View style={styles.processingOverlay}>
-            <ActivityIndicator size="large" color="#d4af37" />
-            <Text style={styles.processingText}>Procesando...</Text>
+            <ChefLoading size="large" text="Procesando..." />
           </View>
         )}
 

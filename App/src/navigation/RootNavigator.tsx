@@ -31,7 +31,9 @@ import TableChatScreen from "../screens/chat/TableChatScreen";
 import BillPaymentScreen from "../screens/table-screens/BillPaymentScreen";
 import WaiterOrdersScreen from "../components/orders/WaiterOrdersScreen";
 import KitchenDashboardScreen from "../screens/kitchen-screens/KitchenDashboardScreen";
+import KitchenMenuScreen from "../screens/kitchen-screens/KitchenMenuScreen";
 import BartenderDashboardScreen from "../screens/bar-screens/BartenderDashboardScreen";
+import BarMenuScreen from "../screens/bar-screens/BarMenuScreen";
 import MemoryGame from "../screens/games/MemoryGame";
 import FastMathGame from "../screens/games/FastMathGame";
 import PuzzleGame from "../screens/games/PuzzleGame";
@@ -178,7 +180,7 @@ function NavigatorContent() {
           <Stack.Screen
             name="AllWaiters"
             component={AllWaitersScreen}
-            options={{ title: "Gestión de Meseros", headerBackTitle: "Volver" }}
+            options={{ title: "Distribución de Meseros", headerShown: false }}
           />
           <Stack.Screen
             name="TableChat"
@@ -196,8 +198,18 @@ function NavigatorContent() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="KitchenMenu"
+            component={KitchenMenuScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="BartenderDashboard"
             component={BartenderDashboardScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="BarMenu"
+            component={BarMenuScreen}
             options={{ headerShown: false }}
           />
         </>
