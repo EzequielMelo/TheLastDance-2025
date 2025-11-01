@@ -50,7 +50,7 @@ export default function ClientLayout({
     if (state === "assigned") {
       navigation.navigate("ScanTableQR");
     } else {
-      // Para otros estados, usar el escáner general
+      // Para otros estados (incluyendo seated), usar el escáner general
       navigation.navigate("QRScanner", {
         mode: "order_status",
         onScanSuccess: (tableId: string) => {

@@ -450,7 +450,7 @@ export default function HomeScreen({ navigation, route }: Props) {
     if (clientState === "assigned") {
       navigation.navigate("ScanTableQR");
     } else {
-      // Para otros estados, usar el escáner general
+      // Para otros estados (incluyendo seated), usar el escáner general
       navigateToQRScanner();
     }
   };

@@ -22,10 +22,17 @@ import {
   CheckCircle,
   X,
   Trash2,
+  QrCode,
 } from "lucide-react-native";
 import { useCart } from "../../context/CartContext";
+import { useClientState } from "../../Hooks/useClientState";
 import api from "../../api/axios";
-import { createOrder, replaceRejectedItems } from "../../api/orders";
+import {
+  createOrder,
+  replaceRejectedItems,
+  checkTableDeliveryStatus,
+  confirmTableDelivery,
+} from "../../api/orders";
 import type { CreateOrderRequest, OrderItem } from "../../types/Order";
 import OrderStatusView from "../orders/OrderStatusView";
 
@@ -37,12 +44,20 @@ interface CartModalProps {
   showCustomAlert?: (
     title: string,
     message: string,
-    buttons?: Array<{text: string, onPress?: () => void, style?: 'default' | 'cancel' | 'destructive'}>,
-    type?: 'success' | 'error' | 'warning' | 'info'
+    buttons?: Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "default" | "cancel" | "destructive";
+    }>,
+    type?: "success" | "error" | "warning" | "info",
   ) => void;
 }
 
-export default function CartModal({ visible, onClose, showCustomAlert }: CartModalProps) {
+export default function CartModal({
+  visible,
+  onClose,
+  showCustomAlert,
+}: CartModalProps) {
   const navigation = useNavigation<NavigationProp>();
   const {
     cartItems,
@@ -57,8 +72,20 @@ export default function CartModal({ visible, onClose, showCustomAlert }: CartMod
     refreshOrders,
   } = useCart();
 
+  const {
+    occupiedTable,
+    deliveryConfirmationStatus,
+    refresh: refreshClientState,
+  } = useClientState();
+
   const [tableId, setTableId] = useState<string | null>(null);
   const [loadingTable, setLoadingTable] = useState(false);
+  const [confirmingDelivery, setConfirmingDelivery] = useState(false);
+  const [deliveryStatus, setDeliveryStatus] = useState<{
+    allDelivered: boolean;
+    totalItems: number;
+    deliveredItems: number;
+  } | null>(null);
 
   // Estado del pedido actual (simplificado)
   const currentOrder = userOrders.find(order => !order.is_paid);
@@ -68,12 +95,20 @@ export default function CartModal({ visible, onClose, showCustomAlert }: CartMod
   const canAddMoreItems =
     hasActiveOrder && !hasPendingItems && !currentOrder?.is_paid;
 
+  // Verificar si hay items delivered cuando se abre el modal
   useEffect(() => {
     if (visible) {
       fetchUserTable();
       refreshOrders().catch(console.error);
+
+      // Verificar delivery status
+      if (occupiedTable?.id) {
+        checkTableDeliveryStatus(occupiedTable.id)
+          .then(setDeliveryStatus)
+          .catch(console.error);
+      }
     }
-  }, [visible]);
+  }, [visible, occupiedTable?.id]);
 
   const fetchUserTable = async () => {
     try {
@@ -120,9 +155,17 @@ export default function CartModal({ visible, onClose, showCustomAlert }: CartMod
 
       if (!orderWithRejectedItems) {
         if (showCustomAlert) {
-          showCustomAlert("Error", "No se encontró la orden con productos rechazados", undefined, 'error');
+          showCustomAlert(
+            "Error",
+            "No se encontró la orden con productos rechazados",
+            undefined,
+            "error",
+          );
         } else {
-          Alert.alert("Error", "No se encontró la orden con productos rechazados");
+          Alert.alert(
+            "Error",
+            "No se encontró la orden con productos rechazados",
+          );
         }
         return;
       }
@@ -140,7 +183,7 @@ export default function CartModal({ visible, onClose, showCustomAlert }: CartMod
           "Error",
           "No se pudo abrir el menú para modificar los productos",
           undefined,
-          'error'
+          "error",
         );
       } else {
         Alert.alert(
@@ -156,10 +199,59 @@ export default function CartModal({ visible, onClose, showCustomAlert }: CartMod
     onClose();
   };
 
+  const handleConfirmDelivery = async () => {
+    if (!occupiedTable?.id) {
+      Alert.alert("Error", "No se pudo obtener la información de tu mesa");
+      return;
+    }
+
+    try {
+      setConfirmingDelivery(true);
+
+      const result = await confirmTableDelivery(occupiedTable.id);
+
+      if (result.success) {
+        Alert.alert(
+          "✅ Recepción Confirmada",
+          "¡Perfecto! Has confirmado la recepción de tu pedido. Ahora tienes acceso a juegos y encuestas.",
+          [
+            {
+              text: "OK",
+              onPress: async () => {
+                onClose();
+                // Refrescar para actualizar el estado
+                await refreshClientState(); // Refresca el estado del cliente
+                refreshOrders(); // Refresca las órdenes
+              },
+            },
+          ],
+        );
+      } else {
+        Alert.alert(
+          "Error",
+          "No se pudo confirmar la recepción. Intenta de nuevo.",
+        );
+      }
+    } catch (error: any) {
+      console.error("Error confirmando entrega:", error);
+      Alert.alert(
+        "Error",
+        error.message || "No se pudo confirmar la recepción del pedido",
+      );
+    } finally {
+      setConfirmingDelivery(false);
+    }
+  };
+
   const handleConfirmOrder = async () => {
     if (cartItems.length === 0) {
       if (showCustomAlert) {
-        showCustomAlert("Error", "No hay productos en el carrito para enviar", undefined, 'error');
+        showCustomAlert(
+          "Error",
+          "No hay productos en el carrito para enviar",
+          undefined,
+          "error",
+        );
       } else {
         Alert.alert("Error", "No hay productos en el carrito para enviar");
       }
@@ -173,7 +265,7 @@ export default function CartModal({ visible, onClose, showCustomAlert }: CartMod
           "Error",
           "Ya tienes productos pendientes de aprobación. No puedes enviar más hasta que sean procesados.",
           undefined,
-          'error'
+          "error",
         );
       } else {
         Alert.alert(
@@ -194,7 +286,7 @@ export default function CartModal({ visible, onClose, showCustomAlert }: CartMod
             "Nueva Tanda Agregada",
             `Se agregaron ${cartCount} ${cartCount === 1 ? "producto" : "productos"} como nueva tanda. Los productos están pendientes de aprobación del mozo.`,
             [{ text: "OK", onPress: onClose }],
-            'success'
+            "success",
           );
         } else {
           Alert.alert(
@@ -211,7 +303,7 @@ export default function CartModal({ visible, onClose, showCustomAlert }: CartMod
             "Error",
             error.message || "No se pudo agregar la nueva tanda.",
             undefined,
-            'error'
+            "error",
           );
         } else {
           Alert.alert(
@@ -226,7 +318,12 @@ export default function CartModal({ visible, onClose, showCustomAlert }: CartMod
     // Verificar mesa
     if (loadingTable) {
       if (showCustomAlert) {
-        showCustomAlert("Espera", "Verificando tu mesa asignada...", undefined, 'info');
+        showCustomAlert(
+          "Espera",
+          "Verificando tu mesa asignada...",
+          undefined,
+          "info",
+        );
       } else {
         Alert.alert("Espera", "Verificando tu mesa asignada...");
       }
@@ -239,7 +336,7 @@ export default function CartModal({ visible, onClose, showCustomAlert }: CartMod
           "Error",
           "No tienes una mesa asignada. Asegúrate de haber escaneado el código QR de tu mesa.",
           [{ text: "OK", onPress: onClose }],
-          'error'
+          "error",
         );
       } else {
         Alert.alert(
@@ -275,7 +372,7 @@ export default function CartModal({ visible, onClose, showCustomAlert }: CartMod
           "Pedido Enviado",
           `Tu pedido por ${formatPrice(cartAmount)} ha sido enviado. Espera a que sea confirmado por el personal.`,
           [{ text: "OK", onPress: onClose }],
-          'success'
+          "success",
         );
       } else {
         Alert.alert(
@@ -291,7 +388,7 @@ export default function CartModal({ visible, onClose, showCustomAlert }: CartMod
           "Error",
           error.message || "No se pudo enviar el pedido. Intenta de nuevo.",
           undefined,
-          'error'
+          "error",
         );
       } else {
         Alert.alert(
@@ -661,6 +758,72 @@ export default function CartModal({ visible, onClose, showCustomAlert }: CartMod
               />
             </View>
           )}
+
+          {/* Botón de Confirmar Recepción - Solo si hay items delivered */}
+          {deliveryStatus?.allDelivered &&
+            deliveryStatus.totalItems > 0 &&
+            deliveryConfirmationStatus === "pending" && (
+              <View
+                style={{
+                  marginTop: 24,
+                  backgroundColor: "rgba(34, 197, 94, 0.1)",
+                  borderRadius: 12,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: "rgba(34, 197, 94, 0.3)",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#22c55e",
+                    fontSize: 16,
+                    fontWeight: "600",
+                    textAlign: "center",
+                    marginBottom: 8,
+                  }}
+                >
+                  ✅ ¡Pedido Completo!
+                </Text>
+                <Text
+                  style={{
+                    color: "#d1d5db",
+                    fontSize: 14,
+                    textAlign: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  Todos tus productos han sido entregados (
+                  {deliveryStatus.totalItems} items)
+                </Text>
+                <TouchableOpacity
+                  onPress={handleConfirmDelivery}
+                  disabled={confirmingDelivery}
+                  style={{
+                    backgroundColor: confirmingDelivery ? "#9ca3af" : "#22c55e",
+                    borderRadius: 12,
+                    padding: 16,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    opacity: confirmingDelivery ? 0.7 : 1,
+                  }}
+                >
+                  <CheckCircle size={20} color="white" />
+                  <Text
+                    style={{
+                      color: "white",
+                      fontSize: 16,
+                      fontWeight: "600",
+                      marginLeft: 8,
+                    }}
+                  >
+                    {confirmingDelivery
+                      ? "Confirmando..."
+                      : "Confirmar Recepción"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
         </ScrollView>
 
         {/* Footer */}

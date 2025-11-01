@@ -18,10 +18,7 @@ import {
   ArrowDown,
 } from "lucide-react-native";
 import { useClientState, ClientState } from "../../Hooks/useClientState";
-import {
-  confirmTableDelivery,
-  checkTableDeliveryStatus,
-} from "../../api/orders";
+import { checkTableDeliveryStatus } from "../../api/orders";
 import type { RootStackNavigationProp } from "../../navigation/RootStackParamList";
 
 interface ClientFlowNavigationProps {
@@ -47,7 +44,6 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
     totalItems: number;
     deliveredItems: number;
   } | null>(null);
-  const [checkingDelivery, setCheckingDelivery] = useState(false);
   const [lastRefreshTrigger, setLastRefreshTrigger] = useState(0);
 
   const handleRefresh = async () => {
@@ -210,22 +206,32 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                   Lista para pagar
                 </Text>
                 <Text className="text-gray-300 text-center mb-6">
-                  Escanea el código QR de tu mesa para proceder con el pago o
-                  responde la encuesta de satisfacción.
+                  Usa el botón QR del menú inferior para ver tu carrito y
+                  proceder con el pago, o responde la encuesta de satisfacción.
                 </Text>
 
-                {/* Botones para pagar cuenta y encuesta */}
-                <View className="flex-col gap-3 w-full items-center">
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate("ScanOrderQR")}
-                    className="bg-amber-600 px-8 py-4 rounded-lg flex-row items-center w-64"
+                {/* Indicador visual del botón QR */}
+                <View className="items-center mb-6">
+                  <View
+                    className="bg-yellow-600 w-16 h-16 rounded-full items-center justify-center mb-3"
+                    style={{
+                      shadowColor: "#d4af37",
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.3,
+                      shadowRadius: 8,
+                      elevation: 8,
+                    }}
                   >
-                    <QrCode size={20} color="white" className="mr-2" />
-                    <Text className="text-white font-semibold text-lg ml-2">
-                      Escanear QR
-                    </Text>
-                  </TouchableOpacity>
+                    <QrCode size={32} color="#1a1a1a" />
+                  </View>
+                  <ArrowDown size={32} color="#d4af37" />
+                  <Text className="text-yellow-500 text-sm font-semibold mt-2">
+                    Presiona aquí para pagar
+                  </Text>
+                </View>
 
+                {/* Botón para encuesta */}
+                <View className="flex-col gap-3 w-full items-center">
                   <TouchableOpacity
                     onPress={() => navigation.navigate("Survey")}
                     className="bg-blue-600 px-8 py-4 rounded-lg flex-row items-center w-64"
@@ -406,19 +412,29 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                       {deliveryStatus.totalItems} Productos entregados
                     </Text>
                     <Text className="text-gray-300 text-center mb-6">
-                      Tu pedido está completo. Confirma que has recibido todo
-                      para desbloquear juegos y encuestas.
+                      Tu pedido está completo. Usa el botón QR del menú inferior
+                      para abrir tu carrito y confirmar la recepción.
                     </Text>
 
-                    <TouchableOpacity
-                      onPress={() => navigation.navigate("ScanOrderQR")}
-                      className="bg-green-600 px-8 py-4 rounded-lg flex-row items-center mb-4"
-                    >
-                      <QrCode size={20} color="white" className="mr-2" />
-                      <Text className="text-white font-semibold text-lg">
-                        Confirmar Recepción
+                    {/* Indicador visual del botón QR */}
+                    <View className="items-center">
+                      <View
+                        className="bg-yellow-600 w-16 h-16 rounded-full items-center justify-center mb-3"
+                        style={{
+                          shadowColor: "#d4af37",
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: 0.3,
+                          shadowRadius: 8,
+                          elevation: 8,
+                        }}
+                      >
+                        <QrCode size={32} color="#1a1a1a" />
+                      </View>
+                      <ArrowDown size={32} color="#d4af37" />
+                      <Text className="text-yellow-500 text-sm font-semibold mt-2">
+                        Presiona aquí para confirmar
                       </Text>
-                    </TouchableOpacity>
+                    </View>
                   </>
                 ) : (
                   <>
