@@ -34,7 +34,7 @@ import {
   submitTandaModifications,
 } from "./ordersServices";
 import type { CreateOrderDTO, OrderItemStatus } from "./orders.types";
-import { 
+import {
   notifyWaiterNewOrder,
   notifyClientOrderRejectedForModification,
   notifyClientOrderConfirmed,
@@ -137,17 +137,19 @@ export async function createOrderHandler(
         // Obtener información de la mesa y el mozo
         const { data: tableData, error: tableError } = await supabaseAdmin
           .from("tables")
-          .select(`
+          .select(
+            `
             number,
             id_waiter,
             users!tables_id_client_fkey(first_name, last_name)
-          `)
+          `,
+          )
           .eq("id", parsed.table_id)
           .single();
 
         if (!tableError && tableData?.id_waiter) {
           const clientData = (tableData as any).users;
-          const clientName = clientData 
+          const clientName = clientData
             ? `${clientData.first_name} ${clientData.last_name}`.trim()
             : "Cliente";
 
@@ -156,7 +158,7 @@ export async function createOrderHandler(
             clientName,
             tableData.number.toString(),
             parsed.items.length,
-            parsed.totalAmount
+            parsed.totalAmount,
           );
         }
       } catch (notifyError) {
@@ -423,13 +425,14 @@ export async function waiterOrderActionHandler(
     switch (action) {
       case "accept":
         result = await acceptOrder(orderId, notes);
-        
+
         // Enviar notificaciones push a cocina y bartender
         try {
           // Obtener información de la orden y mesa
           const { data: orderData, error: orderError } = await supabaseAdmin
             .from("orders")
-            .select(`
+            .select(
+              `
               id_client,
               table_id,
               order_items!inner(
@@ -446,14 +449,15 @@ export async function waiterOrderActionHandler(
                 number,
                 users!tables_id_client_fkey(first_name, last_name)
               )
-            `)
+            `,
+            )
             .eq("id", orderId)
             .single();
 
           if (!orderError && orderData) {
             const tableData = (orderData as any).tables;
             const clientData = tableData?.users;
-            const clientName = clientData 
+            const clientName = clientData
               ? `${clientData.first_name} ${clientData.last_name}`.trim()
               : "Cliente";
 
@@ -466,15 +470,23 @@ export async function waiterOrderActionHandler(
               const menuItem = item.menu_items;
               const itemData = {
                 name: menuItem.name,
-                quantity: item.quantity
+                quantity: item.quantity,
               };
 
               // Categorías que van a cocina
-              if (['platos', 'entradas', 'postres', 'ensaladas'].includes(menuItem.category.toLowerCase())) {
+              if (
+                ["platos", "entradas", "postres", "ensaladas"].includes(
+                  menuItem.category.toLowerCase(),
+                )
+              ) {
                 dishItems.push(itemData);
-              } 
+              }
               // Categorías que van a bar
-              else if (['bebidas', 'tragos', 'cervezas', 'vinos', 'aguas'].includes(menuItem.category.toLowerCase())) {
+              else if (
+                ["bebidas", "tragos", "cervezas", "vinos", "aguas"].includes(
+                  menuItem.category.toLowerCase(),
+                )
+              ) {
                 drinkItems.push(itemData);
               }
             });
@@ -484,7 +496,7 @@ export async function waiterOrderActionHandler(
               await notifyKitchenNewItems(
                 tableData.number.toString(),
                 dishItems,
-                clientName
+                clientName,
               );
             }
 
@@ -493,7 +505,7 @@ export async function waiterOrderActionHandler(
               await notifyBartenderNewItems(
                 tableData.number.toString(),
                 drinkItems,
-                clientName
+                clientName,
               );
             }
 
@@ -501,27 +513,32 @@ export async function waiterOrderActionHandler(
             const totalItemsCount = dishItems.length + drinkItems.length;
             if (totalItemsCount > 0) {
               // Obtener información del mozo que aceptó el pedido
-              const { data: waiterData, error: waiterError } = await supabaseAdmin
-                .from("users")
-                .select("first_name, last_name")
-                .eq("id", req.user.appUserId)
-                .single();
+              const { data: waiterData, error: waiterError } =
+                await supabaseAdmin
+                  .from("users")
+                  .select("first_name, last_name")
+                  .eq("id", req.user.appUserId)
+                  .single();
 
-              const waiterName = waiterData && !waiterError
-                ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
-                : "Mozo";
+              const waiterName =
+                waiterData && !waiterError
+                  ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
+                  : "Mozo";
 
               await notifyClientOrderConfirmed(
                 orderData.id_client,
                 waiterName,
                 tableData.number.toString(),
                 totalItemsCount,
-                result.estimated_time
+                result.estimated_time,
               );
             }
           }
         } catch (notifyError) {
-          console.error("Error enviando notificaciones a cocina/bar:", notifyError);
+          console.error(
+            "Error enviando notificaciones a cocina/bar:",
+            notifyError,
+          );
           // No bloqueamos la respuesta por error de notificación
         }
 
@@ -550,13 +567,14 @@ export async function waiterOrderActionHandler(
         }
 
         result = await partialRejectOrder(orderId, rejectedItemIds, notes);
-        
+
         // Enviar notificación push al cliente sobre el rechazo
         try {
           // Obtener información de la orden y mesa
           const { data: orderData, error: orderError } = await supabaseAdmin
             .from("orders")
-            .select(`
+            .select(
+              `
               id_client,
               table_id,
               tables!inner(
@@ -564,14 +582,15 @@ export async function waiterOrderActionHandler(
                 id_waiter,
                 users!tables_id_waiter_fkey(first_name, last_name)
               )
-            `)
+            `,
+            )
             .eq("id", orderId)
             .single();
 
           if (!orderError && orderData?.table_id) {
             const tableData = (orderData as any).tables;
             const waiterData = tableData?.users;
-            const waiterName = waiterData 
+            const waiterName = waiterData
               ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
               : "Mozo";
 
@@ -580,7 +599,7 @@ export async function waiterOrderActionHandler(
               waiterName,
               tableData.number.toString(),
               rejectedItemIds.length,
-              result.order.order_items.length
+              result.order.order_items.length,
             );
           }
         } catch (notifyError) {
@@ -956,13 +975,15 @@ export async function getKitchenPendingOrdersHandler(
 
     // Verificar que el usuario es cocinero
     if (req.user.position_code !== "cocinero") {
-      res.status(403).json({ 
-        error: "Solo los cocineros pueden acceder a esta función" 
+      res.status(403).json({
+        error: "Solo los cocineros pueden acceder a esta función",
       });
       return;
     }
 
-    console.log(`👨‍🍳 Obteniendo pedidos pendientes para cocinero ${req.user.appUserId}`);
+    console.log(
+      `👨‍🍳 Obteniendo pedidos pendientes para cocinero ${req.user.appUserId}`,
+    );
 
     const pendingOrders = await getKitchenPendingOrders();
 
@@ -994,8 +1015,8 @@ export async function updateKitchenItemStatusHandler(
 
     // Verificar que el usuario es cocinero
     if (req.user.position_code !== "cocinero") {
-      res.status(403).json({ 
-        error: "Solo los cocineros pueden actualizar items de cocina" 
+      res.status(403).json({
+        error: "Solo los cocineros pueden actualizar items de cocina",
       });
       return;
     }
@@ -1004,8 +1025,8 @@ export async function updateKitchenItemStatusHandler(
     const { status } = req.body;
 
     if (!itemId || !status) {
-      res.status(400).json({ 
-        error: "ID del item y status son requeridos" 
+      res.status(400).json({
+        error: "ID del item y status son requeridos",
       });
       return;
     }
@@ -1013,18 +1034,20 @@ export async function updateKitchenItemStatusHandler(
     // Validar status
     const validStatuses: OrderItemStatus[] = ["preparing", "ready"];
     if (!validStatuses.includes(status)) {
-      res.status(400).json({ 
-        error: "Status inválido. Use 'preparing' o 'ready'" 
+      res.status(400).json({
+        error: "Status inválido. Use 'preparing' o 'ready'",
       });
       return;
     }
 
-    console.log(`👨‍🍳 Actualizando item ${itemId} a status ${status} por cocinero ${req.user.appUserId}`);
+    console.log(
+      `👨‍🍳 Actualizando item ${itemId} a status ${status} por cocinero ${req.user.appUserId}`,
+    );
 
     const result = await updateKitchenItemStatus(
       itemId,
       status,
-      req.user.appUserId
+      req.user.appUserId,
     );
 
     if (!result.success) {
@@ -1071,7 +1094,9 @@ export async function getBartenderPendingOrdersHandler(
       return;
     }
 
-    console.log(`🍷 Obteniendo pedidos pendientes para bartender: ${req.user.appUserId}`);
+    console.log(
+      `🍷 Obteniendo pedidos pendientes para bartender: ${req.user.appUserId}`,
+    );
 
     const pendingOrders = await getBartenderPendingOrders();
 
@@ -1114,25 +1139,27 @@ export async function updateBartenderItemStatusHandler(
     const { status } = req.body;
 
     if (!itemId) {
-      res.status(400).json({ 
-        error: "ID del item es requerido" 
+      res.status(400).json({
+        error: "ID del item es requerido",
       });
       return;
     }
 
     if (!status || !["preparing", "ready"].includes(status)) {
-      res.status(400).json({ 
-        error: "Status inválido. Use 'preparing' o 'ready'" 
+      res.status(400).json({
+        error: "Status inválido. Use 'preparing' o 'ready'",
       });
       return;
     }
 
-    console.log(`🍷 Actualizando item ${itemId} a status ${status} por bartender ${req.user.appUserId}`);
+    console.log(
+      `🍷 Actualizando item ${itemId} a status ${status} por bartender ${req.user.appUserId}`,
+    );
 
     const result = await updateBartenderItemStatus(
       itemId,
       status,
-      req.user.appUserId
+      req.user.appUserId,
     );
 
     if (!result.success) {
@@ -1171,28 +1198,33 @@ export async function getTableOrdersStatusHandler(
     const { tableId } = req.params;
 
     if (!tableId) {
-      res.status(400).json({ 
-        error: "ID de mesa requerido" 
+      res.status(400).json({
+        error: "ID de mesa requerido",
       });
       return;
     }
 
-    console.log(`📱 Obteniendo estado de pedidos para mesa ${tableId} y usuario ${req.user.appUserId}`);
+    console.log(
+      `📱 Obteniendo estado de pedidos para mesa ${tableId} y usuario ${req.user.appUserId}`,
+    );
 
     const orders = await getTableOrdersStatus(tableId, req.user.appUserId);
 
     // Calcular estadísticas de los pedidos
     const stats = {
       totalOrders: orders.length,
-      totalItems: orders.reduce((sum, order) => sum + order.order_items.length, 0),
+      totalItems: orders.reduce(
+        (sum, order) => sum + order.order_items.length,
+        0,
+      ),
       itemsByStatus: {
         pending: 0,
         accepted: 0,
         rejected: 0,
         preparing: 0,
         ready: 0,
-        delivered: 0
-      }
+        delivered: 0,
+      },
     };
 
     orders.forEach(order => {
@@ -1205,9 +1237,10 @@ export async function getTableOrdersStatusHandler(
       success: true,
       data: orders,
       stats,
-      message: orders.length > 0 
-        ? `${orders.length} pedidos encontrados` 
-        : "No tienes pedidos en esta mesa",
+      message:
+        orders.length > 0
+          ? `${orders.length} pedidos encontrados`
+          : "No tienes pedidos en esta mesa",
     });
   } catch (error: any) {
     console.error("❌ Error obteniendo estado de pedidos de mesa:", error);
@@ -1353,7 +1386,7 @@ export async function checkTableDeliveryStatusHandler(
       return;
     }
 
-    const tableId = req.params['tableId'];
+    const tableId = req.params["tableId"];
     const userId = req.user.appUserId;
 
     if (!tableId) {
@@ -1366,8 +1399,8 @@ export async function checkTableDeliveryStatusHandler(
     res.json({
       success: true,
       data: deliveryStatus,
-      message: deliveryStatus.allDelivered 
-        ? "Todos los items han sido entregados" 
+      message: deliveryStatus.allDelivered
+        ? "Todos los items han sido entregados"
         : `${deliveryStatus.pendingItems.length} items pendientes de entrega`,
     });
   } catch (error: any) {
@@ -1390,7 +1423,7 @@ export async function payOrderHandler(
       return;
     }
 
-    const tableId = req.params['orderId']; // Reusing orderId param for tableId
+    const tableId = req.params["orderId"]; // Reusing orderId param for tableId
     const clientId = req.body.idClient || req.user.appUserId;
 
     if (!tableId) {
@@ -1405,36 +1438,39 @@ export async function payOrderHandler(
       // Obtener información de la mesa, cliente y mozo
       const { data: tableData, error: tableError } = await supabaseAdmin
         .from("tables")
-        .select(`
+        .select(
+          `
           number,
           users!tables_id_client_fkey(first_name, last_name),
           waiter:users!tables_id_waiter_fkey(first_name, last_name)
-        `)
+        `,
+        )
         .eq("id", tableId)
         .single();
 
       if (!tableError && tableData) {
         const clientData = (tableData as any).users;
         const waiterData = (tableData as any).waiter;
-        
-        const clientName = clientData 
+
+        const clientName = clientData
           ? `${clientData.first_name} ${clientData.last_name}`.trim()
           : "Cliente";
-        
-        const waiterName = waiterData 
+
+        const waiterName = waiterData
           ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
           : "Mozo";
 
         // Calcular el monto total pagado
         const totalAmount = result.paidOrders.reduce(
-          (sum, order) => sum + order.total_amount, 0
+          (sum, order) => sum + order.total_amount,
+          0,
         );
 
         await notifyManagementPaymentReceived(
           clientName,
           tableData.number.toString(),
           totalAmount,
-          waiterName
+          waiterName,
         );
       }
     } catch (notifyError) {
@@ -1463,7 +1499,7 @@ export async function confirmPaymentHandler(
       return;
     }
 
-    const tableId = req.params['tableId'];
+    const tableId = req.params["tableId"];
     const waiterId = req.user.appUserId;
 
     if (!tableId) {
@@ -1498,8 +1534,8 @@ export async function getWaiterReadyItemsHandler(
 
     // Verificar que el usuario es mozo
     if (req.user.position_code !== "mozo") {
-      res.status(403).json({ 
-        error: "Solo los mozos pueden acceder a esta función" 
+      res.status(403).json({
+        error: "Solo los mozos pueden acceder a esta función",
       });
       return;
     }
@@ -1535,8 +1571,8 @@ export async function getWaiterPendingPaymentsHandler(
 
     // Verificar que el usuario es mozo
     if (req.user.position_code !== "mozo") {
-      res.status(403).json({ 
-        error: "Solo los mozos pueden acceder a esta función" 
+      res.status(403).json({
+        error: "Solo los mozos pueden acceder a esta función",
       });
       return;
     }
@@ -1572,8 +1608,8 @@ export async function markItemAsDeliveredHandler(
 
     // Verificar que el usuario es mozo
     if (req.user.position_code !== "mozo") {
-      res.status(403).json({ 
-        error: "Solo los mozos pueden acceder a esta función" 
+      res.status(403).json({
+        error: "Solo los mozos pueden acceder a esta función",
       });
       return;
     }
@@ -1623,6 +1659,7 @@ export async function submitTandaModificationsHandler(
     }
 
     const { orderId } = req.params;
+    const { keepItems, newItems } = req.body;
     const clientId = req.user.appUserId;
 
     if (!orderId) {
@@ -1630,14 +1667,18 @@ export async function submitTandaModificationsHandler(
       return;
     }
 
-    await submitTandaModifications(orderId, clientId);
+    console.log("📥 Controlador recibió:", { keepItems, newItems });
+
+    await submitTandaModifications(orderId, clientId, keepItems, newItems);
 
     // Enviar notificación push al mozo sobre la resubmisión
     try {
       // Obtener información de la orden y mesa
       const { data: orderData, error: orderError } = await supabaseAdmin
         .from("orders")
-        .select(`
+        .select(
+          `
+          id,
           table_id,
           order_items(id),
           tables!inner(
@@ -1645,14 +1686,15 @@ export async function submitTandaModificationsHandler(
             id_waiter,
             users!tables_id_client_fkey(first_name, last_name)
           )
-        `)
+        `,
+        )
         .eq("id", orderId)
         .single();
 
       if (!orderError && orderData?.table_id) {
         const tableData = (orderData as any).tables;
         const clientData = tableData?.users;
-        const clientName = clientData 
+        const clientName = clientData
           ? `${clientData.first_name} ${clientData.last_name}`.trim()
           : "Cliente";
 
@@ -1666,18 +1708,38 @@ export async function submitTandaModificationsHandler(
           clientName,
           tableData.number.toString(),
           itemsCount,
-          estimatedTotal
+          estimatedTotal,
         );
       }
+
+      // Devolver orden actualizada
+      const { data: updatedOrder } = await supabaseAdmin
+        .from("orders")
+        .select(
+          `
+          *,
+          order_items(
+            *,
+            menu_items(*)
+          )
+        `,
+        )
+        .eq("id", orderId)
+        .single();
+
+      res.json({
+        success: true,
+        message: "Modificaciones de tanda reenviadas exitosamente",
+        order: updatedOrder,
+      });
     } catch (notifyError) {
       console.error("Error enviando notificación de resubmisión:", notifyError);
       // No bloqueamos la respuesta por error de notificación
+      res.json({
+        success: true,
+        message: "Modificaciones de tanda reenviadas exitosamente",
+      });
     }
-
-    res.json({
-      success: true,
-      message: "Modificaciones de tanda reenviadas exitosamente",
-    });
   } catch (error: any) {
     console.error("❌ Error reenviando modificaciones de tanda:", error);
     res.status(400).json({

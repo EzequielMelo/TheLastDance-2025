@@ -25,7 +25,7 @@ export const payOrder = async (
     gameDiscountAmount?: number;
     gameDiscountPercentage?: number;
     satisfactionLevel?: string;
-  }
+  },
 ): Promise<Order> => {
   try {
     const requestBody: any = {
@@ -386,7 +386,8 @@ export const updateBartenderItemStatus = async (
   } catch (error: any) {
     console.error("Error actualizando status de item de bar:", error);
     throw new Error(
-      error.response?.data?.error || "Error actualizando status de producto de bar",
+      error.response?.data?.error ||
+        "Error actualizando status de producto de bar",
     );
   }
 };
@@ -444,13 +445,13 @@ export const submitTandaModifications = async (
       unit_price: number;
     }>;
   },
-): Promise<Order> => {
+): Promise<{ success: boolean; message: string; order?: Order }> => {
   try {
     const response = await api.put(
       `/orders/${orderId}/submit-tanda-modifications`,
       modificationsData,
     );
-    return response.data.order;
+    return response.data;
   } catch (error: any) {
     console.error("Error enviando modificaciones de tanda:", error);
     throw new Error(
@@ -471,9 +472,7 @@ export const confirmPayment = async (
     return response.data;
   } catch (error: any) {
     console.error("❌ API: Error confirmando pago:", error);
-    throw new Error(
-      error.response?.data?.error || "Error confirmando pago",
-    );
+    throw new Error(error.response?.data?.error || "Error confirmando pago");
   }
 };
 

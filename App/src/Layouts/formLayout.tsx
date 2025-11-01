@@ -11,6 +11,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { ChefHat } from "lucide-react-native";
 import ChefLoading from "../components/common/ChefLoading";
+import { ScrollProvider, useScroll } from "../context/ScrollContext";
 
 type Props = {
   title: string;
@@ -27,7 +28,7 @@ type Props = {
   footerContent?: ReactNode;
 };
 
-export default function FormLayout({
+function FormLayoutContent({
   title,
   subtitle,
   icon,
@@ -42,16 +43,17 @@ export default function FormLayout({
   footerContent,
 }: Props) {
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const { scrollViewRef } = useScroll();
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
+      "keyboardDidShow",
       () => {
         setKeyboardVisible(true);
       },
     );
     const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
+      "keyboardDidHide",
       () => {
         setKeyboardVisible(false);
       },
@@ -68,20 +70,24 @@ export default function FormLayout({
       className="flex-1"
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1"
-        keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
         <ScrollView
-          contentContainerStyle={{ 
-            flexGrow: 1, 
-            paddingBottom: isKeyboardVisible ? 300 : 50,
-            justifyContent: isKeyboardVisible ? 'flex-start' : 'center',
-            paddingTop: isKeyboardVisible ? 20 : 0
+          ref={scrollViewRef}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingBottom: isKeyboardVisible ? 150 : 50,
+            paddingTop: isKeyboardVisible ? 20 : 0,
+            justifyContent: isKeyboardVisible ? "flex-start" : "center",
           }}
           className="px-8 py-12"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets={true}
+          scrollEventThrottle={16}
+          nestedScrollEnabled={true}
         >
           {/* Header */}
           <View className="items-center mb-10">
@@ -166,5 +172,13 @@ export default function FormLayout({
         </View>
       )}
     </LinearGradient>
+  );
+}
+
+export default function FormLayout(props: Props) {
+  return (
+    <ScrollProvider>
+      <FormLayoutContent {...props} />
+    </ScrollProvider>
   );
 }

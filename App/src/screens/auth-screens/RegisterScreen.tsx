@@ -1,9 +1,4 @@
-import {
-  View,
-  Text,
-  Modal,
-  TouchableOpacity,
-} from "react-native";
+import { View, Text, Modal, TouchableOpacity } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
 import FormLayout from "../../Layouts/formLayout";
@@ -32,23 +27,38 @@ export const RegisterScreen = ({ navigation }: Props) => {
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
   const [facing, setFacing] = useState<CameraType>("back");
   const cameraRef = useRef<CameraView>(null);
-  
+
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState({
     title: "",
     message: "",
     type: "info" as "success" | "error" | "warning" | "info",
-    buttons: [] as Array<{ text: string; onPress?: () => void; style?: "cancel" | "destructive" }>
+    buttons: [] as Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "cancel" | "destructive";
+    }>,
   });
 
   // Helper function to show custom alerts
-  const showAlert = (title: string, message: string, type: "success" | "error" | "warning" | "info" = "info", buttons?: Array<{ text: string; onPress?: () => void; style?: "cancel" | "destructive" }>) => {
+  const showAlert = (
+    title: string,
+    message: string,
+    type: "success" | "error" | "warning" | "info" = "info",
+    buttons?: Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "cancel" | "destructive";
+    }>,
+  ) => {
     setAlertConfig({
       title,
       message,
       type,
-      buttons: buttons || [{ text: "OK", onPress: () => setAlertVisible(false) }]
+      buttons: buttons || [
+        { text: "OK", onPress: () => setAlertVisible(false) },
+      ],
     });
     setAlertVisible(true);
   };
@@ -168,7 +178,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
       const cuilParts = currentCuil.split("-");
       const firstDigits = cuilParts[0] || "";
       const lastDigit = cuilParts[2] || "";
-      
+
       // Crear el formato de CUIL con el DNI en el medio, preservando lo que ya estaba
       const cuilFormat = `${firstDigits}-${dni}-${lastDigit}`;
       handleInputChange("cuil", cuilFormat);
@@ -196,11 +206,16 @@ export const RegisterScreen = ({ navigation }: Props) => {
         message += `, ${loadedFields.join(" y ")} completado${loadedFields.length > 1 ? "s" : ""}`;
       }
 
-      message += ". Completa los primeros 2 dígitos y el último dígito del CUIL";
+      message +=
+        ". Completa los primeros 2 dígitos y el último dígito del CUIL";
 
       showAlert("DNI Escaneado", message, "success");
     } else {
-      showAlert("Error", "No se pudo leer el DNI. Inténtalo de nuevo o completa manualmente.", "error");
+      showAlert(
+        "Error",
+        "No se pudo leer el DNI. Inténtalo de nuevo o completa manualmente.",
+        "error",
+      );
     }
   };
 
@@ -231,7 +246,11 @@ export const RegisterScreen = ({ navigation }: Props) => {
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        showAlert("Permiso requerido", "Se necesita permiso para acceder a la galería", "warning");
+        showAlert(
+          "Permiso requerido",
+          "Se necesita permiso para acceder a la galería",
+          "warning",
+        );
         return;
       }
 
@@ -293,7 +312,11 @@ export const RegisterScreen = ({ navigation }: Props) => {
     if (!permission.granted) {
       const { granted } = await requestPermission();
       if (!granted) {
-        showAlert("Permiso requerido", "Se necesita permiso para usar la cámara", "warning");
+        showAlert(
+          "Permiso requerido",
+          "Se necesita permiso para usar la cámara",
+          "warning",
+        );
         return;
       }
     }
@@ -338,8 +361,8 @@ export const RegisterScreen = ({ navigation }: Props) => {
           onPress: () => {
             closeAlert();
             setTimeout(() => navigation.navigate("Login"), 300);
-          }
-        }
+          },
+        },
       ]);
     }
   };
@@ -380,7 +403,9 @@ export const RegisterScreen = ({ navigation }: Props) => {
             className="bg-blue-600/20 px-4 py-2 rounded-lg border border-blue-500/30 self-start"
           >
             <View className="flex-row items-center">
-              <Text className="text-blue-300 text-lg font-medium">Escanear DNI</Text>
+              <Text className="text-blue-300 text-lg font-medium">
+                Escanear DNI
+              </Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -399,7 +424,9 @@ export const RegisterScreen = ({ navigation }: Props) => {
               onFocus={() => setFocused("first_name")}
               error={errors.first_name}
             />
-            <Text className="text-white text-sm font-medium mb-1">Apellido</Text>
+            <Text className="text-white text-sm font-medium mb-1">
+              Apellido
+            </Text>
             <TextField
               placeholder="Apellido"
               value={formData.last_name}
@@ -420,6 +447,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
               onClear={() => {
                 handleInputChange("file", null);
               }}
+              onFocus={() => setFocused("file")}
               error={errors.file}
               focused={focused === "file"}
             />
@@ -445,7 +473,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
           onFocus={() => setFocused("cuil")}
           error={errors.cuil}
         />
-        
+
         <TextField
           placeholder="Correo electrónico"
           value={formData.email}

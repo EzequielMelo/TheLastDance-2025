@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useRef } from "react";
 import { View, TextInput, Text } from "react-native";
+import { useScroll } from "../../context/ScrollContext";
 
 type Props = {
   value: string;
@@ -11,6 +12,7 @@ type Props = {
   secureTextEntry?: boolean;
   keyboardType?: "default" | "email-address" | "phone-pad" | "numeric";
   focused?: boolean;
+  onLayout?: (y: number) => void;
 };
 
 export default function TextField({
@@ -23,9 +25,25 @@ export default function TextField({
   secureTextEntry,
   keyboardType = "default",
   focused = false,
+  onLayout,
 }: Props) {
+  const containerRef = useRef<View>(null);
+  const { scrollToPosition } = useScroll();
+
+  const handleFocus = () => {
+    // Pequeño delay para asegurar que el teclado se ha mostrado
+    setTimeout(() => {
+      containerRef.current?.measureInWindow((x, y, width, height) => {
+        scrollToPosition(y, height);
+        onLayout?.(y);
+      });
+    }, 150);
+
+    onFocus?.();
+  };
+
   return (
-    <View className="mb-4">
+    <View ref={containerRef} className="mb-4">
       <View
         className={`flex-row items-center h-13 rounded-xl border px-4 bg-white/10 border-white/20 ${
           focused ? "border-[#d4af37] bg-[#d4af37]/10" : ""
@@ -37,7 +55,7 @@ export default function TextField({
           placeholderTextColor="#888"
           value={value}
           onChangeText={onChangeText}
-          onFocus={onFocus}
+          onFocus={handleFocus}
           onBlur={onBlur}
           secureTextEntry={secureTextEntry}
           keyboardType={keyboardType}

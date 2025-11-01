@@ -4,9 +4,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../../auth/useAuth";
 import { useBottomNav } from "../../context/BottomNavContext";
+import { useClientState } from "../../Hooks/useClientState";
 import BottomNavbar from "../navigation/BottomNavbar";
 import Sidebar from "../navigation/Sidebar";
-import { RootStackNavigationProp, RootStackParamList } from "../../navigation/RootStackParamList";
+import {
+  RootStackNavigationProp,
+  RootStackParamList,
+} from "../../navigation/RootStackParamList";
 
 interface ClientLayoutProps {
   children: ReactNode;
@@ -15,43 +19,49 @@ interface ClientLayoutProps {
   onOpenSidebar?: () => void;
 }
 
-export default function ClientLayout({ 
-  children, 
+export default function ClientLayout({
+  children,
   showNavbar = true,
   onOpenCart,
-  onOpenSidebar 
+  onOpenSidebar,
 }: ClientLayoutProps) {
   const navigation = useNavigation<RootStackNavigationProp>();
   const { user, logout } = useAuth();
   const { activeTab, setActiveTab } = useBottomNav();
+  const { state } = useClientState();
   const [sidebarVisible, setSidebarVisible] = useState(false);
 
-  const isCliente = 
+  const isCliente =
     user?.profile_code === "cliente_registrado" ||
     user?.profile_code === "cliente_anonimo";
 
   const handleNavigateHome = () => {
-    setActiveTab('home');
+    setActiveTab("home");
     navigation.navigate("Home");
   };
 
   const handleNavigateMenu = () => {
-    setActiveTab('menu');
+    setActiveTab("menu");
     navigation.navigate("Menu");
   };
 
   const handleScanQR = () => {
-    navigation.navigate("QRScanner", {
-      mode: "order_status",
-      onScanSuccess: (tableId: string) => {
-        // Lógica para manejar el QR scan desde cualquier pantalla
-        console.log("QR escaneado:", tableId);
-      }
-    });
+    // Si el cliente tiene una mesa asignada pero no está sentado, escanear para confirmar llegada
+    if (state === "assigned") {
+      navigation.navigate("ScanTableQR");
+    } else {
+      // Para otros estados, usar el escáner general
+      navigation.navigate("QRScanner", {
+        mode: "order_status",
+        onScanSuccess: (tableId: string) => {
+          console.log("QR escaneado:", tableId);
+        },
+      });
+    }
   };
 
   const handleOpenCart = () => {
-    setActiveTab('cart');
+    setActiveTab("cart");
     setSidebarVisible(false);
     if (onOpenCart) {
       onOpenCart();
@@ -84,13 +94,15 @@ export default function ClientLayout({
       colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
       style={{ flex: 1 }}
     >
-      <View style={{ 
-        flex: 1,
-        paddingBottom: showNavbar && isCliente ? 100 : 0 
-      }}>
+      <View
+        style={{
+          flex: 1,
+          paddingBottom: showNavbar && isCliente ? 100 : 0,
+        }}
+      >
         {children}
       </View>
-      
+
       {/* BottomNavbar solo para clientes */}
       {showNavbar && isCliente && (
         <BottomNavbar

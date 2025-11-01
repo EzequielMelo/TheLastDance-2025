@@ -13,7 +13,6 @@ import type {
 
 // Obtener lista de espera completa para el maitre
 export async function getWaitingList(): Promise<WaitingListResponse> {
-  
   // Primero obtenemos las entradas de waiting_list
   const { data: waitingEntries, error: waitingError } = await supabaseAdmin
     .from("waiting_list")
@@ -22,14 +21,16 @@ export async function getWaitingList(): Promise<WaitingListResponse> {
     .order("priority", { ascending: false })
     .order("joined_at", { ascending: true });
 
-  console.log('📋 getWaitingList - Entradas waiting_list:', { 
-    dataLength: waitingEntries?.length, 
-    error: waitingError?.message 
+  console.log("📋 getWaitingList - Entradas waiting_list:", {
+    dataLength: waitingEntries?.length,
+    error: waitingError?.message,
   });
 
   if (waitingError) {
-    console.error('📋 getWaitingList - Error en waiting_list:', waitingError);
-    throw new Error(`Error obteniendo lista de espera: ${waitingError.message}`);
+    console.error("📋 getWaitingList - Error en waiting_list:", waitingError);
+    throw new Error(
+      `Error obteniendo lista de espera: ${waitingError.message}`,
+    );
   }
 
   if (!waitingEntries || waitingEntries.length === 0) {
@@ -48,14 +49,18 @@ export async function getWaitingList(): Promise<WaitingListResponse> {
     .select("id, first_name, last_name, profile_image, profile_code")
     .in("id", clientIds);
 
-  console.log('📋 getWaitingList - Usuarios obtenidos:', { 
-    usersLength: users?.length, 
+  console.log("📋 getWaitingList - Usuarios obtenidos:", {
+    usersLength: users?.length,
     error: usersError?.message,
-    users: users?.map(u => ({ id: u.id, name: `${u.first_name} ${u.last_name}`, profile_code: u.profile_code }))
+    users: users?.map(u => ({
+      id: u.id,
+      name: `${u.first_name} ${u.last_name}`,
+      profile_code: u.profile_code,
+    })),
   });
 
   if (usersError) {
-    console.error('📋 getWaitingList - Error obteniendo usuarios:', usersError);
+    console.error("📋 getWaitingList - Error obteniendo usuarios:", usersError);
     throw new Error(`Error obteniendo usuarios: ${usersError.message}`);
   }
 
@@ -64,16 +69,18 @@ export async function getWaitingList(): Promise<WaitingListResponse> {
     const user = users?.find(u => u.id === entry.client_id);
     return {
       ...entry,
-      users: user ? {
-        first_name: user.first_name,
-        last_name: user.last_name,
-        profile_image: user.profile_image,
-        profile_code: user.profile_code,
-      } : {
-        first_name: 'Usuario',
-        last_name: 'Desconocido',
-        profile_code: 'cliente_registrado',
-      }
+      users: user
+        ? {
+            first_name: user.first_name,
+            last_name: user.last_name,
+            profile_image: user.profile_image,
+            profile_code: user.profile_code,
+          }
+        : {
+            first_name: "Usuario",
+            last_name: "Desconocido",
+            profile_code: "cliente_registrado",
+          },
     };
   });
 
@@ -150,7 +157,6 @@ export async function getClientPosition(clientId: string): Promise<{
   estimatedWait?: number;
   entry: WaitingListEntry;
 }> {
-  
   const { data: clientEntry } = await supabaseAdmin
     .from("waiting_list")
     .select("*")
@@ -223,7 +229,6 @@ export async function getTablesStatus(): Promise<TablesStatusResponse> {
 
   let clientsData: any[] = [];
   if (clientIds.length > 0) {
-
     const { data: clients, error: clientsError } = await supabaseAdmin
       .from("users")
       .select("id, first_name, last_name, profile_image, profile_code")
@@ -312,9 +317,9 @@ export async function assignClientToTable({
 
     // 3. Verificar capacidad
     if (waitingEntry.party_size > table.capacity) {
-      console.log('❌ [assignClientToTable] Mesa muy pequeña', {
+      console.log("❌ [assignClientToTable] Mesa muy pequeña", {
         party_size: waitingEntry.party_size,
-        capacity: table.capacity
+        capacity: table.capacity,
       });
       return {
         success: false,
@@ -336,7 +341,7 @@ export async function assignClientToTable({
         `Error actualizando lista de espera: ${updateWaitingError.message}`,
       );
     }
-    
+
     const { error: updateTableError } = await supabaseAdmin
       .from("tables")
       .update({
@@ -365,9 +370,9 @@ export async function assignClientToTable({
         "Cliente asignado a la mesa exitosamente. El cliente debe escanear el QR de la mesa para activarla.",
     };
   } catch (error: any) {
-    console.log('💥 [assignClientToTable] Error en asignación:', {
+    console.log("💥 [assignClientToTable] Error en asignación:", {
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
     return {
       success: false,
@@ -382,6 +387,10 @@ export async function activateTableByClient(
   clientId: string,
 ): Promise<{ success: boolean; message: string; table?: any }> {
   try {
+    console.log("🔍 [activateTableByClient] Iniciando...");
+    console.log("📋 tableIdOrNumber:", tableIdOrNumber);
+    console.log("👤 clientId:", clientId);
+
     // 1. Verificar si el cliente ya tiene una mesa ocupada
     const { data: existingOccupiedTable, error: existingError } =
       await supabaseAdmin
@@ -391,7 +400,13 @@ export async function activateTableByClient(
         .eq("is_occupied", true)
         .limit(1);
 
+    console.log(
+      "🔍 Verificando mesas ocupadas existentes:",
+      existingOccupiedTable,
+    );
+
     if (existingError) {
+      console.error("❌ Error verificando mesas ocupadas:", existingError);
       throw new Error(
         `Error verificando mesas ocupadas: ${existingError.message}`,
       );
@@ -399,6 +414,7 @@ export async function activateTableByClient(
 
     if (existingOccupiedTable && existingOccupiedTable.length > 0) {
       const occupiedTable = existingOccupiedTable[0];
+      console.log("⚠️ Cliente ya tiene mesa ocupada:", occupiedTable);
       return {
         success: false,
         message: `Ya tienes la mesa ${occupiedTable?.number || "una mesa"} ocupada. Solo puedes tener una mesa activa a la vez.`,
@@ -410,18 +426,29 @@ export async function activateTableByClient(
     let table: any = null;
     let tableError: any = null;
 
+    console.log("🔍 Buscando mesa por ID/número...");
+
     // Intentar como ID numérico
     if (!isNaN(Number(tableIdOrNumber))) {
+      console.log("🔢 Intentando como ID numérico:", Number(tableIdOrNumber));
       const { data: tableById, error: errorById } = await supabaseAdmin
         .from("tables")
         .select("id, number, id_client, is_occupied")
         .eq("id", Number(tableIdOrNumber))
         .single();
 
+      console.log("📋 Resultado búsqueda por ID:", tableById);
+      console.log("❌ Error búsqueda por ID:", errorById);
+
       if (!errorById && tableById) {
         table = tableById;
+        console.log("✅ Mesa encontrada por ID:", table);
       } else {
         // Si falló como ID, intentar como número de mesa
+        console.log(
+          "🔢 Intentando como número de mesa:",
+          Number(tableIdOrNumber),
+        );
         const { data: tableByNumber, error: errorByNumber } =
           await supabaseAdmin
             .from("tables")
@@ -429,27 +456,42 @@ export async function activateTableByClient(
             .eq("number", Number(tableIdOrNumber))
             .single();
 
+        console.log("📋 Resultado búsqueda por número:", tableByNumber);
+        console.log("❌ Error búsqueda por número:", errorByNumber);
+
         table = tableByNumber;
         tableError = errorByNumber;
       }
     } else {
       // Si no es numérico, solo intentar como número
+      console.log("🔤 No es numérico, intentando como número de mesa");
       const { data: tableByNumber, error: errorByNumber } = await supabaseAdmin
         .from("tables")
         .select("id, number, id_client, is_occupied")
         .eq("number", Number(tableIdOrNumber))
         .single();
 
+      console.log("📋 Resultado búsqueda por número:", tableByNumber);
+      console.log("❌ Error búsqueda por número:", errorByNumber);
+
       table = tableByNumber;
       tableError = errorByNumber;
     }
 
     if (tableError || !table) {
+      console.error("❌ Mesa no encontrada");
       return { success: false, message: "Mesa no encontrada" };
     }
 
+    console.log("✅ Mesa encontrada:", table);
+    console.log("🔍 Comparando id_client:");
+    console.log("   Mesa id_client:", table.id_client);
+    console.log("   Usuario clientId:", clientId);
+    console.log("   ¿Son iguales?:", table.id_client === clientId);
+
     // 3. Verificar que la mesa esté asignada al cliente correcto
     if (table.id_client !== clientId) {
+      console.error("❌ Mesa no asignada al usuario correcto");
       return {
         success: false,
         message:
@@ -459,8 +501,11 @@ export async function activateTableByClient(
 
     // 4. Verificar que no esté ya ocupada
     if (table.is_occupied) {
+      console.log("⚠️ Mesa ya está ocupada");
       return { success: false, message: "La mesa ya está activa" };
     }
+
+    console.log("✅ Validaciones pasadas, activando mesa...");
 
     // 5. Activar la mesa
     const { error: updateError } = await supabaseAdmin
@@ -471,8 +516,11 @@ export async function activateTableByClient(
       .eq("id", table.id);
 
     if (updateError) {
+      console.error("❌ Error activando mesa:", updateError);
       throw new Error(`Error activando mesa: ${updateError.message}`);
     }
+
+    console.log("✅ Mesa activada exitosamente");
 
     // 6. Actualizar el client_id en la tabla chats si existe un chat activo para esta mesa
     try {
@@ -492,10 +540,15 @@ export async function activateTableByClient(
             .eq("id", existingChat.id);
 
           if (updateChatError) {
-            console.error("Error actualizando client_id en chat:", updateChatError);
+            console.error(
+              "Error actualizando client_id en chat:",
+              updateChatError,
+            );
             // No lanzar error porque la mesa se activó correctamente
           } else {
-            console.log(`✅ Chat actualizado con client_id para mesa ${table.number}`);
+            console.log(
+              `✅ Chat actualizado con client_id para mesa ${table.number}`,
+            );
           }
         }
       }
@@ -554,7 +607,6 @@ export async function freeTable(
 
     // 3. Si había un cliente asignado, actualizar su estado en waiting_list
     if (clientId) {
-
       // Buscar la entrada más reciente del cliente en waiting_list
       const { data: waitingEntry, error: waitingError } = await supabaseAdmin
         .from("waiting_list")
@@ -572,11 +624,9 @@ export async function freeTable(
           waitingError.message,
         );
       } else if (waitingEntry) {
-
         // Si el cliente tenía estado 'seated', cambiarlo a 'displaced'
         // (indica que fue removido por staff, no por cancelación propia)
         if (waitingEntry.status === "seated") {
-
           const { error: statusUpdateError } = await supabaseAdmin
             .from("waiting_list")
             .update({
@@ -625,10 +675,8 @@ export async function cancelWaitingListEntry(
   isStaff?: boolean,
 ): Promise<{ success: boolean; message: string }> {
   try {
-
     // Si no es staff, verificar que sea el dueño de la entrada
     if (!isStaff && userId) {
-
       const { data: entry, error: selectError } = await supabaseAdmin
         .from("waiting_list")
         .select("client_id")
@@ -720,15 +768,23 @@ export async function confirmTableDelivery(
   clientId: string,
 ): Promise<{ success: boolean; message: string; table?: any }> {
   try {
-    console.log('📦 confirmTableDelivery - Confirmando entrega para mesa:', tableIdOrNumber, 'cliente:', clientId);
+    console.log(
+      "📦 confirmTableDelivery - Confirmando entrega para mesa:",
+      tableIdOrNumber,
+      "cliente:",
+      clientId,
+    );
 
     // Intentar buscar la mesa por ID (UUID) o por número
     let table: any = null;
     let tableError: any = null;
 
     // Primero intentar como UUID (si tiene formato de UUID)
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tableIdOrNumber);
-    
+    const isUUID =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        tableIdOrNumber,
+      );
+
     if (isUUID) {
       const { data: tableById, error: errorById } = await supabaseAdmin
         .from("tables")
@@ -755,16 +811,22 @@ export async function confirmTableDelivery(
     }
 
     if (tableError || !table) {
-      console.log('❌ confirmTableDelivery - Mesa no encontrada o no pertenece al cliente');
+      console.log(
+        "❌ confirmTableDelivery - Mesa no encontrada o no pertenece al cliente",
+      );
       return {
         success: false,
-        message: "Mesa no encontrada o no tienes permisos para confirmar entrega en esta mesa",
+        message:
+          "Mesa no encontrada o no tienes permisos para confirmar entrega en esta mesa",
       };
     }
 
     // 2. Verificar que el status actual sea 'pending' (no 'delivered' como antes)
-    if (table.table_status !== 'pending') {
-      console.log('❌ confirmTableDelivery - Mesa no está en estado pending, estado actual:', table.table_status);
+    if (table.table_status !== "pending") {
+      console.log(
+        "❌ confirmTableDelivery - Mesa no está en estado pending, estado actual:",
+        table.table_status,
+      );
       return {
         success: false,
         message: "Esta mesa ya tiene el pedido confirmado",
@@ -772,14 +834,18 @@ export async function confirmTableDelivery(
     }
 
     // 3. Verificar que todos los items estén realmente entregados antes de confirmar
-    console.log('🔍 Verificando que todos los items estén entregados antes de confirmar...');
-    
+    console.log(
+      "🔍 Verificando que todos los items estén entregados antes de confirmar...",
+    );
+
     // Usar la función existente para verificar el estado de entrega
     const { checkAllItemsDelivered } = await import("../orders/ordersServices");
     const deliveryCheck = await checkAllItemsDelivered(table.id, clientId);
-    
+
     if (!deliveryCheck.allDelivered) {
-      console.log('❌ confirmTableDelivery - No todos los items están entregados');
+      console.log(
+        "❌ confirmTableDelivery - No todos los items están entregados",
+      );
       return {
         success: false,
         message: `Aún tienes ${deliveryCheck.pendingItems.length} items pendientes de entrega. Espera a que el mozo entregue todo antes de confirmar.`,
@@ -790,18 +856,24 @@ export async function confirmTableDelivery(
     const { data: updatedTable, error: updateError } = await supabaseAdmin
       .from("tables")
       .update({
-        table_status: 'confirmed',
+        table_status: "confirmed",
       })
       .eq("id", table.id)
       .select()
       .single();
 
     if (updateError) {
-      console.error('❌ confirmTableDelivery - Error actualizando status:', updateError);
+      console.error(
+        "❌ confirmTableDelivery - Error actualizando status:",
+        updateError,
+      );
       throw new Error(`Error confirmando entrega: ${updateError.message}`);
     }
 
-    console.log('✅ confirmTableDelivery - Entrega confirmada exitosamente para mesa:', table.number);
+    console.log(
+      "✅ confirmTableDelivery - Entrega confirmada exitosamente para mesa:",
+      table.number,
+    );
 
     return {
       success: true,
@@ -809,7 +881,7 @@ export async function confirmTableDelivery(
       table: updatedTable,
     };
   } catch (error: any) {
-    console.error('💥 confirmTableDelivery - Error:', error);
+    console.error("💥 confirmTableDelivery - Error:", error);
     return {
       success: false,
       message: error.message || "Error interno del servidor",
