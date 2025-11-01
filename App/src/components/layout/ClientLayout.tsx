@@ -53,8 +53,10 @@ export default function ClientLayout({
       // Para otros estados (incluyendo seated), usar el escáner general
       navigation.navigate("QRScanner", {
         mode: "order_status",
-        onScanSuccess: (tableId: string) => {
+        onScanSuccess: async (tableId: string) => {
           console.log("QR escaneado:", tableId);
+          // La lógica de verificación y navegación se maneja en HomeScreen
+          // Este callback solo se usa como referencia del modo de escaneo
         },
       });
     }

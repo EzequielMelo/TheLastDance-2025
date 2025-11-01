@@ -375,6 +375,8 @@ export default function HomeScreen({ navigation, route }: Props) {
 
   // Función para manejar el escaneo exitoso del QR de la mesa
   const handleOrderStatusQRScan = async (tableId: string) => {
+    console.log("🔍 handleOrderStatusQRScan iniciado - tableId:", tableId);
+
     if (!user || user.position_code) {
       ToastAndroid.show(
         "Esta función es solo para clientes",
@@ -385,7 +387,9 @@ export default function HomeScreen({ navigation, route }: Props) {
 
     try {
       // Verificar que el QR escaneado corresponda a la mesa del cliente
+      console.log("📡 Consultando /tables/my-table...");
       const response = await api.get("/tables/my-table");
+      console.log("✅ Respuesta my-table:", response.data);
 
       if (!response.data.hasOccupiedTable) {
         ToastAndroid.show(
@@ -407,14 +411,52 @@ export default function HomeScreen({ navigation, route }: Props) {
         return;
       }
 
-      // Si el QR es correcto, abrir el CartModal
-      setCartModalVisible(true);
-      ToastAndroid.show(
-        "✅ Mesa verificada - Consultando tus productos...",
-        ToastAndroid.SHORT,
-      );
+      // Verificar el estado de la mesa para decidir qué mostrar
+      console.log("📡 Consultando /tables/my-status...");
+      const tableStatusResponse = await api.get("/tables/my-status");
+      const tableStatus = tableStatusResponse.data.table_status;
+      console.log("✅ table_status:", tableStatus);
+
+      // Si el estado es bill_requested, navegar a BillPayment
+      if (tableStatus === "bill_requested") {
+        console.log("💰 Navegando a BillPayment...");
+        ToastAndroid.show(
+          "✅ Mesa verificada - Procesando tu cuenta...",
+          ToastAndroid.SHORT,
+        );
+
+        // Cerrar el scanner primero
+        navigation.goBack();
+
+        // Navegar a BillPayment después de un pequeño delay
+        setTimeout(() => {
+          navigation.navigate("BillPayment", {
+            tableId: myTableId,
+            tableNumber: parseInt(myTableNumber),
+          });
+        }, 100);
+
+        console.log("✅ Navegación a BillPayment programada");
+      } else {
+        // Para otros estados (pending, confirmed), abrir el CartModal
+        console.log("🛒 Abriendo CartModal...");
+
+        // Cerrar el scanner primero
+        navigation.goBack();
+
+        // Abrir el modal después de un pequeño delay
+        setTimeout(() => {
+          setCartModalVisible(true);
+        }, 100);
+
+        ToastAndroid.show(
+          "✅ Mesa verificada - Consultando tus productos...",
+          ToastAndroid.SHORT,
+        );
+      }
     } catch (error: any) {
-      console.error("Error validando mesa:", error);
+      console.error("❌ Error validando mesa:", error);
+      console.error("❌ Error response:", error.response?.data);
 
       let errorMessage = "Error verificando tu mesa";
       if (error.response?.status === 401) {
