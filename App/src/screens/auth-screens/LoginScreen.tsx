@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ToastAndroid,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useEffect, useState } from "react";
 import { ChefHat, Lock, Eye, EyeOff, Mail } from "lucide-react-native";

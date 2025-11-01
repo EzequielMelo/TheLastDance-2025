@@ -458,16 +458,6 @@ export default function MyWaitingPositionScreen() {
         {/* Actions */}
         <View className="gap-3 mb-8">
           <TouchableOpacity
-            onPress={onRefresh}
-            className="bg-[#d4af37] rounded-xl py-4 flex-row items-center justify-center"
-          >
-            <RefreshCw size={20} color="#1a1a1a" />
-            <Text className="text-black font-semibold text-lg ml-2">
-              Actualizar Posición
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
             onPress={handleCancel}
             className="bg-red-600 rounded-xl py-4 flex-row items-center justify-center"
           >

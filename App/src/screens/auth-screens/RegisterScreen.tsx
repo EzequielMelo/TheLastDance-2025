@@ -3,8 +3,6 @@ import {
   Text,
   Modal,
   TouchableOpacity,
-  ToastAndroid,
-  Alert,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
@@ -21,6 +19,7 @@ import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import React, { useState, useRef } from "react";
 import { Logger } from "../../utils/Logger";
+import CustomAlert from "../../components/common/CustomAlert";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Registro">;
 
@@ -33,6 +32,30 @@ export const RegisterScreen = ({ navigation }: Props) => {
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
   const [facing, setFacing] = useState<CameraType>("back");
   const cameraRef = useRef<CameraView>(null);
+  
+  // CustomAlert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    title: "",
+    message: "",
+    type: "info" as "success" | "error" | "warning" | "info",
+    buttons: [] as Array<{ text: string; onPress?: () => void; style?: "cancel" | "destructive" }>
+  });
+
+  // Helper function to show custom alerts
+  const showAlert = (title: string, message: string, type: "success" | "error" | "warning" | "info" = "info", buttons?: Array<{ text: string; onPress?: () => void; style?: "cancel" | "destructive" }>) => {
+    setAlertConfig({
+      title,
+      message,
+      type,
+      buttons: buttons || [{ text: "OK", onPress: () => setAlertVisible(false) }]
+    });
+    setAlertVisible(true);
+  };
+
+  const closeAlert = () => {
+    setAlertVisible(false);
+  };
 
   // Función para parsear el código PDF417 del DNI argentino
   const parseDNIData = (
@@ -175,12 +198,9 @@ export const RegisterScreen = ({ navigation }: Props) => {
 
       message += ". Completa los primeros 2 dígitos y el último dígito del CUIL";
 
-      ToastAndroid.show(message, ToastAndroid.LONG);
+      showAlert("DNI Escaneado", message, "success");
     } else {
-      ToastAndroid.show(
-        "No se pudo leer el DNI. Inténtalo de nuevo o completa manualmente.",
-        ToastAndroid.SHORT,
-      );
+      showAlert("Error", "No se pudo leer el DNI. Inténtalo de nuevo o completa manualmente.", "error");
     }
   };
 
@@ -201,7 +221,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
         setCameraMode(null);
       } catch (error) {
         Logger.error("Error tomando la foto:", error);
-        ToastAndroid.show("Error al tomar la foto", ToastAndroid.SHORT);
+        showAlert("Error", "Error al tomar la foto", "error");
       }
     }
   };
@@ -211,10 +231,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        ToastAndroid.show(
-          "Se necesita permiso para acceder a la galería",
-          ToastAndroid.SHORT,
-        );
+        showAlert("Permiso requerido", "Se necesita permiso para acceder a la galería", "warning");
         return;
       }
 
@@ -232,30 +249,34 @@ export const RegisterScreen = ({ navigation }: Props) => {
           name: "photo.jpg",
         };
         handleInputChange("file", photoFile);
-        ToastAndroid.show(
-          "Foto seleccionada correctamente",
-          ToastAndroid.SHORT,
-        );
+        showAlert("¡Éxito!", "Foto seleccionada correctamente", "success");
       }
     } catch (error) {
       Logger.error("Error seleccionando imagen:", error);
-      ToastAndroid.show("Error al seleccionar imagen", ToastAndroid.SHORT);
+      showAlert("Error", "Error al seleccionar imagen", "error");
     }
   };
 
   const selectPhotoOption = () => {
-    Alert.alert("Seleccionar foto", "¿Cómo deseas agregar la foto?", [
+    showAlert("Seleccionar foto", "¿Cómo deseas agregar la foto?", "info", [
       {
         text: "Tomar foto",
-        onPress: () => openCamera("photo"),
+        onPress: () => {
+          closeAlert();
+          openCamera("photo");
+        },
       },
       {
         text: "Galería",
-        onPress: pickImageFromGallery,
+        onPress: () => {
+          closeAlert();
+          pickImageFromGallery();
+        },
       },
       {
         text: "Cancelar",
         style: "cancel",
+        onPress: closeAlert,
       },
     ]);
   };
@@ -272,10 +293,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
     if (!permission.granted) {
       const { granted } = await requestPermission();
       if (!granted) {
-        ToastAndroid.show(
-          "Se necesita permiso para usar la cámara",
-          ToastAndroid.SHORT,
-        );
+        showAlert("Permiso requerido", "Se necesita permiso para usar la cámara", "warning");
         return;
       }
     }
@@ -285,14 +303,18 @@ export const RegisterScreen = ({ navigation }: Props) => {
   };
 
   const showDNIOptions = () => {
-    Alert.alert("Completar DNI", "¿Cómo deseas completar el DNI?", [
+    showAlert("Completar DNI", "¿Cómo deseas completar el DNI?", "info", [
       {
         text: "Escanear DNI",
-        onPress: () => openCamera("dni"),
+        onPress: () => {
+          closeAlert();
+          openCamera("dni");
+        },
       },
       {
         text: "Completar manualmente",
         style: "cancel",
+        onPress: closeAlert,
       },
     ]);
   };
@@ -310,8 +332,15 @@ export const RegisterScreen = ({ navigation }: Props) => {
 
     const result = await register(fd);
     if (result?.success) {
-      ToastAndroid.show("¡Cuenta creada exitosamente!", ToastAndroid.LONG);
-      setTimeout(() => navigation.navigate("Login"), 800);
+      showAlert("¡Éxito!", "¡Cuenta creada exitosamente!", "success", [
+        {
+          text: "Continuar",
+          onPress: () => {
+            closeAlert();
+            setTimeout(() => navigation.navigate("Login"), 300);
+          }
+        }
+      ]);
     }
   };
 
@@ -525,6 +554,15 @@ export const RegisterScreen = ({ navigation }: Props) => {
           )}
         </View>
       </Modal>
+
+      <CustomAlert
+        visible={alertVisible}
+        onClose={closeAlert}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+      />
     </>
   );
 };

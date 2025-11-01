@@ -565,7 +565,7 @@ export default function HomeScreen({ navigation, route }: Props) {
       colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
       className="flex-1"
     >
-      <View className="px-6 pt-14 pb-8 flex-1">
+      <View className="px-6 pt-8 pb-8 flex-1">
         {/* Header con menú hamburguesa - Solo para empleados */}
         {!isCliente && (
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>

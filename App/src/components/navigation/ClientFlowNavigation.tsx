@@ -13,6 +13,8 @@ import {
   Gamepad2,
   FileText,
   Receipt,
+  UtensilsCrossed,
+  MessageCircle,
 } from "lucide-react-native";
 import { useClientState, ClientState } from "../../Hooks/useClientState";
 import { confirmTableDelivery, checkTableDeliveryStatus } from "../../api/orders";
@@ -123,14 +125,7 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                 className="bg-blue-600 px-6 py-3 rounded-lg flex-row items-center"
               >
                 <Clock size={16} color="white" className="mr-2" />
-                <Text className="text-white font-semibold">Ver Posición</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleRefresh}
-                className="bg-gray-600 px-6 py-3 rounded-lg flex-row items-center"
-              >
-                <RefreshCcw size={16} color="white" className="mr-2" />
-                <Text className="text-white font-semibold">Actualizar</Text>
+                <Text className="text-white font-semibold ml-2">Ver Posición</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -227,57 +222,91 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                 </Text>
                 
                 {/* Botones circulares estilo MercadoPago */}
-                <View className="flex-row justify-around items-start px-4 mb-6">
-                  {/* Juegos */}
-                  <View className="items-center flex-1">
-                    <TouchableOpacity
-                      onPress={() => navigation.navigate("Games")}
-                      className="bg-violet-600 w-16 h-16 rounded-full items-center justify-center mb-3"
-                      style={{ elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 }}
-                    >
-                      <Gamepad2 size={24} color="white" />
-                    </TouchableOpacity>
-                    <View style={{ height: 32, justifyContent: 'flex-start' }}>
-                      <Text className="text-white text-center text-sm font-medium leading-4">
+                <View className="w-full mb-6">
+                  {/* Primera fila: Ver Menú, Chat, Juegos */}
+                  <View className="flex-row justify-around items-center mb-8">
+                    {/* Ver Menú */}
+                    <View className="items-center">
+                      <TouchableOpacity
+                        onPress={() => navigation.navigate("Menu")}
+                        className="bg-blue-600 w-16 h-16 rounded-full items-center justify-center mb-2"
+                        style={{ elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 }}
+                      >
+                        <UtensilsCrossed size={24} color="white" />
+                      </TouchableOpacity>
+                      <Text className="text-white text-center text-xs font-medium">
+                        Ver Menú
+                      </Text>
+                    </View>
+
+                    {/* Chat con Mesero */}
+                    <View className="items-center">
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (occupiedTable) {
+                            navigation.navigate("TableChat", {
+                              tableId: occupiedTable.id
+                            });
+                          }
+                        }}
+                        className="bg-orange-600 w-16 h-16 rounded-full items-center justify-center mb-2"
+                        style={{ elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 }}
+                      >
+                        <MessageCircle size={24} color="white" />
+                      </TouchableOpacity>
+                      <Text className="text-white text-center text-xs font-medium">
+                        Chat con{'\n'}mesero
+                      </Text>
+                    </View>
+
+                    {/* Juegos */}
+                    <View className="items-center">
+                      <TouchableOpacity
+                        onPress={() => navigation.navigate("Games")}
+                        className="bg-purple-600 w-16 h-16 rounded-full items-center justify-center mb-2"
+                        style={{ elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 }}
+                      >
+                        <Gamepad2 size={24} color="white" />
+                      </TouchableOpacity>
+                      <Text className="text-white text-center text-xs font-medium">
                         Juegos
                       </Text>
                     </View>
                   </View>
 
-                  {/* Encuesta */}
-                  <View className="items-center flex-1">
-                    <TouchableOpacity
-                      onPress={() => navigation.navigate("Survey")}
-                      className="bg-green-600 w-16 h-16 rounded-full items-center justify-center mb-3"
-                      style={{ elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 }}
-                    >
-                      <FileText size={24} color="white" />
-                    </TouchableOpacity>
-                    <View style={{ height: 32, justifyContent: 'flex-start' }}>
-                      <Text className="text-white text-center text-sm font-medium leading-4">
+                  {/* Segunda fila: Encuesta, Pedir la Cuenta */}
+                  <View className="flex-row justify-around items-center" style={{ paddingHorizontal: 60 }}>
+                    {/* Encuesta */}
+                    <View className="items-center">
+                      <TouchableOpacity
+                        onPress={() => navigation.navigate("Survey")}
+                        className="bg-green-600 w-16 h-16 rounded-full items-center justify-center mb-2"
+                        style={{ elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 }}
+                      >
+                        <FileText size={24} color="white" />
+                      </TouchableOpacity>
+                      <Text className="text-white text-center text-xs font-medium">
                         Encuesta
                       </Text>
                     </View>
-                  </View>
 
-                  {/* Pedir la Cuenta */}
-                  <View className="items-center flex-1">
-                    <TouchableOpacity
-                      onPress={() => {
-                        if (occupiedTable) {
-                          navigation.navigate("TableChat", {
-                            tableId: occupiedTable.id,
-                            autoMessage: "Pedir la cuenta."
-                          });
-                        }
-                      }}
-                      className="bg-green-600 w-16 h-16 rounded-full items-center justify-center mb-3"
-                      style={{ elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 }}
-                    >
-                      <Receipt size={24} color="white" />
-                    </TouchableOpacity>
-                    <View style={{ height: 32, justifyContent: 'flex-start' }}>
-                      <Text className="text-white text-center text-sm font-medium leading-4">
+                    {/* Pedir la Cuenta */}
+                    <View className="items-center">
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (occupiedTable) {
+                            navigation.navigate("TableChat", {
+                              tableId: occupiedTable.id,
+                              autoMessage: "Pedir la cuenta."
+                            });
+                          }
+                        }}
+                        className="bg-red-600 w-16 h-16 rounded-full items-center justify-center mb-2"
+                        style={{ elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 }}
+                      >
+                        <Receipt size={24} color="white" />
+                      </TouchableOpacity>
+                      <Text className="text-white text-center text-xs font-medium">
                         Pedir la{'\n'}cuenta
                       </Text>
                     </View>
@@ -343,30 +372,47 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                   </>
                 )}
                 
-                {/* Solo mostrar estos botones si NO está en estado bill_requested */}
-                <View className="flex-row gap-4 mb-4">
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate("Menu")}
-                    className="bg-yellow-600 px-6 py-3 rounded-lg"
-                  >
-                    <Text className="text-white font-semibold">
-                      Ver Menú
-                    </Text>
-                  </TouchableOpacity>
-                  {occupiedTable && (
-                    <TouchableOpacity
-                      onPress={() =>
-                        navigation.navigate("TableChat", {
-                          tableId: occupiedTable.id,
-                        })
-                      }
-                      className="bg-blue-600 px-6 py-3 rounded-lg"
-                    >
-                      <Text className="text-white font-semibold">
-                        Chat con Mesero
-                      </Text>
-                    </TouchableOpacity>
-                  )}
+                {/* Botones para estado seated - Solo Ver Menú y Chat */}
+                <View className="w-full mb-6">
+                  <View className="flex-row justify-around items-center" style={{ paddingHorizontal: 60 }}>
+                    {/* Ver Menú */}
+                    <View className="items-center">
+                      <TouchableOpacity
+                        onPress={() => navigation.navigate("Menu")}
+                        className="bg-blue-600 w-16 h-16 rounded-full items-center justify-center mb-2"
+                        style={{ elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 }}
+                      >
+                        <UtensilsCrossed size={24} color="white" />
+                      </TouchableOpacity>
+                      <View style={{ height: 32, justifyContent: 'center' }}>
+                        <Text className="text-white text-center text-xs font-medium">
+                          Ver Menú
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Chat con Mesero */}
+                    <View className="items-center">
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (occupiedTable) {
+                            navigation.navigate("TableChat", {
+                              tableId: occupiedTable.id
+                            });
+                          }
+                        }}
+                        className="bg-orange-600 w-16 h-16 rounded-full items-center justify-center mb-2"
+                        style={{ elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 }}
+                      >
+                        <MessageCircle size={24} color="white" />
+                      </TouchableOpacity>
+                      <View style={{ height: 32, justifyContent: 'center' }}>
+                        <Text className="text-white text-center text-xs font-medium">
+                          Chat con{'\n'}mesero
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
                 </View>
               </>
             )}
