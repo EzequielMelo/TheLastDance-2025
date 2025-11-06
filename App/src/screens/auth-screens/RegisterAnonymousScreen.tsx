@@ -5,7 +5,10 @@ import type { RootStackParamList } from "../../navigation/RootStackParamList";
 import FormLayout from "../../Layouts/formLayout";
 import TextField from "../../components/form/TextField";
 import ImageField from "../../components/form/ImageField";
-import { useRegisterForm, FormDataType } from "../../Hooks/register/useRegisterForm";
+import {
+  useRegisterForm,
+  FormDataType,
+} from "../../Hooks/register/useRegisterForm";
 import { useAuth } from "../../auth/AuthContext";
 import api from "../../api/axios";
 
@@ -17,11 +20,14 @@ export const RegisterAnonymousScreen = ({ navigation }: Props) => {
   const onSubmit = async (data: FormDataType) => {
     const fd = new FormData();
     fd.append("first_name", data.first_name.trim());
-    fd.append("last_name",  data.last_name.trim());
+    fd.append("last_name", data.last_name.trim());
     fd.append("profile_code", "cliente_anonimo");
     if (data.file) fd.append("image", data.file as any);
 
-    const resp = await fetch(`${api.defaults.baseURL}/auth/anonymous`, { method: "POST", body: fd });
+    const resp = await fetch(`${api.defaults.baseURL}/auth/anonymous`, {
+      method: "POST",
+      body: fd,
+    });
     if (!resp.ok) throw new Error((await resp.text()) || `HTTP ${resp.status}`);
     const json = await resp.json();
     if (!json?.token || !json?.user) throw new Error("Respuesta inválida");
@@ -31,8 +37,15 @@ export const RegisterAnonymousScreen = ({ navigation }: Props) => {
     // cuando el estado de autenticación cambie
   };
 
-  const { formData, errors, loading, handleInputChange, handleBlur, pickImage, handleSubmit } =
-    useRegisterForm(onSubmit, "anon");
+  const {
+    formData,
+    errors,
+    loading,
+    handleInputChange,
+    handleBlur,
+    pickImage,
+    handleSubmit,
+  } = useRegisterForm(onSubmit, "anon");
 
   const [focused, setFocused] = useState<string>("");
 
@@ -71,7 +84,10 @@ export const RegisterAnonymousScreen = ({ navigation }: Props) => {
         label="Foto"
         image={formData.file}
         onPick={pickImage}
-        onClear={() => { handleInputChange("file", null); }}
+        onClear={() => {
+          handleInputChange("file", null);
+        }}
+        onFocus={() => setFocused("file")}
         error={errors.file}
         focused={focused === "file"}
       />

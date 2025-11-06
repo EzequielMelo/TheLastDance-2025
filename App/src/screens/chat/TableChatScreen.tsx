@@ -9,6 +9,7 @@ import {
   ToastAndroid,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RouteProp, useRoute, useNavigation } from "@react-navigation/native";
@@ -24,6 +25,7 @@ type TableChatRouteProp = RouteProp<RootStackParamList, "TableChat">;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function TableChatScreen() {
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const route = useRoute<TableChatRouteProp>();
   const navigation = useNavigation<NavigationProp>();
   const { user } = useAuth();
@@ -79,6 +81,27 @@ export default function TableChatScreen() {
 
     return unsubscribe;
   }, [navigation, markAsRead]);
+
+  // Detectar altura del teclado
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      "keyboardDidShow",
+      e => {
+        setKeyboardHeight(e.endCoordinates.height);
+      },
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      "keyboardDidHide",
+      () => {
+        setKeyboardHeight(0);
+      },
+    );
+
+    return () => {
+      keyboardDidHideListener?.remove();
+      keyboardDidShowListener?.remove();
+    };
+  }, []);
 
   // Enviar mensaje automático si se proporciona
   useEffect(() => {
@@ -193,14 +216,15 @@ export default function TableChatScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => {
-              // Si se envió un mensaje automático (como "Pedir la cuenta"), 
+              // Si se envió un mensaje automático (como "Pedir la cuenta"),
               // navegar al Home con refresh para actualizar el estado
               if (autoMessageSent && autoMessage) {
                 // Usar navigate para ir al Home con refresh

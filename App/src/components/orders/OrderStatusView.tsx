@@ -171,7 +171,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
               </Text>
               <Text
                 style={{
-                  fontSize: 14,
+                  fontSize: 12,
                   color: "#6b7280",
                   marginTop: 2,
                 }}
@@ -183,7 +183,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
 
           <Text
             style={{
-              fontSize: 16,
+              fontSize: 14,
               color: "#1e40af",
               textAlign: "center",
               fontStyle: "italic",
@@ -237,7 +237,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             </Text>
             <Text
               style={{
-                fontSize: 14,
+                fontSize: 12,
                 color: "#6b7280",
                 marginTop: 2,
               }}
@@ -252,7 +252,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           <View style={{ marginBottom: 16 }}>
             <Text
               style={{
-                fontSize: 17,
+                fontSize: 15,
                 fontWeight: "600",
                 color: "#ef4444",
                 marginBottom: 8,
@@ -279,7 +279,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                 <View style={{ flex: 1 }}>
                   <Text
                     style={{
-                      fontSize: 16,
+                      fontSize: 14,
                       fontWeight: "500",
                       color: "#ef4444",
                       textDecorationLine: "line-through",
@@ -289,7 +289,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                   </Text>
                   <Text
                     style={{
-                      fontSize: 14,
+                      fontSize: 12,
                       color: "#dc2626",
                     }}
                   >
@@ -298,7 +298,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                 </View>
                 <Text
                   style={{
-                    fontSize: 15,
+                    fontSize: 13,
                     fontWeight: "600",
                     color: "#ef4444",
                     backgroundColor: "rgba(239, 68, 68, 0.2)",
@@ -319,7 +319,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           <View style={{ marginBottom: 16 }}>
             <Text
               style={{
-                fontSize: 17,
+                fontSize: 15,
                 fontWeight: "600",
                 color: "#22c55e",
                 marginBottom: 8,
@@ -346,7 +346,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                 <View style={{ flex: 1 }}>
                   <Text
                     style={{
-                      fontSize: 16,
+                      fontSize: 14,
                       fontWeight: "500",
                       color: "#16a34a",
                     }}
@@ -355,7 +355,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                   </Text>
                   <Text
                     style={{
-                      fontSize: 14,
+                      fontSize: 12,
                       color: "#15803d",
                     }}
                   >
@@ -364,7 +364,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                 </View>
                 <Text
                   style={{
-                    fontSize: 14,
+                    fontSize: 12,
                     fontWeight: "600",
                     color: "#22c55e",
                     backgroundColor: "rgba(34, 197, 94, 0.2)",
@@ -386,7 +386,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             <View style={{ marginBottom: 16 }}>
               <Text
                 style={{
-                  fontSize: 17,
+                  fontSize: 15,
                   fontWeight: "600",
                   color: "#6b7280",
                   marginBottom: 8,
@@ -413,16 +413,16 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                   <View style={{ flex: 1 }}>
                     <Text
                       style={{
-                        fontSize: 16,
-                        fontWeight: "600",
+                        fontSize: 14,
+                        fontWeight: "500",
                         color: "#6b7280",
                       }}
                     >
-                      ${item.subtotal}
+                      {item.menu_item?.name}
                     </Text>
                     <Text
                       style={{
-                        fontSize: 14,
+                        fontSize: 12,
                         color: "#9ca3af",
                       }}
                     >
@@ -456,7 +456,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
         >
           <Text
             style={{
-              fontSize: 16,
+              fontSize: 14,
               fontWeight: "600",
               color: "#3b82f6",
               marginBottom: 4,
@@ -466,7 +466,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           </Text>
           <Text
             style={{
-              fontSize: 14,
+              fontSize: 12,
               color: "#1e40af",
               lineHeight: 16,
             }}
@@ -493,7 +493,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             style={{
               color: "#1a1a1a",
               fontWeight: "700",
-              fontSize: 17,
+              fontSize: 15,
             }}
           >
             🔄 Modificar Selección
@@ -503,39 +503,14 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
     );
   };
 
-  // Renderizar items rejected como información "sin stock" cuando ya no requieren modificación
+  // Renderizar items rejected como grupo informativo separado (sin agrupar por tanda)
   const renderRejectedItemsAsInfo = () => {
     const rejectedItems = groups.rejected;
     const needsModificationItems = groups.needs_modification;
-    const pendingItems = groups.pending;
 
-    // Solo mostrar si hay items rejected PERO ya no se requiere modificación
-    const hasItemsNeedingAction = needsModificationItems.length > 0;
-    const hasModificationsAlreadySent =
-      rejectedItems.length > 0 && pendingItems.length > 0;
-
-    // Verificar si la tanda ya fue procesada
-    const acceptedItems = groups.accepted;
-    const preparingItems = groups.preparing;
-    const readyItems = groups.ready;
-    const deliveredItems = groups.delivered;
-
-    const tandaWasProcessed =
-      acceptedItems.length > 0 ||
-      preparingItems.length > 0 ||
-      readyItems.length > 0 ||
-      deliveredItems.length > 0;
-
-    // Mostrar info de rejected solo si:
-    // - Hay items rejected Y
-    // - NO hay items que necesiten acción Y
-    // - (La tanda fue procesada O ya se enviaron modificaciones)
-    const shouldShowRejectedInfo =
-      rejectedItems.length > 0 &&
-      !hasItemsNeedingAction &&
-      (tandaWasProcessed || hasModificationsAlreadySent);
-
-    if (!shouldShowRejectedInfo) return null;
+    // Solo renderizar si NO hay items que requieren modificación activa
+    if (needsModificationItems.length > 0) return null;
+    if (rejectedItems.length === 0) return null;
 
     return (
       <View
@@ -565,22 +540,22 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                 color: "#ef4444",
               }}
             >
-              ❌ Productos Sin Stock
+              ❌ Items Rechazados
             </Text>
             <Text
               style={{
-                fontSize: 14,
+                fontSize: 12,
                 color: "#6b7280",
                 marginTop: 2,
               }}
             >
-              Estos productos no estaban disponibles en el momento del pedido
+              Estos productos no tienen stock disponible
             </Text>
           </View>
         </View>
 
         {/* Lista de items rechazados */}
-        {rejectedItems.map((item, index) => (
+        {rejectedItems.map(item => (
           <View
             key={item.id}
             style={{
@@ -599,7 +574,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             <View style={{ flex: 1 }}>
               <Text
                 style={{
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: "500",
                   color: "#ef4444",
                   textDecorationLine: "line-through",
@@ -607,22 +582,17 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
               >
                 {item.menu_item?.name}
               </Text>
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: "#dc2626",
-                }}
-              >
-                Cantidad: {item.quantity} • Sin stock disponible
+              <Text style={{ fontSize: 13, color: "#dc2626" }}>
+                Cantidad: {item.quantity}
               </Text>
             </View>
             <Text
               style={{
-                fontSize: 14,
+                fontSize: 12,
                 fontWeight: "600",
                 color: "#ef4444",
                 backgroundColor: "rgba(239, 68, 68, 0.2)",
-                paddingHorizontal: 8,
+                paddingHorizontal: 6,
                 paddingVertical: 2,
                 borderRadius: 4,
               }}
@@ -640,34 +610,6 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
 
     // No renderizar grupos individuales si ya están en el grupo de modificación
     if (status === "rejected" || status === "needs_modification") return null;
-
-    // Para items pending, solo ocultar los que pertenecen a la misma tanda de modificación
-    if (
-      status === "pending" &&
-      (groups.rejected.length > 0 || groups.needs_modification.length > 0)
-    ) {
-      // Obtener batch_ids de items que requieren modificación
-      const modificationBatchIds = new Set(
-        [
-          ...groups.rejected.map(item => item.batch_id),
-          ...groups.needs_modification.map(item => item.batch_id),
-        ].filter(Boolean), // Filtrar null/undefined
-      );
-
-      // Filtrar solo items pending que NO pertenecen a tandas de modificación
-      const newTandaItems = items.filter(item => {
-        // Si el item no tiene batch_id, considerarlo como nueva tanda
-        if (!item.batch_id) return true;
-        // Si el batch_id no está en los de modificación, es nueva tanda
-        return !modificationBatchIds.has(item.batch_id);
-      });
-
-      // Si todos los items pending son de modificación, no renderizar este grupo
-      if (newTandaItems.length === 0) return null;
-
-      // Renderizar solo los items de nuevas tandas
-      items = newTandaItems;
-    }
 
     const statusInfo = getStatusInfo(status);
     const StatusIcon = statusInfo.icon;
@@ -696,17 +638,17 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           <View style={{ flex: 1, marginLeft: 8 }}>
             <Text
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: "600",
-                color: "#ffffff", // Texto blanco para mejor contraste
+                color: "#ffffff",
               }}
             >
               {statusInfo.title}
             </Text>
             <Text
               style={{
-                fontSize: 14,
-                color: "#e5e7eb", // Texto gris claro para descripción
+                fontSize: 12,
+                color: "#e5e7eb",
                 marginTop: 2,
               }}
             >
@@ -731,17 +673,17 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             <View style={{ flex: 1 }}>
               <Text
                 style={{
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: "500",
-                  color: "#ffffff", // Texto blanco para mejor contraste
+                  color: "#ffffff",
                 }}
               >
                 {item.menu_item?.name}
               </Text>
               <Text
                 style={{
-                  fontSize: 14,
-                  color: "#d1d5db", // Gris claro para subtexto
+                  fontSize: 12,
+                  color: "#d1d5db",
                 }}
               >
                 Cantidad: {item.quantity}
@@ -749,9 +691,9 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             </View>
             <Text
               style={{
-                fontSize: 16,
+                fontSize: 14,
                 fontWeight: "600",
-                color: "#ffffff", // Texto blanco para precio
+                color: "#ffffff",
               }}
             >
               ${item.subtotal}
@@ -787,16 +729,16 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
         style={{
           fontSize: 20,
           fontWeight: "bold",
-          color: "#ebe8e8",
+          color: "#111827",
           marginBottom: 16,
         }}
       >
-        Estado de tu pedido
+        Estado de tu Pedido
       </Text>
 
       <Text
         style={{
-          fontSize: 14,
+          fontSize: 12,
           color: "#6b7280",
           marginBottom: 16,
         }}
@@ -832,7 +774,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             style={{
               color: "white",
               fontWeight: "600",
-              fontSize: 18,
+              fontSize: 16,
             }}
           >
             Agregar Más Productos
@@ -851,7 +793,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
       >
         <Text
           style={{
-            fontSize: 14,
+            fontSize: 12,
             color: "#6b7280",
             textAlign: "center",
           }}
@@ -877,14 +819,14 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           style={{
             fontSize: 16,
             fontWeight: "600",
-            color: "#ebe8e8",
+            color: "#111827",
           }}
         >
-          Total del pedido:
+          Total del Pedido:
         </Text>
         <Text
           style={{
-            fontSize: 20,
+            fontSize: 18,
             fontWeight: "bold",
             color: "#22c55e",
           }}

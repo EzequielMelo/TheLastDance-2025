@@ -14,7 +14,46 @@ export async function createOrder(
     console.log("📝 Creando pedido para usuario:", userId);
     console.log("📦 Items del pedido:", orderData.items);
 
-    // 1. Validar que todos los productos existen y están activos
+    // 1. Verificar si el usuario tiene una orden activa con items rechazados
+    const { data: activeOrders, error: activeOrderError } = await supabaseAdmin
+      .from("orders")
+      .select(
+        `
+        id,
+        order_items!inner(
+          menu_item_id,
+          status
+        )
+      `,
+      )
+      .eq("user_id", userId)
+      .eq("is_paid", false);
+
+    if (!activeOrderError && activeOrders && activeOrders.length > 0) {
+      // Obtener todos los menu_item_id rechazados
+      const rejectedMenuItemIds = new Set<string>();
+      activeOrders.forEach((order: any) => {
+        order.order_items?.forEach((item: any) => {
+          if (item.status === "rejected") {
+            rejectedMenuItemIds.add(item.menu_item_id);
+          }
+        });
+      });
+
+      // Verificar si algún item del nuevo pedido está rechazado
+      const blockedItems = orderData.items.filter(item =>
+        rejectedMenuItemIds.has(item.id),
+      );
+
+      if (blockedItems.length > 0) {
+        const blockedNames = blockedItems.map(item => item.name).join(", ");
+        throw new Error(
+          `Los siguientes productos no están disponibles: ${blockedNames}. Ya fueron rechazados previamente en esta sesión.`,
+        );
+      }
+    }
+
+    // 2. Validar que todos los productos existen y están activos
     const menuItemIds = orderData.items.map(item => item.id);
     const { data: menuItems, error: menuError } = await supabaseAdmin
       .from("menu_items")
@@ -87,20 +126,27 @@ export async function createOrder(
 
     // 7. Si hay table_id, resetear el table_status a 'pending'
     if (orderData.table_id) {
-      console.log(`🔄 Reseteando table_status para mesa ${orderData.table_id} a 'pending'`);
-      
+      console.log(
+        `🔄 Reseteando table_status para mesa ${orderData.table_id} a 'pending'`,
+      );
+
       const { error: tableUpdateError } = await supabaseAdmin
         .from("tables")
         .update({
-          table_status: 'pending'
+          table_status: "pending",
         })
         .eq("id", orderData.table_id);
 
       if (tableUpdateError) {
-        console.warn("⚠️ Error actualizando table_status:", tableUpdateError.message);
+        console.warn(
+          "⚠️ Error actualizando table_status:",
+          tableUpdateError.message,
+        );
         // No falla el pedido por esto, solo es un warning
       } else {
-        console.log(`✅ table_status reseteado a 'pending' para mesa ${orderData.table_id}`);
+        console.log(
+          `✅ table_status reseteado a 'pending' para mesa ${orderData.table_id}`,
+        );
       }
     }
 
@@ -561,7 +607,7 @@ export async function rejectIndividualItemsFromBatch(
     // 3. Verificar que los items existen y están en estado 'pending'
     const { data: itemsToCheck, error: itemsError } = await supabaseAdmin
       .from("order_items")
-      .select("id, status, batch_id, menu_item_id, quantity")
+      .select("id, status, batch_id, menu_item_id, quantity, subtotal")
       .eq("order_id", orderId)
       .in("id", itemsToReject);
 
@@ -580,6 +626,15 @@ export async function rejectIndividualItemsFromBatch(
     if (nonPendingItems.length > 0) {
       throw new Error("Solo se pueden rechazar items en estado pendiente");
     }
+
+    // Calcular el monto total de los items rechazados
+    const rejectedAmount = itemsToCheck.reduce(
+      (sum, item) => sum + (item.subtotal || 0),
+      0,
+    );
+    console.log(
+      `💰 Monto a descontar por items rechazados: $${rejectedAmount}`,
+    );
 
     // 4. Obtener todos los batch_ids de los items rechazados
     const batchIds = [...new Set(itemsToCheck.map(item => item.batch_id))];
@@ -617,7 +672,13 @@ export async function rejectIndividualItemsFromBatch(
       );
     }
 
-    // 6. Actualizar notas de la orden explicando qué pasó y qué items no están disponibles
+    // 6. Actualizar total_amount de la orden (restar items rechazados)
+    const newTotalAmount = currentOrder.total_amount - rejectedAmount;
+    console.log(
+      `💰 Nuevo total de la orden: $${newTotalAmount} (anterior: $${currentOrder.total_amount})`,
+    );
+
+    // 7. Actualizar notas y total_amount de la orden
     const unavailableItemsInfo = itemsToCheck
       .map(item => `Item ID ${item.id}`)
       .join(", ");
@@ -625,19 +686,20 @@ export async function rejectIndividualItemsFromBatch(
       ? `⚠️ Items no disponibles: ${unavailableItemsInfo}. Razón: ${reason}. Toda la tanda devuelta para que puedas reorganizar tu pedido.`
       : `⚠️ Items no disponibles: ${unavailableItemsInfo}. Toda la tanda devuelta para que puedas reorganizar tu pedido.`;
 
-    const { error: noteError } = await supabaseAdmin
+    const { error: updateOrderError } = await supabaseAdmin
       .from("orders")
       .update({
         notes: noteText,
+        total_amount: newTotalAmount,
         updated_at: new Date().toISOString(),
       })
       .eq("id", orderId);
 
-    if (noteError) {
-      console.warn(`⚠️ Error agregando notas a la orden: ${noteError.message}`);
+    if (updateOrderError) {
+      console.warn(`⚠️ Error actualizando orden: ${updateOrderError.message}`);
     }
 
-    // 7. Obtener la orden actualizada
+    // 8. Obtener la orden actualizada
     const updatedOrder = await getOrderById(orderId);
 
     console.log(
@@ -1549,12 +1611,15 @@ export async function replaceRejectedItems(
 // Obtener pedidos para cocina (items con category "plato" en estados activos)
 export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
   try {
-    console.log("👨‍🍳 Obteniendo pedidos para cocina (todos los estados activos)...");
+    console.log(
+      "👨‍🍳 Obteniendo pedidos para cocina (todos los estados activos)...",
+    );
 
     // Obtener todos los items activos que son platos
     const { data: kitchenItems, error: itemsError } = await supabaseAdmin
       .from("order_items")
-      .select(`
+      .select(
+        `
         id,
         order_id,
         menu_item_id,
@@ -1584,13 +1649,16 @@ export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
           tables(id, number),
           users(id, first_name, last_name, profile_image)
         )
-      `)
+      `,
+      )
       .in("status", ["accepted", "preparing", "ready"])
       .eq("menu_items.category", "plato")
       .order("created_at", { ascending: true });
 
     if (itemsError) {
-      throw new Error(`Error obteniendo items de cocina: ${itemsError.message}`);
+      throw new Error(
+        `Error obteniendo items de cocina: ${itemsError.message}`,
+      );
     }
 
     if (!kitchenItems || kitchenItems.length === 0) {
@@ -1601,7 +1669,7 @@ export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
     // Agrupar items por orden
     const ordersMap = new Map<string, OrderWithItems>();
 
-    kitchenItems.forEach((item) => {
+    kitchenItems.forEach(item => {
       const order = (item as any).orders;
       const menuItem = (item as any).menu_items;
 
@@ -1610,7 +1678,7 @@ export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
           ...order,
           table: order.tables,
           user: order.users,
-          order_items: []
+          order_items: [],
         });
       }
 
@@ -1624,12 +1692,14 @@ export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
         subtotal: item.subtotal,
         status: item.status,
         created_at: item.created_at,
-        menu_item: menuItem
+        menu_item: menuItem,
       });
     });
 
     const ordersArray = Array.from(ordersMap.values());
-    console.log(`👨‍🍳 Encontradas ${ordersArray.length} órdenes con items para cocina`);
+    console.log(
+      `👨‍🍳 Encontradas ${ordersArray.length} órdenes con items para cocina`,
+    );
 
     return ordersArray;
   } catch (error) {
@@ -1642,10 +1712,12 @@ export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
 export async function updateKitchenItemStatus(
   itemId: string,
   newStatus: OrderItemStatus,
-  cookId: string
+  cookId: string,
 ): Promise<{ success: boolean; message: string }> {
   try {
-    console.log(`👨‍🍳 Actualizando item ${itemId} a status ${newStatus} por cocinero ${cookId}`);
+    console.log(
+      `👨‍🍳 Actualizando item ${itemId} a status ${newStatus} por cocinero ${cookId}`,
+    );
 
     // Validar que el nuevo status es válido para cocina
     const validStatuses: OrderItemStatus[] = ["preparing", "ready"];
@@ -1656,11 +1728,13 @@ export async function updateKitchenItemStatus(
     // Verificar que el item existe y es un plato
     const { data: item, error: itemError } = await supabaseAdmin
       .from("order_items")
-      .select(`
+      .select(
+        `
         id,
         status,
         menu_items!inner(category)
-      `)
+      `,
+      )
       .eq("id", itemId)
       .single();
 
@@ -1692,27 +1766,33 @@ export async function updateKitchenItemStatus(
 
     // Si el item fue marcado como "ready", verificar si todos los items de la mesa están listos para delivery
     if (newStatus === "ready") {
-      console.log(`🔍 Item marcado como ready, verificando si se debe actualizar mesa status...`);
-      
+      console.log(
+        `🔍 Item marcado como ready, verificando si se debe actualizar mesa status...`,
+      );
+
       // Obtener información de la orden y mesa para este item
       const { data: itemInfo, error: itemInfoError } = await supabaseAdmin
         .from("order_items")
-        .select(`
+        .select(
+          `
           orders!inner(
             table_id,
             user_id
           )
-        `)
+        `,
+        )
         .eq("id", itemId)
         .single();
 
       if (!itemInfoError && itemInfo) {
         const tableId = (itemInfo.orders as any).table_id;
         const userId = (itemInfo.orders as any).user_id;
-        
+
         if (tableId && userId) {
-          console.log(`🔄 Verificando delivery status para mesa ${tableId} y usuario ${userId}`);
-          
+          console.log(
+            `🔄 Verificando delivery status para mesa ${tableId} y usuario ${userId}`,
+          );
+
           try {
             // Usar la función existente para verificar y actualizar automáticamente
             const deliveryCheck = await checkAllItemsDelivered(tableId, userId);
@@ -1727,13 +1807,14 @@ export async function updateKitchenItemStatus(
 
     return {
       success: true,
-      message: `Item actualizado a ${newStatus === "preparing" ? "preparando" : "listo"}`
+      message: `Item actualizado a ${newStatus === "preparing" ? "preparando" : "listo"}`,
     };
   } catch (error) {
     console.error("❌ Error en updateKitchenItemStatus:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Error interno del servidor"
+      message:
+        error instanceof Error ? error.message : "Error interno del servidor",
     };
   }
 }
@@ -1741,10 +1822,12 @@ export async function updateKitchenItemStatus(
 // Obtener estado de pedidos de una mesa específica (para cliente que escanea QR)
 export async function getTableOrdersStatus(
   tableId: string,
-  userId: string
+  userId: string,
 ): Promise<OrderWithItems[]> {
   try {
-    console.log(`📱 Obteniendo estado de pedidos para mesa ${tableId} y usuario ${userId}`);
+    console.log(
+      `📱 Obteniendo estado de pedidos para mesa ${tableId} y usuario ${userId}`,
+    );
 
     // Verificar que el usuario tiene acceso a esta mesa
     const { data: tableData, error: tableError } = await supabaseAdmin
@@ -1761,7 +1844,8 @@ export async function getTableOrdersStatus(
     // Obtener todas las órdenes de la mesa del usuario
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
-      .select(`
+      .select(
+        `
         id,
         user_id,
         table_id,
@@ -1790,7 +1874,8 @@ export async function getTableOrdersStatus(
         ),
         tables(id, number),
         users(id, first_name, last_name, profile_image)
-      `)
+      `,
+      )
       .eq("table_id", tableId)
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
@@ -1809,8 +1894,8 @@ export async function getTableOrdersStatus(
       order_items: order.order_items.map((item: any) => ({
         ...item,
         order_id: order.id,
-        menu_item: item.menu_items?.[0] || null
-      }))
+        menu_item: item.menu_items?.[0] || null,
+      })),
     }));
 
     return mappedOrders;
@@ -1825,12 +1910,15 @@ export async function getTableOrdersStatus(
 // Obtener pedidos pendientes para bar (items con category "bebida" y status "accepted")
 export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
   try {
-    console.log("🍷 Obteniendo pedidos para bar (todos los estados activos)...");
+    console.log(
+      "🍷 Obteniendo pedidos para bar (todos los estados activos)...",
+    );
 
     // Obtener todos los items activos que son bebidas
     const { data: barItems, error: itemsError } = await supabaseAdmin
       .from("order_items")
-      .select(`
+      .select(
+        `
         id,
         order_id,
         menu_item_id,
@@ -1860,7 +1948,8 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
           tables(id, number),
           users(id, first_name, last_name, profile_image)
         )
-      `)
+      `,
+      )
       .in("status", ["accepted", "preparing", "ready"])
       .eq("menu_items.category", "bebida")
       .order("created_at", { ascending: true });
@@ -1877,7 +1966,7 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
     // Agrupar items por orden
     const ordersMap = new Map<string, OrderWithItems>();
 
-    barItems.forEach((item) => {
+    barItems.forEach(item => {
       const order = (item as any).orders;
       const menuItem = (item as any).menu_items;
 
@@ -1886,7 +1975,7 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
         orderId: order?.id,
         menuItemName: menuItem?.name,
         orderHasTables: !!order?.tables,
-        orderHasUsers: !!order?.users
+        orderHasUsers: !!order?.users,
       });
 
       if (!ordersMap.has(order.id)) {
@@ -1894,7 +1983,7 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
           ...order,
           table: order.tables,
           user: order.users,
-          order_items: []
+          order_items: [],
         });
       }
 
@@ -1908,7 +1997,7 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
         subtotal: item.subtotal,
         status: item.status,
         created_at: item.created_at,
-        menu_item: menuItem
+        menu_item: menuItem,
       });
     });
 
@@ -1924,10 +2013,12 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
 export async function updateBartenderItemStatus(
   itemId: string,
   newStatus: OrderItemStatus,
-  bartenderId: string
+  bartenderId: string,
 ): Promise<{ success: boolean; message: string }> {
   try {
-    console.log(`🍷 Actualizando item ${itemId} a status ${newStatus} por bartender ${bartenderId}`);
+    console.log(
+      `🍷 Actualizando item ${itemId} a status ${newStatus} por bartender ${bartenderId}`,
+    );
 
     // Validar que el nuevo status es válido para bar
     const validStatuses: OrderItemStatus[] = ["preparing", "ready"];
@@ -1938,16 +2029,20 @@ export async function updateBartenderItemStatus(
     // Verificar que el item existe y es una bebida
     const { data: item, error: itemError } = await supabaseAdmin
       .from("order_items")
-      .select(`
+      .select(
+        `
         id,
         status,
         menu_items!inner(category)
-      `)
+      `,
+      )
       .eq("id", itemId)
       .single();
 
     if (itemError || !item) {
-      throw new Error(`Item no encontrado: ${itemError?.message || "Item inexistente"}`);
+      throw new Error(
+        `Item no encontrado: ${itemError?.message || "Item inexistente"}`,
+      );
     }
 
     // Verificar que es una bebida
@@ -1963,7 +2058,7 @@ export async function updateBartenderItemStatus(
       rejected: [],
       preparing: ["ready"],
       ready: ["delivered"],
-      delivered: []
+      delivered: [],
     };
 
     if (!validTransitions[currentStatus]?.includes(newStatus)) {
@@ -1975,7 +2070,7 @@ export async function updateBartenderItemStatus(
       .from("order_items")
       .update({
         status: newStatus,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq("id", itemId);
 
@@ -1985,16 +2080,17 @@ export async function updateBartenderItemStatus(
 
     const statusMessages: Record<"preparing" | "ready", string> = {
       preparing: "Bebida marcada como en preparación",
-      ready: "Bebida marcada como lista"
+      ready: "Bebida marcada como lista",
     };
 
-    console.log(`✅ ${statusMessages[newStatus as "preparing" | "ready"]} - Item: ${itemId}`);
+    console.log(
+      `✅ ${statusMessages[newStatus as "preparing" | "ready"]} - Item: ${itemId}`,
+    );
 
     return {
       success: true,
-      message: statusMessages[newStatus as "preparing" | "ready"]
+      message: statusMessages[newStatus as "preparing" | "ready"],
     };
-
   } catch (error) {
     console.error("❌ Error en updateBartenderItemStatus:", error);
     throw error;
@@ -2004,7 +2100,7 @@ export async function updateBartenderItemStatus(
 // Verificar si todos los order_items de una mesa están en estado 'delivered'
 export async function checkAllItemsDelivered(
   tableId: string,
-  userId: string
+  userId: string,
 ): Promise<{
   allDelivered: boolean;
   totalItems: number;
@@ -2045,7 +2141,7 @@ export async function checkAllItemsDelivered(
         allDelivered: true, // Si no hay órdenes pendientes, consideramos que todo está entregado
         totalItems: 0,
         deliveredItems: 0,
-        pendingItems: []
+        pendingItems: [],
       };
     }
 
@@ -2055,15 +2151,17 @@ export async function checkAllItemsDelivered(
     // Obtener todos los order_items de estas órdenes
     const { data: orderItems, error: itemsError } = await supabaseAdmin
       .from("order_items")
-      .select(`
+      .select(
+        `
         id,
         status,
         menu_items(
           id,
           name
         )
-      `)
-      .in('order_id', orderIds);
+      `,
+      )
+      .in("order_id", orderIds);
 
     if (itemsError) {
       throw new Error(`Error obteniendo items: ${itemsError.message}`);
@@ -2074,31 +2172,33 @@ export async function checkAllItemsDelivered(
         allDelivered: true, // Si no hay items, consideramos que todo está "entregado"
         totalItems: 0,
         deliveredItems: 0,
-        pendingItems: []
+        pendingItems: [],
       };
     }
 
     // Filtrar items que NO son 'rejected' (solo considerar items válidos para entrega)
-    const validItems = orderItems.filter(item => item.status !== 'rejected');
-    const deliveredItems = validItems.filter(item => item.status === 'delivered');
+    const validItems = orderItems.filter(item => item.status !== "rejected");
+    const deliveredItems = validItems.filter(
+      item => item.status === "delivered",
+    );
     const pendingItems = validItems
-      .filter(item => item.status !== 'delivered')
+      .filter(item => item.status !== "delivered")
       .map(item => ({
         id: item.id,
-        name: (item as any).menu_items?.name || 'Item desconocido',
-        status: item.status as OrderItemStatus
+        name: (item as any).menu_items?.name || "Item desconocido",
+        status: item.status as OrderItemStatus,
       }));
 
     // Considerar "todo entregado" si todos los items válidos (no rejected) están delivered
-    const allDelivered = validItems.length === 0 || deliveredItems.length === validItems.length;
+    const allDelivered =
+      validItems.length === 0 || deliveredItems.length === validItems.length;
 
     return {
       allDelivered,
       totalItems: validItems.length, // Solo contar items válidos (no rejected)
       deliveredItems: deliveredItems.length,
-      pendingItems
+      pendingItems,
     };
-
   } catch (error) {
     console.error("❌ Error en checkAllItemsDelivered:", error);
     throw error;
@@ -2116,9 +2216,15 @@ export async function payOrder(
     gameDiscountPercentage?: number;
     satisfactionLevel?: string;
   }
-): Promise<{ success: boolean; message: string; paidOrders: OrderWithItems[] }> {
+): Promise<{
+  success: boolean;
+  message: string;
+  paidOrders: OrderWithItems[];
+}> {
   try {
-    console.log(`💳 Procesando pago para mesa ${tableId} del cliente ${clientId}`);
+    console.log(
+      `💳 Procesando pago para mesa ${tableId} del cliente ${clientId}`,
+    );
     if (paymentDetails) {
       console.log(`💰 Detalles de pago:`, paymentDetails);
     }
@@ -2133,11 +2239,15 @@ export async function payOrder(
       .single();
 
     if (tableError || !table) {
-      console.error(`❌ Error verificando mesa: ${tableError?.message || 'Mesa no encontrada'}`);
+      console.error(
+        `❌ Error verificando mesa: ${tableError?.message || "Mesa no encontrada"}`,
+      );
       throw new Error("Mesa no encontrada o no tienes acceso a ella");
     }
 
-    console.log(`✅ Mesa verificada: ${table.number}, estado actual: ${table.table_status}`);
+    console.log(
+      `✅ Mesa verificada: ${table.number}, estado actual: ${table.table_status}`,
+    );
 
     // 2. Obtener todas las órdenes no pagadas del cliente en esta mesa
     const { data: orders, error: ordersError } = await supabaseAdmin
@@ -2196,8 +2306,10 @@ export async function payOrder(
 
     // 3. NO actualizar is_paid aquí - se actualizará cuando el mozo confirme
     // Las órdenes permanecen con is_paid = false hasta la confirmación del mozo
-    
-    console.log(`🔄 Procesando pago del cliente (pendiente de confirmación del mozo)`);
+
+    console.log(
+      `🔄 Procesando pago del cliente (pendiente de confirmación del mozo)`,
+    );
 
     // 4. PRIMERO: Marcar la mesa como "pago pendiente de confirmación"
     console.log(`🔄 Actualizando mesa ${tableId} a payment_pending...`);
@@ -2209,11 +2321,17 @@ export async function payOrder(
       .eq("id", tableId);
 
     if (tableUpdateError) {
-      console.error(`❌ Error actualizando estado de mesa: ${tableUpdateError.message}`);
-      throw new Error(`Error actualizando estado de mesa: ${tableUpdateError.message}`);
+      console.error(
+        `❌ Error actualizando estado de mesa: ${tableUpdateError.message}`,
+      );
+      throw new Error(
+        `Error actualizando estado de mesa: ${tableUpdateError.message}`,
+      );
     }
 
-    console.log(`✅ Mesa ${tableId} marcada como pago pendiente de confirmación`);
+    console.log(
+      `✅ Mesa ${tableId} marcada como pago pendiente de confirmación`,
+    );
 
     // 5. NOTIFICAR AL MOZO sobre el pago realizado
     if (table.id_waiter) {
@@ -2225,9 +2343,10 @@ export async function payOrder(
           .eq("id", clientId)
           .single();
 
-        const clientName = clientData && !clientError
-          ? `${clientData.first_name} ${clientData.last_name}`.trim()
-          : "Cliente";
+        const clientName =
+          clientData && !clientError
+            ? `${clientData.first_name} ${clientData.last_name}`.trim()
+            : "Cliente";
 
         // Calcular el total de las órdenes
         const { data: orderAmounts } = await supabaseAdmin
@@ -2237,25 +2356,36 @@ export async function payOrder(
           .eq("user_id", clientId)
           .eq("is_paid", false);
 
-        const totalAmount = orderAmounts?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+        const totalAmount =
+          orderAmounts?.reduce(
+            (sum, order) => sum + (order.total_amount || 0),
+            0,
+          ) || 0;
 
         // Importar la función de notificación aquí para evitar dependencia circular
-        const { notifyWaiterPaymentCompleted } = await import("../../services/pushNotificationService");
-        
+        const { notifyWaiterPaymentCompleted } = await import(
+          "../../services/pushNotificationService"
+        );
+
         await notifyWaiterPaymentCompleted(
           table.id_waiter,
           clientName,
           table.number,
-          totalAmount
+          totalAmount,
         );
       } catch (notifyError) {
-        console.error("Error enviando notificación de pago al mozo:", notifyError);
+        console.error(
+          "Error enviando notificación de pago al mozo:",
+          notifyError,
+        );
         // No bloqueamos la función por error de notificación
       }
     }
 
     // 6. SEGUNDO: Actualizar el estado de waiting_list a 'confirm_pending' si el cliente tiene una entrada activa
-    console.log(`🔄 Buscando entrada en waiting_list para cliente ${clientId}...`);
+    console.log(
+      `🔄 Buscando entrada en waiting_list para cliente ${clientId}...`,
+    );
     const { data: waitingEntry, error: waitingError } = await supabaseAdmin
       .from("waiting_list")
       .select("*")
@@ -2266,9 +2396,13 @@ export async function payOrder(
       .single();
 
     if (!waitingError && waitingEntry) {
-      console.log(`✅ Entrada en waiting_list encontrada: ${waitingEntry.id}, estado actual: ${waitingEntry.status}`);
-      console.log(`🎯 Actualizando waiting_list entry ${waitingEntry.id} a confirm_pending`);
-      
+      console.log(
+        `✅ Entrada en waiting_list encontrada: ${waitingEntry.id}, estado actual: ${waitingEntry.status}`,
+      );
+      console.log(
+        `🎯 Actualizando waiting_list entry ${waitingEntry.id} a confirm_pending`,
+      );
+
       const { error: waitingUpdateError } = await supabaseAdmin
         .from("waiting_list")
         .update({
@@ -2278,14 +2412,20 @@ export async function payOrder(
         .eq("id", waitingEntry.id);
 
       if (waitingUpdateError) {
-        console.error(`❌ Error actualizando waiting_list: ${waitingUpdateError.message}`);
-        console.warn(`⚠️ Error actualizando waiting_list: ${waitingUpdateError.message}`);
+        console.error(
+          `❌ Error actualizando waiting_list: ${waitingUpdateError.message}`,
+        );
+        console.warn(
+          `⚠️ Error actualizando waiting_list: ${waitingUpdateError.message}`,
+        );
         // No falla la función por esto, el pago ya se procesó
       } else {
         console.log(`✅ Waiting_list entry marcada como confirm_pending`);
       }
     } else {
-      console.log(`ℹ️ No se encontró entrada activa en waiting_list para el cliente`);
+      console.log(
+        `ℹ️ No se encontró entrada activa en waiting_list para el cliente`,
+      );
       if (waitingError) {
         console.warn(`⚠️ Error buscando waiting_list: ${waitingError.message}`);
       }
@@ -2308,7 +2448,6 @@ export async function payOrder(
       message: `Pago procesado y pendiente de confirmación del mozo para ${orders.length} órdenes`,
       paidOrders,
     };
-
   } catch (error) {
     console.error("❌ Error procesando pago:", error);
     throw error;
@@ -2342,7 +2481,9 @@ export async function confirmPaymentAndReleaseTable(
       .single();
 
     if (tableError || !table) {
-      throw new Error("Mesa no encontrada, no tienes acceso o no hay pago pendiente");
+      throw new Error(
+        "Mesa no encontrada, no tienes acceso o no hay pago pendiente",
+      );
     }
 
     // 2. Marcar todas las órdenes del cliente específico como pagadas
@@ -2368,10 +2509,14 @@ export async function confirmPaymentAndReleaseTable(
         .in("id", orderIds);
 
       if (updateError) {
-        throw new Error(`Error marcando órdenes como pagadas: ${updateError.message}`);
+        throw new Error(
+          `Error marcando órdenes como pagadas: ${updateError.message}`,
+        );
       }
 
-      console.log(`✅ ${orders.length} órdenes marcadas como pagadas por confirmación del mozo`);
+      console.log(
+        `✅ ${orders.length} órdenes marcadas como pagadas por confirmación del mozo`,
+      );
     }
 
     // 3. Actualizar waiting_list a 'completed' para el cliente que pagó
@@ -2385,8 +2530,10 @@ export async function confirmPaymentAndReleaseTable(
       .single();
 
     if (!waitingError && waitingEntry) {
-      console.log(`🎯 Actualizando waiting_list entry ${waitingEntry.id} a completed`);
-      
+      console.log(
+        `🎯 Actualizando waiting_list entry ${waitingEntry.id} a completed`,
+      );
+
       const { error: waitingUpdateError } = await supabaseAdmin
         .from("waiting_list")
         .update({
@@ -2396,12 +2543,16 @@ export async function confirmPaymentAndReleaseTable(
         .eq("id", waitingEntry.id);
 
       if (waitingUpdateError) {
-        console.warn(`⚠️ Error actualizando waiting_list: ${waitingUpdateError.message}`);
+        console.warn(
+          `⚠️ Error actualizando waiting_list: ${waitingUpdateError.message}`,
+        );
       } else {
         console.log(`✅ Waiting_list entry marcada como completed`);
       }
     } else {
-      console.log(`ℹ️ No se encontró entrada confirm_pending en waiting_list para el cliente`);
+      console.log(
+        `ℹ️ No se encontró entrada confirm_pending en waiting_list para el cliente`,
+      );
     }
 
     // 4. Liberar completamente la mesa
@@ -2418,7 +2569,9 @@ export async function confirmPaymentAndReleaseTable(
       throw new Error(`Error liberando mesa: ${releaseError.message}`);
     }
 
-    console.log(`✅ Mesa ${tableId} liberada completamente por mozo ${waiterId}`);
+    console.log(
+      `✅ Mesa ${tableId} liberada completamente por mozo ${waiterId}`,
+    );
 
     // 5. Obtener el total real SOLO de las órdenes que acabamos de marcar como pagadas
     let finalTotalAmount = 0;
@@ -2429,7 +2582,11 @@ export async function confirmPaymentAndReleaseTable(
         .select("total_amount")
         .in("id", orderIds);
 
-      finalTotalAmount = paidOrdersData?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+      finalTotalAmount =
+        paidOrdersData?.reduce(
+          (sum, order) => sum + (order.total_amount || 0),
+          0,
+        ) || 0;
     }
 
     // 6. Obtener información del cliente que pagó y mozo para las notificaciones
@@ -2445,13 +2602,15 @@ export async function confirmPaymentAndReleaseTable(
       .eq("id", waiterId)
       .single();
 
-    const clientName = clientData && !clientError
-      ? `${clientData.first_name} ${clientData.last_name}`.trim()
-      : "Cliente";
+    const clientName =
+      clientData && !clientError
+        ? `${clientData.first_name} ${clientData.last_name}`.trim()
+        : "Cliente";
 
-    const waiterName = waiterData && !waiterError
-      ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
-      : "Mozo";
+    const waiterName =
+      waiterData && !waiterError
+        ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
+        : "Mozo";
 
     // 7. PUNTO 22: Entrega diferenciada de factura según tipo de usuario
     if (invoiceInfo?.generated && invoiceInfo.filePath) {
@@ -2509,13 +2668,15 @@ export async function confirmPaymentAndReleaseTable(
 
     // 8. Enviar notificación estándar al cliente confirmando que el pago fue recibido
     try {
-      const { notifyClientPaymentConfirmation } = await import("../../services/pushNotificationService");
+      const { notifyClientPaymentConfirmation } = await import(
+        "../../services/pushNotificationService"
+      );
       await notifyClientPaymentConfirmation(
         payingClientId, // Usar el cliente que solicitó el pago
         waiterName,
         table.number,
         finalTotalAmount,
-        invoiceInfo
+        invoiceInfo,
       );
       console.log(`📱 Notificación de pago confirmado enviada al cliente ${invoiceInfo?.generated ? 'con información de factura' : 'sin factura'}`);
     } catch (notifyError) {
@@ -2525,13 +2686,15 @@ export async function confirmPaymentAndReleaseTable(
 
     // 9. Enviar notificación a gerencia sobre el pago recibido
     try {
-      const { notifyManagementPaymentReceived } = await import("../../services/pushNotificationService");
+      const { notifyManagementPaymentReceived } = await import(
+        "../../services/pushNotificationService"
+      );
       await notifyManagementPaymentReceived(
         clientName,
         table.number,
         finalTotalAmount,
         waiterName,
-        "efectivo" // Método de pago simulado
+        "efectivo", // Método de pago simulado
       );
       console.log(`📱 Notificación de pago recibido enviada a gerencia`);
     } catch (notifyError) {
@@ -2543,7 +2706,6 @@ export async function confirmPaymentAndReleaseTable(
       success: true,
       message: "Pago confirmado y mesa liberada exitosamente",
     };
-
   } catch (error) {
     console.error("❌ Error confirmando pago:", error);
     throw error;
@@ -2554,12 +2716,15 @@ export async function confirmPaymentAndReleaseTable(
 
 export async function getWaiterReadyItems(waiterId: string): Promise<any[]> {
   try {
-    console.log(`🥳 Obteniendo items listos para entregar para mozo ${waiterId}`);
+    console.log(
+      `🥳 Obteniendo items listos para entregar para mozo ${waiterId}`,
+    );
 
     // Obtener todos los items con status 'ready' de las mesas asignadas al mozo
     const { data: readyItems, error: itemsError } = await supabaseAdmin
       .from("order_items")
-      .select(`
+      .select(
+        `
         id,
         order_id,
         menu_item_id,
@@ -2594,7 +2759,8 @@ export async function getWaiterReadyItems(waiterId: string): Promise<any[]> {
           ),
           users(id, first_name, last_name, profile_image)
         )
-      `)
+      `,
+      )
       .eq("status", "ready")
       .eq("orders.tables.id_waiter", waiterId)
       .order("created_at", { ascending: true });
@@ -2612,16 +2778,16 @@ export async function getWaiterReadyItems(waiterId: string): Promise<any[]> {
     const groupedByTable = readyItems.reduce((acc: any, item: any) => {
       const tableId = item.orders.table_id;
       const tableNumber = item.orders.tables.number;
-      
+
       if (!acc[tableId]) {
         acc[tableId] = {
           table_id: tableId,
           table_number: tableNumber,
           customer_name: `${item.orders.users.first_name} ${item.orders.users.last_name}`,
-          items: []
+          items: [],
         };
       }
-      
+
       acc[tableId].items.push({
         id: item.id,
         order_id: item.order_id,
@@ -2629,21 +2795,20 @@ export async function getWaiterReadyItems(waiterId: string): Promise<any[]> {
           id: item.menu_items.id,
           name: item.menu_items.name,
           description: item.menu_items.description,
-          category: item.menu_items.category
+          category: item.menu_items.category,
         },
         quantity: item.quantity,
         status: item.status,
-        created_at: item.created_at
+        created_at: item.created_at,
       });
-      
+
       return acc;
     }, {});
 
     const result = Object.values(groupedByTable);
     console.log(`🥳 ${result.length} mesas con items listos encontradas`);
-    
-    return result;
 
+    return result;
   } catch (error) {
     console.error("❌ Error en getWaiterReadyItems:", error);
     throw error;
@@ -2651,22 +2816,28 @@ export async function getWaiterReadyItems(waiterId: string): Promise<any[]> {
 }
 
 // Obtener mesas con pago pendiente de confirmación para un mozo
-export async function getWaiterPendingPayments(waiterId: string): Promise<any[]> {
+export async function getWaiterPendingPayments(
+  waiterId: string,
+): Promise<any[]> {
   try {
     // Log más discreto - solo en desarrollo
-    if (process.env['NODE_ENV'] === 'development') {
-      console.log(`💰 Verificando mesas con pago pendiente para mozo ${waiterId}`);
+    if (process.env["NODE_ENV"] === "development") {
+      console.log(
+        `💰 Verificando mesas con pago pendiente para mozo ${waiterId}`,
+      );
     }
 
     // Primero obtenemos las mesas con pago pendiente
     const { data: tables, error } = await supabaseAdmin
       .from("tables")
-      .select(`
+      .select(
+        `
         id,
         number,
         id_client,
         table_status
-      `)
+      `,
+      )
       .eq("id_waiter", waiterId)
       .eq("table_status", "payment_pending")
       .eq("is_occupied", true)
@@ -2674,13 +2845,15 @@ export async function getWaiterPendingPayments(waiterId: string): Promise<any[]>
 
     if (error) {
       // Solo loguear errores reales de base de datos, no lanzar excepción
-      console.warn(`⚠️ Error consultando mesas con pago pendiente: ${error.message}`);
+      console.warn(
+        `⚠️ Error consultando mesas con pago pendiente: ${error.message}`,
+      );
       return [];
     }
 
     if (!tables || tables.length === 0) {
       // Mensaje más discreto cuando no hay mesas pendientes
-      if (process.env['NODE_ENV'] === 'development') {
+      if (process.env["NODE_ENV"] === "development") {
         console.log("💰 No hay mesas con pago pendiente actualmente");
       }
       return [];
@@ -2704,14 +2877,18 @@ export async function getWaiterPendingPayments(waiterId: string): Promise<any[]>
           .eq("user_id", table.id_client) // Filtrar solo las órdenes del cliente que está pidiendo pagar
           .eq("is_paid", false); // Solo órdenes no pagadas
 
-        const totalAmount = (orders || []).reduce((sum, order) => sum + (order.total_amount || 0), 0);
+        const totalAmount = (orders || []).reduce(
+          (sum, order) => sum + (order.total_amount || 0),
+          0,
+        );
 
         result.push({
           table_id: table.id,
           table_number: table.number,
-          customer_name: user && !userError 
-            ? `${user.first_name} ${user.last_name}` 
-            : "Cliente desconocido",
+          customer_name:
+            user && !userError
+              ? `${user.first_name} ${user.last_name}`
+              : "Cliente desconocido",
           customer_id: table.id_client,
           total_amount: totalAmount,
         });
@@ -2720,7 +2897,6 @@ export async function getWaiterPendingPayments(waiterId: string): Promise<any[]>
 
     console.log(`💰 ${result.length} mesa(s) con pago pendiente encontrada(s)`);
     return result;
-
   } catch (error) {
     // Capturar cualquier error inesperado pero no propagarlo
     console.warn("⚠️ Error verificando pagos pendientes:", error);
@@ -2728,14 +2904,20 @@ export async function getWaiterPendingPayments(waiterId: string): Promise<any[]>
   }
 }
 
-export async function markItemAsDelivered(itemId: string, waiterId: string): Promise<void> {
+export async function markItemAsDelivered(
+  itemId: string,
+  waiterId: string,
+): Promise<void> {
   try {
-    console.log(`🚚 Marcando item ${itemId} como entregado por mozo ${waiterId}`);
+    console.log(
+      `🚚 Marcando item ${itemId} como entregado por mozo ${waiterId}`,
+    );
 
     // Verificar que el item existe y está en estado 'ready'
     const { data: item, error: itemError } = await supabaseAdmin
       .from("order_items")
-      .select(`
+      .select(
+        `
         id,
         status,
         orders!inner(
@@ -2743,7 +2925,8 @@ export async function markItemAsDelivered(itemId: string, waiterId: string): Pro
           table_id,
           tables!inner(id, id_waiter)
         )
-      `)
+      `,
+      )
       .eq("id", itemId)
       .single();
 
@@ -2763,9 +2946,9 @@ export async function markItemAsDelivered(itemId: string, waiterId: string): Pro
     // Actualizar el status del item a 'delivered'
     const { error: updateError } = await supabaseAdmin
       .from("order_items")
-      .update({ 
+      .update({
         status: "delivered",
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq("id", itemId);
 
@@ -2774,21 +2957,33 @@ export async function markItemAsDelivered(itemId: string, waiterId: string): Pro
     }
 
     console.log(`✅ Item ${itemId} marcado como entregado`);
-
   } catch (error) {
     console.error("❌ Error en markItemAsDelivered:", error);
     throw error;
   }
 }
 
-export async function submitTandaModifications(orderId: string, clientId: string): Promise<void> {
+export async function submitTandaModifications(
+  orderId: string,
+  clientId: string,
+  keepItems?: string[],
+  newItems?: Array<{
+    menu_item_id: string;
+    quantity: number;
+    unit_price: number;
+  }>,
+): Promise<void> {
   try {
-    console.log(`🔄 Reenviando modificaciones de tanda para orden ${orderId} del cliente ${clientId}`);
+    console.log(
+      `🔄 Reenviando modificaciones de tanda para orden ${orderId} del cliente ${clientId}`,
+    );
+    console.log("📦 keepItems:", keepItems);
+    console.log("📦 newItems:", newItems);
 
     // 1. Verificar que la orden pertenece al cliente
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
-      .select("id, user_id")
+      .select("id, user_id, table_id")
       .eq("id", orderId)
       .eq("user_id", clientId)
       .single();
@@ -2797,33 +2992,213 @@ export async function submitTandaModifications(orderId: string, clientId: string
       throw new Error("Orden no encontrada o no pertenece al cliente");
     }
 
-    // 2. Cambiar todos los items con status 'needs_modification' a 'pending'
-    const { data: modifiedItems, error: updateError } = await supabaseAdmin
+    // 2. Obtener el batch_id de la tanda existente (de items needs_modification o rejected)
+    const { data: existingBatchItem, error: batchError } = await supabaseAdmin
       .from("order_items")
-      .update({ 
-        status: "pending",
-        updated_at: new Date().toISOString()
-      })
+      .select("batch_id")
       .eq("order_id", orderId)
-      .eq("status", "needs_modification")
-      .select("id, menu_items(name)");
+      .or("status.eq.needs_modification,status.eq.rejected")
+      .limit(1)
+      .single();
 
-    if (updateError) {
-      throw new Error(`Error actualizando items: ${updateError.message}`);
+    if (batchError && batchError.code !== "PGRST116") {
+      // PGRST116 = no rows returned
+      throw new Error(`Error obteniendo batch_id: ${batchError.message}`);
     }
 
-    // 3. Los items 'rejected' se mantienen como están (no se modifican)
-    
-    if (modifiedItems && modifiedItems.length > 0) {
-      const itemNames = modifiedItems.map(item => 
-        (item as any).menu_items?.name || 'Item desconocido'
-      ).join(', ');
-      
-      console.log(`✅ ${modifiedItems.length} items reenviados al mozo: ${itemNames}`);
-    } else {
-      console.log("⚠️ No se encontraron items con status 'needs_modification' para reenviar");
+    const tandaBatchId = existingBatchItem?.batch_id;
+    console.log("🔖 Batch ID de la tanda:", tandaBatchId);
+
+    // 3. Calcular los cambios en el total_amount
+    let amountToAdd = 0; // Nuevos items a sumar
+    let amountToSubtract = 0; // Items removidos a restar
+
+    // Obtener items needs_modification actuales para calcular cuáles se eliminan
+    const { data: needsModItems, error: needsModError } = await supabaseAdmin
+      .from("order_items")
+      .select("id, subtotal")
+      .eq("order_id", orderId)
+      .eq("status", "needs_modification");
+
+    if (needsModError) {
+      throw new Error(
+        `Error obteniendo items needs_modification: ${needsModError.message}`,
+      );
     }
 
+    // Calcular items que se van a eliminar (needs_modification que NO están en keepItems)
+    const itemsToRemove = (needsModItems || []).filter(
+      item => !keepItems?.includes(item.id),
+    );
+    amountToSubtract = itemsToRemove.reduce(
+      (sum, item) => sum + (item.subtotal || 0),
+      0,
+    );
+
+    console.log(
+      `💰 Items a eliminar: ${itemsToRemove.length}, monto a restar: $${amountToSubtract}`,
+    );
+
+    // Calcular nuevos items a agregar
+    if (newItems && newItems.length > 0) {
+      amountToAdd = newItems.reduce(
+        (sum, item) => sum + item.quantity * item.unit_price,
+        0,
+      );
+      console.log(
+        `💰 Nuevos items: ${newItems.length}, monto a sumar: $${amountToAdd}`,
+      );
+
+      // Verificar que ningún item nuevo esté rechazado en la orden actual
+      const { data: rejectedItems, error: rejectedError } = await supabaseAdmin
+        .from("order_items")
+        .select("menu_item_id")
+        .eq("order_id", orderId)
+        .eq("status", "rejected");
+
+      if (!rejectedError && rejectedItems && rejectedItems.length > 0) {
+        const rejectedMenuItemIds = new Set(
+          rejectedItems.map((item: any) => item.menu_item_id),
+        );
+
+        const blockedNewItems = newItems.filter(item =>
+          rejectedMenuItemIds.has(item.menu_item_id),
+        );
+
+        if (blockedNewItems.length > 0) {
+          throw new Error(
+            "No puedes agregar productos que ya fueron rechazados en esta sesión",
+          );
+        }
+      }
+    }
+
+    // 4. Eliminar items needs_modification que NO están en keepItems
+    if (itemsToRemove.length > 0) {
+      const itemIdsToRemove = itemsToRemove.map(item => item.id);
+      const { error: deleteError } = await supabaseAdmin
+        .from("order_items")
+        .delete()
+        .in("id", itemIdsToRemove);
+
+      if (deleteError) {
+        throw new Error(
+          `Error eliminando items no mantenidos: ${deleteError.message}`,
+        );
+      }
+
+      console.log(
+        `🗑️ ${itemsToRemove.length} items needs_modification eliminados`,
+      );
+    }
+
+    // 5. Si hay keepItems, cambiar esos items de 'needs_modification' a 'pending'
+    if (keepItems && keepItems.length > 0) {
+      const { data: keptItemsData, error: updateError } = await supabaseAdmin
+        .from("order_items")
+        .update({
+          status: "pending",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("order_id", orderId)
+        .in("id", keepItems)
+        .eq("status", "needs_modification")
+        .select("id, menu_items(name)");
+
+      if (updateError) {
+        throw new Error(
+          `Error actualizando items mantenidos: ${updateError.message}`,
+        );
+      }
+
+      if (keptItemsData && keptItemsData.length > 0) {
+        const itemNames = keptItemsData
+          .map(item => (item as any).menu_items?.name || "Item desconocido")
+          .join(", ");
+
+        console.log(
+          `✅ ${keptItemsData.length} items mantenidos y reenviados: ${itemNames}`,
+        );
+      }
+    }
+
+    // 6. Si hay newItems, agregarlos a la orden con el MISMO batch_id de la tanda
+    if (newItems && newItems.length > 0) {
+      if (!tandaBatchId) {
+        throw new Error("No se pudo obtener el batch_id de la tanda existente");
+      }
+
+      const itemsToInsert = newItems.map(item => ({
+        order_id: orderId,
+        menu_item_id: item.menu_item_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        subtotal: item.quantity * item.unit_price,
+        status: "pending",
+        batch_id: tandaBatchId, // ✅ Usar el batch_id de la tanda existente
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { data: insertedItems, error: insertError } = await supabaseAdmin
+        .from("order_items")
+        .insert(itemsToInsert)
+        .select("id, menu_items(name)");
+
+      if (insertError) {
+        throw new Error(
+          `Error insertando nuevos items: ${insertError.message}`,
+        );
+      }
+
+      if (insertedItems && insertedItems.length > 0) {
+        const newItemNames = insertedItems
+          .map(item => (item as any).menu_items?.name || "Item desconocido")
+          .join(", ");
+
+        console.log(
+          `✅ ${insertedItems.length} items nuevos agregados con batch_id ${tandaBatchId}: ${newItemNames}`,
+        );
+      }
+    }
+
+    // 7. Actualizar total_amount de la orden
+    const { data: currentOrder, error: getOrderError } = await supabaseAdmin
+      .from("orders")
+      .select("total_amount")
+      .eq("id", orderId)
+      .single();
+
+    if (getOrderError || !currentOrder) {
+      throw new Error("Error obteniendo orden actual");
+    }
+
+    const newTotalAmount =
+      currentOrder.total_amount - amountToSubtract + amountToAdd;
+
+    console.log(
+      `💰 Actualizando total: $${currentOrder.total_amount} - $${amountToSubtract} + $${amountToAdd} = $${newTotalAmount}`,
+    );
+
+    const { error: updateTotalError } = await supabaseAdmin
+      .from("orders")
+      .update({
+        total_amount: newTotalAmount,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
+
+    if (updateTotalError) {
+      throw new Error(
+        `Error actualizando total_amount: ${updateTotalError.message}`,
+      );
+    }
+
+    // 8. Los items 'rejected' se mantienen como están (registro auxiliar para el cliente)
+    // NO se eliminan ni se modifican - sirven como historial de productos no disponibles
+    console.log("ℹ️ Items rechazados mantenidos como registro auxiliar");
+
+    console.log("✅ Modificaciones de tanda procesadas exitosamente");
   } catch (error) {
     console.error("❌ Error en submitTandaModifications:", error);
     throw error;

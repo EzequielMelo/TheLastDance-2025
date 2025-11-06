@@ -34,10 +34,6 @@ export default function ScanTableQRScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [hasOccupiedTable, setHasOccupiedTable] = useState<boolean | null>(
-    null,
-  );
-  const [loading, setLoading] = useState(true);
 
   // Verificar que el usuario pueda confirmar mesa
   const canConfirm =
@@ -50,29 +46,6 @@ export default function ScanTableQRScreen() {
     }
   }, [permission]);
 
-  // Verificar si el usuario ya tiene una mesa ocupada
-  useEffect(() => {
-    const checkOccupiedTable = async () => {
-      if (!canConfirm) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const response = await api.get("/tables/my-table");
-
-        setHasOccupiedTable(response.data.hasOccupiedTable);
-      } catch (error) {
-        console.error("Error checking my table:", error);
-        setHasOccupiedTable(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkOccupiedTable();
-  }, [canConfirm, user?.id]);
-
   const handleBarCodeScanned = async ({ data }: { data: string }) => {
     if (scanned || processing) return;
 
@@ -80,6 +53,8 @@ export default function ScanTableQRScreen() {
     setProcessing(true);
 
     try {
+      console.log("📱 QR escaneado - datos crudos:", data);
+
       // Por ahora, vamos a simular que el QR contiene el ID de la mesa
       // En el futuro, esto será un deeplink como: thelastdance://table/{tableId}
       let tableId: string;
@@ -88,22 +63,29 @@ export default function ScanTableQRScreen() {
         // Si es un deeplink estructurado
         const url = new URL(data);
         tableId = url.pathname.split("/").pop() || "";
+        console.log("📱 Deeplink detectado - tableId extraído:", tableId);
       } else {
         // Por ahora, asumimos que el QR contiene directamente el ID de la mesa
         tableId = data.trim();
+        console.log("📱 QR simple - usando como tableId:", tableId);
       }
 
       if (!tableId) {
         ToastAndroid.show(
           "❌ QR Inválido - No contiene información válida de mesa",
-          ToastAndroid.SHORT
+          ToastAndroid.SHORT,
         );
         setScanned(false);
         return;
       }
 
+      console.log("🔄 Intentando activar mesa con ID:", tableId);
+      console.log("👤 Usuario ID:", user?.id);
+
       // Llamar al endpoint para activar la mesa
       const response = await api.post(`/tables/${tableId}/activate`);
+
+      console.log("✅ Respuesta del servidor:", response.data);
 
       if (response.data.success) {
         // Mostrar éxito con Toast
@@ -111,7 +93,7 @@ export default function ScanTableQRScreen() {
           `🎉 ¡Mesa ${response.data.table.table_number} confirmada! Disfruta tu experiencia`,
           ToastAndroid.LONG,
         );
-        
+
         // Navegar después de un breve delay
         setTimeout(() => {
           navigation.navigate("Home");
@@ -120,7 +102,8 @@ export default function ScanTableQRScreen() {
         throw new Error(response.data.message || "Error al activar la mesa");
       }
     } catch (error: any) {
-      console.error("Error activating table:", error);
+      console.error("❌ Error activating table:", error);
+      console.error("❌ Error response:", error.response?.data);
 
       let errorMessage = "No se pudo confirmar tu llegada a la mesa.";
       let alertTitle = "Error";
@@ -155,25 +138,6 @@ export default function ScanTableQRScreen() {
       setProcessing(false);
     }
   };
-
-  if (loading) {
-    return (
-      <LinearGradient
-        colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          paddingHorizontal: 24,
-        }}
-      >
-        <Clock size={64} color="#d4af37" />
-        <Text style={{ color: "white", fontSize: 18, marginTop: 16 }}>
-          Verificando estado de mesa...
-        </Text>
-      </LinearGradient>
-    );
-  }
 
   if (!canConfirm) {
     return (
@@ -218,81 +182,6 @@ export default function ScanTableQRScreen() {
           }}
         >
           <Text style={{ color: "black", fontWeight: "600" }}>Volver</Text>
-        </TouchableOpacity>
-      </LinearGradient>
-    );
-  }
-
-  if (hasOccupiedTable) {
-    return (
-      <LinearGradient
-        colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          paddingHorizontal: 24,
-        }}
-      >
-        <CheckCircle size={64} color="#22c55e" />
-        <Text
-          style={{
-            color: "white",
-            fontSize: 18,
-            marginTop: 16,
-            fontWeight: "600",
-            textAlign: "center",
-          }}
-        >
-          Ya tienes una mesa activa
-        </Text>
-        <Text
-          style={{
-            color: "#9ca3af",
-            textAlign: "center",
-            marginTop: 8,
-            marginBottom: 24,
-          }}
-        >
-          Solo puedes tener una mesa ocupada a la vez. Si necesitas cambiar de
-          mesa, contacta al maitre.
-        </Text>
-        <TouchableOpacity
-          onPress={() => {
-            try {
-              navigation.navigate("Home");
-            } catch (error) {
-              console.error("Navigation error:", error);
-            }
-          }}
-          style={{
-            backgroundColor: "#d4af37",
-            paddingHorizontal: 24,
-            paddingVertical: 12,
-            borderRadius: 12,
-            marginBottom: 16,
-          }}
-        >
-          <Text style={{ color: "black", fontWeight: "600" }}>
-            Ir al inicio
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => {
-            try {
-              navigation.goBack();
-            } catch (error) {
-              console.error("Navigation goBack error:", error);
-            }
-          }}
-          style={{
-            backgroundColor: "rgba(255,255,255,0.2)",
-            paddingHorizontal: 24,
-            paddingVertical: 12,
-            borderRadius: 12,
-          }}
-        >
-          <Text style={{ color: "white", fontWeight: "500" }}>Volver</Text>
         </TouchableOpacity>
       </LinearGradient>
     );

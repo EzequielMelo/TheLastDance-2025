@@ -14,7 +14,11 @@ import {
   NativeSyntheticEvent,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
+import {
+  useNavigation,
+  useRoute,
+  useFocusEffect,
+} from "@react-navigation/native";
 import ChefLoading from "../../components/common/ChefLoading";
 import CustomAlert from "../../components/common/CustomAlert";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -42,6 +46,7 @@ import {
 } from "../../api/orders";
 import { useCart } from "../../context/CartContext";
 import FloatingCart from "../../components/cart/FloatingCart";
+import FloatingModifyCart from "../../components/cart/FloatingModifyCart";
 import CartModal from "../../components/cart/CartModal";
 
 const { width, height } = Dimensions.get("window");
@@ -89,8 +94,8 @@ export default function MenuScreen() {
   // Efecto para actualizar el tab activo cuando se enfoque la pantalla
   useFocusEffect(
     React.useCallback(() => {
-      setActiveTab('menu');
-    }, [setActiveTab])
+      setActiveTab("menu");
+    }, [setActiveTab]),
   );
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -100,9 +105,11 @@ export default function MenuScreen() {
     "all" | "plato" | "bebida"
   >("all");
   const [cartModalVisible, setCartModalVisible] = useState(false);
-  
+
   // Estado para manejar los indicadores de imagen
-  const [currentImageIndex, setCurrentImageIndex] = useState<{[key: string]: number}>({});
+  const [currentImageIndex, setCurrentImageIndex] = useState<{
+    [key: string]: number;
+  }>({});
 
   // Modo de modificación de productos rechazados
   const isModifyMode = route.params?.mode === "modify-rejected";
@@ -113,26 +120,39 @@ export default function MenuScreen() {
   }>({});
   const [isSubmittingChanges, setIsSubmittingChanges] = useState(false);
 
+  // Estado para almacenar TODOS los items rechazados de la sesión actual
+  const [allRejectedItemIds, setAllRejectedItemIds] = useState<Set<string>>(
+    new Set(),
+  );
+
   // Estados para CustomAlert
   const [showAlert, setShowAlert] = useState(false);
   const [alertConfig, setAlertConfig] = useState({
-    type: 'info' as 'success' | 'error' | 'warning' | 'info',
-    title: '',
-    message: '',
-    buttons: [] as Array<{text: string, onPress?: () => void, style?: 'default' | 'cancel' | 'destructive'}>
+    type: "info" as "success" | "error" | "warning" | "info",
+    title: "",
+    message: "",
+    buttons: [] as Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "default" | "cancel" | "destructive";
+    }>,
   });
 
   const showCustomAlert = (
     title: string,
     message: string,
-    buttons?: Array<{text: string, onPress?: () => void, style?: 'default' | 'cancel' | 'destructive'}>,
-    type: 'success' | 'error' | 'warning' | 'info' = 'info'
+    buttons?: Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "default" | "cancel" | "destructive";
+    }>,
+    type: "success" | "error" | "warning" | "info" = "info",
   ) => {
     setAlertConfig({
       type,
       title,
       message,
-      buttons: buttons || [{text: 'OK'}]
+      buttons: buttons || [{ text: "OK" }],
     });
     setShowAlert(true);
   };
@@ -140,6 +160,41 @@ export default function MenuScreen() {
   useEffect(() => {
     loadMenuItems();
   }, [selectedCategory]);
+
+  // Cargar TODOS los items rechazados de la orden actual del usuario
+  const loadRejectedItems = async () => {
+    try {
+      const response = await api.get("/orders/my-orders");
+      const myOrders = response.data;
+
+      // Buscar la orden activa (no pagada)
+      const activeOrder = myOrders.find((order: any) => !order.is_paid);
+
+      if (activeOrder && activeOrder.order_items) {
+        // Obtener todos los menu_item_id de items con status "rejected"
+        const rejectedIds = new Set<string>(
+          activeOrder.order_items
+            .filter((item: any) => item.status === "rejected")
+            .map((item: any) => item.menu_item_id as string),
+        );
+
+        console.log(
+          "🚫 Items rechazados en esta sesión:",
+          Array.from(rejectedIds),
+        );
+        setAllRejectedItemIds(rejectedIds);
+      } else {
+        // No hay orden activa, limpiar items rechazados
+        setAllRejectedItemIds(new Set());
+      }
+    } catch (error) {
+      console.error("Error cargando items rechazados:", error);
+    }
+  };
+
+  useEffect(() => {
+    loadRejectedItems();
+  }, [refreshing]); // Re-cargar cuando se refresca
 
   // Inicializar items seleccionados solo con los disponibles (NO los rechazados)
   useEffect(() => {
@@ -262,13 +317,8 @@ export default function MenuScreen() {
   };
 
   const wasItemRejected = (itemId: string) => {
-    return (
-      isModifyMode &&
-      rejectedItems.some(
-        (rejected: any) =>
-          rejected.menu_item_id === itemId && rejected.status === "rejected",
-      )
-    );
+    // Verificar si el item está en la lista global de items rechazados de esta sesión
+    return allRejectedItemIds.has(itemId);
   };
 
   const handleSubmitModifications = async () => {
@@ -284,26 +334,43 @@ export default function MenuScreen() {
         (item: any) => item.status === "needs_modification",
       );
 
+      console.log("🔍 DEBUG - needsModificationItems:", needsModificationItems);
+
       // Items needs_modification que el usuario mantiene (están en selectedModifyItems)
       const keepItems = needsModificationItems
         .filter((item: any) => selectedModifyItems[item.menu_item_id])
         .map((item: any) => item.id);
 
-      // Separar items nuevos de items mantenidos
-      // Incluir TODOS los items de la tanda original (rejected + needs_modification)
-      const allOriginalItems = rejectedItems.filter(
-        (item: any) =>
-          item.status === "rejected" || item.status === "needs_modification",
-      );
-      const originalMenuItems = allOriginalItems.map(
+      console.log("🔍 DEBUG - keepItems:", keepItems);
+
+      // IDs de los items needs_modification (NO incluir los rejected)
+      const needsModificationMenuItemIds = needsModificationItems.map(
         (item: any) => item.menu_item_id,
       );
 
-      // Solo los items que NO existían en la tanda original son nuevos
+      console.log(
+        "🔍 DEBUG - needsModificationMenuItemIds:",
+        needsModificationMenuItemIds,
+      );
+      console.log(
+        "🔍 DEBUG - selectedModifyItems COMPLETO:",
+        selectedModifyItems,
+      );
+
+      // Items nuevos = todos los que están en selectedModifyItems pero NO son needs_modification
       const formattedNewItems = Object.entries(selectedModifyItems)
-        .filter(([itemId, quantity]) => !originalMenuItems.includes(itemId))
+        .filter(
+          ([itemId, quantity]) =>
+            !needsModificationMenuItemIds.includes(itemId),
+        )
         .map(([itemId, quantity]) => {
           const menuItem = menuItems.find(m => m.id === itemId);
+          console.log(`🔍 DEBUG - Procesando item nuevo: ${itemId}`, {
+            quantity,
+            menuItem: menuItem
+              ? { id: menuItem.id, name: menuItem.name, price: menuItem.price }
+              : null,
+          });
           return {
             menu_item_id: itemId,
             quantity,
@@ -311,42 +378,21 @@ export default function MenuScreen() {
           };
         });
 
-      // Si no hay cambios, preguntar al usuario
+      console.log("🔍 DEBUG - formattedNewItems FINAL:", formattedNewItems);
+
+      // Si no hay cambios (ni keepItems ni newItems), preguntar al usuario
       if (keepItems.length === 0 && formattedNewItems.length === 0) {
         Alert.alert(
           "Sin cambios",
-          "No has realizado ningún cambio. ¿Quieres mantener solo los productos disponibles de la tanda original?",
+          "No has seleccionado ningún producto. ¿Quieres cancelar la modificación?",
           [
-            { text: "Cancelar", style: "cancel" },
+            { text: "Volver a seleccionar", style: "cancel" },
             {
-              text: "Mantener disponibles",
-              onPress: async () => {
-                try {
-                  await submitTandaModifications(orderId, {
-                    keepItems: needsModificationItems.map(item => item.id),
-                    newItems: [],
-                  });
-
-                  Alert.alert(
-                    "Cambios Enviados",
-                    "Se mantendrán los productos disponibles de la tanda original",
-                    [
-                      {
-                        text: "OK",
-                        onPress: () => {
-                          refreshOrders();
-                          navigation.goBack();
-                        },
-                      },
-                    ],
-                  );
-                } catch (error: any) {
-                  Alert.alert(
-                    "Error",
-                    error.message || "No se pudieron enviar los cambios",
-                  );
-                }
+              text: "Cancelar modificación",
+              style: "destructive",
+              onPress: () => {
                 setIsSubmittingChanges(false);
+                navigation.goBack();
               },
             },
           ],
@@ -355,27 +401,39 @@ export default function MenuScreen() {
         return;
       }
 
-      // Enviar modificaciones de tanda
-      await submitTandaModifications(orderId, {
+      const payload = {
         keepItems,
         newItems: formattedNewItems,
-      });
+      };
+
+      console.log(
+        "📤 ENVIANDO AL BACKEND - Payload completo:",
+        JSON.stringify(payload, null, 2),
+      );
+
+      // Enviar modificaciones de tanda
+      const response = await submitTandaModifications(orderId, payload);
+
+      console.log("✅ RESPUESTA DEL BACKEND:", response);
 
       Alert.alert(
         "Cambios Enviados",
-        "Los productos modificados han sido enviados para aprobación del mozo",
+        `Se han enviado ${keepItems.length} producto(s) original(es) y ${formattedNewItems.length} producto(s) nuevo(s) para aprobación`,
         [
           {
             text: "OK",
             onPress: () => {
               refreshOrders();
+              loadRejectedItems(); // Recargar items rechazados
               navigation.goBack();
             },
           },
         ],
       );
     } catch (error: any) {
-      console.error("Error submitting modifications:", error);
+      console.error("❌ ERROR COMPLETO:", error);
+      console.error("❌ ERROR MESSAGE:", error.message);
+      console.error("❌ ERROR RESPONSE:", error.response?.data);
       Alert.alert(
         "Error",
         error.message || "No se pudieron enviar los cambios",
@@ -416,7 +474,10 @@ export default function MenuScreen() {
               );
 
               if (rejectedItemIds.length === 0) {
-                Alert.alert("Error", "No hay productos rechazados para eliminar.");
+                Alert.alert(
+                  "Error",
+                  "No hay productos rechazados para eliminar.",
+                );
                 return;
               }
 
@@ -430,6 +491,7 @@ export default function MenuScreen() {
                     text: "OK",
                     onPress: () => {
                       refreshOrders();
+                      loadRejectedItems(); // Recargar items rechazados
                       navigation.goBack();
                     },
                   },
@@ -495,643 +557,520 @@ export default function MenuScreen() {
             paddingHorizontal: 24,
             paddingBottom: 26,
           }}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            marginBottom: 16,
-          }}
         >
-          <View style={{ flex: 1, alignItems: "center" }}>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginBottom: 4,
-              }}
-            >
-              <Utensils size={24} color="#d4af37" />
-              <Text
-                style={{
-                  color: "white",
-                  fontSize: 24,
-                  fontWeight: "600",
-                  marginLeft: 8,
-                }}
-              >
-                {isModifyMode ? "Modificar Productos" : "Nuestro Menú"}
-              </Text>
-            </View>
-            <Text style={{ color: "#d1d5db", fontSize: 14 }}>
-              {isModifyMode
-                ? "Selecciona nuevos productos para reemplazar los rechazados"
-                : "Explora nuestros deliciosos platos y bebidas"}
-            </Text>
-          </View>
-        </View>
-
-        {/* Información compacta de items rechazados */}
-        {isModifyMode &&
-          (() => {
-            // Filtrar solo los items que fueron realmente rechazados (sin stock)
-            const actuallyRejectedItems = rejectedItems.filter(
-              (item: any) => item.status === "rejected",
-            );
-
-            if (actuallyRejectedItems.length === 0) return null;
-
-            return (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginBottom: 16,
+            }}
+          >
+            <View style={{ flex: 1, alignItems: "center" }}>
               <View
-                style={{
-                  backgroundColor: "rgba(239, 68, 68, 0.1)",
-                  borderRadius: 8,
-                  padding: 12,
-                  marginHorizontal: 24,
-                  marginBottom: 16,
-                  borderLeftWidth: 4,
-                  borderLeftColor: "#ef4444",
-                }}
-              >
-                <View>
-                  <Text
-                    style={{
-                      color: "#ef4444",
-                      fontSize: 14,
-                      fontWeight: "600",
-                      marginBottom: 2,
-                    }}
-                  >
-                    ❌ Sin stock:{" "}
-                    {actuallyRejectedItems
-                      .map(item => item.menu_item?.name)
-                      .join(", ")}
-                  </Text>
-                  <Text
-                    style={{
-                      color: "#dc2626",
-                      fontSize: 12,
-                    }}
-                  >
-                    Selecciona productos alternativos del menú
-                  </Text>
-                </View>
-              </View>
-            );
-          })()}
-
-        {/* Category Filter */}
-        <View
-          style={{ flexDirection: "row", justifyContent: "center", gap: 8 }}
-        >
-          {[
-            { key: "all", label: "Todo", icon: Filter },
-            { key: "plato", label: "Platos", icon: ChefHat },
-            { key: "bebida", label: "Bebidas", icon: Coffee },
-          ].map(category => {
-            const IconComponent = category.icon;
-            const isSelected = selectedCategory === category.key;
-
-            return (
-              <TouchableOpacity
-                key={category.key}
-                onPress={() => setSelectedCategory(category.key as any)}
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  backgroundColor: isSelected
-                    ? "#d4af37"
-                    : "rgba(255,255,255,0.1)",
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  borderRadius: 20,
+                  marginBottom: 4,
                 }}
               >
-                <IconComponent
-                  size={16}
-                  color={isSelected ? "#1a1a1a" : "#d1d5db"}
-                />
+                <Utensils size={24} color="#d4af37" />
                 <Text
                   style={{
-                    color: isSelected ? "#1a1a1a" : "#d1d5db",
-                    fontWeight: "500",
-                    marginLeft: 6,
+                    color: "white",
+                    fontSize: 24,
+                    fontWeight: "600",
+                    marginLeft: 8,
                   }}
                 >
-                  {category.label}
+                  {isModifyMode ? "Modificar Productos" : "Nuestro Menú"}
                 </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
+              </View>
+              <Text style={{ color: "#d1d5db", fontSize: 14 }}>
+                {isModifyMode
+                  ? "Selecciona nuevos productos para reemplazar los rechazados"
+                  : "Explora nuestros deliciosos platos y bebidas"}
+              </Text>
+            </View>
+          </View>
 
-      {/* Menu Items */}
-      <FlatList
-        data={filteredItems}
-        keyExtractor={item => item.id}
-        pagingEnabled
-        decelerationRate="fast"
-        snapToAlignment="start"
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#d4af37"
-            colors={["#d4af37"]}
-          />
-        }
-        contentContainerStyle={{ 
-          paddingBottom: 140 // Espacio optimizado para carrito flotante + navbar
-        }}
-        renderItem={({ item }) => {
-          const CategoryIcon = getCategoryIcon(item.category);
-          const categoryColor = getCategoryColor(item.category);
-          const isRejected = wasItemRejected(item.id);
+          {/* Category Filter */}
+          <View
+            style={{ flexDirection: "row", justifyContent: "center", gap: 8 }}
+          >
+            {[
+              { key: "all", label: "Todo", icon: Filter },
+              { key: "plato", label: "Platos", icon: ChefHat },
+              { key: "bebida", label: "Bebidas", icon: Coffee },
+            ].map(category => {
+              const IconComponent = category.icon;
+              const isSelected = selectedCategory === category.key;
 
-          // Calculamos un espacio más optimizado para dispositivos reales
-          const RESERVED_BOTTOM = 130; // Optimizado para mejor aprovechamiento
-          
-          const innerCardHeight = Math.max(
-            ITEM_VISIBLE_HEIGHT - RESERVED_BOTTOM - 15, // Menos agresivo en la reducción
-            360, // Altura mínima aumentada para garantizar espacio
-          );
-
-          // Función para manejar el scroll de imágenes
-          const handleImageScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-            const scrollPosition = event.nativeEvent.contentOffset.x;
-            const imageIndex = Math.round(scrollPosition / (width - 48));
-            setCurrentImageIndex(prev => ({
-              ...prev,
-              [item.id]: imageIndex
-            }));
-          };
-
-          const currentImageIdx = currentImageIndex[item.id] || 0;
-
-          return (
-            <View
-              style={{
-                height: ITEM_VISIBLE_HEIGHT,
-                width: "100%",
-                justifyContent: "flex-start",
-                paddingHorizontal: 24,
-                paddingBottom: 20, // Reducido para mejor aprovechamiento del espacio
-              }}
-            >
-              <View
-                style={{
-                  height: innerCardHeight,
-                  backgroundColor: "rgba(255,255,255,0.05)",
-                  borderRadius: 16,
-                  overflow: "hidden",
-                  borderWidth: 1,
-                  borderColor: isRejected ? "#ef4444" : "rgba(255,255,255,0.1)",
-                }}
-              >
-                {isRejected && (
-                  <View
-                    style={{
-                      position: "absolute",
-                      top: 12,
-                      right: 12,
-                      backgroundColor: "#ef4444",
-                      borderRadius: 8,
-                      paddingHorizontal: 8,
-                      paddingVertical: 4,
-                      zIndex: 1,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: "white",
-                        fontSize: 12,
-                        fontWeight: "600",
-                      }}
-                    >
-                      RECHAZADO
-                    </Text>
-                  </View>
-                )}
-
-                {/* Images Section */}
-                {item.menu_item_images && item.menu_item_images.length > 0 && (
-                  <View style={{ height: innerCardHeight * 0.5, position: 'relative' }}>
-                    <FlatList
-                      data={item.menu_item_images.sort(
-                        (a, b) => a.position - b.position,
-                      )}
-                      keyExtractor={img => img.id}
-                      horizontal
-                      pagingEnabled
-                      decelerationRate="fast"
-                      snapToInterval={width - 48}
-                      showsHorizontalScrollIndicator={false}
-                      onScroll={handleImageScroll}
-                      scrollEventThrottle={16}
-                      renderItem={({ item: imgItem }) => (
-                        <Image
-                          source={{ uri: imgItem.image_url }}
-                          style={{
-                            width: width - 48,
-                            height: innerCardHeight * 0.5,
-                            resizeMode: "cover",
-                          }}
-                        />
-                      )}
-                    />
-                    
-                    {/* Indicadores de página para las imágenes */}
-                    {item.menu_item_images.length > 1 && (
-                      <View
-                        style={{
-                          position: 'absolute',
-                          bottom: 12,
-                          left: 0,
-                          right: 0,
-                          flexDirection: 'row',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                        }}
-                      >
-                        {item.menu_item_images.map((_, index) => (
-                          <View
-                            key={index}
-                            style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: 4,
-                              backgroundColor: currentImageIdx === index ? '#d4af37' : 'rgba(255,255,255,0.4)',
-                              marginHorizontal: 4,
-                            }}
-                          />
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                )}
-
-                {/* Content Section */}
-                <View style={{ flex: 1, padding: 20, paddingBottom: 10 }}>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginBottom: 12,
-                    }}
-                  >
-                    <View
-                      style={{ flexDirection: "row", alignItems: "center" }}
-                    >
-                      <View
-                        style={{
-                          backgroundColor: categoryColor,
-                          borderRadius: 8,
-                          padding: 6,
-                          marginRight: 12,
-                        }}
-                      >
-                        <CategoryIcon size={16} color="white" />
-                      </View>
-                      <Text
-                        style={{
-                          color: "#9ca3af",
-                          fontSize: 12,
-                          fontWeight: "500",
-                          textTransform: "uppercase",
-                          letterSpacing: 1,
-                        }}
-                      >
-                        {item.category === "plato" ? "Plato" : "Bebida"}
-                      </Text>
-                    </View>
-
-                    <View
-                      style={{
-                        backgroundColor: "#d4af37",
-                        borderRadius: 8,
-                        paddingHorizontal: 12,
-                        paddingVertical: 4,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: "#1a1a1a",
-                          fontSize: 16,
-                          fontWeight: "700",
-                        }}
-                      >
-                        {formatPrice(item.price)}
-                      </Text>
-                    </View>
-                  </View>
-
+              return (
+                <TouchableOpacity
+                  key={category.key}
+                  onPress={() => setSelectedCategory(category.key as any)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    backgroundColor: isSelected
+                      ? "#d4af37"
+                      : "rgba(255,255,255,0.1)",
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 20,
+                  }}
+                >
+                  <IconComponent
+                    size={16}
+                    color={isSelected ? "#1a1a1a" : "#d1d5db"}
+                  />
                   <Text
                     style={{
-                      color: "white",
-                      fontSize: 22,
-                      fontWeight: "700",
-                      marginBottom: 8,
+                      color: isSelected ? "#1a1a1a" : "#d1d5db",
+                      fontWeight: "500",
+                      marginLeft: 6,
                     }}
                   >
-                    {item.name}
+                    {category.label}
                   </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
 
-                  {/* Descripción scrolleable limitada a 3 líneas de altura */}
-                  <ScrollView
-                    style={{
-                      maxHeight: 60,
-                      marginBottom: 16,
-                    }}
-                    contentContainerStyle={{
-                      paddingRight: 4,
-                    }}
-                    showsVerticalScrollIndicator={true} // Mostrar barra para indicar que es scrolleable
-                    nestedScrollEnabled={true}
-                  >
-                    <Text
+        {/* Menu Items */}
+        <FlatList
+          data={filteredItems}
+          keyExtractor={item => item.id}
+          pagingEnabled
+          decelerationRate="fast"
+          snapToAlignment="start"
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#d4af37"
+              colors={["#d4af37"]}
+            />
+          }
+          contentContainerStyle={{
+            paddingBottom: 140, // Espacio optimizado para carrito flotante + navbar
+          }}
+          renderItem={({ item }) => {
+            const CategoryIcon = getCategoryIcon(item.category);
+            const categoryColor = getCategoryColor(item.category);
+            const isRejected = wasItemRejected(item.id);
+
+            // Calculamos un espacio más optimizado para dispositivos reales
+            const RESERVED_BOTTOM = 130; // Optimizado para mejor aprovechamiento
+
+            const innerCardHeight = Math.max(
+              ITEM_VISIBLE_HEIGHT - RESERVED_BOTTOM - 15, // Menos agresivo en la reducción
+              360, // Altura mínima aumentada para garantizar espacio
+            );
+
+            // Función para manejar el scroll de imágenes
+            const handleImageScroll = (
+              event: NativeSyntheticEvent<NativeScrollEvent>,
+            ) => {
+              const scrollPosition = event.nativeEvent.contentOffset.x;
+              const imageIndex = Math.round(scrollPosition / (width - 48));
+              setCurrentImageIndex(prev => ({
+                ...prev,
+                [item.id]: imageIndex,
+              }));
+            };
+
+            const currentImageIdx = currentImageIndex[item.id] || 0;
+
+            return (
+              <View
+                style={{
+                  height: ITEM_VISIBLE_HEIGHT,
+                  width: "100%",
+                  justifyContent: "flex-start",
+                  paddingHorizontal: 24,
+                  paddingBottom: 20, // Reducido para mejor aprovechamiento del espacio
+                }}
+              >
+                <View
+                  style={{
+                    height: innerCardHeight,
+                    backgroundColor: "rgba(255,255,255,0.05)",
+                    borderRadius: 16,
+                    overflow: "hidden",
+                    borderWidth: 1,
+                    borderColor: isRejected
+                      ? "#ef4444"
+                      : "rgba(255,255,255,0.1)",
+                  }}
+                >
+                  {isRejected && (
+                    <View
                       style={{
-                        color: "#d1d5db",
-                        fontSize: 14,
-                        lineHeight: 20,
+                        position: "absolute",
+                        top: 12,
+                        right: 12,
+                        backgroundColor: "#ef4444",
+                        borderRadius: 8,
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        zIndex: 1,
                       }}
                     >
-                      {item.description}
-                    </Text>
-                  </ScrollView>
+                      <Text
+                        style={{
+                          color: "white",
+                          fontSize: 12,
+                          fontWeight: "600",
+                        }}
+                      >
+                        RECHAZADO
+                      </Text>
+                    </View>
+                  )}
 
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      paddingTop: 12,
-                      borderTopWidth: 1,
-                      borderTopColor: "rgba(255,255,255,0.1)",
-                      minHeight: 48, // Altura mínima para evitar superposición
-                    }}
-                  >
+                  {/* Images Section */}
+                  {item.menu_item_images &&
+                    item.menu_item_images.length > 0 && (
+                      <View
+                        style={{
+                          height: innerCardHeight * 0.5,
+                          position: "relative",
+                        }}
+                      >
+                        <FlatList
+                          data={item.menu_item_images.sort(
+                            (a, b) => a.position - b.position,
+                          )}
+                          keyExtractor={img => img.id}
+                          horizontal
+                          pagingEnabled
+                          decelerationRate="fast"
+                          snapToInterval={width - 48}
+                          showsHorizontalScrollIndicator={false}
+                          onScroll={handleImageScroll}
+                          scrollEventThrottle={16}
+                          renderItem={({ item: imgItem }) => (
+                            <Image
+                              source={{ uri: imgItem.image_url }}
+                              style={{
+                                width: width - 48,
+                                height: innerCardHeight * 0.5,
+                                resizeMode: "cover",
+                              }}
+                            />
+                          )}
+                        />
+
+                        {/* Indicadores de página para las imágenes */}
+                        {item.menu_item_images.length > 1 && (
+                          <View
+                            style={{
+                              position: "absolute",
+                              bottom: 12,
+                              left: 0,
+                              right: 0,
+                              flexDirection: "row",
+                              justifyContent: "center",
+                              alignItems: "center",
+                            }}
+                          >
+                            {item.menu_item_images.map((_, index) => (
+                              <View
+                                key={index}
+                                style={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: 4,
+                                  backgroundColor:
+                                    currentImageIdx === index
+                                      ? "#d4af37"
+                                      : "rgba(255,255,255,0.4)",
+                                  marginHorizontal: 4,
+                                }}
+                              />
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    )}
+
+                  {/* Content Section */}
+                  <View style={{ flex: 1, padding: 20, paddingBottom: 10 }}>
                     <View
                       style={{
                         flexDirection: "row",
                         alignItems: "center",
-                        flex: 1,
-                        marginRight: 12, // Espacio entre tiempo y botones
+                        justifyContent: "space-between",
+                        marginBottom: 12,
                       }}
                     >
-                      <Clock size={16} color="#d4af37" />
-                      <Text
-                        style={{
-                          color: "#d4af37",
-                          fontSize: 14,
-                          fontWeight: "500",
-                          marginLeft: 6,
-                        }}
+                      <View
+                        style={{ flexDirection: "row", alignItems: "center" }}
                       >
-                        {item.prepMinutes} min
-                      </Text>
-                    </View>
-
-                    <View
-                      style={{ 
-                        flexDirection: "row", 
-                        alignItems: "center",
-                        flexShrink: 0, // Evita que se comprima
-                      }}
-                    >
-                      {getCurrentItemQuantity(item.id) > 0 ? (
                         <View
                           style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            backgroundColor: isRejected ? "#9ca3af" : "#d4af37",
+                            backgroundColor: categoryColor,
                             borderRadius: 8,
-                            paddingHorizontal: 4,
-                            opacity: isRejected ? 0.5 : 1,
+                            padding: 6,
+                            marginRight: 12,
                           }}
                         >
-                          <TouchableOpacity
-                            onPress={() =>
-                              handleQuantityChange(
-                                item.id,
-                                getCurrentItemQuantity(item.id) - 1,
-                              )
-                            }
-                            disabled={isRejected}
-                            style={{ padding: 8 }}
-                          >
-                            <Minus
-                              size={16}
-                              color={isRejected ? "#ffffff" : "#1a1a1a"}
-                            />
-                          </TouchableOpacity>
+                          <CategoryIcon size={16} color="white" />
+                        </View>
+                        <Text
+                          style={{
+                            color: "#9ca3af",
+                            fontSize: 12,
+                            fontWeight: "500",
+                            textTransform: "uppercase",
+                            letterSpacing: 1,
+                          }}
+                        >
+                          {item.category === "plato" ? "Plato" : "Bebida"}
+                        </Text>
+                      </View>
 
-                          <Text
+                      <View
+                        style={{
+                          backgroundColor: "#d4af37",
+                          borderRadius: 8,
+                          paddingHorizontal: 12,
+                          paddingVertical: 4,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: "#1a1a1a",
+                            fontSize: 16,
+                            fontWeight: "700",
+                          }}
+                        >
+                          {formatPrice(item.price)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text
+                      style={{
+                        color: "white",
+                        fontSize: 22,
+                        fontWeight: "700",
+                        marginBottom: 8,
+                      }}
+                    >
+                      {item.name}
+                    </Text>
+
+                    {/* Descripción scrolleable limitada a 3 líneas de altura */}
+                    <ScrollView
+                      style={{
+                        maxHeight: 60,
+                        marginBottom: 16,
+                      }}
+                      contentContainerStyle={{
+                        paddingRight: 4,
+                      }}
+                      showsVerticalScrollIndicator={true} // Mostrar barra para indicar que es scrolleable
+                      nestedScrollEnabled={true}
+                    >
+                      <Text
+                        style={{
+                          color: "#d1d5db",
+                          fontSize: 14,
+                          lineHeight: 20,
+                        }}
+                      >
+                        {item.description}
+                      </Text>
+                    </ScrollView>
+
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        paddingTop: 12,
+                        borderTopWidth: 1,
+                        borderTopColor: "rgba(255,255,255,0.1)",
+                        minHeight: 48, // Altura mínima para evitar superposición
+                      }}
+                    >
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          flex: 1,
+                          marginRight: 12, // Espacio entre tiempo y botones
+                        }}
+                      >
+                        <Clock size={16} color="#d4af37" />
+                        <Text
+                          style={{
+                            color: "#d4af37",
+                            fontSize: 14,
+                            fontWeight: "500",
+                            marginLeft: 6,
+                          }}
+                        >
+                          {item.prepMinutes} min
+                        </Text>
+                      </View>
+
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          flexShrink: 0, // Evita que se comprima
+                        }}
+                      >
+                        {getCurrentItemQuantity(item.id) > 0 ? (
+                          <View
                             style={{
-                              color: isRejected ? "#ffffff" : "#1a1a1a",
-                              fontWeight: "600",
-                              fontSize: 16,
-                              marginHorizontal: 12,
+                              flexDirection: "row",
+                              alignItems: "center",
+                              backgroundColor: isRejected
+                                ? "#9ca3af"
+                                : "#d4af37",
+                              borderRadius: 8,
+                              paddingHorizontal: 4,
+                              opacity: isRejected ? 0.5 : 1,
                             }}
                           >
-                            {getCurrentItemQuantity(item.id)}
-                          </Text>
+                            <TouchableOpacity
+                              onPress={() =>
+                                handleQuantityChange(
+                                  item.id,
+                                  getCurrentItemQuantity(item.id) - 1,
+                                )
+                              }
+                              disabled={isRejected}
+                              style={{ padding: 8 }}
+                            >
+                              <Minus
+                                size={16}
+                                color={isRejected ? "#ffffff" : "#1a1a1a"}
+                              />
+                            </TouchableOpacity>
 
+                            <Text
+                              style={{
+                                color: isRejected ? "#ffffff" : "#1a1a1a",
+                                fontWeight: "600",
+                                fontSize: 16,
+                                marginHorizontal: 12,
+                              }}
+                            >
+                              {getCurrentItemQuantity(item.id)}
+                            </Text>
+
+                            <TouchableOpacity
+                              onPress={() =>
+                                handleQuantityChange(
+                                  item.id,
+                                  getCurrentItemQuantity(item.id) + 1,
+                                )
+                              }
+                              disabled={isRejected}
+                              style={{ padding: 8 }}
+                            >
+                              <Plus
+                                size={16}
+                                color={isRejected ? "#ffffff" : "#1a1a1a"}
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
                           <TouchableOpacity
-                            onPress={() =>
-                              handleQuantityChange(
-                                item.id,
-                                getCurrentItemQuantity(item.id) + 1,
-                              )
-                            }
+                            onPress={() => handleAddToCart(item)}
                             disabled={isRejected}
-                            style={{ padding: 8 }}
+                            style={{
+                              backgroundColor: isRejected
+                                ? "#9ca3af"
+                                : hasPendingOrder && !isModifyMode
+                                  ? "#6b7280"
+                                  : "#d4af37",
+                              borderRadius: 8,
+                              paddingHorizontal: 16,
+                              paddingVertical: 10,
+                              flexDirection: "row",
+                              alignItems: "center",
+                              opacity: isRejected
+                                ? 0.5
+                                : hasPendingOrder && !isModifyMode
+                                  ? 0.8
+                                  : 1,
+                            }}
                           >
-                            <Plus
-                              size={16}
-                              color={isRejected ? "#ffffff" : "#1a1a1a"}
-                            />
+                            {isRejected ? (
+                              <>
+                                <X size={16} color="#ffffff" />
+                                <Text
+                                  style={{
+                                    color: "#ffffff",
+                                    fontWeight: "600",
+                                    marginLeft: 4,
+                                  }}
+                                >
+                                  No disponible
+                                </Text>
+                              </>
+                            ) : hasPendingOrder && !isModifyMode ? (
+                              <>
+                                <Lock size={16} color="#ffffff" />
+                                <Text
+                                  style={{
+                                    color: "#ffffff",
+                                    fontWeight: "600",
+                                    marginLeft: 4,
+                                  }}
+                                >
+                                  Bloqueado
+                                </Text>
+                              </>
+                            ) : (
+                              <>
+                                <Plus size={16} color="#1a1a1a" />
+                                <Text
+                                  style={{
+                                    color: "#1a1a1a",
+                                    fontWeight: "600",
+                                    marginLeft: 4,
+                                  }}
+                                >
+                                  {isModifyMode ? "Seleccionar" : "Agregar"}
+                                </Text>
+                              </>
+                            )}
                           </TouchableOpacity>
-                        </View>
-                      ) : (
-                        <TouchableOpacity
-                          onPress={() => handleAddToCart(item)}
-                          disabled={isRejected}
-                          style={{
-                            backgroundColor: isRejected
-                              ? "#9ca3af"
-                              : hasPendingOrder && !isModifyMode
-                                ? "#6b7280"
-                                : "#d4af37",
-                            borderRadius: 8,
-                            paddingHorizontal: 16,
-                            paddingVertical: 10,
-                            flexDirection: "row",
-                            alignItems: "center",
-                            opacity: isRejected
-                              ? 0.5
-                              : hasPendingOrder && !isModifyMode
-                                ? 0.8
-                                : 1,
-                          }}
-                        >
-                          {isRejected ? (
-                            <>
-                              <X size={16} color="#ffffff" />
-                              <Text
-                                style={{
-                                  color: "#ffffff",
-                                  fontWeight: "600",
-                                  marginLeft: 4,
-                                }}
-                              >
-                                No disponible
-                              </Text>
-                            </>
-                          ) : hasPendingOrder && !isModifyMode ? (
-                            <>
-                              <Lock size={16} color="#ffffff" />
-                              <Text
-                                style={{
-                                  color: "#ffffff",
-                                  fontWeight: "600",
-                                  marginLeft: 4,
-                                }}
-                              >
-                                Bloqueado
-                              </Text>
-                            </>
-                          ) : (
-                            <>
-                              <Plus size={16} color="#1a1a1a" />
-                              <Text
-                                style={{
-                                  color: "#1a1a1a",
-                                  fontWeight: "600",
-                                  marginLeft: 4,
-                                }}
-                              >
-                                {isModifyMode ? "Seleccionar" : "Agregar"}
-                              </Text>
-                            </>
-                          )}
-                        </TouchableOpacity>
-                      )}
+                        )}
+                      </View>
                     </View>
                   </View>
                 </View>
               </View>
-            </View>
-          );
-        }}
-      />
+            );
+          }}
+        />
 
-      {/* Floating Cart Component o Carrito de Modificaciones */}
-      {isModifyMode ? (
-        // Carrito flotante para modificaciones
-        Object.keys(selectedModifyItems).length > 0 && (
-          <TouchableOpacity
+        {/* Floating Cart Component */}
+        {isModifyMode ? (
+          <FloatingModifyCart
             onPress={() => setCartModalVisible(true)}
-            style={{
-              position: "absolute",
-              bottom: 34,
-              left: 24,
-              right: 24,
-              backgroundColor: "#d4af37",
-              borderRadius: 16,
-              padding: 16,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              shadowRadius: 8,
-              elevation: 8,
-            }}
-          >
-            <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  color: "#1a1a1a",
-                  fontSize: 16,
-                  fontWeight: "600",
-                }}
-              >
-                � Productos de reemplazo
-              </Text>
-              <Text
-                style={{
-                  color: "#1a1a1a",
-                  fontSize: 14,
-                  opacity: 0.8,
-                }}
-              >
-                {Object.values(selectedModifyItems).reduce(
-                  (sum, qty) => sum + qty,
-                  0,
-                )}{" "}
-                productos de reemplazo
-              </Text>
-            </View>
-
-            <View
-              style={{
-                backgroundColor: "#1a1a1a",
-                borderRadius: 12,
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                flexDirection: "row",
-                alignItems: "center",
-              }}
-            >
-              <Text
-                style={{
-                  color: "#d4af37",
-                  fontWeight: "600",
-                  marginRight: 4,
-                }}
-              >
-                Ver carrito
-              </Text>
-              <View
-                style={{
-                  backgroundColor: "#d4af37",
-                  borderRadius: 10,
-                  width: 20,
-                  height: 20,
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  style={{
-                    color: "#1a1a1a",
-                    fontSize: 12,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {Object.values(selectedModifyItems).reduce(
-                    (sum, qty) => sum + qty,
-                    0,
-                  )}
-                </Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-        )
-      ) : (
-        // FloatingCart normal
-        <>
-          <FloatingCart onPress={() => setCartModalVisible(true)} />
-          <CartModal
-            visible={cartModalVisible}
-            onClose={() => setCartModalVisible(false)}
+            selectedItems={selectedModifyItems}
+            menuItems={menuItems}
           />
-        </>
-      )}
+        ) : (
+          <FloatingCart onPress={() => setCartModalVisible(true)} />
+        )}
+
+        <CartModal
+          visible={cartModalVisible}
+          onClose={() => setCartModalVisible(false)}
+        />
       </LinearGradient>
 
       {/* Modal para modificaciones o CartModal normal */}

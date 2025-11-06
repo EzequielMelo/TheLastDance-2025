@@ -1,5 +1,6 @@
 import React, { useRef } from "react";
 import { View, Text, TextInput } from "react-native";
+import { useScroll } from "../../context/ScrollContext";
 
 type Props = {
   value: string; // Formato: "XX-XXXXXXXX-X"
@@ -20,12 +21,23 @@ export default function CUILField({
 }: Props) {
   const secondInputRef = useRef<TextInput>(null);
   const thirdInputRef = useRef<TextInput>(null);
+  const containerRef = useRef<View>(null);
+  const { scrollToPosition } = useScroll();
 
   // Parsear el valor actual en las 3 partes
   const parts = value.split("-");
   const firstPart = parts[0] || "";
   const secondPart = parts[1] || "";
   const thirdPart = parts[2] || "";
+
+  const handleFocusWithScroll = () => {
+    setTimeout(() => {
+      containerRef.current?.measureInWindow((x, y, width, height) => {
+        scrollToPosition(y, height);
+      });
+    }, 150);
+    onFocus?.();
+  };
 
   const handleFirstPartChange = (text: string) => {
     // Solo permitir números y máximo 2 caracteres
@@ -59,9 +71,9 @@ export default function CUILField({
   };
 
   return (
-    <View className="mb-4">
+    <View ref={containerRef} className="mb-4">
       <Text className="text-white text-sm font-medium mb-1">CUIL</Text>
-      
+
       <View className="flex-row items-center gap-2">
         {/* Primer input: 2 dígitos */}
         <TextInput
@@ -72,7 +84,7 @@ export default function CUILField({
           placeholderTextColor="#888"
           value={firstPart}
           onChangeText={handleFirstPartChange}
-          onFocus={onFocus}
+          onFocus={handleFocusWithScroll}
           onBlur={onBlur}
           keyboardType="numeric"
           maxLength={2}
@@ -90,7 +102,7 @@ export default function CUILField({
           placeholderTextColor="#888"
           value={secondPart}
           onChangeText={handleSecondPartChange}
-          onFocus={onFocus}
+          onFocus={handleFocusWithScroll}
           onBlur={onBlur}
           keyboardType="numeric"
           maxLength={8}
@@ -108,16 +120,14 @@ export default function CUILField({
           placeholderTextColor="#888"
           value={thirdPart}
           onChangeText={handleThirdPartChange}
-          onFocus={onFocus}
+          onFocus={handleFocusWithScroll}
           onBlur={onBlur}
           keyboardType="numeric"
           maxLength={1}
         />
       </View>
 
-      {!!error && (
-        <Text className="text-red-500 text-sm mt-1">{error}</Text>
-      )}
+      {!!error && <Text className="text-red-500 text-sm mt-1">{error}</Text>}
     </View>
   );
 }
