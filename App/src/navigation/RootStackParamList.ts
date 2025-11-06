@@ -4,6 +4,7 @@ export type RootStackParamList = {
   Login: undefined;
   Registro: undefined;
   RegistroAnonimo: undefined;
+  CompleteProfile: { user: any }; // Pantalla para completar perfil después de OAuth
   Home: { refresh?: number } | undefined;
   Splash: undefined;
   CreateMenuItem: { initialCategory?: "plato" | "bebida" } | undefined;
@@ -17,7 +18,7 @@ export type RootStackParamList = {
   MyWaitingPosition: undefined; // Ver posición en lista de espera
   ScanTableQR: undefined; // Escanear QR de mesa para confirmar llegada
   ScanOrderQR: undefined; // Escanear QR para confirmar pedido entregado
-  QRScanner: { 
+  QRScanner: {
     mode: "order_status" | "confirm_arrival" | "confirm_delivery" | "payment";
     onScanSuccess: (data: string) => void;
   }; // Scanner QR genérico
@@ -40,7 +41,7 @@ export type RootStackParamList = {
   AllWaiters: undefined; // Gestión de meseros (admin/supervisor)
   TableChat: { tableId: string; autoMessage?: string }; // Chat entre cliente y mesero
   BillPayment: { tableNumber?: number; tableId?: string }; // Pantalla de pago de cuenta
-  InvoiceView: { 
+  InvoiceView: {
     invoiceData: {
       generated: boolean;
       filePath?: string;
