@@ -8,12 +8,14 @@ interface NotificationContextType {
   expoPushToken: string | null;
   sendTokenToBackend: () => Promise<void>;
   showTestNotification: () => Promise<void>;
+  setupPaymentNotificationHandler: (handler: (data: any) => void) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType>({
   expoPushToken: null,
   sendTokenToBackend: async () => {},
   showTestNotification: async () => {},
+  setupPaymentNotificationHandler: () => {},
 });
 
 export const useNotifications = () => useContext(NotificationContext);
@@ -35,6 +37,22 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       sendTokenToBackend();
     }
   }, [user, token, expoPushToken]);
+
+  const setupPaymentNotificationHandler = (handler: (data: any) => void) => {
+    try {
+      // Configurar listeners de notificaciones
+      NotificationService.setupNotificationListeners();
+      
+      // Agregar handler para notificaciones de pago
+      NotificationService.addNotificationHandler((data) => {
+        if (data.type === 'payment_confirmed') {
+          handler(data);
+        }
+      });
+    } catch (error) {
+      console.error('❌ Error setting up notification handlers:', error);
+    }
+  };
 
   const generateToken = () => {
     const timestamp = Date.now().toString(36);
@@ -113,6 +131,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         expoPushToken,
         sendTokenToBackend,
         showTestNotification,
+        setupPaymentNotificationHandler,
       }}
     >
       {children}

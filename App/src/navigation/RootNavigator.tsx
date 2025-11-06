@@ -3,6 +3,7 @@ import { NavigationContainer, useNavigation } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
 import { useAuth } from "../auth/AuthContext";
+import NavigationNotificationHandler from "../components/NavigationNotificationHandler";
 import HomeScreen from "../screens/HomeScreen";
 import SplashScreen from "../screens/SplashScreen";
 import { LoginScreen } from "../screens/auth-screens/LoginScreen";
@@ -29,6 +30,7 @@ import WaiterDashboardScreen from "../screens/waiter-screens/WaiterDashboardScre
 import AllWaitersScreen from "../screens/admin-screens/AllWaitersScreen";
 import TableChatScreen from "../screens/chat/TableChatScreen";
 import BillPaymentScreen from "../screens/table-screens/BillPaymentScreen";
+import InvoiceViewScreen from "../screens/table-screens/InvoiceViewScreen";
 import WaiterOrdersScreen from "../components/orders/WaiterOrdersScreen";
 import KitchenDashboardScreen from "../screens/kitchen-screens/KitchenDashboardScreen";
 import KitchenMenuScreen from "../screens/kitchen-screens/KitchenMenuScreen";
@@ -57,14 +59,18 @@ function NavigatorContent() {
   }
 
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: "#151F2E" },
-        headerTintColor: "#fff",
-      }}
-      initialRouteName={token ? "Home" : "Login"}
-    >
-      {token ? (
+    <>
+      {/* Componente que configura handlers de notificación con navegación */}
+      <NavigationNotificationHandler />
+      
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: { backgroundColor: "#151F2E" },
+          headerTintColor: "#fff",
+        }}
+        initialRouteName={token ? "Home" : "Login"}
+      >
+        {token ? (
         <>
           <Stack.Screen
             name="Home"
@@ -193,6 +199,11 @@ function NavigatorContent() {
             options={{ title: "Pagar Cuenta", headerBackTitle: "Volver" }}
           />
           <Stack.Screen
+            name="InvoiceView"
+            component={InvoiceViewScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="KitchenDashboard"
             component={KitchenDashboardScreen}
             options={{ headerShown: false }}
@@ -232,7 +243,8 @@ function NavigatorContent() {
           />
         </>
       )}
-    </Stack.Navigator>
+      </Stack.Navigator>
+    </>
   );
 }
 

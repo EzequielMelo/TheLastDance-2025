@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
+import path from "path";
 import { supabaseAdmin } from "../../config/supabase";
+import { InvoiceService } from "../invoices/invoiceService";
 import {
   createOrder,
   getOrderById,
@@ -40,6 +42,8 @@ import {
   notifyClientOrderConfirmed,
   notifyKitchenNewItems,
   notifyBartenderNewItems,
+  notifyWaiterKitchenItemsReady,
+  notifyWaiterBartenderItemsReady,
   notifyManagementPaymentReceived,
 } from "../../services/pushNotificationService";
 
@@ -1035,6 +1039,48 @@ export async function updateKitchenItemStatusHandler(
       return;
     }
 
+    // Si el item está listo, notificar al mozo
+    if (status === "ready") {
+      try {
+        // Consulta más simple para obtener la información necesaria
+        const { data: itemData, error: itemError } = await supabaseAdmin
+          .from("order_items")
+          .select(`
+            id,
+            quantity,
+            menu_items!inner(name),
+            orders!inner(
+              table_id,
+              tables!inner(number, id_waiter)
+            )
+          `)
+          .eq("id", itemId)
+          .single();
+
+        if (!itemError && itemData) {
+          const order = Array.isArray(itemData.orders) ? itemData.orders[0] : itemData.orders;
+          const tables = order?.tables;
+          const table = Array.isArray(tables) ? tables[0] : tables;
+          const menuItems = itemData.menu_items;
+          const menuItem = Array.isArray(menuItems) ? menuItems[0] : menuItems;
+          
+          if (table && 'id_waiter' in table && 'number' in table && menuItem && 'name' in menuItem) {
+            await notifyWaiterKitchenItemsReady(
+              table.id_waiter,
+              table.number.toString(),
+              [{
+                name: menuItem.name,
+                quantity: itemData.quantity || 1
+              }]
+            );
+          }
+        }
+      } catch (notifyError) {
+        console.error("Error enviando notificación de plato listo:", notifyError);
+        // No bloqueamos la respuesta por error de notificación
+      }
+    }
+
     res.json({
       success: true,
       message: result.message,
@@ -1141,6 +1187,48 @@ export async function updateBartenderItemStatusHandler(
         message: result.message,
       });
       return;
+    }
+
+    // Si el item está listo, notificar al mozo
+    if (status === "ready") {
+      try {
+        // Consulta para obtener la información necesaria
+        const { data: itemData, error: itemError } = await supabaseAdmin
+          .from("order_items")
+          .select(`
+            id,
+            quantity,
+            menu_items!inner(name),
+            orders!inner(
+              table_id,
+              tables!inner(number, id_waiter)
+            )
+          `)
+          .eq("id", itemId)
+          .single();
+
+        if (!itemError && itemData) {
+          const order = Array.isArray(itemData.orders) ? itemData.orders[0] : itemData.orders;
+          const tables = order?.tables;
+          const table = Array.isArray(tables) ? tables[0] : tables;
+          const menuItems = itemData.menu_items;
+          const menuItem = Array.isArray(menuItems) ? menuItems[0] : menuItems;
+          
+          if (table && 'id_waiter' in table && 'number' in table && menuItem && 'name' in menuItem) {
+            await notifyWaiterBartenderItemsReady(
+              table.id_waiter,
+              table.number.toString(),
+              [{
+                name: menuItem.name,
+                quantity: itemData.quantity || 1
+              }]
+            );
+          }
+        }
+      } catch (notifyError) {
+        console.error("Error enviando notificación de bebida lista:", notifyError);
+        // No bloqueamos la respuesta por error de notificación
+      }
     }
 
     res.json({
@@ -1392,13 +1480,20 @@ export async function payOrderHandler(
 
     const tableId = req.params['orderId']; // Reusing orderId param for tableId
     const clientId = req.body.idClient || req.user.appUserId;
+    const paymentDetails = req.body.paymentDetails; // Nuevos datos de pago con descuentos
 
     if (!tableId) {
       res.status(400).json({ error: "ID de mesa requerido" });
       return;
     }
 
-    const result = await payOrder(tableId, clientId);
+    console.log(`💰 PayOrderHandler - Datos recibidos:`, {
+      tableId,
+      clientId,
+      paymentDetails
+    });
+
+    const result = await payOrder(tableId, clientId, paymentDetails);
 
     // Enviar notificación push a dueño y supervisor sobre el pago recibido
     try {
@@ -1471,9 +1566,93 @@ export async function confirmPaymentHandler(
       return;
     }
 
-    const result = await confirmPaymentAndReleaseTable(tableId, waiterId);
+    // Obtener el cliente que solicitó el pago buscando órdenes no pagadas
+    const { data: unpaidOrders, error: ordersError } = await supabaseAdmin
+      .from("orders")
+      .select("user_id")
+      .eq("table_id", tableId)
+      .eq("is_paid", false)
+      .limit(1);
 
-    res.json(result);
+    if (ordersError || !unpaidOrders || unpaidOrders.length === 0) {
+      res.status(400).json({ error: "No se encontraron órdenes pendientes de pago" });
+      return;
+    }
+
+    const payingClientId = unpaidOrders[0]?.user_id;
+
+    if (!payingClientId) {
+      res.status(400).json({ error: "No se pudo identificar el cliente que solicitó el pago" });
+      return;
+    }
+
+    // Generar factura ANTES de confirmar el pago
+    let invoiceInfo: {
+      generated: boolean;
+      filePath?: string;
+      fileName?: string;
+      message?: string;
+      error?: string;
+    } = {
+      generated: false,
+      error: 'No se generó factura'
+    };
+
+    try {
+      console.log(`📄 Generando factura para mesa ${tableId}`);
+      
+      // Obtener el cliente de la mesa para generar la factura
+      const { data: tableData, error: tableError } = await supabaseAdmin
+        .from('tables')
+        .select('id_client')
+        .eq('id', tableId)
+        .single();
+
+      if (!tableError && tableData?.id_client) {
+        const invoiceResult = await InvoiceService.generateInvoiceHTML(
+          tableId,
+          payingClientId // Usar el cliente que solicitó el pago
+        );
+
+        if (invoiceResult.success && invoiceResult.filePath) {
+          console.log(`✅ Factura generada: ${invoiceResult.filePath}`);
+          const fileName = invoiceResult.filePath ? path.basename(invoiceResult.filePath) : undefined;
+          invoiceInfo = {
+            generated: true,
+            filePath: invoiceResult.filePath,
+            fileName: fileName,
+            message: 'Factura generada exitosamente'
+          } as typeof invoiceInfo;
+        } else {
+          console.error(`❌ Error generando factura: ${invoiceResult.error}`);
+          invoiceInfo = {
+            generated: false,
+            error: invoiceResult.error || 'Error desconocido'
+          };
+        }
+      } else {
+        console.error('❌ No se pudo obtener cliente de la mesa para factura');
+        invoiceInfo = {
+          generated: false,
+          error: 'No se pudo identificar el cliente para generar factura'
+        };
+      }
+    } catch (invoiceError) {
+      console.error('❌ Error en generación de factura:', invoiceError);
+      invoiceInfo = {
+        generated: false,
+        error: 'Error interno generando factura'
+      };
+    }
+
+    // Confirmar pago y liberar mesa, pasando la información de la factura
+    const result = await confirmPaymentAndReleaseTable(tableId, waiterId, payingClientId, invoiceInfo);
+
+    // Respuesta completa con información de pago y factura
+    res.json({
+      ...result,
+      invoice: invoiceInfo
+    });
   } catch (error: any) {
     console.error("❌ Error confirmando pago:", error);
     res.status(400).json({

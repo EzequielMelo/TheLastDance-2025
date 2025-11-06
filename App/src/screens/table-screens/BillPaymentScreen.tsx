@@ -188,7 +188,7 @@ const BillPaymentScreen: React.FC = () => {
       const gameDiscountAmount = calculateGameDiscountAmount();
       const totalAmount = getTotalWithTip();
       
-      // Preparar datos de pago
+      // Preparar datos de pago para enviar al mozo
       const paymentData = {
         totalAmount,
         tipAmount,
@@ -197,14 +197,15 @@ const BillPaymentScreen: React.FC = () => {
         satisfactionLevel: `${selectedSatisfaction.percentage}% - ${selectedSatisfaction.label}`,
       };
       
-      // Llamar a la API para procesar el pago con todos los datos
+      // ⚠️ IMPORTANTE: Esta llamada solo marca el pago como "pendiente de confirmación"
+      // NO genera la factura - eso lo hace el mozo cuando confirma la recepción
       await payOrder(billData.tableId, billData.idClient, paymentData);
       
-      // ✅ Resetear descuentos de juegos después del pago exitoso
+      // ✅ Resetear descuentos de juegos después de solicitar el pago
       const discountCleared = await clearDiscount();
       console.log("🎮 Game discount reset:", discountCleared ? "✅ Success" : "❌ Failed");
       
-      // Mostrar alert de éxito en lugar de toast
+      // Mostrar mensaje de que el pago está pendiente de confirmación del mozo
       setShowSuccessAlert(true);
       
     } catch (err) {
@@ -428,12 +429,12 @@ const BillPaymentScreen: React.FC = () => {
           setShowSuccessAlert(false);
           navigation.navigate("Home");
         }}
-        title="¡Pago Exitoso!"
-        message="¡Pago procesado exitosamente! Gracias por tu visita a TheLastDance."
+        title="¡Solicitud de Pago Enviada!"
+        message="Tu solicitud de pago ha sido enviada al mozo. Cuando el mozo confirme la recepción del pago, recibirás la factura automáticamente. ¡Gracias por tu visita!"
         type="success"
         buttons={[
           {
-            text: "Continuar",
+            text: "Entendido",
             style: "default",
             onPress: () => {
               setShowSuccessAlert(false);

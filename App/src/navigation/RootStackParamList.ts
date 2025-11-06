@@ -40,6 +40,16 @@ export type RootStackParamList = {
   AllWaiters: undefined; // Gestión de meseros (admin/supervisor)
   TableChat: { tableId: string; autoMessage?: string }; // Chat entre cliente y mesero
   BillPayment: { tableNumber?: number; tableId?: string }; // Pantalla de pago de cuenta
+  InvoiceView: { 
+    invoiceData: {
+      generated: boolean;
+      filePath?: string;
+      fileName?: string;
+      message?: string;
+      error?: string;
+    };
+    paymentAmount?: number;
+  }; // Pantalla para ver la factura generada
   KitchenDashboard: undefined; // Panel de cocina para cocineros
   KitchenMenu: undefined; // Menú de platos para cocineros (solo vista)
   BartenderDashboard: undefined; // Panel de bar para bartenders

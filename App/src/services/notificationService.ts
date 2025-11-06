@@ -17,13 +17,44 @@ if (Constants.executionEnvironment !== "storeClient") {
 }
 
 export interface NotificationData {
-  type: "new_client_registration";
-  clientId: string;
-  clientName: string;
+  type: "new_client_registration" | "payment_confirmed";
+  clientId?: string;
+  clientName?: string;
+  tableNumber?: string;
+  waiterName?: string;
+  totalAmount?: number;
+  screen?: string;
+  invoiceData?: {
+    generated: boolean;
+    filePath?: string;
+    fileName?: string;
+    message?: string;
+    error?: string;
+  };
 }
 
 export class NotificationService {
   private static expoPushToken: string | null = null;
+  private static notificationHandlers: ((data: NotificationData) => void)[] = [];
+
+  static addNotificationHandler(handler: (data: NotificationData) => void) {
+    this.notificationHandlers.push(handler);
+  }
+
+  static removeNotificationHandler(handler: (data: NotificationData) => void) {
+    this.notificationHandlers = this.notificationHandlers.filter(h => h !== handler);
+  }
+
+  private static handleNotificationReceived(data: NotificationData) {
+    console.log("📱 Notification received:", data);
+    this.notificationHandlers.forEach(handler => {
+      try {
+        handler(data);
+      } catch (error) {
+        console.error("❌ Error in notification handler:", error);
+      }
+    });
+  }
 
   static async registerForPushNotifications(): Promise<string | null> {
     if (Constants.executionEnvironment === "storeClient" || !Device.isDevice) {
@@ -89,6 +120,14 @@ export class NotificationService {
       vibrationPattern: [0, 250, 250, 250],
       lightColor: "#d4af37",
     });
+
+    await Notifications.setNotificationChannelAsync("payment_confirmations", {
+      name: "Confirmación de Pagos",
+      description: "Notificaciones de pagos confirmados",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 500, 250, 500],
+      lightColor: "#10b981",
+    });
   }
 
   static getExpoPushToken(): string | null {
@@ -96,6 +135,8 @@ export class NotificationService {
   }
 
   static async showLocalNotification(title: string, body: string, data?: any) {
+    const channelId = data?.type === "payment_confirmed" ? "payment_confirmations" : "client_registrations";
+    
     await Notifications.scheduleNotificationAsync({
       content: {
         title,
@@ -103,10 +144,35 @@ export class NotificationService {
         data,
         sound: "default",
         ...(Platform.OS === "android" && {
-          channelId: "client_registrations",
+          channelId,
         }),
       },
       trigger: null,
+    });
+
+    // Manejar la notificación internamente
+    if (data) {
+      this.handleNotificationReceived(data);
+    }
+  }
+
+  static setupNotificationListeners() {
+    // Listener para cuando la app está en foreground
+    Notifications.addNotificationReceivedListener(notification => {
+      console.log("📱 Notification received in foreground:", notification);
+      const data = notification.request.content.data as unknown as NotificationData;
+      if (data && data.type) {
+        this.handleNotificationReceived(data);
+      }
+    });
+
+    // Listener para cuando el usuario toca la notificación
+    Notifications.addNotificationResponseReceivedListener(response => {
+      console.log("👆 Notification tapped:", response);
+      const data = response.notification.request.content.data as unknown as NotificationData;
+      if (data && data.type) {
+        this.handleNotificationReceived(data);
+      }
     });
   }
 }
