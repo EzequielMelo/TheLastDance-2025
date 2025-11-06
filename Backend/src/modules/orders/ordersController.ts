@@ -802,6 +802,25 @@ export async function waiterItemsActionHandler(
       notes,
     );
 
+    // Emitir socket al cliente para actualización en tiempo real
+    try {
+      const { data: orderData } = await supabaseAdmin
+        .from("orders")
+        .select("id_client")
+        .eq("id", orderId)
+        .single();
+
+      if (orderData?.id_client) {
+        emitClientStateUpdate(orderData.id_client, "client:state-update", {
+          type: "items_action",
+          action,
+          itemIds,
+        });
+      }
+    } catch (socketError) {
+      console.error("Error emitiendo socket:", socketError);
+    }
+
     res.json({
       success: true,
       message: `Items ${action === "accept" ? "aceptados" : "rechazados"} exitosamente`,
@@ -1120,6 +1139,37 @@ export async function updateKitchenItemStatusHandler(
       }
     }
 
+    // Emitir socket al cliente para actualización en tiempo real
+    try {
+      const { data: itemData } = await supabaseAdmin
+        .from("order_items")
+        .select(
+          `
+          orders!inner(
+            id_client
+          )
+        `,
+        )
+        .eq("id", itemId)
+        .single();
+
+      if (itemData) {
+        const order = Array.isArray(itemData.orders)
+          ? itemData.orders[0]
+          : itemData.orders;
+
+        if (order && "id_client" in order) {
+          emitClientStateUpdate(order.id_client, "client:state-update", {
+            type: "item_status_updated",
+            itemId,
+            status,
+          });
+        }
+      }
+    } catch (socketError) {
+      console.error("Error emitiendo socket:", socketError);
+    }
+
     res.json({
       success: true,
       message: result.message,
@@ -1287,6 +1337,37 @@ export async function updateBartenderItemStatusHandler(
         );
         // No bloqueamos la respuesta por error de notificación
       }
+    }
+
+    // Emitir socket al cliente para actualización en tiempo real
+    try {
+      const { data: itemData } = await supabaseAdmin
+        .from("order_items")
+        .select(
+          `
+          orders!inner(
+            id_client
+          )
+        `,
+        )
+        .eq("id", itemId)
+        .single();
+
+      if (itemData) {
+        const order = Array.isArray(itemData.orders)
+          ? itemData.orders[0]
+          : itemData.orders;
+
+        if (order && "id_client" in order) {
+          emitClientStateUpdate(order.id_client, "client:state-update", {
+            type: "item_status_updated",
+            itemId,
+            status,
+          });
+        }
+      }
+    } catch (socketError) {
+      console.error("Error emitiendo socket:", socketError);
     }
 
     res.json({
@@ -1651,11 +1732,9 @@ export async function confirmPaymentHandler(
     const payingClientId = unpaidOrders[0]?.user_id;
 
     if (!payingClientId) {
-      res
-        .status(400)
-        .json({
-          error: "No se pudo identificar el cliente que solicitó el pago",
-        });
+      res.status(400).json({
+        error: "No se pudo identificar el cliente que solicitó el pago",
+      });
       return;
     }
 
@@ -1846,6 +1925,37 @@ export async function markItemAsDeliveredHandler(
     }
 
     await markItemAsDelivered(itemId, waiterId);
+
+    // Obtener información del cliente para emitir socket
+    try {
+      const { data: itemData } = await supabaseAdmin
+        .from("order_items")
+        .select(
+          `
+          orders!inner(
+            id_client,
+            table_id
+          )
+        `,
+        )
+        .eq("id", itemId)
+        .single();
+
+      if (itemData) {
+        const order = Array.isArray(itemData.orders)
+          ? itemData.orders[0]
+          : itemData.orders;
+
+        if (order && "id_client" in order) {
+          emitClientStateUpdate(order.id_client, "client:state-update", {
+            type: "item_delivered",
+            itemId,
+          });
+        }
+      }
+    } catch (socketError) {
+      console.error("Error emitiendo socket:", socketError);
+    }
 
     res.json({
       success: true,
