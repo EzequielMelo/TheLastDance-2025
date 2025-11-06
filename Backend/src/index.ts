@@ -16,6 +16,7 @@ import tablesRoutes from "./modules/tables/tablesRoutes";
 import ordersRoutes from "./modules/orders/ordersRoutes";
 import waiterRoutes from "./modules/waiter/waiterRoutes";
 import chatRoutes from "./modules/chat/chatRoutes";
+import { invoiceRoutes } from "./modules/invoices/invoiceRoutes";
 
 const app = express();
 const PORT = parseInt(process.env["PORT"] || "3000", 10);
@@ -172,6 +173,7 @@ app.use("/api/tables", tablesRoutes);
 app.use("/api/orders", ordersRoutes);
 app.use("/api/waiter", waiterRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/invoices", invoiceRoutes);
 /*
 app.use("/api/users", userRoutes);
 app.use("/api/payments", paymentRoutes);

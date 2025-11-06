@@ -2209,6 +2209,13 @@ export async function checkAllItemsDelivered(
 export async function payOrder(
   tableId: string,
   clientId: string,
+  paymentDetails?: {
+    totalAmount: number;
+    tipAmount: number;
+    gameDiscountAmount?: number;
+    gameDiscountPercentage?: number;
+    satisfactionLevel?: string;
+  }
 ): Promise<{
   success: boolean;
   message: string;
@@ -2218,6 +2225,9 @@ export async function payOrder(
     console.log(
       `💳 Procesando pago para mesa ${tableId} del cliente ${clientId}`,
     );
+    if (paymentDetails) {
+      console.log(`💰 Detalles de pago:`, paymentDetails);
+    }
 
     // 1. Verificar que el cliente tiene acceso a la mesa
     const { data: table, error: tableError } = await supabaseAdmin
@@ -2242,7 +2252,7 @@ export async function payOrder(
     // 2. Obtener todas las órdenes no pagadas del cliente en esta mesa
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
-      .select("id")
+      .select("id, total_amount")
       .eq("table_id", tableId)
       .eq("user_id", clientId)
       .eq("is_paid", false);
@@ -2256,6 +2266,43 @@ export async function payOrder(
     }
 
     console.log(`📝 Encontradas ${orders.length} órdenes para procesar pago`);
+
+    // 3. ACTUALIZAR TOTAL_AMOUNT si hay descuentos de juegos
+    if (paymentDetails?.gameDiscountAmount && paymentDetails.gameDiscountAmount > 0) {
+      console.log(`🎮 Aplicando descuento de juegos: $${paymentDetails.gameDiscountAmount} (${paymentDetails.gameDiscountPercentage}%)`);
+      
+      // Calcular el total original de todas las órdenes
+      const originalTotal = orders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+      console.log(`💵 Total original: $${originalTotal}`);
+      
+      // Calcular el nuevo total después del descuento (sin incluir propina)
+      const discountedTotal = originalTotal - paymentDetails.gameDiscountAmount;
+      console.log(`💵 Total después del descuento: $${discountedTotal}`);
+      
+      // Actualizar proporcionalmente cada orden
+      for (const order of orders) {
+        const orderProportion = (order.total_amount || 0) / originalTotal;
+        const orderDiscount = paymentDetails.gameDiscountAmount * orderProportion;
+        const newOrderTotal = (order.total_amount || 0) - orderDiscount;
+        
+        console.log(`📋 Orden ${order.id}: $${order.total_amount} → $${newOrderTotal.toFixed(2)} (descuento: $${orderDiscount.toFixed(2)})`);
+        
+        const { error: updateError } = await supabaseAdmin
+          .from("orders")
+          .update({
+            total_amount: Math.round(newOrderTotal * 100) / 100, // Redondear a 2 decimales
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", order.id);
+
+        if (updateError) {
+          console.error(`❌ Error actualizando orden ${order.id}:`, updateError);
+          throw new Error(`Error aplicando descuento a la orden: ${updateError.message}`);
+        }
+      }
+      
+      console.log(`✅ Descuentos de juegos aplicados a todas las órdenes`);
+    }
 
     // 3. NO actualizar is_paid aquí - se actualizará cuando el mozo confirme
     // Las órdenes permanecen con is_paid = false hasta la confirmación del mozo
@@ -2304,7 +2351,7 @@ export async function payOrder(
         // Calcular el total de las órdenes
         const { data: orderAmounts } = await supabaseAdmin
           .from("orders")
-          .select("total_amount")
+          .select("total_amount, user_id, is_paid")
           .eq("table_id", tableId)
           .eq("user_id", clientId)
           .eq("is_paid", false);
@@ -2411,6 +2458,14 @@ export async function payOrder(
 export async function confirmPaymentAndReleaseTable(
   tableId: string,
   waiterId: string,
+  payingClientId: string, // NUEVO PARÁMETRO: ID del cliente que solicitó el pago
+  invoiceInfo?: {
+    generated: boolean;
+    filePath?: string;
+    fileName?: string;
+    message?: string;
+    error?: string;
+  }
 ): Promise<{ success: boolean; message: string }> {
   try {
     console.log(`💰 Mozo ${waiterId} confirmando pago para mesa ${tableId}`);
@@ -2431,12 +2486,12 @@ export async function confirmPaymentAndReleaseTable(
       );
     }
 
-    // 2. Marcar todas las órdenes de la mesa como pagadas
+    // 2. Marcar todas las órdenes del cliente específico como pagadas
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
       .select("id")
       .eq("table_id", tableId)
-      .eq("user_id", table.id_client)
+      .eq("user_id", payingClientId) // Usar el cliente que solicitó el pago
       .eq("is_paid", false); // Solo órdenes que aún no están marcadas como pagadas
 
     if (ordersError) {
@@ -2464,11 +2519,11 @@ export async function confirmPaymentAndReleaseTable(
       );
     }
 
-    // 3. Actualizar waiting_list a 'completed' para el cliente
+    // 3. Actualizar waiting_list a 'completed' para el cliente que pagó
     const { data: waitingEntry, error: waitingError } = await supabaseAdmin
       .from("waiting_list")
       .select("*")
-      .eq("client_id", table.id_client)
+      .eq("client_id", payingClientId) // Usar el cliente que solicitó el pago
       .eq("status", "confirm_pending")
       .order("joined_at", { ascending: false })
       .limit(1)
@@ -2534,11 +2589,11 @@ export async function confirmPaymentAndReleaseTable(
         ) || 0;
     }
 
-    // 6. Obtener información del cliente y mozo para las notificaciones
+    // 6. Obtener información del cliente que pagó y mozo para las notificaciones
     const { data: clientData, error: clientError } = await supabaseAdmin
       .from("users")
       .select("first_name, last_name")
-      .eq("id", table.id_client)
+      .eq("id", payingClientId) // Usar el cliente que solicitó el pago
       .single();
 
     const { data: waiterData, error: waiterError } = await supabaseAdmin
@@ -2557,24 +2612,79 @@ export async function confirmPaymentAndReleaseTable(
         ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
         : "Mozo";
 
-    // 7. Enviar notificación al cliente confirmando que el pago fue recibido
+    // 7. PUNTO 22: Entrega diferenciada de factura según tipo de usuario
+    if (invoiceInfo?.generated && invoiceInfo.filePath) {
+      try {
+        // Obtener datos del cliente de la tabla users
+        const { data: clientData, error: clientError } = await supabaseAdmin
+          .from("users")
+          .select("first_name, last_name")
+          .eq("id", payingClientId)
+          .single();
+
+        // Obtener email del cliente desde Firebase Auth
+        const { getAuthEmailById } = await import("../admin/adminServices");
+        const clientEmail = await getAuthEmailById(payingClientId);
+
+        if (clientEmail && !clientError && clientData) {
+          // USUARIO REGISTRADO: Enviar factura por email
+          console.log(`📧 Enviando factura por email a usuario registrado: ${clientEmail}`);
+          
+          const { InvoiceEmailService } = await import("../../services/invoiceEmailService");
+          const emailResult = await InvoiceEmailService.sendInvoiceByEmail(
+            clientEmail,
+            invoiceInfo.filePath,
+            {
+              clientName: `${clientData.first_name} ${clientData.last_name}`.trim(),
+              tableNumber: table.number.toString(),
+              invoiceNumber: invoiceInfo.fileName?.replace('.html', '') || 'N/A',
+              totalAmount: finalTotalAmount,
+              invoiceDate: new Date().toLocaleDateString('es-AR')
+            }
+          );
+
+          if (emailResult.success) {
+            console.log(`✅ Factura enviada por email exitosamente a: ${clientEmail}`);
+          } else {
+            console.error(`❌ Error enviando factura por email: ${emailResult.error}`);
+          }
+        } else {
+          // USUARIO ANÓNIMO: Enviar notificación push con enlace de descarga
+          console.log(`📱 Enviando notificación push con enlace de descarga a usuario anónimo: ${table.id_client}`);
+          
+          const { notifyAnonymousClientInvoiceReady } = await import("../../services/pushNotificationService");
+          await notifyAnonymousClientInvoiceReady(
+            payingClientId, // Usar el cliente que solicitó el pago
+            table.number,
+            finalTotalAmount,
+            invoiceInfo
+          );
+        }
+      } catch (deliveryError) {
+        console.error(`❌ Error en entrega diferenciada de factura:`, deliveryError);
+        // Continúa con notificación normal como fallback
+      }
+    }
+
+    // 8. Enviar notificación estándar al cliente confirmando que el pago fue recibido
     try {
       const { notifyClientPaymentConfirmation } = await import(
         "../../services/pushNotificationService"
       );
       await notifyClientPaymentConfirmation(
-        table.id_client,
+        payingClientId, // Usar el cliente que solicitó el pago
         waiterName,
         table.number,
         finalTotalAmount,
+        invoiceInfo,
       );
-      console.log(`📱 Notificación de pago confirmado enviada al cliente`);
+      console.log(`📱 Notificación de pago confirmado enviada al cliente ${invoiceInfo?.generated ? 'con información de factura' : 'sin factura'}`);
     } catch (notifyError) {
       console.warn(`⚠️ Error enviando notificación al cliente:`, notifyError);
       // No falla la función por esto
     }
 
-    // 8. Enviar notificación a gerencia sobre el pago recibido
+    // 9. Enviar notificación a gerencia sobre el pago recibido
     try {
       const { notifyManagementPaymentReceived } = await import(
         "../../services/pushNotificationService"
@@ -2759,11 +2869,13 @@ export async function getWaiterPendingPayments(
           .eq("id", table.id_client)
           .single();
 
-        // Obtener el total amount de las órdenes de la mesa
+        // Obtener el total amount de las órdenes del cliente específico que está pidiendo pagar
         const { data: orders } = await supabaseAdmin
           .from("orders")
           .select("total_amount")
-          .eq("table_id", table.id); // Sin filtrar por is_paid ya que están esperando confirmación
+          .eq("table_id", table.id)
+          .eq("user_id", table.id_client) // Filtrar solo las órdenes del cliente que está pidiendo pagar
+          .eq("is_paid", false); // Solo órdenes no pagadas
 
         const totalAmount = (orders || []).reduce(
           (sum, order) => sum + (order.total_amount || 0),

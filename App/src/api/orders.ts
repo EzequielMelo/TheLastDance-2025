@@ -17,7 +17,7 @@ export interface WaiterOrderActionResponse {
 }
 
 export const payOrder = async (
-  orderId: string,
+  tableId: string,
   idClient: string,
   paymentData?: {
     totalAmount: number;
@@ -26,7 +26,10 @@ export const payOrder = async (
     gameDiscountPercentage?: number;
     satisfactionLevel?: string;
   },
-): Promise<Order> => {
+): Promise<{
+  success: boolean;
+  message: string;
+}> => {
   try {
     const requestBody: any = {
       idClient,
@@ -37,13 +40,19 @@ export const payOrder = async (
       requestBody.paymentDetails = paymentData;
     }
 
-    const response = await api.put(`/orders/${orderId}/pay`, requestBody);
-    console.log("Response from payOrder:", response.data);
-    return response.data.order;
+    // ⚠️ IMPORTANTE: Este endpoint solo marca el pago como "pendiente de confirmación"
+    // La factura se genera cuando el mozo confirma en /orders/table/:tableId/confirm-payment
+    const response = await api.put(`/orders/${tableId}/pay`, requestBody);
+    console.log("Response from payOrder (client request):", response.data);
+    
+    return {
+      success: response.data.success || true,
+      message: response.data.message || 'Solicitud de pago enviada al mozo',
+    };
   } catch (error: any) {
-    console.error("Error procesando pago de orden:", error);
+    console.error("Error enviando solicitud de pago:", error);
     throw new Error(
-      error.response?.data?.error || "Error procesando pago de la orden",
+      error.response?.data?.error || "Error enviando solicitud de pago",
     );
   }
 };
@@ -485,6 +494,42 @@ export const getWaiterPendingPayments = async (): Promise<any[]> => {
     console.error("❌ API: Error obteniendo pagos pendientes:", error);
     throw new Error(
       error.response?.data?.error || "Error obteniendo pagos pendientes",
+    );
+  }
+};
+
+// Descargar factura generada
+export const downloadInvoice = async (fileName: string): Promise<string> => {
+  try {
+    const response = await api.get(`/invoices/download/${fileName}`, {
+      responseType: 'blob', // Para manejar archivos binarios
+    });
+    
+    // En React Native, tendríamos que usar FileSystem o similar
+    // Por ahora retornamos una URL que se puede abrir en el navegador
+    return `/api/invoices/download/${fileName}`;
+  } catch (error: any) {
+    console.error("❌ API: Error descargando factura:", error);
+    throw new Error(
+      error.response?.data?.error || "Error descargando factura",
+    );
+  }
+};
+
+// Generar factura manualmente (para testing)
+export const generateInvoiceManually = async (tableId: string): Promise<{
+  success: boolean;
+  message: string;
+  filePath?: string;
+  fileName?: string;
+}> => {
+  try {
+    const response = await api.post(`/invoices/generate/${tableId}`);
+    return response.data;
+  } catch (error: any) {
+    console.error("❌ API: Error generando factura:", error);
+    throw new Error(
+      error.response?.data?.error || "Error generando factura",
     );
   }
 };

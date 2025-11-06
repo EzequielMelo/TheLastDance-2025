@@ -576,16 +576,9 @@ export async function notifyWaiterNewOrder(
   totalAmount: number,
 ) {
   try {
-    // Obtener token del mozo específico
-    const { data: waiter, error } = await supabaseAdmin
-      .from("users")
-      .select("push_token")
-      .eq("id", waiterId)
-      .eq("state", "aprobado")
-      .not("push_token", "is", null)
-      .single();
+    const token = await getWaiterToken(waiterId);
 
-    if (error || !waiter?.push_token) {
+    if (!token) {
       return;
     }
 
@@ -602,7 +595,7 @@ export async function notifyWaiterNewOrder(
       },
     };
 
-    await sendExpoPushNotification([waiter.push_token], notificationData);
+    await sendExpoPushNotification([token], notificationData);
   } catch (error) {
     console.error(
       "❌ Error al enviar notificación de nuevo pedido al mozo:",
@@ -724,6 +717,115 @@ export async function notifyBartenderNewItems(
   }
 }
 
+// Función para notificar al mozo cuando los platos están listos desde cocina
+export async function notifyWaiterKitchenItemsReady(
+  waiterId: string,
+  tableNumber: string,
+  dishItems: Array<{ name: string; quantity: number }>,
+) {
+  try {
+    const token = await getWaiterToken(waiterId);
+
+    if (!token) {
+      return;
+    }
+
+    const totalItems = dishItems.reduce((sum, item) => sum + item.quantity, 0);
+    const itemsText = dishItems.map(item => `${item.quantity}x ${item.name}`).join(", ");
+
+    const notificationData: PushNotificationData = {
+      title: `🍽️ Platos listos - Mesa #${tableNumber}`,
+      body: `${totalItems} platos terminados: ${itemsText}`,
+      data: {
+        type: "kitchen_items_ready",
+        tableNumber,
+        itemsCount: totalItems,
+        items: dishItems,
+        screen: "WaiterPendingOrders",
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación de platos listos al mozo:",
+      error,
+    );
+  }
+}
+
+// Función para notificar al mozo cuando las bebidas están listas desde bar
+export async function notifyWaiterBartenderItemsReady(
+  waiterId: string,
+  tableNumber: string,
+  drinkItems: Array<{ name: string; quantity: number }>,
+) {
+  try {
+    const token = await getWaiterToken(waiterId);
+
+    if (!token) {
+      return;
+    }
+
+    const totalItems = drinkItems.reduce((sum, item) => sum + item.quantity, 0);
+    const itemsText = drinkItems.map(item => `${item.quantity}x ${item.name}`).join(", ");
+
+    const notificationData: PushNotificationData = {
+      title: `🍹 Bebidas listas - Mesa #${tableNumber}`,
+      body: `${totalItems} bebidas terminadas: ${itemsText}`,
+      data: {
+        type: "bartender_items_ready",
+        tableNumber,
+        itemsCount: totalItems,
+        items: drinkItems,
+        screen: "WaiterPendingOrders",
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación de bebidas listas al mozo:",
+      error,
+    );
+  }
+}
+
+// Función para notificar al mozo cuando TODO el pedido está completo (cocina + bar)
+export async function notifyWaiterOrderFullyReady(
+  waiterId: string,
+  tableNumber: string,
+  clientName: string,
+  totalItems: number,
+) {
+  try {
+    const token = await getWaiterToken(waiterId);
+
+    if (!token) {
+      return;
+    }
+
+    const notificationData: PushNotificationData = {
+      title: `✅ Pedido completo - Mesa #${tableNumber}`,
+      body: `${clientName}: Todo el pedido (${totalItems} items) está listo para servir`,
+      data: {
+        type: "order_fully_ready",
+        tableNumber,
+        clientName,
+        totalItems,
+        screen: "WaiterPendingOrders",
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación de pedido completo al mozo:",
+      error,
+    );
+  }
+}
+
 // Función para notificar al mozo cuando el cliente solicita la cuenta
 export async function notifyWaiterPaymentRequest(
   waiterId: string,
@@ -802,6 +904,13 @@ export async function notifyClientPaymentConfirmation(
   waiterName: string,
   tableNumber: string,
   totalAmount: number,
+  invoiceData?: {
+    generated: boolean;
+    filePath?: string;
+    fileName?: string;
+    message?: string;
+    error?: string;
+  }
 ) {
   try {
     const token = await getClientToken(clientId);
@@ -812,13 +921,14 @@ export async function notifyClientPaymentConfirmation(
 
     const notificationData: PushNotificationData = {
       title: `✅ Pago confirmado - Mesa #${tableNumber}`,
-      body: `${waiterName} confirmó tu pago de $${totalAmount.toLocaleString()}. ¡Gracias por tu visita!`,
+      body: `${waiterName} confirmó tu pago de $${totalAmount.toLocaleString()}. ${invoiceData?.generated ? '¡Tu factura está lista!' : 'Gracias por tu visita!'}`,
       data: {
         type: "payment_confirmed",
         tableNumber,
         waiterName,
         totalAmount,
-        screen: "PaymentSuccess",
+        screen: "InvoiceView",
+        invoiceData: invoiceData || { generated: false },
       },
     };
 
@@ -826,6 +936,59 @@ export async function notifyClientPaymentConfirmation(
   } catch (error) {
     console.error(
       "❌ Error al enviar notificación de confirmación de pago:",
+      error,
+    );
+  }
+}
+
+// Función ESPECÍFICA para usuarios anónimos: envía notificación con enlace de descarga
+export async function notifyAnonymousClientInvoiceReady(
+  clientId: string,
+  tableNumber: string,
+  totalAmount: number,
+  invoiceData: {
+    generated: boolean;
+    filePath?: string;
+    fileName?: string;
+    message?: string;
+    error?: string;
+  }
+) {
+  try {
+    const token = await getClientToken(clientId);
+
+    if (!token) {
+      console.log(`❓ No se encontró token para usuario anónimo: ${clientId}`);
+      return;
+    }
+
+    if (!invoiceData.generated || !invoiceData.fileName) {
+      console.log(`❌ Factura no generada para usuario anónimo: ${clientId}`);
+      return;
+    }
+
+    // Crear URL de descarga para el usuario anónimo
+    const downloadUrl = `${process.env['API_URL'] || 'http://localhost:3000'}/api/invoices/download/${invoiceData.fileName}`;
+
+    const notificationData: PushNotificationData = {
+      title: `🧾 Tu factura está lista - Mesa #${tableNumber}`,
+      body: `Tu pago de $${totalAmount.toLocaleString()} fue confirmado. Toca aquí para descargar tu factura oficial AFIP.`,
+      data: {
+        type: "anonymous_invoice_ready",
+        tableNumber,
+        totalAmount,
+        downloadUrl,
+        fileName: invoiceData.fileName,
+        screen: "InvoiceDownload",
+        invoiceData,
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+    console.log(`✅ Notificación de factura enviada a usuario anónimo: ${clientId}`);
+  } catch (error) {
+    console.error(
+      "❌ Error al enviar notificación de factura a usuario anónimo:",
       error,
     );
   }
