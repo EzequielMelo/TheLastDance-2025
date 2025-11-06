@@ -7,7 +7,7 @@ import { z } from "zod";
  * Schema para validar el provider
  */
 const socialAuthSchema = z.object({
-  provider: z.enum(["facebook"]),
+  provider: z.enum(["google"]),
   redirectUrl: z.string().url(),
 });
 

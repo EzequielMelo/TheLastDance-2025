@@ -13,10 +13,6 @@ import {
   processSocialCallback,
   completeProfile,
 } from "../modules/auth/socialAuthController";
-import {
-  handleDataDeletionCallback,
-  getDataDeletionStatus,
-} from "../modules/auth/dataDeleteController";
 import { authenticateUser } from "../middlewares/authMiddleware";
 import multer from "multer";
 
@@ -35,9 +31,5 @@ router.get("/validate-token", checkTokenValidity);
 router.post("/social/init", initSocialAuth);
 router.post("/social/callback", processSocialCallback);
 router.put("/social/complete-profile", authenticateUser, completeProfile);
-
-// Rutas de eliminación de datos (requerido por Facebook)
-router.post("/data-deletion/callback", handleDataDeletionCallback);
-router.get("/data-deletion/status", getDataDeletionStatus);
 
 export default router;

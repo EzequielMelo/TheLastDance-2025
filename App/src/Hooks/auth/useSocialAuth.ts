@@ -4,6 +4,7 @@ import { makeRedirectUri } from "expo-auth-session";
 import api from "../../api/axios";
 import { API_BASE_URL } from "../../api/config";
 import * as SecureStore from "expo-secure-store";
+import Constants from "expo-constants";
 
 // Necesario para cerrar correctamente el navegador después del OAuth
 WebBrowser.maybeCompleteAuthSession();
@@ -15,7 +16,7 @@ interface SocialAuthResult {
   error?: string;
 }
 
-type SocialProvider = "facebook";
+type SocialProvider = "google";
 
 export const useSocialAuth = () => {
   const [loading, setLoading] = useState(false);
@@ -29,19 +30,24 @@ export const useSocialAuth = () => {
     try {
       setLoading(true);
 
-      // Configurar URL de redirección
-      const redirectUrl = makeRedirectUri({
-        scheme: "thelastdance", // Debe coincidir con el scheme en app.json
+      // Detectar si estamos en Expo Go
+      const isExpoGo = Constants.appOwnership === "expo";
+
+      // Configurar URL de redirección para tu app
+      const appRedirectUrl = makeRedirectUri({
+        scheme: isExpoGo ? undefined : "thelastdance", // undefined usa 'exp://' en Expo Go
         path: "auth/callback",
       });
 
       console.log("🔑 Iniciando OAuth con:", provider);
-      console.log("🔗 Redirect URL:", redirectUrl);
+      console.log("📱 Modo:", isExpoGo ? "Expo Go" : "Standalone");
+      console.log("🔗 App Redirect URL:", appRedirectUrl);
 
       // Paso 1: Solicitar al backend la URL de autenticación
+      // El backend pasará el appRedirectUrl a Supabase para el redirect final
       const initResponse = await api.post(`${API_BASE_URL}/auth/social/init`, {
         provider,
-        redirectUrl,
+        redirectUrl: appRedirectUrl, // Tu app recibirá el callback final
       });
 
       if (!initResponse.data.success || !initResponse.data.url) {
@@ -50,24 +56,40 @@ export const useSocialAuth = () => {
 
       const authUrl = initResponse.data.url;
       console.log("🌐 Abriendo navegador para OAuth...");
+      console.log("🔗 URL de OAuth:", authUrl);
 
       // Paso 2: Abrir navegador para autenticación
+      // Supabase manejará el callback de Google y luego redirigirá a tu app
       const result = await WebBrowser.openAuthSessionAsync(
         authUrl,
-        redirectUrl,
+        appRedirectUrl, // Tu app espera el callback aquí
       );
 
       console.log("📱 Resultado del navegador:", result.type);
 
       if (result.type === "success") {
         const url = result.url;
+        console.log("🔗 URL completa recibida:", url);
 
         // Extraer tokens del callback URL
-        const params = new URLSearchParams(
-          url.split("#")[1] || url.split("?")[1],
-        );
+        const fragment = url.split("#")[1];
+        const query = url.split("?")[1];
+
+        console.log("📝 Fragment (#):", fragment);
+        console.log("📝 Query (?):", query);
+
+        const params = new URLSearchParams(fragment || query);
         const accessToken = params.get("access_token");
         const refreshToken = params.get("refresh_token");
+
+        console.log(
+          "🔑 Access Token extraído:",
+          accessToken ? "✓ Presente" : "✗ Faltante",
+        );
+        console.log(
+          "🔑 Refresh Token extraído:",
+          refreshToken ? "✓ Presente" : "✗ Faltante",
+        );
 
         if (!accessToken || !refreshToken) {
           throw new Error("No se recibieron tokens de autenticación");
@@ -111,18 +133,27 @@ export const useSocialAuth = () => {
           needsAdditionalInfo,
         };
       } else if (result.type === "cancel") {
+        console.log("⚠️ Usuario canceló la autenticación");
         return {
           success: false,
           error: "Autenticación cancelada por el usuario",
         };
-      } else {
+      } else if (result.type === "dismiss") {
+        console.log("⚠️ Navegador cerrado sin completar");
         return {
           success: false,
-          error: "Error en la autenticación",
+          error: "Ventana de autenticación cerrada",
+        };
+      } else {
+        console.log("❌ Tipo de resultado desconocido:", result.type);
+        return {
+          success: false,
+          error: `Error en la autenticación: ${result.type}`,
         };
       }
     } catch (error: any) {
       console.error("❌ Error en autenticación social:", error);
+      console.error("❌ Stack trace:", error.stack);
       return {
         success: false,
         error:
@@ -174,8 +205,7 @@ export const useSocialAuth = () => {
   };
 
   return {
-    signInWithFacebook: () => signInWithProvider("facebook"),
-    signInWithInstagram: () => signInWithProvider("facebook"), // Instagram usa Facebook OAuth
+    signInWithGoogle: () => signInWithProvider("google"),
     completeUserProfile,
     loading,
   };

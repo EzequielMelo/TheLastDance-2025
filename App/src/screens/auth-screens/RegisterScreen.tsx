@@ -23,7 +23,7 @@ type CameraMode = "photo" | "dni" | null;
 
 export const RegisterScreen = ({ navigation }: Props) => {
   const { actionLoading, handleRegister: register } = useAuthActions();
-  const { signInWithFacebook, loading: socialLoading } = useSocialAuth();
+  const { signInWithGoogle, loading: socialLoading } = useSocialAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const [showCamera, setShowCamera] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
@@ -70,8 +70,8 @@ export const RegisterScreen = ({ navigation }: Props) => {
   };
 
   // Manejar autenticación social
-  const handleSocialSignIn = async (provider: "facebook") => {
-    const result = await signInWithFacebook();
+  const handleSocialSignIn = async (provider: "google") => {
+    const result = await signInWithGoogle();
 
     if (result.success) {
       if (result.needsAdditionalInfo) {
@@ -557,11 +557,11 @@ export const RegisterScreen = ({ navigation }: Props) => {
 
         {/* Botones de redes sociales */}
         <View className="flex-row justify-center gap-4 mb-4">
-          {/* Facebook/Instagram */}
+          {/* Google */}
           <TouchableOpacity
-            onPress={() => handleSocialSignIn("facebook")}
+            onPress={() => handleSocialSignIn("google")}
             disabled={socialLoading || actionLoading}
-            className="bg-blue-600 p-4 rounded-full"
+            className="bg-white p-4 rounded-full flex-row items-center gap-2"
             style={{
               opacity: socialLoading || actionLoading ? 0.5 : 1,
               elevation: 4,
@@ -571,7 +571,9 @@ export const RegisterScreen = ({ navigation }: Props) => {
               shadowRadius: 4,
             }}
           >
-            <Text className="text-2xl text-white font-bold">f</Text>
+            <Text className="text-2xl font-bold" style={{ color: "#4285F4" }}>
+              G
+            </Text>
           </TouchableOpacity>
         </View>
       </FormLayout>
