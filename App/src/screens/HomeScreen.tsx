@@ -18,6 +18,7 @@ import { useAuth } from "../auth/useAuth";
 import { useFocusEffect } from "@react-navigation/native";
 import { useBottomNav } from "../context/BottomNavContext";
 import { useClientState } from "../Hooks/useClientState";
+import { useCart } from "../context/CartContext";
 import api from "../api/axios";
 import {
   Menu,
@@ -52,7 +53,8 @@ type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 export default function HomeScreen({ navigation, route }: Props) {
   const { user, token, logout, isLoading } = useAuth();
   const { activeTab, setActiveTab } = useBottomNav();
-  const { state: clientState } = useClientState();
+  const { state: clientState, occupiedTable } = useClientState();
+  const { cartAmount, cartCount, userOrders } = useCart();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [cartModalVisible, setCartModalVisible] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -488,11 +490,24 @@ export default function HomeScreen({ navigation, route }: Props) {
   };
 
   const handleBottomNavQR = () => {
+    console.log(
+      "🔍 HomeScreen - handleBottomNavQR - Estado actual:",
+      clientState,
+    );
+
+    // Si el cliente no está en la lista de espera, escanear QR del maitre para unirse
+    if (clientState === "not_in_queue") {
+      console.log("✅ Navegando a ScanQR (unirse a lista de espera)");
+      navigation.navigate("ScanQR");
+    }
     // Si el cliente tiene una mesa asignada pero no está sentado, escanear para confirmar llegada
-    if (clientState === "assigned") {
+    else if (clientState === "assigned") {
+      console.log("✅ Navegando a ScanTableQR (confirmar llegada)");
       navigation.navigate("ScanTableQR");
-    } else {
-      // Para otros estados (incluyendo seated), usar el escáner general
+    }
+    // Para otros estados (seated, in_queue, etc.), usar el escáner general
+    else {
+      console.log("✅ Navegando a QRScanner (orden/pago)");
       navigateToQRScanner();
     }
   };
@@ -638,6 +653,20 @@ export default function HomeScreen({ navigation, route }: Props) {
     user?.profile_code === "cliente_registrado" ||
     user?.profile_code === "cliente_anonimo";
 
+  // Función helper para obtener órdenes de la mesa actual sin pagar
+  const getCurrentTableUnpaidOrders = () => {
+    if (!occupiedTable) return [];
+    return userOrders.filter(
+      order => order.table_id === occupiedTable.id && !order.is_paid,
+    );
+  };
+
+  // Verificar si hay items para mostrar (carrito o órdenes sin pagar de la mesa actual)
+  const hasItemsToShow = () => {
+    const currentOrders = getCurrentTableUnpaidOrders();
+    return cartCount > 0 || currentOrders.length > 0;
+  };
+
   // Efecto para resetear activeTab cuando se vuelve a Home
   useFocusEffect(
     useCallback(() => {
@@ -683,7 +712,7 @@ export default function HomeScreen({ navigation, route }: Props) {
       colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
       className="flex-1"
     >
-      <View className="px-6 pt-8 pb-8 flex-1">
+      <View className="px-6 pt-12 pb-8 flex-1">
         {/* Header con menú hamburguesa - Solo para empleados */}
         {!isCliente && (
           <View
@@ -735,7 +764,13 @@ export default function HomeScreen({ navigation, route }: Props) {
           style={{ flex: 1 }}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            paddingBottom: isCliente ? 100 : 20, // Más padding para clientes por el navbar
+            paddingBottom: isCliente
+              ? (clientState === "seated" ||
+                  clientState === "confirm_pending") &&
+                (cartCount > 0 || (userOrders && userOrders.length > 0))
+                ? 170 // Espacio para card compacto + navbar (~70px card + 80px navbar + 20px margen)
+                : 100 // Padding normal para navbar
+              : 20, // Sin navbar para otros roles
           }}
           refreshControl={
             <RefreshControl
@@ -755,6 +790,41 @@ export default function HomeScreen({ navigation, route }: Props) {
                 onRefresh={handleClientRefresh}
                 refreshTrigger={clientRefreshTrigger}
               />
+
+              {/* Consejo - Dentro del ScrollView para estados sin cart summary */}
+              {!(
+                (clientState === "seated" ||
+                  clientState === "confirm_pending") &&
+                hasItemsToShow()
+              ) && (
+                <View
+                  style={{
+                    backgroundColor: "rgba(212, 175, 55, 0.1)",
+                    borderRadius: 12,
+                    padding: 16,
+                    marginTop: 18,
+                    borderWidth: 1,
+                    borderColor: "rgba(212, 175, 55, 0.3)",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#d4af37",
+                      fontSize: 14,
+                      fontWeight: "600",
+                      marginBottom: 4,
+                    }}
+                  >
+                    💡 Consejo
+                  </Text>
+                  <Text
+                    style={{ color: "white", fontSize: 14, lineHeight: 18 }}
+                  >
+                    También puedes acceder a estas funciones desde el menú
+                    lateral (☰) según tu estado actual
+                  </Text>
+                </View>
+              )}
 
               {/* Card del mozo cuando el pago está pendiente de confirmación */}
               {(() => {
@@ -861,33 +931,6 @@ export default function HomeScreen({ navigation, route }: Props) {
                   </View>
                 </View>
               )}
-
-              {/* Info sobre el sidebar para clientes */}
-              <View
-                style={{
-                  backgroundColor: "rgba(212, 175, 55, 0.1)",
-                  borderRadius: 12,
-                  padding: 16,
-                  marginTop: 16,
-                  borderWidth: 1,
-                  borderColor: "rgba(212, 175, 55, 0.3)",
-                }}
-              >
-                <Text
-                  style={{
-                    color: "#d4af37",
-                    fontSize: 14,
-                    fontWeight: "600",
-                    marginBottom: 4,
-                  }}
-                >
-                  💡 Consejo
-                </Text>
-                <Text style={{ color: "white", fontSize: 14, lineHeight: 18 }}>
-                  También puedes acceder a estas funciones desde el menú lateral
-                  (☰) según tu estado actual
-                </Text>
-              </View>
             </View>
           ) : user?.position_code === "cocinero" ? (
             <View>
@@ -1420,6 +1463,13 @@ export default function HomeScreen({ navigation, route }: Props) {
                 onPress={() => handleNavigate("WaiterDashboard")}
               />
 
+              <ActionCard
+                title="📝 Órdenes Pendientes"
+                description="Ver todas las órdenes pendientes de entrega"
+                icon={Clock}
+                onPress={() => handleNavigate("WaiterOrders")}
+              />
+
               {/* Info para mozos */}
               <View
                 style={{
@@ -1710,6 +1760,73 @@ export default function HomeScreen({ navigation, route }: Props) {
           )}
         </ScrollView>
       </View>
+
+      {/* Resumen de Gastos Compacto - Solo para estados seated y confirm_pending con items */}
+      {isCliente &&
+        (clientState === "seated" || clientState === "confirm_pending") &&
+        hasItemsToShow() && (
+          <View
+            style={{
+              position: "absolute",
+              bottom: 105, // 80 del navbar + 20 de separación
+              left: 20,
+              right: 20,
+              backgroundColor: "rgba(212, 175, 55, 0.1)",
+              borderRadius: 16,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: "rgba(212, 175, 55, 0.3)",
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            {/* Lado izquierdo: Info compacta */}
+            <View>
+              <Text
+                style={{
+                  color: "#d4af37",
+                  fontSize: 16,
+                  fontWeight: "600",
+                  marginBottom: 2,
+                }}
+              >
+                💰 Total Gastado
+              </Text>
+              <Text style={{ color: "#999", fontSize: 13 }}>
+                {(() => {
+                  const currentTableOrders = getCurrentTableUnpaidOrders();
+                  const totalItems =
+                    cartCount +
+                    currentTableOrders.reduce(
+                      (sum, order) => sum + order.order_items.length,
+                      0,
+                    );
+                  return `${totalItems} ${totalItems === 1 ? "item" : "items"}`;
+                })()}
+              </Text>
+            </View>
+
+            {/* Lado derecho: Total grande */}
+            <Text
+              style={{
+                color: "#22c55e",
+                fontSize: 24,
+                fontWeight: "700",
+              }}
+            >
+              $
+              {(() => {
+                const currentTableOrders = getCurrentTableUnpaidOrders();
+                const totalOrders = currentTableOrders.reduce(
+                  (sum, order) => sum + order.total_amount,
+                  0,
+                );
+                return (cartAmount + totalOrders).toLocaleString();
+              })()}
+            </Text>
+          </View>
+        )}
 
       {/* Sidebar */}
       <Sidebar

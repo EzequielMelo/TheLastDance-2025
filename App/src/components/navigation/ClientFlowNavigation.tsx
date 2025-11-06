@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, Alert } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import {
   Users,
   Clock,
@@ -18,6 +18,7 @@ import {
   ArrowDown,
 } from "lucide-react-native";
 import { useClientState, ClientState } from "../../Hooks/useClientState";
+import { useClientStateSocket } from "../../Hooks/useClientStateSocket";
 import { checkTableDeliveryStatus } from "../../api/orders";
 import type { RootStackNavigationProp } from "../../navigation/RootStackParamList";
 
@@ -38,6 +39,10 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
     deliveryConfirmationStatus,
     refresh,
   } = useClientState();
+
+  // Socket para actualizaciones en tiempo real
+  useClientStateSocket(refresh);
+
   const navigation = useNavigation<RootStackNavigationProp>();
   const [deliveryStatus, setDeliveryStatus] = useState<{
     allDelivered: boolean;
@@ -50,6 +55,22 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
     await refresh();
     onRefresh?.();
   };
+
+  // Verificar delivery status cuando la pantalla está en foco
+  useFocusEffect(
+    React.useCallback(() => {
+      if (
+        state === "seated" &&
+        occupiedTable?.id &&
+        deliveryConfirmationStatus === "pending"
+      ) {
+        console.log("🔍 Verificando delivery status al entrar a la pantalla");
+        checkTableDeliveryStatus(occupiedTable.id)
+          .then(setDeliveryStatus)
+          .catch(console.error);
+      }
+    }, [state, occupiedTable?.id, deliveryConfirmationStatus]),
+  );
 
   // Solo ejecutar cuando se dispare refreshTrigger (pull-to-refresh)
   useEffect(() => {
@@ -91,24 +112,41 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
 
       case "not_in_queue":
         return (
-          <View className="items-center">
-            <Users size={64} color="#d4af37" />
-            <Text className="text-white text-xl font-bold mt-4 mb-2">
-              ¡Bienvenido!
+          <View>
+            {/* Header con ícono a la izquierda y textos a la derecha */}
+            <View className="flex-row items-center mb-6 w-full justify-center px-2">
+              <Users size={58} color="#d4af37" />
+              <View className="ml-4" style={{ maxWidth: 200 }}>
+                <Text className="text-white text-2xl font-bold">
+                  ¡Bienvenido!
+                </Text>
+                <Text className="text-gray-300 text-lg">
+                  Únete a la lista de espera
+                </Text>
+              </View>
+            </View>
+
+            <Text className="text-gray-300 text-center text-lg mb-6">
+              Para comenzar, usa el botón QR del menú inferior para unirte a la
+              lista de espera.
             </Text>
-            <Text className="text-gray-300 text-center mb-6">
-              Para comenzar, únete a la lista de espera y te asignaremos una
-              mesa cuando esté disponible.
-            </Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate("ScanQR")}
-              className="bg-yellow-600 px-8 py-4 rounded-lg flex-row items-center"
-            >
-              <Users size={20} color="white" className="mr-2" />
-              <Text className="text-white font-semibold text-lg">
-                Unirse a Lista de Espera
-              </Text>
-            </TouchableOpacity>
+
+            {/* Indicador visual del botón QR */}
+            <View className="items-center">
+              <View
+                className="bg-yellow-600 w-16 h-16 rounded-full items-center justify-center mb-3"
+                style={{
+                  shadowColor: "#d4af37",
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                  elevation: 8,
+                }}
+              >
+                <QrCode size={32} color="#1a1a1a" />
+              </View>
+              <ArrowDown size={32} color="#d4af37" />
+            </View>
           </View>
         );
 
@@ -116,7 +154,7 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
         return (
           <View>
             {/* Header con ícono a la izquierda y textos a la derecha */}
-            <View className="flex-row items-center mb-6 w-full px-2">
+            <View className="flex-row items-center mb-6 w-full justify-center px-2">
               <Clock size={58} color="#d4af37" />
               <View className="flex-1 ml-4">
                 <Text className="text-white text-2xl font-bold">
@@ -162,9 +200,8 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
               </View>
             </View>
 
-            <Text className="text-gray-300 text-center mb-6">
-              Ve a tu mesa y usa el botón QR del menú inferior para confirmar tu
-              llegada.
+            <Text className="text-gray-300 text-center text-lg mb-6">
+              Ve a tu mesa y usa el botón QR inferior para confirmar tu llegada.
             </Text>
 
             {/* Indicador visual del botón QR */}
@@ -182,9 +219,6 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                 <QrCode size={32} color="#1a1a1a" />
               </View>
               <ArrowDown size={32} color="#d4af37" />
-              <Text className="text-yellow-500 text-sm font-semibold mt-2">
-                Presiona aquí para escanear
-              </Text>
             </View>
           </View>
         );
@@ -195,74 +229,97 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
             {/* Si el table_status es 'bill_requested', mostrar solo botón para pagar cuenta */}
             {deliveryConfirmationStatus === "bill_requested" ? (
               <>
-                <Receipt size={64} color="#f59e0b" />
-                <Text className="text-white text-xl font-bold mt-4 mb-2">
-                  Pagar la Cuenta
-                </Text>
-                <Text className="text-gray-300 text-center mb-2">
-                  Mesa {occupiedTable?.number}
-                </Text>
-                <Text className="text-amber-400 text-lg font-semibold mb-4">
+                {/* Header con ícono a la izquierda y textos a la derecha */}
+                <View className="flex-row items-center mb-2 w-full justify-center px-2">
+                  <Receipt size={58} color="#f59e0b" />
+                  <View className="ml-4" style={{ maxWidth: 200 }}>
+                    <Text className="text-white text-2xl font-bold">
+                      Pagar la Cuenta
+                    </Text>
+                    <Text className="text-gray-300 text-lg">
+                      Mesa {occupiedTable?.number}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text className="text-amber-400 text-center text-lg font-semibold mb-4">
                   Lista para pagar
                 </Text>
+
                 <Text className="text-gray-300 text-center mb-6">
                   Usa el botón QR del menú inferior para ver tu carrito y
                   proceder con el pago, o responde la encuesta de satisfacción.
                 </Text>
 
-                {/* Indicador visual del botón QR */}
-                <View className="items-center mb-6">
+                {/* Botones circulares: QR y Encuesta */}
+                <View className="w-full mb-6">
                   <View
-                    className="bg-yellow-600 w-16 h-16 rounded-full items-center justify-center mb-3"
-                    style={{
-                      shadowColor: "#d4af37",
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.3,
-                      shadowRadius: 8,
-                      elevation: 8,
-                    }}
+                    className="flex-row justify-around items-center"
+                    style={{ paddingHorizontal: 60 }}
                   >
-                    <QrCode size={32} color="#1a1a1a" />
-                  </View>
-                  <ArrowDown size={32} color="#d4af37" />
-                  <Text className="text-yellow-500 text-sm font-semibold mt-2">
-                    Presiona aquí para pagar
-                  </Text>
-                </View>
+                    {/* Botón QR para pagar */}
+                    <View className="items-center">
+                      <View
+                        className="bg-yellow-600 w-16 h-16 rounded-full items-center justify-center mb-2"
+                        style={{
+                          shadowColor: "#d4af37",
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: 0.3,
+                          shadowRadius: 8,
+                          elevation: 8,
+                        }}
+                      >
+                        <QrCode size={32} color="#1a1a1a" />
+                      </View>
+                      <View style={{ height: 32, justifyContent: "center" }}>
+                        <Text className="text-white text-center text-xs font-medium">
+                          Pagar usando{"\n"}QR
+                        </Text>
+                      </View>
+                    </View>
 
-                {/* Botón para encuesta */}
-                <View className="flex-col gap-3 w-full items-center">
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate("Survey")}
-                    className="bg-blue-600 px-8 py-4 rounded-lg flex-row items-center w-64"
-                  >
-                    <FileText size={20} color="white" className="mr-2" />
-                    <Text className="text-white font-semibold text-lg ml-2">
-                      Encuesta
-                    </Text>
-                  </TouchableOpacity>
+                    {/* Encuesta */}
+                    <View className="items-center">
+                      <TouchableOpacity
+                        onPress={() => navigation.navigate("Survey")}
+                        className="bg-blue-600 w-16 h-16 rounded-full items-center justify-center mb-2"
+                        style={{
+                          elevation: 4,
+                          shadowColor: "#000",
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.25,
+                          shadowRadius: 4,
+                        }}
+                      >
+                        <FileText size={24} color="white" />
+                      </TouchableOpacity>
+                      <View style={{ height: 32, justifyContent: "center" }}>
+                        <Text className="text-white text-center text-xs font-medium">
+                          Encuesta
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
                 </View>
               </>
             ) : /* Si el table_status es 'confirmed', mostrar acceso directo a juegos/encuestas */
             deliveryConfirmationStatus === "confirmed" ? (
               <>
-                {console.log(
-                  "🎉 Showing confirmed state - Acceso directo a opciones!",
-                )}
-                <CheckCircle size={64} color="#10b981" />
-                <Text className="text-white text-xl font-bold mt-4 mb-2">
-                  ¡Pedido Confirmado!
-                </Text>
-                <Text className="text-gray-300 text-center mb-2">
-                  Mesa {occupiedTable?.number}
-                </Text>
-                <Text className="text-green-400 text-lg font-semibold mb-4">
+                {/* Header con ícono a la izquierda y textos a la derecha */}
+                <View className="flex-row items-center mb-2 w-full justify-center px-2">
+                  <CheckCircle size={58} color="#10b981" />
+                  <View className="ml-4">
+                    <Text className="text-white text-2xl font-bold">
+                      ¡Pedido Confirmado!
+                    </Text>
+                    <Text className="text-gray-300 text-lg">
+                      Mesa {occupiedTable?.number}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text className="text-green-400 text-center text-lg font-semibold mb-4">
                   Acceso completo desbloqueado
-                </Text>
-                <Text className="text-gray-300 text-center mb-8">
-                  Si todavía no has jugado, ¡ahora es tu oportunidad! Si lográs
-                  ganar en tu primera victoria, desbloquearás un descuento para
-                  tu cuenta.
                 </Text>
 
                 {/* Botones circulares estilo MercadoPago */}
@@ -398,43 +455,30 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                 deliveryStatus.totalItems > 0 &&
                 deliveryConfirmationStatus === "pending" ? (
                   <>
-                    {console.log(
-                      "✅ Showing delivered state - Pedido en Mesa!",
-                    )}
-                    <Package size={64} color="#22c55e" />
-                    <Text className="text-white text-xl font-bold mt-4 mb-2">
-                      ¡Pedido en Mesa!
-                    </Text>
-                    <Text className="text-gray-300 text-center mb-2">
-                      Mesa {occupiedTable?.number}
-                    </Text>
-                    <Text className="text-green-400 text-lg font-semibold mb-4">
-                      {deliveryStatus.totalItems} Productos entregados
-                    </Text>
-                    <Text className="text-gray-300 text-center mb-6">
-                      Tu pedido está completo. Usa el botón QR del menú inferior
-                      para abrir tu carrito y confirmar la recepción.
+                    {/* Header con ícono a la izquierda y textos a la derecha */}
+                    <View className="flex-row items-center mb-2 w-full justify-center px-2">
+                      <Package size={58} color="#22c55e" />
+                      <View className="ml-4" style={{ maxWidth: 200 }}>
+                        <Text className="text-white text-2xl font-bold">
+                          ¡Pedido en Mesa!
+                        </Text>
+                        <Text className="text-gray-300 text-lg">
+                          Mesa {occupiedTable?.number}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text className="text-green-400 text-center text-lg font-semibold mb-2">
+                      {deliveryStatus.totalItems}{" "}
+                      {deliveryStatus.totalItems === 1
+                        ? "Producto entregado"
+                        : "Productos entregados"}
                     </Text>
 
-                    {/* Indicador visual del botón QR */}
-                    <View className="items-center">
-                      <View
-                        className="bg-yellow-600 w-16 h-16 rounded-full items-center justify-center mb-3"
-                        style={{
-                          shadowColor: "#d4af37",
-                          shadowOffset: { width: 0, height: 4 },
-                          shadowOpacity: 0.3,
-                          shadowRadius: 8,
-                          elevation: 8,
-                        }}
-                      >
-                        <QrCode size={32} color="#1a1a1a" />
-                      </View>
-                      <ArrowDown size={32} color="#d4af37" />
-                      <Text className="text-yellow-500 text-sm font-semibold mt-2">
-                        Presiona aquí para confirmar
-                      </Text>
-                    </View>
+                    <Text className="text-gray-300 text-center text-lg mb-6">
+                      Tu pedido está completo. Usa el botón QR inferior para
+                      abrir tu carrito y confirmar la recepción.
+                    </Text>
                   </>
                 ) : (
                   <>
@@ -468,12 +512,9 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                   </>
                 )}
 
-                {/* Botones para estado seated - Solo Ver Menú y Chat */}
+                {/* Botones para estado seated - Ver Menú, Chat y Juegos */}
                 <View className="w-full mb-6">
-                  <View
-                    className="flex-row justify-around items-center"
-                    style={{ paddingHorizontal: 60 }}
-                  >
+                  <View className="flex-row justify-around items-center">
                     {/* Ver Menú */}
                     <View className="items-center">
                       <TouchableOpacity
@@ -520,6 +561,28 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                       <View style={{ height: 32, justifyContent: "center" }}>
                         <Text className="text-white text-center text-xs font-medium">
                           Chat con{"\n"}mesero
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Juegos */}
+                    <View className="items-center">
+                      <TouchableOpacity
+                        onPress={() => navigation.navigate("Games")}
+                        className="bg-purple-600 w-16 h-16 rounded-full items-center justify-center mb-2"
+                        style={{
+                          elevation: 4,
+                          shadowColor: "#000",
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.25,
+                          shadowRadius: 4,
+                        }}
+                      >
+                        <Gamepad2 size={24} color="white" />
+                      </TouchableOpacity>
+                      <View style={{ height: 32, justifyContent: "center" }}>
+                        <Text className="text-white text-center text-xs font-medium">
+                          Juegos
                         </Text>
                       </View>
                     </View>
@@ -626,7 +689,10 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
   };
 
   return (
-    <View className="bg-gray-900 p-6 my-2" style={{ borderRadius: 16 }}>
+    <View
+      className="bg-gray-900 px-6 pt-6 pb-3 mt-3"
+      style={{ borderRadius: 16 }}
+    >
       {renderStateContent()}
     </View>
   );

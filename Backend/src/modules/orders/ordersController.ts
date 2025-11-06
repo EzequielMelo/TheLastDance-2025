@@ -42,6 +42,7 @@ import {
   notifyBartenderNewItems,
   notifyManagementPaymentReceived,
 } from "../../services/pushNotificationService";
+import { emitClientStateUpdate } from "../../socket/clientStateSocket";
 
 const createOrderSchema = z.object({
   table_id: z.string().uuid().optional(),
@@ -1507,7 +1508,24 @@ export async function confirmPaymentHandler(
       return;
     }
 
+    // Obtener información de la mesa antes de confirmar (para tener el clientId)
+    const { data: tableInfo } = await supabaseAdmin
+      .from("tables")
+      .select("id_client, number")
+      .eq("id", tableId)
+      .single();
+
     const result = await confirmPaymentAndReleaseTable(tableId, waiterId);
+
+    // Emitir evento de socket para actualización en tiempo real
+    if (result.success && tableInfo?.id_client) {
+      emitClientStateUpdate(tableInfo.id_client, "client:payment-confirmed", {
+        tableId,
+        tableNumber: tableInfo.number,
+        status: "completed",
+        message: "Pago confirmado por el mozo",
+      });
+    }
 
     res.json(result);
   } catch (error: any) {

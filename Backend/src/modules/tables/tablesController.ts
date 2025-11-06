@@ -22,6 +22,7 @@ import {
   notifyClientTableAssigned,
   notifyWaiterPaymentRequest,
 } from "../../services/pushNotificationService";
+import { emitClientStateUpdate } from "../../socket/clientStateSocket";
 
 // ========== CONTROLADORES PARA LISTA DE ESPERA ==========
 
@@ -84,6 +85,12 @@ export async function addToWaitingListHandler(req: Request, res: Response) {
       console.error("Error enviando notificación al maître:", notifyError);
       // No bloqueamos la respuesta por error de notificación
     }
+
+    // Emitir evento de socket para actualización en tiempo real
+    emitClientStateUpdate(entryData.client_id, "client:state-update", {
+      waitingListId: result.id,
+      status: "in_queue",
+    });
 
     return res.status(201).json({
       message: "Agregado a la lista de espera exitosamente",
@@ -269,6 +276,13 @@ export async function assignTableHandler(req: Request, res: Response) {
           waitingEntry.client_id,
           tableData.number.toString(),
         );
+
+        // Emitir evento de socket para actualización en tiempo real
+        emitClientStateUpdate(waitingEntry.client_id, "client:table-assigned", {
+          tableId: assignData.table_id,
+          tableNumber: tableData.number,
+          status: "assigned",
+        });
       }
     } catch (notifyError) {
       console.error("Error enviando notificación al cliente:", notifyError);
@@ -306,6 +320,13 @@ export async function activateTableHandler(req: Request, res: Response) {
     if (!result.success) {
       return res.status(400).json({ error: result.message });
     }
+
+    // Emitir evento de socket para actualización en tiempo real (cliente se sentó)
+    emitClientStateUpdate(req.user.appUserId, "client:state-update", {
+      tableId,
+      tableNumber: result.table?.number,
+      status: "seated",
+    });
 
     return res.json({
       success: true,
@@ -419,7 +440,11 @@ export async function getMyStatusHandler(req: Request, res: Response) {
       .maybeSingle();
 
     // Si está en confirm_pending, devolver ese estado (tiene prioridad sobre seated)
-    if (!waitingError && waitingEntry && waitingEntry.status === "confirm_pending") {
+    if (
+      !waitingError &&
+      waitingEntry &&
+      waitingEntry.status === "confirm_pending"
+    ) {
       // También obtener información de la mesa asignada para confirm_pending
       const { data: clientTable } = await supabaseAdmin
         .from("tables")
@@ -451,7 +476,7 @@ export async function getMyStatusHandler(req: Request, res: Response) {
       const result = {
         status: "seated",
         table: occupiedTable,
-        table_status: occupiedTable.table_status || 'pending',
+        table_status: occupiedTable.table_status || "pending",
       };
       return res.json(result);
     }
@@ -544,11 +569,21 @@ export async function confirmDeliveryHandler(req: Request, res: Response) {
         .json({ error: "Solo clientes pueden confirmar entrega" });
     }
 
-    const result = await confirmTableDelivery(tableIdOrNumber, req.user.appUserId);
+    const result = await confirmTableDelivery(
+      tableIdOrNumber,
+      req.user.appUserId,
+    );
 
     if (!result.success) {
       return res.status(400).json({ error: result.message });
     }
+
+    // Emitir evento de socket para actualización en tiempo real
+    emitClientStateUpdate(req.user.appUserId, "client:delivery-confirmed", {
+      tableId: result.table?.id,
+      tableNumber: result.table?.number,
+      status: "confirmed",
+    });
 
     return res.json({
       success: true,
@@ -585,14 +620,14 @@ export async function requestBillHandler(req: Request, res: Response) {
       .single();
 
     if (tableError || !table) {
-      return res.status(403).json({ 
-        error: "Mesa no encontrada o no tienes acceso a ella" 
+      return res.status(403).json({
+        error: "Mesa no encontrada o no tienes acceso a ella",
       });
     }
 
     if (!table.id_waiter) {
-      return res.status(400).json({ 
-        error: "No hay mozo asignado a esta mesa" 
+      return res.status(400).json({
+        error: "No hay mozo asignado a esta mesa",
       });
     }
 
@@ -604,15 +639,16 @@ export async function requestBillHandler(req: Request, res: Response) {
 
     if (updateError) {
       console.error("Error actualizando estado de mesa:", updateError);
-      return res.status(500).json({ 
-        error: "Error interno del servidor" 
+      return res.status(500).json({
+        error: "Error interno del servidor",
       });
     }
 
     // 3. Calcular el total de las órdenes no pagadas
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
-      .select(`
+      .select(
+        `
         id,
         total_amount,
         order_items (
@@ -620,19 +656,23 @@ export async function requestBillHandler(req: Request, res: Response) {
           price,
           menu_items (name)
         )
-      `)
+      `,
+      )
       .eq("table_id", tableId)
       .eq("user_id", clientId)
       .eq("is_paid", false);
 
     if (ordersError) {
       console.error("Error obteniendo órdenes:", ordersError);
-      return res.status(500).json({ 
-        error: "Error calculando el total" 
+      return res.status(500).json({
+        error: "Error calculando el total",
       });
     }
 
-    const totalAmount = (orders || []).reduce((sum, order) => sum + (order.total_amount || 0), 0);
+    const totalAmount = (orders || []).reduce(
+      (sum, order) => sum + (order.total_amount || 0),
+      0,
+    );
 
     // 4. Obtener información del cliente para la notificación
     const { data: clientData, error: clientError } = await supabaseAdmin
@@ -641,9 +681,10 @@ export async function requestBillHandler(req: Request, res: Response) {
       .eq("id", clientId)
       .single();
 
-    const clientName = clientData && !clientError
-      ? `${clientData.first_name} ${clientData.last_name}`.trim()
-      : "Cliente";
+    const clientName =
+      clientData && !clientError
+        ? `${clientData.first_name} ${clientData.last_name}`.trim()
+        : "Cliente";
 
     // 5. Enviar notificación al mozo
     try {
@@ -651,12 +692,20 @@ export async function requestBillHandler(req: Request, res: Response) {
         table.id_waiter,
         clientName,
         table.number,
-        totalAmount
+        totalAmount,
       );
     } catch (notifyError) {
       console.error("Error enviando notificación al mozo:", notifyError);
       // No bloqueamos la respuesta por error de notificación
     }
+
+    // Emitir evento de socket para actualización en tiempo real
+    emitClientStateUpdate(clientId, "client:bill-requested", {
+      tableId: table.id,
+      tableNumber: table.number,
+      totalAmount,
+      status: "bill_requested",
+    });
 
     return res.json({
       success: true,
@@ -665,13 +714,12 @@ export async function requestBillHandler(req: Request, res: Response) {
         tableNumber: table.number,
         totalAmount,
         itemsCount: orders?.length || 0,
-      }
+      },
     });
-
   } catch (error) {
     console.error("Error en requestBillHandler:", error);
-    return res.status(500).json({ 
-      error: "Error interno del servidor" 
+    return res.status(500).json({
+      error: "Error interno del servidor",
     });
   }
 }
@@ -700,15 +748,16 @@ export async function getTableOrderStatusHandler(req: Request, res: Response) {
       .single();
 
     if (tableError || !table) {
-      return res.status(403).json({ 
-        error: "No tienes acceso a esta mesa o la mesa no está ocupada" 
+      return res.status(403).json({
+        error: "No tienes acceso a esta mesa o la mesa no está ocupada",
       });
     }
 
     // 2. Obtener todas las órdenes no pagadas del cliente en esta mesa
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
-      .select(`
+      .select(
+        `
         id,
         total_amount,
         created_at,
@@ -723,15 +772,16 @@ export async function getTableOrderStatusHandler(req: Request, res: Response) {
             prep_minutes
           )
         )
-      `)
+      `,
+      )
       .eq("table_id", tableId)
       .eq("user_id", clientId)
       .eq("is_paid", false)
       .order("created_at", { ascending: false });
 
     if (ordersError) {
-      return res.status(500).json({ 
-        error: "Error obteniendo órdenes" 
+      return res.status(500).json({
+        error: "Error obteniendo órdenes",
       });
     }
 
@@ -741,8 +791,8 @@ export async function getTableOrderStatusHandler(req: Request, res: Response) {
         message: "No hay órdenes activas",
         data: {
           table_number: table.number,
-          orders: []
-        }
+          orders: [],
+        },
       });
     }
 
@@ -753,7 +803,7 @@ export async function getTableOrderStatusHandler(req: Request, res: Response) {
       preparing: 0,
       ready: 0,
       delivered: 0,
-      rejected: 0
+      rejected: 0,
     };
 
     const itemsByStatus: Record<string, any[]> = {
@@ -762,7 +812,7 @@ export async function getTableOrderStatusHandler(req: Request, res: Response) {
       preparing: [],
       ready: [],
       delivered: [],
-      rejected: []
+      rejected: [],
     };
 
     orders.forEach(order => {
@@ -771,7 +821,7 @@ export async function getTableOrderStatusHandler(req: Request, res: Response) {
         if (status in statusCounts) {
           statusCounts[status as keyof typeof statusCounts]++;
         }
-        
+
         if (status in itemsByStatus && itemsByStatus[status]) {
           itemsByStatus[status]!.push({
             id: item.id,
@@ -779,7 +829,7 @@ export async function getTableOrderStatusHandler(req: Request, res: Response) {
             category: item.menu_items.category,
             quantity: item.quantity,
             prep_minutes: item.menu_items.prep_minutes,
-            order_id: order.id
+            order_id: order.id,
           });
         }
       });
@@ -793,14 +843,13 @@ export async function getTableOrderStatusHandler(req: Request, res: Response) {
         summary: statusCounts,
         items_by_status: itemsByStatus,
         total_orders: orders.length,
-        last_order_time: orders[0]?.created_at
-      }
+        last_order_time: orders[0]?.created_at,
+      },
     });
-
   } catch (error) {
     console.error("Error en getTableOrderStatusHandler:", error);
-    return res.status(500).json({ 
-      error: "Error interno del servidor" 
+    return res.status(500).json({
+      error: "Error interno del servidor",
     });
   }
 }

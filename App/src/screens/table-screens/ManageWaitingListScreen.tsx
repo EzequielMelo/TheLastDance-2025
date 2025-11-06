@@ -847,7 +847,8 @@ export default function ManageWaitingListScreen() {
                         Mesa {table.number}
                       </Text>
                       <Text className="text-gray-400 text-sm">
-                        {table.capacity} personas • {table.type}
+                        {table.capacity} personas{" • "}
+                        {table.type}
                       </Text>
                     </View>
                     <ArrowRight size={20} color="#d4af37" />

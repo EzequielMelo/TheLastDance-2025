@@ -172,7 +172,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
               <Text
                 style={{
                   fontSize: 12,
-                  color: "#6b7280",
+                  color: "#d1d5db",
                   marginTop: 2,
                 }}
               >
@@ -184,7 +184,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           <Text
             style={{
               fontSize: 14,
-              color: "#1e40af",
+              color: "#93c5fd",
               textAlign: "center",
               fontStyle: "italic",
             }}
@@ -238,7 +238,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             <Text
               style={{
                 fontSize: 12,
-                color: "#6b7280",
+                color: "#d1d5db",
                 marginTop: 2,
               }}
             >
@@ -356,7 +356,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                   <Text
                     style={{
                       fontSize: 12,
-                      color: "#15803d",
+                      color: "#86efac",
                     }}
                   >
                     Cantidad: {item.quantity} • Tenemos stock
@@ -366,7 +366,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                   style={{
                     fontSize: 12,
                     fontWeight: "600",
-                    color: "#22c55e",
+                    color: "#86efac",
                     backgroundColor: "rgba(34, 197, 94, 0.2)",
                     paddingHorizontal: 8,
                     paddingVertical: 2,
@@ -388,7 +388,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                 style={{
                   fontSize: 15,
                   fontWeight: "600",
-                  color: "#6b7280",
+                  color: "#d1d5db",
                   marginBottom: 8,
                 }}
               >
@@ -415,7 +415,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                       style={{
                         fontSize: 14,
                         fontWeight: "500",
-                        color: "#6b7280",
+                        color: "#d1d5db",
                       }}
                     >
                       {item.menu_item?.name}
@@ -423,7 +423,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                     <Text
                       style={{
                         fontSize: 12,
-                        color: "#9ca3af",
+                        color: "#e5e7eb",
                       }}
                     >
                       Cantidad: {item.quantity} • En la misma tanda
@@ -433,7 +433,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                     style={{
                       fontSize: 14,
                       fontWeight: "600",
-                      color: "#6b7280",
+                      color: "#d1d5db",
                     }}
                   >
                     ${item.subtotal}
@@ -458,7 +458,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             style={{
               fontSize: 14,
               fontWeight: "600",
-              color: "#3b82f6",
+              color: "#93c5fd",
               marginBottom: 4,
             }}
           >
@@ -467,7 +467,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           <Text
             style={{
               fontSize: 12,
-              color: "#1e40af",
+              color: "#bfdbfe",
               lineHeight: 16,
             }}
           >
@@ -545,7 +545,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             <Text
               style={{
                 fontSize: 12,
-                color: "#6b7280",
+                color: "#d1d5db",
                 marginTop: 2,
               }}
             >
@@ -667,7 +667,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
               alignItems: "center",
               paddingVertical: 8,
               borderTopWidth: index > 0 ? 1 : 0,
-              borderTopColor: "#e5e7eb",
+              borderTopColor: "rgba(255,255,255,0.1)",
             }}
           >
             <View style={{ flex: 1 }}>
@@ -729,7 +729,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
         style={{
           fontSize: 20,
           fontWeight: "bold",
-          color: "#111827",
+          color: "#ffffff",
           marginBottom: 16,
         }}
       >
@@ -739,7 +739,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
       <Text
         style={{
           fontSize: 12,
-          color: "#6b7280",
+          color: "#d1d5db",
           marginBottom: 16,
         }}
       >
@@ -785,16 +785,18 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
       {/* Información adicional */}
       <View
         style={{
-          backgroundColor: "#f9fafb",
+          backgroundColor: "rgba(255,255,255,0.05)",
           borderRadius: 8,
           padding: 12,
           marginTop: 16,
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.1)",
         }}
       >
         <Text
           style={{
             fontSize: 12,
-            color: "#6b7280",
+            color: "#d1d5db",
             textAlign: "center",
           }}
         >
@@ -812,14 +814,14 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           marginTop: 16,
           paddingTop: 16,
           borderTopWidth: 1,
-          borderTopColor: "#e5e7eb",
+          borderTopColor: "rgba(255,255,255,0.1)",
         }}
       >
         <Text
           style={{
             fontSize: 16,
             fontWeight: "600",
-            color: "#111827",
+            color: "#ffffff",
           }}
         >
           Total del Pedido:

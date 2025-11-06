@@ -107,7 +107,7 @@ export default function ScanOrderQRScreen() {
       if (!tableId) {
         ToastAndroid.show(
           "❌ QR Inválido: No contiene información válida de mesa",
-          ToastAndroid.SHORT
+          ToastAndroid.SHORT,
         );
         setTimeout(() => setScanned(false), 1500);
         return;
@@ -121,28 +121,28 @@ export default function ScanOrderQRScreen() {
       // Primero verificar el estado actual de la mesa
       const statusResponse = await api.get("/tables/my-status");
       const currentTableStatus = statusResponse.data.table_status;
-      
+
       console.log("📊 Current table status:", currentTableStatus);
 
-      if (currentTableStatus === 'bill_requested') {
+      if (currentTableStatus === "bill_requested") {
         // Si ya se pidió la cuenta, navegar a pantalla de pago
         console.log("💰 Navegando a pantalla de pago");
-        
+
         // Obtener el tableId real desde el estado del usuario
         const realTableId = statusResponse.data.table?.id || myTableId;
-        
+
         console.log("💳 Navegando con tableId:", realTableId);
         console.log("💳 statusResponse.data.table:", statusResponse.data.table);
-        
+
         if (!realTableId) {
           ToastAndroid.show(
             "❌ Mesa no identificada. Escanea tu mesa primero",
-            ToastAndroid.SHORT
+            ToastAndroid.SHORT,
           );
           setTimeout(() => setScanned(false), 1500);
           return;
         }
-        
+
         navigation.navigate("BillPayment", {
           tableId: realTableId,
           tableNumber: statusResponse.data.table?.number,
@@ -154,29 +154,32 @@ export default function ScanOrderQRScreen() {
       if (!myTableId) {
         ToastAndroid.show(
           "❌ Mesa no identificada. Escanea tu mesa primero",
-          ToastAndroid.SHORT
+          ToastAndroid.SHORT,
         );
         setTimeout(() => setScanned(false), 1500);
         return;
       }
-      
-      const confirmResponse = await api.post(`/tables/${myTableId}/confirm-delivery`);
+
+      const confirmResponse = await api.post(
+        `/tables/${myTableId}/confirm-delivery`,
+      );
 
       if (!confirmResponse.data.success) {
-        throw new Error(confirmResponse.data.error || "Error confirmando entrega");
+        throw new Error(
+          confirmResponse.data.error || "Error confirmando entrega",
+        );
       }
 
       // Entrega confirmada exitosamente
       ToastAndroid.show(
         "🎉 ¡Entrega Confirmada! Ahora puedes jugar, llenar encuesta o pedir la cuenta",
-        ToastAndroid.LONG
+        ToastAndroid.LONG,
       );
-      
+
       // Navegar al home donde podrá acceder a todas las opciones
       setTimeout(() => {
         navigation.navigate("Home", { refresh: Date.now() });
       }, 2500);
-
     } catch (error: any) {
       console.error("Error processing QR scan:", error);
 
@@ -190,13 +193,11 @@ export default function ScanOrderQRScreen() {
         errorMessage = "Esta mesa no existe o no tienes pedidos en ella.";
       } else if (error.response?.status === 403) {
         alertTitle = "Sin permisos";
-        errorMessage = "No tienes permisos para realizar esta acción en esta mesa.";
+        errorMessage =
+          "No tienes permisos para realizar esta acción en esta mesa.";
       }
 
-      ToastAndroid.show(
-        `❌ ${alertTitle}: ${errorMessage}`,
-        ToastAndroid.LONG
-      );
+      ToastAndroid.show(`❌ ${alertTitle}: ${errorMessage}`, ToastAndroid.LONG);
       setTimeout(() => setScanned(false), 2000);
     } finally {
       setProcessing(false);
@@ -411,8 +412,7 @@ export default function ScanOrderQRScreen() {
             paddingTop: 48,
             paddingBottom: 32,
           }}
-        >
-        </LinearGradient>
+        ></LinearGradient>
 
         {/* Scanning frame */}
         <View
@@ -524,7 +524,7 @@ export default function ScanOrderQRScreen() {
             left: 0,
             right: 0,
             zIndex: 10,
-            paddingTop: 32,
+            paddingTop: 48,
             paddingBottom: 48,
           }}
         >

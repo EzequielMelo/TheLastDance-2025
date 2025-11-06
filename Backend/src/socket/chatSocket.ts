@@ -2,11 +2,12 @@ import { Server } from "socket.io";
 import { Server as HttpServer } from "http";
 import { supabaseAdmin } from "../config/supabase";
 import { ChatServices } from "../modules/chat/chatServices";
-import { 
+import {
   notifyWaitersNewClientMessage,
   notifyWaiterClientMessage,
-  notifyClientWaiterMessage
+  notifyClientWaiterMessage,
 } from "../services/pushNotificationService";
+import { setupClientStateSocket } from "./clientStateSocket";
 
 interface SocketUser {
   appUserId: string;
@@ -255,17 +256,19 @@ export const setupSocketIO = (httpServer: HttpServer) => {
             // Obtener información de la mesa y usuarios
             const { data: tableData, error: tableError } = await supabaseAdmin
               .from("tables")
-              .select(`
+              .select(
+                `
                 number,
                 id_client,
                 id_waiter,
                 users!tables_id_client_fkey(name)
-              `)
+              `,
+              )
               .eq("id", tableId)
               .single();
 
             if (!tableError && tableData) {
-              if (senderType === 'client') {
+              if (senderType === "client") {
                 // Cliente envía mensaje al mozo específico
                 const clientData = (tableData as any).users;
                 const clientName = clientData?.name || "Cliente";
@@ -276,7 +279,7 @@ export const setupSocketIO = (httpServer: HttpServer) => {
                   clientName,
                   tableData.number.toString(),
                   message.trim(),
-                  chatId
+                  chatId,
                 );
 
                 // Si es el primer mensaje del cliente, también notificar a todos los mozos
@@ -287,30 +290,35 @@ export const setupSocketIO = (httpServer: HttpServer) => {
                   .eq("sender_type", "client")
                   .limit(2); // Buscar 2 porque el actual ya está guardado
 
-                const isFirstMessage = !previousMessages || previousMessages.length <= 1;
+                const isFirstMessage =
+                  !previousMessages || previousMessages.length <= 1;
 
                 if (isFirstMessage) {
                   await notifyWaitersNewClientMessage(
                     clientName,
                     tableData.number.toString(),
-                    message.trim()
+                    message.trim(),
                   );
                 }
-              } else if (senderType === 'waiter') {
+              } else if (senderType === "waiter") {
                 // Mozo envía mensaje al cliente
-                const waiterName = `${user.first_name} ${user.last_name}`.trim();
+                const waiterName =
+                  `${user.first_name} ${user.last_name}`.trim();
 
                 await notifyClientWaiterMessage(
                   tableData.id_client,
                   waiterName,
                   tableData.number.toString(),
                   message.trim(),
-                  chatId
+                  chatId,
                 );
               }
             }
           } catch (notifyError) {
-            console.error("❌ Error enviando notificaciones push:", notifyError);
+            console.error(
+              "❌ Error enviando notificaciones push:",
+              notifyError,
+            );
             // No bloqueamos el mensaje por error de notificación
           }
 
@@ -324,7 +332,10 @@ export const setupSocketIO = (httpServer: HttpServer) => {
           );
         } catch (error) {
           console.error("💥 Error completo al enviar mensaje:", error);
-          console.error("Stack trace:", error instanceof Error ? error.stack : "Sin stack");
+          console.error(
+            "Stack trace:",
+            error instanceof Error ? error.stack : "Sin stack",
+          );
           socket.emit("error", { message: "Error al enviar mensaje" });
         }
       },
@@ -379,6 +390,9 @@ export const setupSocketIO = (httpServer: HttpServer) => {
       }
     }, 60000); // Cada minuto
   }
+
+  // Configurar listeners para actualizaciones de estado de cliente
+  setupClientStateSocket(io);
 
   return io;
 };

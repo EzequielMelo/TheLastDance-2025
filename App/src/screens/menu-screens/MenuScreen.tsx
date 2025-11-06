@@ -95,6 +95,10 @@ export default function MenuScreen() {
   useFocusEffect(
     React.useCallback(() => {
       setActiveTab("menu");
+      return () => {
+        // Cleanup cuando se pierde el foco para liberar memoria
+        setCurrentImageIndex({});
+      };
     }, [setActiveTab]),
   );
 
@@ -553,7 +557,7 @@ export default function MenuScreen() {
         {/* Header */}
         <View
           style={{
-            paddingTop: 30,
+            paddingTop: 48,
             paddingHorizontal: 24,
             paddingBottom: 26,
           }}
@@ -647,6 +651,17 @@ export default function MenuScreen() {
           decelerationRate="fast"
           snapToAlignment="start"
           showsVerticalScrollIndicator={false}
+          // Optimizaciones de rendimiento
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={2}
+          initialNumToRender={1}
+          windowSize={3}
+          updateCellsBatchingPeriod={50}
+          getItemLayout={(data, index) => ({
+            length: ITEM_VISIBLE_HEIGHT,
+            offset: ITEM_VISIBLE_HEIGHT * index,
+            index,
+          })}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -761,6 +776,10 @@ export default function MenuScreen() {
                                 height: innerCardHeight * 0.5,
                                 resizeMode: "cover",
                               }}
+                              // Optimizaciones de rendimiento
+                              resizeMethod="resize"
+                              fadeDuration={0}
+                              progressiveRenderingEnabled={true}
                             />
                           )}
                         />

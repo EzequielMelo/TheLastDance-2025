@@ -417,7 +417,7 @@ export default function ScanTableQRScreen() {
             left: 0,
             right: 0,
             zIndex: 10,
-            paddingTop: 32,
+            paddingTop: 48,
             paddingBottom: 48,
           }}
         >
