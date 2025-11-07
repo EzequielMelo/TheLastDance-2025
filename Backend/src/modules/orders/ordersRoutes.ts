@@ -29,6 +29,7 @@ import {
   getWaiterPendingPaymentsHandler,
   markItemAsDeliveredHandler,
   submitTandaModificationsHandler,
+  getAnonymousOrderData,
 } from "./ordersController";
 
 const router = express.Router();
@@ -41,6 +42,9 @@ router.post("/", createOrderHandler);
 
 // Obtener pedidos del usuario actual
 router.get("/my-orders", getUserOrdersHandler);
+
+// Obtener datos de pedido para usuarios anónimos (para generar PDF)
+router.get("/anonymous-order-data", getAnonymousOrderData);
 
 // Obtener pedidos pendientes (para empleados)
 router.get("/pending", getPendingOrdersHandler);

@@ -121,9 +121,6 @@ export async function createOrderHandler(
     const parsed = createOrderSchema.parse(req.body);
     const userId = req.user.appUserId;
 
-    console.log("🛒 Creando pedido para usuario:", userId);
-    console.log("📦 Datos del pedido:", JSON.stringify(parsed, null, 2));
-
     const orderData: CreateOrderDTO = {
       table_id: parsed.table_id,
       items: parsed.items as any,
@@ -1743,6 +1740,8 @@ export async function confirmPaymentHandler(
       generated: boolean;
       filePath?: string;
       fileName?: string;
+      htmlContent?: string;
+      isRegistered?: boolean;
       message?: string;
       error?: string;
     } = {
@@ -1761,28 +1760,66 @@ export async function confirmPaymentHandler(
         .single();
 
       if (!tableError && tableData?.id_client) {
-        const invoiceResult = await InvoiceService.generateInvoiceHTML(
-          tableId,
-          payingClientId, // Usar el cliente que solicitó el pago
-        );
+        // PASO 1: Determinar si el cliente es registrado o anónimo
+        const { getAuthEmailById } = await import("../admin/adminServices");
+        const clientEmail = await getAuthEmailById(payingClientId);
+        const isRegisteredUser = !!clientEmail;
 
-        if (invoiceResult.success && invoiceResult.filePath) {
-          console.log(`✅ Factura generada: ${invoiceResult.filePath}`);
-          const fileName = invoiceResult.filePath
-            ? path.basename(invoiceResult.filePath)
-            : undefined;
-          invoiceInfo = {
-            generated: true,
-            filePath: invoiceResult.filePath,
-            fileName: fileName,
-            message: "Factura generada exitosamente",
-          } as typeof invoiceInfo;
+        console.log(`👤 Cliente ${payingClientId} es ${isRegisteredUser ? 'REGISTRADO' : 'ANÓNIMO'}`);
+
+        let invoiceResult;
+        
+        if (isRegisteredUser) {
+          // CLIENTE REGISTRADO: Solo generar HTML (no guardar archivo)
+          console.log(`📧 Generando factura HTML para cliente registrado (envío por email)`);
+          invoiceResult = await InvoiceService.generateInvoiceHTMLOnly(
+            tableId,
+            payingClientId,
+          );
+          
+          if (invoiceResult.success && invoiceResult.htmlContent) {
+            console.log(`✅ Factura HTML generada para cliente registrado`);
+            invoiceInfo = {
+              generated: true,
+              htmlContent: invoiceResult.htmlContent,
+              isRegistered: true,
+              message: "Factura generada exitosamente para envío por email",
+            } as typeof invoiceInfo;
+          } else {
+            console.error(`❌ Error generando factura HTML: ${invoiceResult.error}`);
+            invoiceInfo = {
+              generated: false,
+              error: invoiceResult.error || "Error generando factura HTML",
+            };
+          }
         } else {
-          console.error(`❌ Error generando factura: ${invoiceResult.error}`);
-          invoiceInfo = {
-            generated: false,
-            error: invoiceResult.error || "Error desconocido",
-          };
+          // CLIENTE ANÓNIMO: Generar HTML y guardar archivo
+          console.log(`📁 Generando factura con archivo para cliente anónimo (descarga)`);
+          invoiceResult = await InvoiceService.generateInvoiceWithFile(
+            tableId,
+            payingClientId,
+          );
+          
+          if (invoiceResult.success && invoiceResult.filePath) {
+            console.log(`✅ Factura generada y guardada: ${invoiceResult.filePath}`);
+            const fileName = invoiceResult.filePath
+              ? path.basename(invoiceResult.filePath)
+              : undefined;
+            invoiceInfo = {
+              generated: true,
+              filePath: invoiceResult.filePath,
+              fileName: fileName,
+              htmlContent: invoiceResult.htmlContent,
+              isRegistered: false,
+              message: "Factura generada exitosamente para descarga",
+            } as typeof invoiceInfo;
+          } else {
+            console.error(`❌ Error generando factura con archivo: ${invoiceResult.error}`);
+            invoiceInfo = {
+              generated: false,
+              error: invoiceResult.error || "Error generando factura con archivo",
+            };
+          }
         }
       } else {
         console.error("❌ No se pudo obtener cliente de la mesa para factura");
@@ -2079,5 +2116,124 @@ export async function submitTandaModificationsHandler(
       success: false,
       error: error.message || "Error al reenviar modificaciones de tanda",
     });
+  }
+}
+
+// Obtener datos de pedido para generar factura en cliente anónimo
+export async function getAnonymousOrderData(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.user?.appUserId;
+
+    if (!userId) {
+      res.status(401).json({ error: "Usuario no autenticado" });
+      return;
+    }
+
+    // Verificar que sea un usuario anónimo
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('profile_code, first_name, last_name')
+      .eq('id', userId)
+      .single();
+
+    if (userError) {
+      console.error('Error obteniendo usuario:', userError);
+      res.status(500).json({ error: 'Error obteniendo datos del usuario' });
+      return;
+    }
+
+    if (!user || user.profile_code !== 'cliente_anonimo') {
+      res.json({ hasOrder: false });
+      return;
+    }
+
+    // Buscar si tiene una orden pagada
+    const { data: paidOrders, error: ordersError } = await supabaseAdmin
+      .from('orders')
+      .select('id, total_amount, created_at, table_id')
+      .eq('user_id', userId)
+      .eq('is_paid', true)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (ordersError) {
+      console.error('Error buscando órdenes pagadas:', ordersError);
+      res.status(500).json({ error: 'Error obteniendo datos del pedido' });
+      return;
+    }
+
+    if (!paidOrders || paidOrders.length === 0) {
+      res.json({ hasOrder: false });
+      return;
+    }
+
+    const order = paidOrders[0];
+    if (!order) {
+      res.json({ hasOrder: false });
+      return;
+    }
+
+    // Obtener datos de la mesa
+    const { data: tableData, error: tableError } = await supabaseAdmin
+      .from('tables')
+      .select('number')
+      .eq('id', order.table_id)
+      .single();
+
+    if (tableError) {
+      console.error('Error obteniendo datos de mesa:', tableError);
+    }
+
+    // Obtener items de la orden
+    const { data: orderItems, error: itemsError } = await supabaseAdmin
+      .from('order_items')
+      .select(`
+        quantity,
+        unit_price,
+        menu_items(name, description, category)
+      `)
+      .eq('order_id', order.id);
+
+    if (itemsError) {
+      console.error('Error obteniendo items de la orden:', itemsError);
+      res.status(500).json({ error: 'Error obteniendo items del pedido' });
+      return;
+    }
+
+    // Formatear datos básicos para el PDF
+    const tableNumber = tableData?.number || 'N/A';
+    
+    const items = orderItems?.map((item: any) => ({
+      name: item.menu_items.name,
+      description: item.menu_items.description,
+      category: item.menu_items.category,
+      quantity: item.quantity,
+      unitPrice: item.unit_price,
+      totalPrice: item.quantity * item.unit_price
+    })) || [];
+
+    const subtotal = items.reduce((sum: number, item: any) => sum + item.totalPrice, 0);
+    
+    res.json({
+      hasOrder: true,
+      orderData: {
+        clientName: `${user.first_name || 'Cliente'} ${user.last_name || 'Anónimo'}`,
+        tableNumber: tableNumber.toString(),
+        items,
+        subtotal,
+        tipAmount: 0,
+        gameDiscountAmount: 0,
+        gameDiscountPercentage: 0,
+        totalAmount: order.total_amount,
+        satisfactionLevel: '',
+        orderDate: new Date(order.created_at).toLocaleDateString('es-AR'),
+        orderTime: new Date(order.created_at).toLocaleTimeString('es-AR'),
+        invoiceNumber: `INV-${order.id.slice(0, 8).toUpperCase()}`,
+      }
+    });
+
+  } catch (error: any) {
+    console.error('❌ Error obteniendo datos del pedido:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 }

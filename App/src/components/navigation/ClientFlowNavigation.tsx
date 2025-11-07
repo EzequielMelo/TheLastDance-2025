@@ -16,10 +16,13 @@ import {
   UtensilsCrossed,
   MessageCircle,
   ArrowDown,
+  Download,
 } from "lucide-react-native";
 import { useClientState, ClientState } from "../../Hooks/useClientState";
 import { useClientStateSocket } from "../../Hooks/useClientStateSocket";
-import { checkTableDeliveryStatus } from "../../api/orders";
+import { checkTableDeliveryStatus, getAnonymousOrderData } from "../../api/orders";
+import { PDFService } from "../../services/pdfService";
+import { useAuth } from "../../auth/useAuth";
 import type { RootStackNavigationProp } from "../../navigation/RootStackParamList";
 
 interface ClientFlowNavigationProps {
@@ -44,21 +47,64 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
   useClientStateSocket(refresh);
 
   const navigation = useNavigation<RootStackNavigationProp>();
+  const { user } = useAuth();
   const [deliveryStatus, setDeliveryStatus] = useState<{
     allDelivered: boolean;
     totalItems: number;
     deliveredItems: number;
   } | null>(null);
   const [lastRefreshTrigger, setLastRefreshTrigger] = useState(0);
+  const [anonymousOrderData, setAnonymousOrderData] = useState<{
+    hasOrder: boolean;
+    orderData?: {
+      clientName: string;
+      tableNumber: string;
+      items: Array<{
+        name: string;
+        description: string;
+        category: string;
+        quantity: number;
+        unitPrice: number;
+        totalPrice: number;
+      }>;
+      subtotal: number;
+      tipAmount: number;
+      gameDiscountAmount: number;
+      gameDiscountPercentage: number;
+      totalAmount: number;
+      satisfactionLevel: string;
+      orderDate: string;
+      orderTime: string;
+      invoiceNumber: string;
+    };
+  } | null>(null);
 
   const handleRefresh = async () => {
     await refresh();
+    
+    // Verificar datos de orden para usuarios anónimos
+    if (user?.profile_code === "cliente_anonimo") {
+      try {
+        const orderDataCheck = await getAnonymousOrderData();
+        setAnonymousOrderData(orderDataCheck);
+      } catch (error) {
+        console.error("Error verificando datos de orden anónimos:", error);
+      }
+    }
+    
     onRefresh?.();
   };
 
   // Verificar delivery status cuando la pantalla está en foco
   useFocusEffect(
     React.useCallback(() => {
+      // Verificar datos de orden para usuarios anónimos
+      if (user?.profile_code === "cliente_anonimo") {
+        getAnonymousOrderData()
+          .then(setAnonymousOrderData)
+          .catch(console.error);
+      }
+
       if (
         state === "seated" &&
         occupiedTable?.id &&
@@ -69,7 +115,7 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
           .then(setDeliveryStatus)
           .catch(console.error);
       }
-    }, [state, occupiedTable?.id, deliveryConfirmationStatus]),
+    }, [state, occupiedTable?.id, deliveryConfirmationStatus, user?.profile_code]),
   );
 
   // Solo ejecutar cuando se dispare refreshTrigger (pull-to-refresh)
@@ -99,6 +145,68 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
   }, [refreshTrigger]); // SOLO refreshTrigger como dependencia
 
   const renderStateContent = () => {
+    // Verificar si es usuario anónimo con pedido listo para facturar, independientemente del estado
+    if (user?.profile_code === "cliente_anonimo" && anonymousOrderData?.hasOrder) {
+      return (
+        <View className="items-center">
+          {/* Header con ícono a la izquierda y textos a la derecha */}
+          <View className="flex-row items-center mb-2 w-full justify-center px-2">
+            <Download size={58} color="#10b981" />
+            <View className="ml-4" style={{ maxWidth: 200 }}>
+              <Text className="text-white text-2xl font-bold">
+                ¡Factura Lista!
+              </Text>
+              <Text className="text-gray-300 text-lg">
+                Mesa #{anonymousOrderData.orderData?.tableNumber}
+              </Text>
+            </View>
+          </View>
+
+          <Text className="text-green-400 text-center text-lg font-semibold mb-2">
+            Tu factura está lista para descargar
+          </Text>
+
+          <Text className="text-gray-300 text-center text-lg mb-6">
+            Pago confirmado por $
+            {anonymousOrderData.orderData?.totalAmount?.toLocaleString()}. 
+            Si deseas realizar nuevos pedidos, crea una cuenta para disfrutar de beneficios exclusivos.
+          </Text>
+
+          {/* Botón de descarga */}
+          <View className="w-full mb-6">
+            <TouchableOpacity
+              onPress={async () => {
+                if (anonymousOrderData.orderData) {
+                  try {
+                    await PDFService.generateInvoicePDF(anonymousOrderData.orderData);
+                  } catch (error) {
+                    console.error("Error generando PDF:", error);
+                    Alert.alert(
+                      "Error", 
+                      "No se pudo generar la factura. Inténtalo de nuevo."
+                    );
+                  }
+                }
+              }}
+              className="bg-green-600 py-4 rounded-lg flex-row justify-center items-center mb-4"
+              style={{
+                elevation: 4,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 4,
+              }}
+            >
+              <Download size={24} color="white" />
+              <Text className="text-white text-lg font-bold ml-3">
+                Descargar Factura
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
     switch (state) {
       case "loading":
         return (
@@ -615,10 +723,6 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                 onPress={handleRefresh}
                 className="bg-amber-600 px-6 py-3 rounded-lg flex-row items-center"
               >
-                <RefreshCcw size={16} color="white" className="mr-2" />
-                <Text className="text-white font-semibold">
-                  Actualizar Estado
-                </Text>
               </TouchableOpacity>
             </View>
           </View>

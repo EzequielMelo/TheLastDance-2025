@@ -14,6 +14,7 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/RootStackParamList";
 import { getDiscount } from "../../storage/discountStorage";
+import { useAuth } from "../../auth/useAuth";
 
 const simonImg = require("../../../assets/simon.png");
 const mathImg = require("../../../assets/math-quiz.png");
@@ -47,19 +48,23 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function GamesScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const { user } = useAuth();
   const [discount, setDiscount] = useState<number | null>(null);
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const d = await getDiscount();
-      if (!mounted) return;
-      setDiscount(d && d.received ? d.amount : null);
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    // Solo cargar descuentos para usuarios registrados
+    if (user?.profile_code === "cliente_registrado") {
+      let mounted = true;
+      (async () => {
+        const d = await getDiscount();
+        if (!mounted) return;
+        setDiscount(d && d.received ? d.amount : null);
+      })();
+      return () => {
+        mounted = false;
+      };
+    }
+  }, [user?.profile_code]);
 
   return (
     <LinearGradient
@@ -84,6 +89,8 @@ export default function GamesScreen() {
         <Text style={styles.bannerText}>
           {discount
             ? `Descuento aplicado: ${discount}%`
+            : user?.profile_code === "cliente_anonimo"
+            ? "Juega y divertite - Los descuentos están disponibles solo para usuarios registrados"
             : "Ganá un descuento si ganás en tu primera victoria"}
         </Text>
       </View>
@@ -95,8 +102,9 @@ export default function GamesScreen() {
         <Text style={styles.title}>Nuestros juegos disponibles</Text>
 
         <Text style={styles.info}>
-          Seleccioná un juego. La primera victoria que consigas en cualquiera de
-          los juegos desbloquea un descuento para la cuenta!
+          {user?.profile_code === "cliente_anonimo" 
+            ? "Seleccioná un juego y divertite. Los descuentos están disponibles solo para usuarios registrados."
+            : "Seleccioná un juego. La primera victoria que consigas en cualquiera de los juegos desbloquea un descuento para la cuenta!"}
         </Text>
 
         <View style={styles.list}>

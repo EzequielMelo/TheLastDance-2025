@@ -5,6 +5,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
 import { RootStackParamList } from "../../navigation/RootStackParamList";
 import { awardIfFirstWin } from "../../storage/discountStorage";
+import { useAuth } from "../../auth/useAuth";
 
 const DISCOUNT = 20;
 
@@ -14,6 +15,7 @@ const target = [1, 2, 3, 4, 5, 6, 7, 8, null];
 
 export default function PuzzleGame() {
   const navigation = useNavigation<NavigationProp>();
+  const { user } = useAuth();
   const generateTiles = () =>
     Array.from({ length: 9 }, (_, i) => (i < 8 ? i + 1 : null)).sort(
       () => Math.random() - 0.5,
@@ -42,7 +44,16 @@ export default function PuzzleGame() {
     JSON.stringify(arr) === JSON.stringify(target);
 
   const handleWin = async () => {
-    const res = await awardIfFirstWin(true, DISCOUNT);
+    // Verificar si es usuario anónimo
+    if (user?.profile_code === "cliente_anonimo") {
+      ToastAndroid.show("🎉 ¡Ganaste el juego! (Los usuarios anónimos no reciben descuentos)", ToastAndroid.LONG);
+      setTimeout(() => {
+        navigation.navigate("Games" as any);
+      }, 2500);
+      return;
+    }
+    
+    const res = await awardIfFirstWin(true, DISCOUNT, user?.profile_code);
     if (res.awarded) {
       const currentDiscount = res.discount?.amount || DISCOUNT;
       if (currentDiscount > DISCOUNT) {

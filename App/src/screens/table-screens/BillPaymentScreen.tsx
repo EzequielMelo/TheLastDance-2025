@@ -88,9 +88,12 @@ const BillPaymentScreen: React.FC = () => {
 
   const loadCurrentDiscount = async () => {
     try {
-      const discount = await getDiscount();
-      if (discount && discount.received) {
-        setCurrentDiscount(discount);
+      // Solo cargar descuentos para usuarios registrados
+      if (user?.profile_code === "cliente_registrado") {
+        const discount = await getDiscount();
+        if (discount && discount.received) {
+          setCurrentDiscount(discount);
+        }
       }
     } catch (error) {
       console.error("Error loading current discount:", error);
@@ -137,7 +140,7 @@ const BillPaymentScreen: React.FC = () => {
   };
 
   const calculateGameDiscountAmount = (): number => {
-    if (!billData || !currentDiscount) return 0;
+    if (!billData || !currentDiscount || user?.profile_code === "cliente_anonimo") return 0;
     return Math.round((billData.subtotal * currentDiscount.amount) / 100);
   };
 
@@ -171,7 +174,7 @@ const BillPaymentScreen: React.FC = () => {
     let message = `Subtotal: $${billData.subtotal.toLocaleString()}\n`;
     message += `Propina (${selectedSatisfaction.tipPercentage}%): $${tipAmount.toLocaleString()}\n`;
     
-    if (currentDiscount && gameDiscountAmount > 0) {
+    if (currentDiscount && gameDiscountAmount > 0 && user?.profile_code === "cliente_registrado") {
       message += `Descuento por juegos (${currentDiscount.amount}%): -$${gameDiscountAmount.toLocaleString()}\n`;
     }
     
@@ -283,8 +286,8 @@ const BillPaymentScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Descuentos de Juegos */}
-        {billData.gameDiscounts.length > 0 && (
+        {/* Descuentos de Juegos - Solo para usuarios registrados */}
+        {billData.gameDiscounts.length > 0 && user?.profile_code === "cliente_registrado" && (
           <View className="bg-gray-800 rounded-lg p-4 mb-4">
             <Text className="text-white text-lg font-semibold mb-3 flex-row items-center">
               <Gift size={20} color="#10b981" className="mr-2" />

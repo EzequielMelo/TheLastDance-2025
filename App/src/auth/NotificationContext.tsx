@@ -45,7 +45,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       
       // Agregar handler para notificaciones de pago
       NotificationService.addNotificationHandler((data) => {
-        if (data.type === 'payment_confirmed') {
+        if (data.type === 'payment_confirmed' || data.type === 'anonymous_invoice_ready') {
           handler(data);
         }
       });

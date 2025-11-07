@@ -35,6 +35,7 @@ import {
 } from "../../api/orders";
 import type { CreateOrderRequest, OrderItem } from "../../types/Order";
 import OrderStatusView from "../orders/OrderStatusView";
+import CustomAlert from "../common/CustomAlert";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -86,6 +87,48 @@ export default function CartModal({
     totalItems: number;
     deliveredItems: number;
   } | null>(null);
+
+  // Estado para CustomAlert
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: "success" | "error" | "warning" | "info";
+    buttons: Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "default" | "cancel" | "destructive";
+    }>;
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+    buttons: [],
+  });
+
+  const showAlert = (
+    title: string,
+    message: string,
+    buttons: Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "default" | "cancel" | "destructive";
+    }> = [{ text: "OK" }],
+    type: "success" | "error" | "warning" | "info" = "info"
+  ) => {
+    setAlertConfig({
+      visible: true,
+      title,
+      message,
+      type,
+      buttons,
+    });
+  };
+
+  const hideAlert = () => {
+    setAlertConfig(prev => ({ ...prev, visible: false }));
+  };
 
   // Estado del pedido actual (simplificado)
   const currentOrder = userOrders.find(order => !order.is_paid);
@@ -201,7 +244,12 @@ export default function CartModal({
 
   const handleConfirmDelivery = async () => {
     if (!occupiedTable?.id) {
-      Alert.alert("Error", "No se pudo obtener la información de tu mesa");
+      showAlert(
+        "Error",
+        "No se pudo obtener la información de tu mesa",
+        undefined,
+        "error"
+      );
       return;
     }
 
@@ -211,7 +259,7 @@ export default function CartModal({
       const result = await confirmTableDelivery(occupiedTable.id);
 
       if (result.success) {
-        Alert.alert(
+        showAlert(
           "✅ Recepción Confirmada",
           "¡Perfecto! Has confirmado la recepción de tu pedido. Ahora tienes acceso a juegos y encuestas.",
           [
@@ -225,18 +273,23 @@ export default function CartModal({
               },
             },
           ],
+          "success"
         );
       } else {
-        Alert.alert(
+        showAlert(
           "Error",
           "No se pudo confirmar la recepción. Intenta de nuevo.",
+          undefined,
+          "error"
         );
       }
     } catch (error: any) {
       console.error("Error confirmando entrega:", error);
-      Alert.alert(
+      showAlert(
         "Error",
         error.message || "No se pudo confirmar la recepción del pedido",
+        undefined,
+        "error"
       );
     } finally {
       setConfirmingDelivery(false);
@@ -792,8 +845,7 @@ export default function CartModal({
                     marginBottom: 16,
                   }}
                 >
-                  Todos tus productos han sido entregados (
-                  {deliveryStatus.totalItems} items)
+                  Todos tus productos han sido entregados.
                 </Text>
                 <TouchableOpacity
                   onPress={handleConfirmDelivery}
@@ -914,6 +966,16 @@ export default function CartModal({
           </View>
         )}
       </LinearGradient>
+
+      {/* CustomAlert */}
+      <CustomAlert
+        visible={alertConfig.visible}
+        onClose={hideAlert}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+      />
     </Modal>
   );
 }

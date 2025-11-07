@@ -1,4 +1,3 @@
-import fs from 'fs';
 import { sendMail } from '../lib/sendgridMailer';
 
 interface InvoiceEmailData {
@@ -15,18 +14,10 @@ export class InvoiceEmailService {
    */
   static async sendInvoiceByEmail(
     userEmail: string,
-    invoiceFilePath: string,
+    invoiceHTML: string,
     invoiceData: InvoiceEmailData
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      // Verificar que el archivo existe
-      if (!fs.existsSync(invoiceFilePath)) {
-        throw new Error('Archivo de factura no encontrado');
-      }
-
-      // Leer el contenido HTML de la factura
-      const invoiceHTML = fs.readFileSync(invoiceFilePath, 'utf8');
-      
       // Crear el email con la factura embebida
       const subject = `Factura ${invoiceData.invoiceNumber} - The Last Dance`;
       const emailHTML = this.createInvoiceEmailTemplate(invoiceData, invoiceHTML);
@@ -76,8 +67,8 @@ export class InvoiceEmailService {
             padding: 20px;
         }
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: linear-gradient(135deg, #d4af37 0%, #b8941f 50%, #d4af37 100%);
+            color: #1a1a1a;
             padding: 30px;
             text-align: center;
             border-radius: 10px 10px 0 0;
@@ -87,18 +78,7 @@ export class InvoiceEmailService {
             padding: 30px;
             border-radius: 0 0 10px 10px;
         }
-        .invoice-summary {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-            border-left: 4px solid #667eea;
-        }
-        .amount {
-            font-size: 24px;
-            font-weight: bold;
-            color: #667eea;
-        }
+
         .invoice-container {
             background: white;
             padding: 20px;
@@ -118,7 +98,12 @@ export class InvoiceEmailService {
 </head>
 <body>
     <div class="header">
-        <h1>🧾 Tu Factura está Lista</h1>
+        <div style="margin-bottom: 20px;">
+            <img src="https://eahhbvsassnukebtvate.supabase.co/storage/v1/object/public/Icon/icono.png" 
+                 alt="Last Dance Logo" 
+                 style="width: 60px; height: 60px; border-radius: 12px; box-shadow: 0 8px 16px rgba(212,175,55,0.3);" />
+        </div>
+        <h1>Tu Factura está Lista</h1>
         <p>Gracias por tu visita a The Last Dance</p>
     </div>
     
@@ -127,22 +112,14 @@ export class InvoiceEmailService {
         
         <p>Te enviamos tu factura correspondiente a tu consumo en nuestra mesa <strong>${invoiceData.tableNumber}</strong>.</p>
         
-        <div class="invoice-summary">
-            <h3>📋 Resumen de Factura</h3>
-            <p><strong>Número:</strong> ${invoiceData.invoiceNumber}</p>
-            <p><strong>Fecha:</strong> ${invoiceData.invoiceDate}</p>
-            <p><strong>Mesa:</strong> ${invoiceData.tableNumber}</p>
-            <p><strong>Total:</strong> <span class="amount">$${invoiceData.totalAmount.toFixed(2)}</span></p>
-        </div>
-        
-        <h3>📄 Factura Completa</h3>
+        <h3>Factura Completa</h3>
         <p>A continuación encontrarás tu factura oficial con formato AFIP:</p>
         
         <div class="invoice-container">
             ${invoiceHTML}
         </div>
         
-        <p><strong>💾 Importante:</strong> Puedes guardar este email como comprobante de tu compra. La factura incluye todos los datos fiscales requeridos por AFIP.</p>
+        <p><strong>Importante:</strong> Puedes guardar este email como comprobante de tu compra. La factura incluye todos los datos fiscales requeridos por AFIP.</p>
         
         <p>¡Esperamos verte pronto nuevamente!</p>
         
@@ -168,12 +145,6 @@ Tu Factura - The Last Dance
 Hola ${invoiceData.clientName},
 
 Te enviamos tu factura correspondiente a tu consumo en nuestra mesa ${invoiceData.tableNumber}.
-
-RESUMEN DE FACTURA:
-- Número: ${invoiceData.invoiceNumber}
-- Fecha: ${invoiceData.invoiceDate}
-- Mesa: ${invoiceData.tableNumber}
-- Total: $${invoiceData.totalAmount.toFixed(2)}
 
 Esta factura incluye todos los datos fiscales requeridos por AFIP.
 
