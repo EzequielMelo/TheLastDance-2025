@@ -9,6 +9,7 @@ import SplashScreen from "../screens/SplashScreen";
 import { LoginScreen } from "../screens/auth-screens/LoginScreen";
 import { RegisterScreen } from "../screens/auth-screens/RegisterScreen";
 import { RegisterAnonymousScreen } from "../screens/auth-screens/RegisterAnonymousScreen";
+import { CompleteOAuthRegistrationScreen } from "../screens/auth-screens/CompleteOAuthRegistrationScreen";
 import CreateMenuItemScreen from "../screens/menu-screens/CreateMenuItemScreen";
 import ClientsScreen from "../screens/admin-screens/UsersList";
 import { AddStaffScreen } from "../screens/admin-screens/AddStaffScreen";
@@ -62,7 +63,7 @@ function NavigatorContent() {
     <>
       {/* Componente que configura handlers de notificación con navegación */}
       <NavigationNotificationHandler />
-      
+
       <Stack.Navigator
         screenOptions={{
           headerStyle: { backgroundColor: "#151F2E" },
@@ -71,178 +72,183 @@ function NavigatorContent() {
         initialRouteName={token ? "Home" : "Login"}
       >
         {token ? (
-        <>
-          <Stack.Screen
-            name="Home"
-            component={HomeScreen}
-            options={{ headerShown: false }}
-          />
-          {/* 🔒 Solo disponible logueado */}
-          <Stack.Screen
-            name="CreateMenuItem"
-            component={CreateMenuItemScreen}
-            options={{ title: "Agregar al menú", headerBackTitle: "Volver" }}
-          />
-          <Stack.Screen
-            name="Clients"
-            component={ClientsScreen}
-            options={{
-              title: "Usuarios Pendientes",
-              headerBackTitle: "Volver",
-            }}
-          />
-          <Stack.Screen
-            name="AddStaff"
-            component={AddStaffScreen}
-            options={{ title: "Añadir miembro" }}
-          />
-          <Stack.Screen
-            name="CreateTable"
-            component={CreateTableScreen}
-            options={{ title: "Nueva Mesa", headerBackTitle: "Volver" }}
-          />
-          <Stack.Screen
-            name="ManageWaitingList"
-            component={ManageWaitingListScreen}
-            options={{ title: "Lista de Espera", headerBackTitle: "Volver" }}
-          />
-          <Stack.Screen
-            name="GenerateWaitingListQR"
-            component={GenerateWaitingListQRScreen}
-            options={{ title: "Generar QR", headerBackTitle: "Volver" }}
-          />
-          <Stack.Screen
-            name="ScanQR"
-            component={ScanQRScreen}
-            options={{ title: "Escanear QR", headerBackTitle: "Volver" }}
-          />
-          <Stack.Screen
-            name="ScanTableQR"
-            component={ScanTableQRScreen}
-            options={{ title: "Confirmar Mesa", headerBackTitle: "Volver" }}
-          />
-          <Stack.Screen
-            name="ScanOrderQR"
-            component={ScanOrderQRScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="QRScanner"
-            component={QRScannerScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Games"
-            component={GamesScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Memory"
-            component={MemoryGame}
-            options={{ headerShown: false }}
-          />
+          <>
+            <Stack.Screen
+              name="Home"
+              component={HomeScreen}
+              options={{ headerShown: false }}
+            />
+            {/* 🔒 Solo disponible logueado */}
+            <Stack.Screen
+              name="CreateMenuItem"
+              component={CreateMenuItemScreen}
+              options={{ title: "Agregar al menú", headerBackTitle: "Volver" }}
+            />
+            <Stack.Screen
+              name="Clients"
+              component={ClientsScreen}
+              options={{
+                title: "Usuarios Pendientes",
+                headerBackTitle: "Volver",
+              }}
+            />
+            <Stack.Screen
+              name="AddStaff"
+              component={AddStaffScreen}
+              options={{ title: "Añadir miembro" }}
+            />
+            <Stack.Screen
+              name="CreateTable"
+              component={CreateTableScreen}
+              options={{ title: "Nueva Mesa", headerBackTitle: "Volver" }}
+            />
+            <Stack.Screen
+              name="ManageWaitingList"
+              component={ManageWaitingListScreen}
+              options={{ title: "Lista de Espera", headerBackTitle: "Volver" }}
+            />
+            <Stack.Screen
+              name="GenerateWaitingListQR"
+              component={GenerateWaitingListQRScreen}
+              options={{ title: "Generar QR", headerBackTitle: "Volver" }}
+            />
+            <Stack.Screen
+              name="ScanQR"
+              component={ScanQRScreen}
+              options={{ title: "Escanear QR", headerBackTitle: "Volver" }}
+            />
+            <Stack.Screen
+              name="ScanTableQR"
+              component={ScanTableQRScreen}
+              options={{ title: "Confirmar Mesa", headerBackTitle: "Volver" }}
+            />
+            <Stack.Screen
+              name="ScanOrderQR"
+              component={ScanOrderQRScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="QRScanner"
+              component={QRScannerScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Games"
+              component={GamesScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Memory"
+              component={MemoryGame}
+              options={{ headerShown: false }}
+            />
 
-          <Stack.Screen
-            name="FastMath"
-            component={FastMathGame}
-            options={{ headerShown: false }}
-          />
+            <Stack.Screen
+              name="FastMath"
+              component={FastMathGame}
+              options={{ headerShown: false }}
+            />
 
-          <Stack.Screen
-            name="Puzzle"
-            component={PuzzleGame}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Survey"
-            component={SurveyScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="JoinWaitingList"
-            component={JoinWaitingListScreen}
-            options={{ title: "Unirse a Lista", headerBackTitle: "Volver" }}
-          />
-          <Stack.Screen
-            name="MyWaitingPosition"
-            component={MyWaitingPositionScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Menu"
-            component={MenuScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="WaiterDashboard"
-            component={WaiterDashboardScreen}
-            options={{ title: "Panel del Mesero", headerBackTitle: "Volver" }}
-          />
-          <Stack.Screen
-            name="WaiterOrders"
-            component={WaiterOrdersScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="AllWaiters"
-            component={AllWaitersScreen}
-            options={{ title: "Distribución de Meseros", headerShown: false }}
-          />
-          <Stack.Screen
-            name="TableChat"
-            component={TableChatScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="BillPayment"
-            component={BillPaymentScreen}
-            options={{ title: "Pagar Cuenta", headerBackTitle: "Volver" }}
-          />
-          <Stack.Screen
-            name="InvoiceView"
-            component={InvoiceViewScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="KitchenDashboard"
-            component={KitchenDashboardScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="KitchenMenu"
-            component={KitchenMenuScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="BartenderDashboard"
-            component={BartenderDashboardScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="BarMenu"
-            component={BarMenuScreen}
-            options={{ headerShown: false }}
-          />
-        </>
-      ) : (
-        <>
-          <Stack.Screen
-            name="Login"
-            component={LoginScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Registro"
-            component={RegisterScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="RegistroAnonimo"
-            component={RegisterAnonymousScreen}
-            options={{ headerShown: false }}
-          />
-        </>
-      )}
+            <Stack.Screen
+              name="Puzzle"
+              component={PuzzleGame}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Survey"
+              component={SurveyScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="JoinWaitingList"
+              component={JoinWaitingListScreen}
+              options={{ title: "Unirse a Lista", headerBackTitle: "Volver" }}
+            />
+            <Stack.Screen
+              name="MyWaitingPosition"
+              component={MyWaitingPositionScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Menu"
+              component={MenuScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="WaiterDashboard"
+              component={WaiterDashboardScreen}
+              options={{ title: "Panel del Mesero", headerBackTitle: "Volver" }}
+            />
+            <Stack.Screen
+              name="WaiterOrders"
+              component={WaiterOrdersScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="AllWaiters"
+              component={AllWaitersScreen}
+              options={{ title: "Distribución de Meseros", headerShown: false }}
+            />
+            <Stack.Screen
+              name="TableChat"
+              component={TableChatScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="BillPayment"
+              component={BillPaymentScreen}
+              options={{ title: "Pagar Cuenta", headerBackTitle: "Volver" }}
+            />
+            <Stack.Screen
+              name="InvoiceView"
+              component={InvoiceViewScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="KitchenDashboard"
+              component={KitchenDashboardScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="KitchenMenu"
+              component={KitchenMenuScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="BartenderDashboard"
+              component={BartenderDashboardScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="BarMenu"
+              component={BarMenuScreen}
+              options={{ headerShown: false }}
+            />
+          </>
+        ) : (
+          <>
+            <Stack.Screen
+              name="Login"
+              component={LoginScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Registro"
+              component={RegisterScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="RegistroAnonimo"
+              component={RegisterAnonymousScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="CompleteOAuthRegistration"
+              component={CompleteOAuthRegistrationScreen}
+              options={{ headerShown: false }}
+            />
+          </>
+        )}
       </Stack.Navigator>
     </>
   );

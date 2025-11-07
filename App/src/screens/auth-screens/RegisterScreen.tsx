@@ -1,4 +1,4 @@
-import { View, Text, Modal, TouchableOpacity } from "react-native";
+import { View, Text, Modal, TouchableOpacity, Platform } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
 import FormLayout from "../../Layouts/formLayout";
@@ -10,6 +10,7 @@ import {
   FormDataType,
 } from "../../Hooks/register/useRegisterForm";
 import { useAuthActions } from "../../auth/useAuthActions";
+import { useSocialAuth } from "../../Hooks/auth/useSocialAuth";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import React, { useState, useRef } from "react";
@@ -22,6 +23,7 @@ type CameraMode = "photo" | "dni" | null;
 
 export const RegisterScreen = ({ navigation }: Props) => {
   const { actionLoading, handleRegister: register } = useAuthActions();
+  const { signInWithGoogle, loading: socialLoading } = useSocialAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const [showCamera, setShowCamera] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
@@ -65,6 +67,50 @@ export const RegisterScreen = ({ navigation }: Props) => {
 
   const closeAlert = () => {
     setAlertVisible(false);
+  };
+
+  // Manejar autenticación social
+  const handleSocialSignIn = async (provider: "google") => {
+    const result = await signInWithGoogle();
+
+    if (result.success) {
+      if (
+        result.requires_completion &&
+        result.session_id &&
+        result.user_preview
+      ) {
+        // Usuario nuevo: navegar a pantalla para completar DNI y CUIL
+        navigation.navigate("CompleteOAuthRegistration", {
+          session_id: result.session_id,
+          user_preview: result.user_preview,
+        });
+      } else {
+        // Usuario completo, ir al home
+        showAlert(
+          "¡Bienvenido!",
+          "Registro completado exitosamente",
+          "success",
+          [
+            {
+              text: "Continuar",
+              onPress: () => {
+                closeAlert();
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: "Home" }],
+                });
+              },
+            },
+          ],
+        );
+      }
+    } else {
+      showAlert(
+        "Error",
+        result.error || "Error al iniciar sesión con redes sociales",
+        "error",
+      );
+    }
   };
 
   // Función para parsear el código PDF417 del DNI argentino
@@ -506,6 +552,35 @@ export const RegisterScreen = ({ navigation }: Props) => {
           onFocus={() => setFocused("confirmPassword")}
           error={errors.confirmPassword}
         />
+
+        {/* Separador */}
+        <View className="flex-row items-center my-6">
+          <View className="flex-1 h-px bg-gray-600" />
+          <Text className="mx-4 text-gray-400">O continúa con</Text>
+          <View className="flex-1 h-px bg-gray-600" />
+        </View>
+
+        {/* Botones de redes sociales */}
+        <View className="flex-row justify-center gap-4 mb-4">
+          {/* Google */}
+          <TouchableOpacity
+            onPress={() => handleSocialSignIn("google")}
+            disabled={socialLoading || actionLoading}
+            className="bg-white p-4 rounded-full flex-row items-center gap-2"
+            style={{
+              opacity: socialLoading || actionLoading ? 0.5 : 1,
+              elevation: 4,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+            }}
+          >
+            <Text className="text-2xl font-bold" style={{ color: "#4285F4" }}>
+              G
+            </Text>
+          </TouchableOpacity>
+        </View>
       </FormLayout>
 
       <Modal visible={showCamera} animationType="slide">

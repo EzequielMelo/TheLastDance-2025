@@ -8,6 +8,11 @@ import {
   deleteAnonymousUser,
   refreshToken,
 } from "./authController";
+import {
+  initSocialAuth,
+  processSocialCallback,
+  completeRegistration,
+} from "../modules/auth/socialAuthController";
 import multer from "multer";
 
 const router = express.Router();
@@ -20,5 +25,10 @@ router.post("/refresh", refreshToken);
 router.post("/update-push-token", updatePushToken);
 router.delete("/anonymous", deleteAnonymousUser);
 router.get("/validate-token", checkTokenValidity);
+
+// Rutas de autenticación social
+router.post("/social/init", initSocialAuth);
+router.post("/social/callback", processSocialCallback);
+router.post("/social/complete-registration", completeRegistration); // Nuevo: crear usuario con todos los datos
 
 export default router;
