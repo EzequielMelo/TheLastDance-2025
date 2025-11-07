@@ -138,6 +138,14 @@ export const useSocialAuth = () => {
           };
         }
 
+        // Usuario existente: mapear profile_image a photo_url
+        const mappedUser = user
+          ? {
+              ...user,
+              photo_url: user.profile_image, // Mapear profile_image del backend a photo_url del frontend
+            }
+          : null;
+
         // Usuario existente: guardar tokens y continuar
         if (session?.access_token) {
           await SecureStore.setItemAsync("authToken", session.access_token);
@@ -149,8 +157,8 @@ export const useSocialAuth = () => {
         }
 
         // Actualizar el contexto de autenticación
-        if (session?.access_token && user) {
-          await login(session.access_token, user, session.refresh_token);
+        if (session?.access_token && mappedUser) {
+          await login(session.access_token, mappedUser, session.refresh_token);
           console.log("✅ Contexto de autenticación actualizado");
         }
 
@@ -158,7 +166,7 @@ export const useSocialAuth = () => {
 
         return {
           success: true,
-          user,
+          user: mappedUser,
         };
       } else if (result.type === "cancel") {
         console.log("⚠️ Usuario canceló la autenticación");
@@ -218,6 +226,14 @@ export const useSocialAuth = () => {
 
       const { user, session } = response.data;
 
+      // Mapear profile_image a photo_url
+      const mappedUser = user
+        ? {
+            ...user,
+            photo_url: user.profile_image, // Mapear profile_image del backend a photo_url del frontend
+          }
+        : null;
+
       // Guardar tokens
       if (session?.access_token) {
         await SecureStore.setItemAsync("authToken", session.access_token);
@@ -229,8 +245,8 @@ export const useSocialAuth = () => {
       }
 
       // Actualizar el contexto de autenticación
-      if (session?.access_token && user) {
-        await login(session.access_token, user, session.refresh_token);
+      if (session?.access_token && mappedUser) {
+        await login(session.access_token, mappedUser, session.refresh_token);
         console.log(
           "✅ Contexto de autenticación actualizado después de completar registro",
         );
@@ -240,7 +256,7 @@ export const useSocialAuth = () => {
 
       return {
         success: true,
-        user,
+        user: mappedUser,
       };
     } catch (error: any) {
       console.error("❌ Error completando registro:", error);
