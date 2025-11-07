@@ -74,10 +74,15 @@ export const RegisterScreen = ({ navigation }: Props) => {
     const result = await signInWithGoogle();
 
     if (result.success) {
-      if (result.needsAdditionalInfo) {
-        // Navegar a pantalla para completar información
-        navigation.navigate("CompleteProfile", {
-          user: result.user,
+      if (
+        result.requires_completion &&
+        result.session_id &&
+        result.user_preview
+      ) {
+        // Usuario nuevo: navegar a pantalla para completar DNI y CUIL
+        navigation.navigate("CompleteOAuthRegistration", {
+          session_id: result.session_id,
+          user_preview: result.user_preview,
         });
       } else {
         // Usuario completo, ir al home

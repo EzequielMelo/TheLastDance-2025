@@ -11,9 +11,8 @@ import {
 import {
   initSocialAuth,
   processSocialCallback,
-  completeProfile,
+  completeRegistration,
 } from "../modules/auth/socialAuthController";
-import { authenticateUser } from "../middlewares/authMiddleware";
 import multer from "multer";
 
 const router = express.Router();
@@ -30,6 +29,6 @@ router.get("/validate-token", checkTokenValidity);
 // Rutas de autenticación social
 router.post("/social/init", initSocialAuth);
 router.post("/social/callback", processSocialCallback);
-router.put("/social/complete-profile", authenticateUser, completeProfile);
+router.post("/social/complete-registration", completeRegistration); // Nuevo: crear usuario con todos los datos
 
 export default router;

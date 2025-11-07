@@ -9,7 +9,7 @@ import SplashScreen from "../screens/SplashScreen";
 import { LoginScreen } from "../screens/auth-screens/LoginScreen";
 import { RegisterScreen } from "../screens/auth-screens/RegisterScreen";
 import { RegisterAnonymousScreen } from "../screens/auth-screens/RegisterAnonymousScreen";
-import { CompleteProfileScreen } from "../screens/auth-screens/CompleteProfileScreen";
+import { CompleteOAuthRegistrationScreen } from "../screens/auth-screens/CompleteOAuthRegistrationScreen";
 import CreateMenuItemScreen from "../screens/menu-screens/CreateMenuItemScreen";
 import ClientsScreen from "../screens/admin-screens/UsersList";
 import { AddStaffScreen } from "../screens/admin-screens/AddStaffScreen";
@@ -243,8 +243,8 @@ function NavigatorContent() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="CompleteProfile"
-              component={CompleteProfileScreen}
+              name="CompleteOAuthRegistration"
+              component={CompleteOAuthRegistrationScreen}
               options={{ headerShown: false }}
             />
           </>

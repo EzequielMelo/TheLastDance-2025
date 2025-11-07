@@ -4,7 +4,15 @@ export type RootStackParamList = {
   Login: undefined;
   Registro: undefined;
   RegistroAnonimo: undefined;
-  CompleteProfile: { user: any }; // Pantalla para completar perfil después de OAuth
+  CompleteOAuthRegistration: {
+    session_id: string;
+    user_preview: {
+      email: string;
+      first_name: string;
+      last_name: string;
+      profile_image?: string | null;
+    };
+  }; // Pantalla para completar registro OAuth con DNI y CUIL
   Home: { refresh?: number } | undefined;
   Splash: undefined;
   CreateMenuItem: { initialCategory?: "plato" | "bebida" } | undefined;

@@ -12,7 +12,14 @@ WebBrowser.maybeCompleteAuthSession();
 interface SocialAuthResult {
   success: boolean;
   user?: any;
-  needsAdditionalInfo?: boolean;
+  requires_completion?: boolean; // Usuario nuevo que necesita completar DNI/CUIL
+  session_id?: string; // Para completar registro después
+  user_preview?: {
+    email: string;
+    first_name: string;
+    last_name: string;
+    profile_image?: string | null;
+  }; // Datos del usuario desde Google
   error?: string;
 }
 
@@ -97,7 +104,9 @@ export const useSocialAuth = () => {
 
         console.log("✅ Tokens recibidos, enviando al backend...");
 
-        // Paso 3: Enviar tokens al backend para procesar
+        // Paso 3: Enviar tokens al backend
+        // - Si es usuario nuevo: guarda en memoria y devuelve session_id
+        // - Si es usuario existente: devuelve session y user
         const callbackResponse = await api.post(
           `${API_BASE_URL}/auth/social/callback`,
           {
@@ -112,9 +121,22 @@ export const useSocialAuth = () => {
           );
         }
 
-        const { user, session, needsAdditionalInfo } = callbackResponse.data;
+        const { user, session, requires_completion, session_id, user_preview } =
+          callbackResponse.data;
 
-        // Guardar tokens en SecureStore
+        // Usuario nuevo: necesita completar registro
+        if (requires_completion && session_id) {
+          console.log("📋 Usuario nuevo, necesita completar registro");
+          console.log("🆔 Session ID:", session_id);
+          return {
+            success: true,
+            requires_completion: true,
+            session_id,
+            user_preview,
+          };
+        }
+
+        // Usuario existente: guardar tokens y continuar
         if (session?.access_token) {
           await SecureStore.setItemAsync("authToken", session.access_token);
           console.log("💾 Token guardado en SecureStore");
@@ -125,12 +147,10 @@ export const useSocialAuth = () => {
         }
 
         console.log("✅ Autenticación completada");
-        console.log("📋 Necesita información adicional:", needsAdditionalInfo);
 
         return {
           success: true,
           user,
-          needsAdditionalInfo,
         };
       } else if (result.type === "cancel") {
         console.log("⚠️ Usuario canceló la autenticación");
@@ -167,37 +187,53 @@ export const useSocialAuth = () => {
   };
 
   /**
-   * Completa el perfil del usuario con DNI, CUIL y teléfono
+   * Completa el registro de un nuevo usuario con session_id
    */
-  const completeUserProfile = async (data: {
+  const completeRegistration = async (data: {
+    session_id: string;
     dni: string;
     cuil: string;
-    phone?: string;
   }) => {
     try {
       setLoading(true);
 
-      const response = await api.put(
-        `${API_BASE_URL}/auth/social/complete-profile`,
+      console.log("📝 Completando registro con session_id:", data.session_id);
+
+      const response = await api.post(
+        `${API_BASE_URL}/auth/social/complete-registration`,
         data,
       );
 
       if (!response.data.success) {
-        throw new Error(response.data.error || "Error completando el perfil");
+        throw new Error(response.data.error || "Error completando el registro");
       }
+
+      const { user, session } = response.data;
+
+      // Guardar tokens
+      if (session?.access_token) {
+        await SecureStore.setItemAsync("authToken", session.access_token);
+        console.log("💾 Token guardado en SecureStore");
+      }
+
+      if (session?.refresh_token) {
+        await SecureStore.setItemAsync("refreshToken", session.refresh_token);
+      }
+
+      console.log("✅ Registro completado exitosamente");
 
       return {
         success: true,
-        user: response.data.user,
+        user,
       };
     } catch (error: any) {
-      console.error("❌ Error completando perfil:", error);
+      console.error("❌ Error completando registro:", error);
       return {
         success: false,
         error:
           error.response?.data?.error ||
           error.message ||
-          "Error completando el perfil",
+          "Error completando el registro",
       };
     } finally {
       setLoading(false);
@@ -206,7 +242,7 @@ export const useSocialAuth = () => {
 
   return {
     signInWithGoogle: () => signInWithProvider("google"),
-    completeUserProfile,
+    completeRegistration,
     loading,
   };
 };

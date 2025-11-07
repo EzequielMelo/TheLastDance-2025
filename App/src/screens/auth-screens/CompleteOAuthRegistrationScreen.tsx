@@ -7,29 +7,32 @@ import TextField from "../../components/form/TextField";
 import CUILField from "../../components/form/CUILField";
 import { useSocialAuth } from "../../Hooks/auth/useSocialAuth";
 
-type Props = NativeStackScreenProps<RootStackParamList, "CompleteProfile">;
+type Props = NativeStackScreenProps<
+  RootStackParamList,
+  "CompleteOAuthRegistration"
+>;
 
-export const CompleteProfileScreen = ({ navigation, route }: Props) => {
-  const { user } = route.params;
-  const { completeUserProfile, loading } = useSocialAuth();
+export const CompleteOAuthRegistrationScreen = ({
+  navigation,
+  route,
+}: Props) => {
+  const { session_id, user_preview } = route.params;
+  const { completeRegistration, loading } = useSocialAuth();
 
   const [formData, setFormData] = useState({
     dni: "",
     cuil: "",
-    phone: "",
   });
 
   const [errors, setErrors] = useState({
     dni: "",
     cuil: "",
-    phone: "",
   });
 
   const validateForm = (): boolean => {
     const newErrors = {
       dni: "",
       cuil: "",
-      phone: "",
     };
 
     // Validar DNI
@@ -46,13 +49,8 @@ export const CompleteProfileScreen = ({ navigation, route }: Props) => {
       newErrors.cuil = "El CUIL debe tener 11 dígitos";
     }
 
-    // Validar teléfono (opcional pero con formato)
-    if (formData.phone && formData.phone.length < 10) {
-      newErrors.phone = "El teléfono debe tener al menos 10 dígitos";
-    }
-
     setErrors(newErrors);
-    return !newErrors.dni && !newErrors.cuil && !newErrors.phone;
+    return !newErrors.dni && !newErrors.cuil;
   };
 
   const handleComplete = async () => {
@@ -60,21 +58,20 @@ export const CompleteProfileScreen = ({ navigation, route }: Props) => {
       return;
     }
 
-    const result = await completeUserProfile({
+    const result = await completeRegistration({
+      session_id,
       dni: formData.dni,
       cuil: formData.cuil,
-      phone: formData.phone || undefined,
     });
 
     if (result.success) {
       Alert.alert(
-        "¡Perfil Completado!",
-        "Tu registro ha sido completado exitosamente",
+        "¡Registro Completado!",
+        "Tu cuenta ha sido creada exitosamente",
         [
           {
             text: "Continuar",
             onPress: () => {
-              // Navegar al home
               navigation.reset({
                 index: 0,
                 routes: [{ name: "Home" }],
@@ -84,14 +81,14 @@ export const CompleteProfileScreen = ({ navigation, route }: Props) => {
         ],
       );
     } else {
-      Alert.alert("Error", result.error || "No se pudo completar el perfil");
+      Alert.alert("Error", result.error || "No se pudo completar el registro");
     }
   };
 
   return (
     <FormLayout
-      title="Completa tu Perfil"
-      subtitle={`Hola ${user?.first_name || user?.email || ""}!`}
+      title="¡Bienvenido!"
+      subtitle={`Hola ${user_preview.first_name}!`}
       submitLabel="Completar Registro"
       onSubmit={handleComplete}
       loading={loading}
@@ -120,21 +117,10 @@ export const CompleteProfileScreen = ({ navigation, route }: Props) => {
         error={errors.cuil}
       />
 
-      <TextField
-        placeholder="Teléfono (opcional)"
-        value={formData.phone}
-        onChangeText={v => {
-          setFormData({ ...formData, phone: v.replace(/\D/g, "") });
-          setErrors({ ...errors, phone: "" });
-        }}
-        keyboardType="phone-pad"
-        error={errors.phone}
-      />
-
-      <View className="mt-4 bg-yellow-600/20 p-4 rounded-lg border border-yellow-600/40">
-        <Text className="text-yellow-400 text-sm text-center">
-          ℹ️ Esta información es necesaria para completar tu perfil y garantizar
-          la seguridad de tu cuenta
+      <View className="mt-4 bg-blue-600/20 p-4 rounded-lg border border-blue-600/40">
+        <Text className="text-blue-300 text-sm text-center">
+          ℹ️ Tus datos de Google (nombre, email y foto) se usarán
+          automáticamente
         </Text>
       </View>
     </FormLayout>
