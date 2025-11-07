@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { View, Text, Alert } from "react-native";
+import { View, Text } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
 import FormLayout from "../../Layouts/formLayout";
 import TextField from "../../components/form/TextField";
 import CUILField from "../../components/form/CUILField";
+import CustomAlert from "../../components/common/CustomAlert";
 import { useSocialAuth } from "../../Hooks/auth/useSocialAuth";
 
 type Props = NativeStackScreenProps<
@@ -28,6 +29,44 @@ export const CompleteOAuthRegistrationScreen = ({
     dni: "",
     cuil: "",
   });
+
+  // CustomAlert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    title: "",
+    message: "",
+    type: "info" as "success" | "error" | "warning" | "info",
+    buttons: [] as Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "cancel" | "destructive";
+    }>,
+  });
+
+  const showAlert = (
+    title: string,
+    message: string,
+    type: "success" | "error" | "warning" | "info" = "info",
+    buttons?: Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "cancel" | "destructive";
+    }>,
+  ) => {
+    setAlertConfig({
+      title,
+      message,
+      type,
+      buttons: buttons || [
+        { text: "OK", onPress: () => setAlertVisible(false) },
+      ],
+    });
+    setAlertVisible(true);
+  };
+
+  const closeAlert = () => {
+    setAlertVisible(false);
+  };
 
   const validateForm = (): boolean => {
     const newErrors = {
@@ -65,23 +104,30 @@ export const CompleteOAuthRegistrationScreen = ({
     });
 
     if (result.success) {
-      Alert.alert(
+      showAlert(
         "¡Registro Completado!",
-        "Tu cuenta ha sido creada exitosamente",
+        "Tu cuenta ha sido creada exitosamente. Ahora puedes iniciar sesión.",
+        "success",
         [
           {
-            text: "Continuar",
+            text: "Iniciar Sesión",
             onPress: () => {
+              closeAlert();
+              // Volver al login para que inicie sesión con sus credenciales
               navigation.reset({
                 index: 0,
-                routes: [{ name: "Home" }],
+                routes: [{ name: "Login" }],
               });
             },
           },
         ],
       );
     } else {
-      Alert.alert("Error", result.error || "No se pudo completar el registro");
+      showAlert(
+        "Error",
+        result.error || "No se pudo completar el registro",
+        "error",
+      );
     }
   };
 
@@ -123,6 +169,15 @@ export const CompleteOAuthRegistrationScreen = ({
           automáticamente
         </Text>
       </View>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+        onClose={closeAlert}
+      />
     </FormLayout>
   );
 };

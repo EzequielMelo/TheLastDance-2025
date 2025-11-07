@@ -5,6 +5,7 @@ import api from "../../api/axios";
 import { API_BASE_URL } from "../../api/config";
 import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
+import { useAuth } from "../../auth/useAuth";
 
 // Necesario para cerrar correctamente el navegador después del OAuth
 WebBrowser.maybeCompleteAuthSession();
@@ -27,6 +28,7 @@ type SocialProvider = "google";
 
 export const useSocialAuth = () => {
   const [loading, setLoading] = useState(false);
+  const { login } = useAuth(); // Para actualizar el contexto después del login
 
   /**
    * Inicia sesión con un proveedor social (Google, Facebook, Apple)
@@ -146,6 +148,12 @@ export const useSocialAuth = () => {
           await SecureStore.setItemAsync("refreshToken", session.refresh_token);
         }
 
+        // Actualizar el contexto de autenticación
+        if (session?.access_token && user) {
+          await login(session.access_token, user, session.refresh_token);
+          console.log("✅ Contexto de autenticación actualizado");
+        }
+
         console.log("✅ Autenticación completada");
 
         return {
@@ -218,6 +226,14 @@ export const useSocialAuth = () => {
 
       if (session?.refresh_token) {
         await SecureStore.setItemAsync("refreshToken", session.refresh_token);
+      }
+
+      // Actualizar el contexto de autenticación
+      if (session?.access_token && user) {
+        await login(session.access_token, user, session.refresh_token);
+        console.log(
+          "✅ Contexto de autenticación actualizado después de completar registro",
+        );
       }
 
       console.log("✅ Registro completado exitosamente");

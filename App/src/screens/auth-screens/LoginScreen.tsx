@@ -115,21 +115,8 @@ export const LoginScreen = ({ navigation }: Props) => {
           session_id: result.session_id,
           user_preview: result.user_preview,
         });
-      } else {
-        // Usuario completo, ir al home
-        showAlert("¡Bienvenido!", "Inicio de sesión exitoso", "success", [
-          {
-            text: "Continuar",
-            onPress: () => {
-              closeAlert();
-              navigation.reset({
-                index: 0,
-                routes: [{ name: "Home" }],
-              });
-            },
-          },
-        ]);
       }
+      // Usuario existente: el contexto ya se actualizó, la navegación será automática
     } else {
       showAlert(
         "Error",

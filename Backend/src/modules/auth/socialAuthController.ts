@@ -3,6 +3,7 @@ import { supabaseAdmin } from "../../config/supabase";
 import type { Provider } from "@supabase/supabase-js";
 import { z } from "zod";
 import crypto from "crypto";
+import { uploadAvatar } from "../../lib/storage/avatarUpload";
 
 // Almacenamiento temporal en memoria para sesiones OAuth pendientes
 interface PendingOAuthSession {
@@ -16,6 +17,97 @@ interface PendingOAuthSession {
 }
 
 const pendingOAuthSessions = new Map<string, PendingOAuthSession>();
+
+/**
+ * Mejora la calidad de las URLs de fotos de Google
+ * Cambia s96-c por s400-c para obtener imágenes de 400x400 en lugar de 96x96
+ */
+function improveGooglePhotoUrl(url: string): string {
+  if (!url) return url;
+
+  // Detectar URLs de Google Photos
+  if (
+    url.includes("googleusercontent.com") ||
+    url.includes("ggpht.com") ||
+    url.includes("google.com/a/")
+  ) {
+    const desiredSize = 400; // 400x400 píxeles (alta calidad)
+
+    // Reemplazar parámetros de tamaño existentes
+    let improvedUrl = url
+      .replace(/=s\d+-c/g, `=s${desiredSize}-c`) // =s96-c -> =s400-c
+      .replace(/\/s\d+-c\//g, `/s${desiredSize}-c/`) // /s96-c/ -> /s400-c/
+      .replace(/=w\d+-h\d+/g, `=s${desiredSize}-c`); // =w96-h96 -> =s400-c
+
+    // Si no tiene parámetro de tamaño, agregarlo
+    if (!improvedUrl.includes("=s") && !improvedUrl.includes("=w")) {
+      improvedUrl += `=s${desiredSize}-c`;
+    }
+
+    return improvedUrl;
+  }
+
+  return url;
+}
+
+/**
+ * Descarga una imagen desde una URL y la convierte en formato Multer File
+ */
+async function downloadImageAsFile(
+  imageUrl: string,
+  userId: string,
+): Promise<Express.Multer.File | null> {
+  try {
+    // Mejorar calidad de la URL de Google
+    const improvedUrl = improveGooglePhotoUrl(imageUrl);
+
+    console.log("� Procesando foto de perfil de Google...");
+    console.log(`🔗 URL original: ${imageUrl}`);
+    if (improvedUrl !== imageUrl) {
+      console.log(`🔗 URL mejorada: ${improvedUrl}`);
+    }
+
+    console.log("📥 Descargando imagen de perfil...");
+    const response = await fetch(improvedUrl);
+
+    if (!response.ok) {
+      console.error(
+        `❌ Error descargando imagen: ${response.status} ${response.statusText}`,
+      );
+      return null;
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    if (!buffer || buffer.length === 0) {
+      console.error("❌ Buffer vacío al descargar imagen");
+      return null;
+    }
+
+    // Detectar tipo de imagen desde Content-Type o URL
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    const extension = contentType.split("/")[1] || "jpg";
+
+    // Crear un objeto compatible con Multer.File
+    const file: Express.Multer.File = {
+      fieldname: "profile_image",
+      originalname: `google_avatar_${userId}.${extension}`,
+      encoding: "7bit",
+      mimetype: contentType,
+      buffer: buffer,
+      size: buffer.length,
+    } as Express.Multer.File;
+
+    console.log(
+      `✅ Imagen descargada exitosamente (${buffer.length} bytes, ${contentType})`,
+    );
+    return file;
+  } catch (error) {
+    console.error("❌ Error descargando imagen de Google:", error);
+    return null;
+  }
+}
 
 // Limpiar sesiones expiradas cada 5 minutos
 setInterval(
@@ -291,6 +383,36 @@ export async function completeRegistration(
       user_metadata?.["name"]?.split(" ").slice(1).join(" ") ||
       "";
 
+    // Descargar y subir la foto de perfil de Google al bucket
+    let profileImageUrl: string | null = null;
+    const googleImageUrl =
+      user_metadata?.["avatar_url"] || user_metadata?.["picture"];
+
+    if (googleImageUrl) {
+      console.log("📸 Iniciando proceso de descarga de foto de Google...");
+      const imageFile = await downloadImageAsFile(
+        googleImageUrl,
+        supabase_user_id,
+      );
+
+      if (imageFile) {
+        try {
+          console.log("📤 Subiendo imagen al bucket de Supabase...");
+          profileImageUrl = await uploadAvatar(supabase_user_id, imageFile);
+          console.log("✅ Foto de perfil subida al bucket:", profileImageUrl);
+        } catch (uploadError) {
+          console.error("❌ Error subiendo foto de perfil:", uploadError);
+          // Continuar sin foto si falla
+        }
+      } else {
+        console.log(
+          "⚠️ No se pudo descargar la imagen, continuando sin foto de perfil",
+        );
+      }
+    } else {
+      console.log("ℹ️ Usuario no tiene foto de perfil en Google");
+    }
+
     try {
       // Crear usuario en la tabla users
       console.log("🆕 Creando usuario en la base de datos con todos los datos");
@@ -302,8 +424,7 @@ export async function completeRegistration(
           first_name: firstName,
           last_name: lastName,
           profile_code: "cliente_registrado",
-          profile_image:
-            user_metadata?.["avatar_url"] || user_metadata?.["picture"] || null,
+          profile_image: profileImageUrl, // URL del bucket, no de Google
           state: "pendiente", // Pendiente de aprobación admin
           dni,
           cuil,
