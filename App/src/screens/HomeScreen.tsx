@@ -667,13 +667,18 @@ export default function HomeScreen({ navigation, route }: Props) {
     return cartCount > 0 || currentOrders.length > 0;
   };
 
-  // Efecto para resetear activeTab cuando se vuelve a Home
+  // Efecto para resetear activeTab y refrescar estado cuando se vuelve a Home
   useFocusEffect(
     useCallback(() => {
       if (isCliente) {
         setActiveTab("home");
+        
+        // Refrescar estado del cliente cuando se regresa a la pantalla
+        console.log("🔄 HomeScreen - Pantalla enfocada, refrescando estado...");
+        checkWaitingListStatus();
+        setClientRefreshTrigger(prev => prev + 1);
       }
-    }, [isCliente]),
+    }, [isCliente, checkWaitingListStatus]),
   );
 
   const getProfileLabel = (profileCode: string, positionCode?: string) => {
@@ -1353,7 +1358,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                       marginBottom: 12,
                     }}
                   >
-                    💰 Pagos pendientes de confirmación
+                    Pagos pendientes de confirmación
                   </Text>
 
                   <View>
@@ -1372,7 +1377,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                         {/* Monto total del pedido */}
                         <View
                           style={{
-                            alignItems: "flex-end",
+                            alignItems: "flex-start",
                             marginBottom: 8,
                           }}
                         >
@@ -1791,7 +1796,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                   marginBottom: 2,
                 }}
               >
-                💰 Total Gastado
+                Total Gastado
               </Text>
               <Text style={{ color: "#999", fontSize: 13 }}>
                 {(() => {
@@ -1802,7 +1807,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                       (sum, order) => sum + order.order_items.length,
                       0,
                     );
-                  return `${totalItems} ${totalItems === 1 ? "item" : "items"}`;
+                  return `${totalItems} ${totalItems === 1 ? "producto" : "productos"}`;
                 })()}
               </Text>
             </View>

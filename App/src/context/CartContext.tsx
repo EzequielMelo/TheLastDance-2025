@@ -9,6 +9,7 @@ import {
   getUserOrders,
   addItemsToPartialOrder,
   addItemsToExistingOrder,
+  getAnonymousOrderData,
 } from "../api/orders";
 import type { Order } from "../types/Order";
 import { useAuth } from "../auth/useAuth";
@@ -112,6 +113,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   const [hasPartialOrder, setHasPartialOrder] = useState(false);
   const [hasAcceptedOrder, setHasAcceptedOrder] = useState(false);
   const [hasRejectedOrder, setHasRejectedOrder] = useState(false);
+  const [hasAnonymousPaidOrder, setHasAnonymousPaidOrder] = useState(false);
   const [acceptedOrderItems, setAcceptedOrderItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
@@ -528,10 +530,27 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     }
   };
 
+  // Verificar si usuario anónimo tiene pedidos pagados
+  const checkAnonymousPaidOrder = async () => {
+    if (!user || user.profile_code !== 'cliente_anonimo') {
+      setHasAnonymousPaidOrder(false);
+      return;
+    }
+
+    try {
+      const result = await getAnonymousOrderData();
+      setHasAnonymousPaidOrder(result.hasOrder);
+    } catch (error) {
+      console.error("Error verificando pedido anónimo pagado:", error);
+      setHasAnonymousPaidOrder(false);
+    }
+  };
+
   // Cargar pedidos al montar el componente o cuando cambie el usuario
   useEffect(() => {
     if (user) {
       loadOrdersFromDatabase();
+      checkAnonymousPaidOrder();
     } else {
       // Si no hay usuario, limpiar todo
       setCartItems([]);
@@ -542,12 +561,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       setHasPendingOrder(false);
       setHasPartialOrder(false);
       setHasRejectedOrder(false);
+      setHasAnonymousPaidOrder(false);
     }
   }, [user]);
 
   // Función pública para refrescar órdenes
   const refreshOrders = async () => {
     await loadOrdersFromDatabase();
+    await checkAnonymousPaidOrder();
   };
 
   // Función para agregar items a pedido parcial
@@ -950,6 +971,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     return Math.max(tiempoPlatos, tiempoBebidas);
   })();
 
+  // Lógica computada: bloquear si tiene pedido pendiente O si es anónimo con pedido pagado
+  const shouldBlockOrders = hasPendingOrder || hasAnonymousPaidOrder;
+
   const value: CartContextType = {
     cartItems,
     pendingOrderItems,
@@ -957,7 +981,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     acceptedOrderItems,
     rejectedOrderItems,
     userOrders,
-    hasPendingOrder,
+    hasPendingOrder: shouldBlockOrders, // Ahora incluye ambos casos
     hasPartialOrder,
     hasAcceptedOrder,
     hasRejectedOrder,

@@ -171,14 +171,6 @@ export const setupSocketIO = (httpServer: HttpServer) => {
         try {
           const { chatId, message, tableId } = data;
 
-          console.log("🔍 Datos recibidos para enviar mensaje:", {
-            chatId,
-            message: message.substring(0, 50),
-            tableId,
-            userId: user.appUserId,
-            userName: `${user.first_name} ${user.last_name}`,
-          });
-
           if (!message.trim()) {
             console.log("❌ Mensaje vacío rechazado");
             socket.emit("error", {
@@ -193,8 +185,6 @@ export const setupSocketIO = (httpServer: HttpServer) => {
             user.profile_code === "cliente_registrado"
               ? ("client" as const)
               : ("waiter" as const);
-
-          console.log("👤 Tipo de usuario emisor:", senderType);
 
           // Verificar que el chat existe
           const { data: chatExists, error: chatError } = await supabaseAdmin
@@ -215,18 +205,13 @@ export const setupSocketIO = (httpServer: HttpServer) => {
             return;
           }
 
-          console.log("✅ Chat verificado:", chatExists);
-
           // Guardar mensaje en base de datos
-          console.log("💾 Intentando guardar mensaje en BD...");
           const newMessage = await ChatServices.createMessage(
             chatId,
             user.appUserId,
             senderType,
             message.trim(),
           );
-
-          console.log("✅ Mensaje guardado en BD:", newMessage.id);
 
           // Enviar mensaje a todos en la sala
           const messageData = {
@@ -322,14 +307,6 @@ export const setupSocketIO = (httpServer: HttpServer) => {
             // No bloqueamos el mensaje por error de notificación
           }
 
-          // Debug: verificar cuántos usuarios recibieron el mensaje
-          const roomClients = io.sockets.adapter.rooms.get(roomName);
-          console.log(
-            `📤 Mensaje enviado en mesa ${tableId} por ${user.first_name} a ${roomClients?.size || 0} usuarios`,
-          );
-          console.log(
-            `💬 Contenido: "${message.trim().substring(0, 50)}${message.trim().length > 50 ? "..." : ""}"`,
-          );
         } catch (error) {
           console.error("💥 Error completo al enviar mensaje:", error);
           console.error(

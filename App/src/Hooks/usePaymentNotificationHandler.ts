@@ -12,6 +12,8 @@ export const usePaymentNotificationHandler = () => {
     waiterName?: string;
     totalAmount?: number;
     screen?: string;
+    downloadUrl?: string;
+    fileName?: string;
     invoiceData?: {
       generated: boolean;
       filePath?: string;
@@ -43,6 +45,27 @@ export const usePaymentNotificationHandler = () => {
           Alert.alert(
             "✅ Pago confirmado", 
             `${waiterName} confirmó tu pago de $${amount.toLocaleString()}.\n\n${notificationData.invoiceData?.error || 'Gracias por tu visita!'}`,
+            [{ text: "OK", style: "default" }]
+          );
+        }
+      } else if (notificationData.type === "anonymous_invoice_ready") {
+        // Manejar notificación específica para usuarios anónimos
+        console.log("📄 Handling anonymous invoice ready notification:", notificationData);
+        
+        if (notificationData.invoiceData?.generated && notificationData.fileName) {
+          navigation.navigate("InvoiceView", {
+            invoiceData: {
+              generated: true,
+              fileName: notificationData.fileName,
+              filePath: notificationData.invoiceData.filePath,
+              message: notificationData.invoiceData.message,
+            },
+            paymentAmount: notificationData.totalAmount || 0,
+          });
+        } else {
+          Alert.alert(
+            "🧾 Factura lista", 
+            `Tu pago de $${(notificationData.totalAmount || 0).toLocaleString()} fue confirmado, pero hubo un problema generando la factura.`,
             [{ text: "OK", style: "default" }]
           );
         }

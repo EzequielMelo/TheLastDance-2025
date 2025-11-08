@@ -52,8 +52,14 @@ export async function clearDiscount(): Promise<boolean> {
 export async function awardIfFirstWin(
   isWin: boolean,
   amountIfWin: number,
+  userProfileCode?: string,
 ): Promise<{ awarded: boolean; discount: Discount | null }> {
   try {
+    // Los usuarios anónimos no reciben descuentos
+    if (userProfileCode === "cliente_anonimo") {
+      return { awarded: false, discount: null };
+    }
+    
     const current = await getDiscount();
     
     if (isWin) {

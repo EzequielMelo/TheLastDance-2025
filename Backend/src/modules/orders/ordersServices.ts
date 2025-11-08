@@ -1910,10 +1910,6 @@ export async function getTableOrdersStatus(
 // Obtener pedidos pendientes para bar (items con category "bebida" y status "accepted")
 export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
   try {
-    console.log(
-      "🍷 Obteniendo pedidos para bar (todos los estados activos)...",
-    );
-
     // Obtener todos los items activos que son bebidas
     const { data: barItems, error: itemsError } = await supabaseAdmin
       .from("order_items")
@@ -1969,14 +1965,6 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
     barItems.forEach(item => {
       const order = (item as any).orders;
       const menuItem = (item as any).menu_items;
-
-      console.log("🍷 Procesando item de bar:", {
-        itemId: item.id,
-        orderId: order?.id,
-        menuItemName: menuItem?.name,
-        orderHasTables: !!order?.tables,
-        orderHasUsers: !!order?.users,
-      });
 
       if (!ordersMap.has(order.id)) {
         ordersMap.set(order.id, {
@@ -2463,6 +2451,8 @@ export async function confirmPaymentAndReleaseTable(
     generated: boolean;
     filePath?: string;
     fileName?: string;
+    htmlContent?: string;
+    isRegistered?: boolean;
     message?: string;
     error?: string;
   }
@@ -2613,7 +2603,7 @@ export async function confirmPaymentAndReleaseTable(
         : "Mozo";
 
     // 7. PUNTO 22: Entrega diferenciada de factura según tipo de usuario
-    if (invoiceInfo?.generated && invoiceInfo.filePath) {
+    if (invoiceInfo?.generated) {
       try {
         // Obtener datos del cliente de la tabla users
         const { data: clientData, error: clientError } = await supabaseAdmin
@@ -2622,22 +2612,33 @@ export async function confirmPaymentAndReleaseTable(
           .eq("id", payingClientId)
           .single();
 
-        // Obtener email del cliente desde Firebase Auth
-        const { getAuthEmailById } = await import("../admin/adminServices");
-        const clientEmail = await getAuthEmailById(payingClientId);
+        if (clientError || !clientData) {
+          console.error('❌ Error obteniendo datos del cliente:', clientError);
+          throw new Error('No se pudieron obtener datos del cliente');
+        }
 
-        if (clientEmail && !clientError && clientData) {
-          // USUARIO REGISTRADO: Enviar factura por email
-          console.log(`📧 Enviando factura por email a usuario registrado: ${clientEmail}`);
+        const clientName = `${clientData.first_name} ${clientData.last_name}`.trim();
+
+        if (invoiceInfo.isRegistered && invoiceInfo.htmlContent) {
+          // USUARIO REGISTRADO: Enviar factura por email (HTML embebido)
+          console.log(`📧 Enviando factura por email a usuario registrado`);
+          
+          // Obtener email del cliente desde Firebase Auth
+          const { getAuthEmailById } = await import("../admin/adminServices");
+          const clientEmail = await getAuthEmailById(payingClientId);
+          
+          if (!clientEmail) {
+            throw new Error('No se pudo obtener email del cliente registrado');
+          }
           
           const { InvoiceEmailService } = await import("../../services/invoiceEmailService");
           const emailResult = await InvoiceEmailService.sendInvoiceByEmail(
             clientEmail,
-            invoiceInfo.filePath,
+            invoiceInfo.htmlContent,
             {
-              clientName: `${clientData.first_name} ${clientData.last_name}`.trim(),
+              clientName,
               tableNumber: table.number.toString(),
-              invoiceNumber: invoiceInfo.fileName?.replace('.html', '') || 'N/A',
+              invoiceNumber: `INV-${Date.now()}`,
               totalAmount: finalTotalAmount,
               invoiceDate: new Date().toLocaleDateString('es-AR')
             }
@@ -2648,17 +2649,24 @@ export async function confirmPaymentAndReleaseTable(
           } else {
             console.error(`❌ Error enviando factura por email: ${emailResult.error}`);
           }
-        } else {
+        } else if (!invoiceInfo.isRegistered && invoiceInfo.filePath && invoiceInfo.fileName) {
           // USUARIO ANÓNIMO: Enviar notificación push con enlace de descarga
-          console.log(`📱 Enviando notificación push con enlace de descarga a usuario anónimo: ${table.id_client}`);
+          console.log(`📱 Enviando notificación push con enlace de descarga a usuario anónimo`);
           
           const { notifyAnonymousClientInvoiceReady } = await import("../../services/pushNotificationService");
           await notifyAnonymousClientInvoiceReady(
-            payingClientId, // Usar el cliente que solicitó el pago
-            table.number,
+            payingClientId,
+            table.number.toString(),
             finalTotalAmount,
-            invoiceInfo
+            {
+              generated: true,
+              filePath: invoiceInfo.filePath,
+              fileName: invoiceInfo.fileName,
+              message: invoiceInfo.message || "Factura generada exitosamente"
+            }
           );
+        } else {
+          console.warn(`⚠️ Factura generada pero faltan datos para entrega: isRegistered=${invoiceInfo.isRegistered}, hasHTML=${!!invoiceInfo.htmlContent}, hasFile=${!!invoiceInfo.filePath}`);
         }
       } catch (deliveryError) {
         console.error(`❌ Error en entrega diferenciada de factura:`, deliveryError);

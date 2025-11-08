@@ -527,9 +527,43 @@ export const generateInvoiceManually = async (tableId: string): Promise<{
     const response = await api.post(`/invoices/generate/${tableId}`);
     return response.data;
   } catch (error: any) {
-    console.error("❌ API: Error generando factura:", error);
+    console.error("❌ API: Error generando factura manualmente:", error);
     throw new Error(
       error.response?.data?.error || "Error generando factura",
     );
+  }
+};
+
+// Obtener datos de pedido para usuarios anónimos (para generar PDF local)
+export const getAnonymousOrderData = async (): Promise<{
+  hasOrder: boolean;
+  orderData?: {
+    clientName: string;
+    tableNumber: string;
+    items: Array<{
+      name: string;
+      description: string;
+      category: string;
+      quantity: number;
+      unitPrice: number;
+      totalPrice: number;
+    }>;
+    subtotal: number;
+    tipAmount: number;
+    gameDiscountAmount: number;
+    gameDiscountPercentage: number;
+    totalAmount: number;
+    satisfactionLevel: string;
+    orderDate: string;
+    orderTime: string;
+    invoiceNumber: string;
+  };
+}> => {
+  try {
+    const response = await api.get('/orders/anonymous-order-data');
+    return response.data;
+  } catch (error: any) {
+    console.error("❌ API: Error obteniendo datos del pedido anónimo:", error);
+    return { hasOrder: false };
   }
 };

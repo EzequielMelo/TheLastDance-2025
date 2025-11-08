@@ -17,13 +17,15 @@ if (Constants.executionEnvironment !== "storeClient") {
 }
 
 export interface NotificationData {
-  type: "new_client_registration" | "payment_confirmed";
+  type: "new_client_registration" | "payment_confirmed" | "anonymous_invoice_ready";
   clientId?: string;
   clientName?: string;
   tableNumber?: string;
   waiterName?: string;
   totalAmount?: number;
   screen?: string;
+  downloadUrl?: string;
+  fileName?: string;
   invoiceData?: {
     generated: boolean;
     filePath?: string;

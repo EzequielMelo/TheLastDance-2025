@@ -31,10 +31,35 @@ interface InvoiceData {
 }
 
 export class InvoiceService {
-  static async generateInvoiceHTML(
+  // Para clientes REGISTRADOS: Solo generar HTML sin guardar archivo
+  static async generateInvoiceHTMLOnly(
     tableId: string,
     clientId: string,
-  ): Promise<{ success: boolean; filePath?: string; htmlContent?: string; error?: string }> {
+  ): Promise<{ success: boolean; htmlContent?: string; error?: string }> {
+    try {
+      // Obtener datos de la factura
+      const invoiceData = await this.getInvoiceData(tableId, clientId);
+      
+      if (!invoiceData) {
+        return { success: false, error: 'No se encontraron datos para la factura' };
+      }
+
+      // Generar solo el HTML sin guardarlo
+      const htmlContent = this.createHTMLInvoice(invoiceData);
+      
+      console.log(`📧 Factura HTML generada para cliente registrado (no se guarda archivo)`);
+      return { success: true, htmlContent };
+    } catch (error) {
+      console.error('Error generando factura HTML:', error);
+      return { success: false, error: 'Error interno generando factura' };
+    }
+  }
+
+  // Para clientes ANÓNIMOS: Generar HTML Y guardar archivo para descarga
+  static async generateInvoiceWithFile(
+    tableId: string,
+    clientId: string,
+  ): Promise<{ success: boolean; filePath?: string; fileName?: string; htmlContent?: string; error?: string }> {
     try {
       // Obtener datos de la factura
       const invoiceData = await this.getInvoiceData(tableId, clientId);
@@ -46,14 +71,25 @@ export class InvoiceService {
       // Generar el HTML
       const htmlContent = this.createHTMLInvoice(invoiceData);
       
-      // Guardar el archivo HTML
+      // Guardar el archivo HTML para usuarios anónimos
       const filePath = await this.saveHTMLFile(invoiceData, htmlContent);
+      const fileName = path.basename(filePath);
       
-      return { success: true, filePath, htmlContent };
+      console.log(`📁 Factura HTML generada y guardada para cliente anónimo: ${fileName}`);
+      return { success: true, filePath, fileName, htmlContent };
     } catch (error) {
-      console.error('Error generando factura HTML:', error);
+      console.error('Error generando factura con archivo:', error);
       return { success: false, error: 'Error interno generando factura' };
     }
+  }
+
+  // MÉTODO LEGACY: Mantener por compatibilidad (usar generateInvoiceWithFile para nuevos casos)
+  static async generateInvoiceHTML(
+    tableId: string,
+    clientId: string,
+  ): Promise<{ success: boolean; filePath?: string; htmlContent?: string; error?: string }> {
+    console.log(`⚠️ Usando método legacy generateInvoiceHTML - considerar usar generateInvoiceHTMLOnly o generateInvoiceWithFile`);
+    return this.generateInvoiceWithFile(tableId, clientId);
   }
 
   private static async getInvoiceData(
@@ -204,18 +240,15 @@ export class InvoiceService {
     const currentTime = new Date().toLocaleTimeString('es-AR');
     const invoiceNumber = data.invoiceNumber.replace('INV-', '').padStart(8, '0');
     
-    // Usar el totalAmount que ya calculamos correctamente
-    const subtotal = data.totalAmount;
+    // Calcular correctamente con IVA ya incluido en precios
+    const totalConIVA = data.totalAmount; // Total que ya incluye IVA
+    const netoGravado = totalConIVA / 1.21; // Base sin IVA (dividir por 1.21)
     
     const totalDiscount = data.discounts.reduce((sum, discount) => sum + discount.amount, 0);
-    const finalTotal = subtotal - totalDiscount + data.tip;
+    const finalTotal = totalConIVA - totalDiscount + data.tip;
     
     // Crear items para la tabla - usar directamente los items de la primera orden consolidada
     const allItems = data.orders[0]?.items || [];
-    
-    console.log('📊 Debug HTML - allItems:', allItems.length);
-    console.log('📊 Debug HTML - primer item:', allItems[0]);
-    console.log('📊 Debug HTML - subtotal:', subtotal);
     
     return `
 <!DOCTYPE html>
@@ -228,7 +261,7 @@ export class InvoiceService {
     <style>
         * {
             box-sizing: border-box;
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
         }
 
         body {
@@ -390,9 +423,7 @@ export class InvoiceService {
         </thead>
         <tbody>
             ${(() => {
-              console.log('📊 Debug HTML - Generando tabla con items:', allItems);
               const tableRows = allItems.map((item, index) => {
-                console.log(`📊 Debug HTML - Item ${index}:`, item);
                 return `
                 <tr>
                     <td class="text-left">${index + 1}</td>
@@ -401,12 +432,11 @@ export class InvoiceService {
                     <td class="text-center">un.</td>
                     <td class="text-right">$${item.price.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
                     <td class="text-center">0,00</td>
-                    <td class="text-right">$${item.total.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+                    <td class="text-right">$${(item.total / 1.21).toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
                     <td class="text-right">21,00</td>
-                    <td class="text-right">$${(item.total * 1.21).toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+                    <td class="text-right">$${item.total.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
                 </tr>`;
               }).join('');
-              console.log('📊 Debug HTML - HTML generado de la tabla:', tableRows.length, 'caracteres');
               return tableRows;
             })()}
             ${data.discounts.map((discount, index) => `
@@ -439,84 +469,17 @@ export class InvoiceService {
     </table>
 
     <div class="footer" style="margin-top: 50px;">
-        <div class="flex wrapper space-between">
-            <div style="width:55%">
-                <p class="bold">Otros tributos</p>
-                <table>
-                    <thead>
-                        <th>Descripción</th>
-                        <th>Detalle</th>
-                        <th class="text-right">Alíc. %</th>
-                        <th class="text-right">Importe</th>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Per./Ret. de Impuesto a las Ganancias</td>
-                            <td></td>
-                            <td></td>
-                            <td class="text-right">0,00</td>
-                        </tr>
-                        <tr>
-                            <td>Per./Ret. de IVA</td>
-                            <td></td>
-                            <td></td>
-                            <td class="text-right">0,00</td>
-                        </tr>
-                        <tr>
-                            <td>Impuestos Internos</td>
-                            <td></td>
-                            <td></td>
-                            <td class="text-right">0,00</td>
-                        </tr>
-                        <tr>
-                            <td>Impuestos Municipales</td>
-                            <td></td>
-                            <td></td>
-                            <td class="text-right">0,00</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+        <div class="flex wrapper space-between" style="justify-content: flex-end;">
             <div style="width:40%;margin-top: 40px;">
                 <div class="wrapper" style="padding: 10px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                         <span><b>Importe Neto Gravado:</b></span>
-                        <span><b>$${(subtotal / 1.21).toLocaleString('es-AR', {minimumFractionDigits: 2})}</b></span>
+                        <span><b>$${netoGravado.toLocaleString('es-AR', {minimumFractionDigits: 2})}</b></span>
                     </div>
                     
                     <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                         <span><b>IVA 21%:</b></span>
-                        <span><b>$${(subtotal - (subtotal / 1.21)).toLocaleString('es-AR', {minimumFractionDigits: 2})}</b></span>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                        <span><b>IVA 27%:</b></span>
-                        <span><b>$0,00</b></span>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                        <span><b>IVA 10.5%:</b></span>
-                        <span><b>$0,00</b></span>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                        <span><b>IVA 5%:</b></span>
-                        <span><b>$0,00</b></span>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                        <span><b>IVA 2.5%:</b></span>
-                        <span><b>$0,00</b></span>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                        <span><b>IVA 0%:</b></span>
-                        <span><b>$0,00</b></span>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                        <span><b>Importe Otros Tributos:</b></span>
-                        <span><b>$0,00</b></span>
+                        <span><b>$${(totalConIVA - netoGravado).toLocaleString('es-AR', {minimumFractionDigits: 2})}</b></span>
                     </div>
                     
                     <div style="display: flex; justify-content: space-between; margin-top: 10px; border-top: 1px solid #000; padding-top: 5px;">

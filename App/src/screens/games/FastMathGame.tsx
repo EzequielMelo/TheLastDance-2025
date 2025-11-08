@@ -14,6 +14,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
 import { RootStackParamList } from "../../navigation/RootStackParamList";
 import { awardIfFirstWin } from "../../storage/discountStorage";
+import { useAuth } from "../../auth/useAuth";
 
 const MAX_ROUNDS = 5;
 const DISCOUNT = 15;
@@ -23,6 +24,7 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function FastMathGame() {
   const navigation = useNavigation<NavigationProp>();
+  const { user } = useAuth();
 
   const [round, setRound] = useState(1);
   const [question, setQuestion] = useState<{ text: string; answer: number }>({
@@ -189,7 +191,16 @@ export default function FastMathGame() {
     }
 
     if (round >= MAX_ROUNDS) {
-      const res = await awardIfFirstWin(true, DISCOUNT);
+      // Verificar si es usuario anónimo
+      if (user?.profile_code === "cliente_anonimo") {
+        ToastAndroid.show("🎉 ¡Ganaste el juego! (Los usuarios anónimos no reciben descuentos)", ToastAndroid.LONG);
+        setTimeout(() => {
+          navigation.navigate("Games" as any);
+        }, 2500);
+        return;
+      }
+      
+      const res = await awardIfFirstWin(true, DISCOUNT, user?.profile_code);
       if (res.awarded) {
         const currentDiscount = res.discount?.amount || DISCOUNT;
         if (currentDiscount > DISCOUNT) {

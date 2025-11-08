@@ -5,6 +5,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
 import { RootStackParamList } from "../../navigation/RootStackParamList";
 import { awardIfFirstWin } from "../../storage/discountStorage";
+import { useAuth } from "../../auth/useAuth";
 
 const COLORS = ["#ff7675", "#74b9ff", "#55efc4", "#ffeaa7"];
 const DISCOUNT = 10;
@@ -38,6 +39,7 @@ export default function MemoryGame() {
   const [showing, setShowing] = useState(false);
 
   const navigation = useNavigation<NavigationProp>();
+  const { user } = useAuth();
 
   useEffect(() => {
     startRound(1);
@@ -85,7 +87,16 @@ export default function MemoryGame() {
 
     if (next.length === pattern.length) {
       if (round >= MAX_ROUNDS) {
-        const res = await awardIfFirstWin(true, DISCOUNT);
+        // Verificar si es usuario anónimo
+        if (user?.profile_code === "cliente_anonimo") {
+          ToastAndroid.show("🎉 ¡Ganaste el juego! (Los usuarios anónimos no reciben descuentos)", ToastAndroid.LONG);
+          setTimeout(() => {
+            navigation.navigate("Games" as any);
+          }, 2500);
+          return;
+        }
+        
+        const res = await awardIfFirstWin(true, DISCOUNT, user?.profile_code);
         if (res.awarded) {
           const currentDiscount = res.discount?.amount || DISCOUNT;
           if (currentDiscount > DISCOUNT) {
