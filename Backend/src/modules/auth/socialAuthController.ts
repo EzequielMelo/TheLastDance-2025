@@ -262,8 +262,31 @@ export async function processSocialCallback(
     }
 
     if (existingUser) {
-      // Usuario ya existe, permitir login directo
-      console.log("✅ Usuario existente encontrado, permitiendo login");
+      // Usuario ya existe, validar estado de aprobación
+      console.log("✅ Usuario existente encontrado, validando estado");
+
+      // Bloqueo por estado (solo cliente_registrado)
+      if (
+        existingUser.profile_code === "cliente_registrado" &&
+        existingUser.state !== "aprobado"
+      ) {
+        console.log(`⚠️ Usuario con estado: ${existingUser.state}`);
+        if (existingUser.state === "pendiente") {
+          res.status(403).json({
+            success: false,
+            error: "Tu registro está pendiente de aprobación.",
+          });
+          return;
+        } else {
+          res.status(403).json({
+            success: false,
+            error: "Tu registro fue rechazado.",
+          });
+          return;
+        }
+      }
+
+      console.log("✅ Usuario aprobado, permitiendo login");
 
       const needsAdditionalInfo = !existingUser.dni || !existingUser.cuil;
 
