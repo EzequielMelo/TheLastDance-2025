@@ -1,5 +1,11 @@
 import { sendMail } from "./sendgridMailer";
-import { tplPending, tplApproved, tplRejected } from "./emailTemplates";
+import { 
+  tplPending, 
+  tplApproved, 
+  tplRejected,
+  tplReservationApproved,
+  tplReservationRejected
+} from "./emailTemplates";
 
 const htmlToText = (html: string) =>
   html
@@ -23,22 +29,66 @@ export async function sendApprovedEmail(to: string, name: string) {
 }
 
 export async function sendRejectedEmail(to: string, name: string, reason?: string) {
-  console.log("🔄 [DEBUG] sendRejectedEmail iniciado con:", { to, name, reason });
   
   const subject = "Estado de tu registro - The Last Dance";
-  console.log("🔄 [DEBUG] Subject generado:", subject);
   
   const html = tplRejected(name || "Cliente", reason);
-  console.log("🔄 [DEBUG] HTML template generado, longitud:", html.length);
   
   const text = htmlToText(html);
-  console.log("🔄 [DEBUG] Text generado, longitud:", text.length);
+    
+  try {
+    const result = await sendMail({ to, subject, html, text });
+    return result;
+  } catch (error) {
+    console.error("❌ [DEBUG] sendMail falló:", error);
+    throw error;
+  }
+}
+
+// ============================================
+// Emails para Reservas
+// ============================================
+
+export async function sendReservationApprovedEmail(
+  to: string,
+  name: string,
+  date: string,
+  time: string,
+  partySize: number,
+  tableNumber: string
+) {
   
-  console.log("🔄 [DEBUG] Llamando sendMail con parámetros:", { to, subject });
+  const subject = "¡Tu reserva fue aprobada! - Last Dance Restaurant";
+  
+  const html = tplReservationApproved(name || "Cliente", date, time, partySize, tableNumber);
+  
+  const text = htmlToText(html);
+    
+  try {
+    const result = await sendMail({ to, subject, html, text });
+    return result;
+  } catch (error) {
+    console.error("❌ [DEBUG] sendMail falló:", error);
+    throw error;
+  }
+}
+
+export async function sendReservationRejectedEmail(
+  to: string,
+  name: string,
+  date: string,
+  time: string,
+  partySize: number,
+  reason?: string
+) {  
+  const subject = "Actualización de tu reserva - Last Dance Restaurant";
+  
+  const html = tplReservationRejected(name || "Cliente", date, time, partySize, reason);
+  
+  const text = htmlToText(html);
   
   try {
     const result = await sendMail({ to, subject, html, text });
-    console.log("✅ [DEBUG] sendMail completado exitosamente:", result);
     return result;
   } catch (error) {
     console.error("❌ [DEBUG] sendMail falló:", error);

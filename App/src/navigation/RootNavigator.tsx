@@ -40,6 +40,9 @@ import BarMenuScreen from "../screens/bar-screens/BarMenuScreen";
 import MemoryGame from "../screens/games/MemoryGame";
 import FastMathGame from "../screens/games/FastMathGame";
 import PuzzleGame from "../screens/games/PuzzleGame";
+import MakeReservationScreen from "../screens/reservation-screens/MakeReservationScreen";
+import ManageReservationsScreen from '../screens/reservation-screens/ManageReservationsScreen';
+import MyReservationsScreen from '../screens/MyReservationsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -222,6 +225,21 @@ function NavigatorContent() {
             <Stack.Screen
               name="BarMenu"
               component={BarMenuScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="MakeReservation"
+              component={MakeReservationScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="ManageReservations"
+              component={ManageReservationsScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="MyReservations"
+              component={MyReservationsScreen}
               options={{ headerShown: false }}
             />
           </>

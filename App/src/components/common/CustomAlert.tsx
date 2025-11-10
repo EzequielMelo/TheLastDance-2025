@@ -74,7 +74,10 @@ export default function CustomAlert({
       case "error":
         return { icon: XCircle, color: "#ef4444", bgColor: "#ef4444" };
       case "warning":
-        return { icon: AlertTriangle, color: "#f59e0b", bgColor: "#f59e0b" };
+        // Si hay más de un botón (confirmación), no mostrar ícono
+        return buttons.length > 1 
+          ? { icon: null, color: "#f59e0b", bgColor: "#f59e0b" }
+          : { icon: AlertTriangle, color: "#f59e0b", bgColor: "#f59e0b" };
       default:
         return { icon: Info, color: "#3b82f6", bgColor: "#3b82f6" };
     }
@@ -132,12 +135,14 @@ export default function CustomAlert({
             {/* Header con icono */}
             <View className="pt-6 pb-4 px-6">
               <View className="flex-row items-center">
-                <View
-                  className="rounded-full p-2 mr-3"
-                  style={{ backgroundColor: `${bgColor}20` }}
-                >
-                  <IconComponent size={20} color={color} />
-                </View>
+                {IconComponent && (
+                  <View
+                    className="rounded-full p-2 mr-3"
+                    style={{ backgroundColor: `${bgColor}20` }}
+                  >
+                    <IconComponent size={20} color={color} />
+                  </View>
+                )}
                 <Text className="text-white text-xl font-bold flex-1">
                   {title}
                 </Text>

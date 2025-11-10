@@ -63,6 +63,12 @@ export type RootStackParamList = {
   KitchenMenu: undefined; // Menú de platos para cocineros (solo vista)
   BartenderDashboard: undefined; // Panel de bar para bartenders
   BarMenu: undefined; // Menú de bebidas para bartenders (solo vista)
+  
+  // Sistema de Reservas
+  MakeReservation: undefined; // Crear nueva reserva (clientes registrados)
+  MyReservations: undefined; // Ver mis reservas (clientes registrados)
+  ManageReservations: undefined; // Gestionar reservas (dueño/supervisor)
+  ReservationDetails: { reservationId: string }; // Ver detalles de una reserva
 };
 
 export type RootStackNavigationProp = StackNavigationProp<RootStackParamList>;

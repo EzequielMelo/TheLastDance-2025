@@ -169,3 +169,127 @@ export const tplRejected = (name: string, reason?: string) =>
     </div>
     `
   );
+
+// ============================================
+// Templates para Reservas
+// ============================================
+
+export const tplReservationApproved = (
+  name: string,
+  date: string,
+  time: string,
+  partySize: number,
+  tableNumber: string
+) =>
+  wrapper(
+    "¡Tu reserva fue aprobada!",
+    `
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:18px;margin-bottom:8px">¡Excelentes noticias, <strong style="color:${brandColor}">${name}</strong>!</div>
+    </div>
+    
+    <p style="color:${textColor};margin-bottom:20px">
+      Tu reserva ha sido <strong style="color:${brandColor};background:rgba(212,175,55,0.1);padding:2px 8px;border-radius:4px">✅ APROBADA</strong> exitosamente.
+    </p>
+    
+    <div style="background:rgba(212,175,55,0.1);border-radius:12px;padding:24px;margin:24px 0;border:1px solid rgba(212,175,55,0.3)">
+      <div style="color:${brandColor};font-weight:700;font-size:18px;margin-bottom:16px;text-align:center">
+        📅 Detalles de tu Reserva
+      </div>
+      
+      <div style="margin-bottom:12px">
+        <span style="color:${brandColor};font-weight:600">📆 Fecha:</span>
+        <span style="color:${textColor};margin-left:8px">${date}</span>
+      </div>
+      
+      <div style="margin-bottom:12px">
+        <span style="color:${brandColor};font-weight:600">🕐 Hora:</span>
+        <span style="color:${textColor};margin-left:8px">${time}</span>
+      </div>
+      
+      <div style="margin-bottom:12px">
+        <span style="color:${brandColor};font-weight:600">👥 Personas:</span>
+        <span style="color:${textColor};margin-left:8px">${partySize}</span>
+      </div>
+      
+      <div>
+        <span style="color:${brandColor};font-weight:600">🪑 Mesa:</span>
+        <span style="color:${textColor};margin-left:8px">${tableNumber}</span>
+      </div>
+    </div>
+    
+    <p style="color:${textColor};margin-bottom:20px;text-align:center">
+      Por favor, llegá <strong style="color:${brandColor}">15 minutos antes</strong> de tu hora reservada.
+    </p>
+    
+    <div style="text-align:center;background:rgba(212,175,55,0.1);border-radius:12px;padding:20px;margin:24px 0">
+      <div style="color:${brandColor};font-weight:600;font-size:16px;margin-bottom:8px">¡Te esperamos en Last Dance!</div>
+      <div style="color:${textColor};font-size:14px">Preparamos todo para tu visita</div>
+    </div>
+    
+    <div style="text-align:center;margin-top:32px">
+      <div style="color:${grayText};font-size:14px">¡Nos vemos pronto!</div>
+      <div style="color:${brandColor};font-weight:600;margin-top:4px">El equipo de Last Dance</div>
+    </div>
+    `
+  );
+
+export const tplReservationRejected = (
+  name: string,
+  date: string,
+  time: string,
+  partySize: number,
+  reason?: string
+) =>
+  wrapper(
+    "Actualización de tu reserva",
+    `
+    <div style="color:${textColor};text-align:center;margin-bottom:24px">
+      <div style="font-size:18px;margin-bottom:8px">Hola <strong style="color:${brandColor}">${name}</strong>,</div>
+    </div>
+    
+    <p style="color:${textColor};margin-bottom:20px">
+      Lamentablemente, tu solicitud de reserva fue <strong style="color:#ef4444;background:rgba(239,68,68,0.1);padding:2px 8px;border-radius:4px;">❌ rechazada</strong> en esta oportunidad.
+    </p>
+    
+    <div style="background:rgba(239,68,68,0.05);border-radius:12px;padding:20px;margin:20px 0;border:1px solid rgba(239,68,68,0.2)">
+      <div style="color:${textColor};font-weight:600;font-size:16px;margin-bottom:12px">Reserva solicitada:</div>
+      
+      <div style="margin-bottom:8px">
+        <span style="color:${grayText}">📆 Fecha:</span>
+        <span style="color:${textColor};margin-left:8px">${date}</span>
+      </div>
+      
+      <div style="margin-bottom:8px">
+        <span style="color:${grayText}">🕐 Hora:</span>
+        <span style="color:${textColor};margin-left:8px">${time}</span>
+      </div>
+      
+      <div>
+        <span style="color:${grayText}">👥 Personas:</span>
+        <span style="color:${textColor};margin-left:8px">${partySize}</span>
+      </div>
+    </div>
+    
+    ${reason ? `
+    <div style="background:rgba(239,68,68,0.1);border-left:4px solid #ef4444;padding:16px;margin:20px 0;border-radius:0 8px 8px 0">
+      <div style="color:${textColor};font-weight:600;margin-bottom:8px">Motivo del rechazo:</div>
+      <div style="color:${grayText};font-size:14px;line-height:1.5">${reason}</div>
+    </div>
+    ` : ""}
+    
+    <p style="color:${textColor};margin-bottom:24px">
+      Te invitamos a intentar con otra fecha u horario. Nuestro equipo está disponible para ayudarte a encontrar la mejor opción.
+    </p>
+    
+    <div style="text-align:center;background:rgba(212,175,55,0.1);border-radius:12px;padding:20px;margin:24px 0">
+      <div style="color:${brandColor};font-weight:600;font-size:16px;margin-bottom:8px">¿Querés intentar con otra fecha?</div>
+      <div style="color:${textColor};font-size:14px">Podés hacer una nueva reserva en cualquier momento</div>
+    </div>
+    
+    <div style="text-align:center;margin-top:32px">
+      <div style="color:${grayText};font-size:14px">Gracias por tu interés en</div>
+      <div style="color:${brandColor};font-weight:600;margin-top:4px">Last Dance Restaurant</div>
+    </div>
+    `
+  );

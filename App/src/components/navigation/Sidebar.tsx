@@ -29,6 +29,7 @@ import {
 import { User } from "../../types/User";
 import { useClientState } from "../../Hooks/useClientState";
 import { useCart } from "../../context/CartContext";
+import { getAnonymousOrderData } from "../../api/orders";
 
 const { width } = Dimensions.get("window");
 const SIDEBAR_WIDTH = width * 0.85;
@@ -62,6 +63,9 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
   // Hook del carrito para obtener información de items
   const { cartCount, pendingOrderCount, hasPendingOrder } = useCart();
   
+  // Estado para verificar si usuario anónimo tiene pedido pagado
+  const [hasAnonymousPaidOrder, setHasAnonymousPaidOrder] = React.useState(false);
+  
   // Extraer datos del cliente si corresponde
   const { state, waitingPosition, assignedTable, occupiedTable, refresh } = isClient ? clientState : {
     state: null,
@@ -86,6 +90,15 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
       }).start();
     }
   }, [visible]);
+
+  // Verificar si usuario anónimo tiene pedido pagado cuando se abre el sidebar
+  React.useEffect(() => {
+    if (visible && user?.profile_code === "cliente_anonimo") {
+      getAnonymousOrderData()
+        .then(result => setHasAnonymousPaidOrder(result.hasOrder))
+        .catch(() => setHasAnonymousPaidOrder(false));
+    }
+  }, [visible, user?.profile_code]);
 
   const getProfileLabel = (profileCode: string, positionCode?: string) => {
     const profileLabels: { [key: string]: string } = {
@@ -240,6 +253,16 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
       onPress: () => onNavigate("AllWaiters"),
       roles: ["dueno", "supervisor"],
     },
+    
+    // Gestión de Reservas (Admin)
+    {
+      id: "manage-reservations",
+      title: "Gestionar Reservas",
+      subtitle: "Aprobar o rechazar solicitudes de reserva",
+      icon: <Users size={20} color="#374151" />,
+      onPress: () => onNavigate("ManageReservations"),
+      roles: ["dueno", "supervisor"],
+    },
   ];
 
   const getFilteredActions = () => {
@@ -272,14 +295,38 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
 
     switch (state) {
       case "not_in_queue":
-        clientActions.push({
-          id: "join-queue",
-          title: "Unirse a Lista de Espera",
-          subtitle: "Escanea el QR para reservar una mesa",
-          icon: <Users size={20} color="#374151" />,
-          onPress: () => onNavigate("ScanQR"),
-          roles: ["cliente_registrado", "cliente_anonimo"],
-        });
+        // Para clientes registrados: mostrar "Reservar Mesa" y "Mis Reservas"
+        if (user?.profile_code === "cliente_registrado") {
+          clientActions.push(
+            {
+              id: "make-reservation",
+              title: "Reservar Mesa",
+              subtitle: "Reservá una mesa para una fecha y horario específico",
+              icon: <Users size={20} color="#374151" />,
+              onPress: () => onNavigate("MakeReservation"),
+              roles: ["cliente_registrado"],
+            },
+            {
+              id: "my-reservations",
+              title: "Mis Reservas",
+              subtitle: "Ver y gestionar tus reservas",
+              icon: <Clock size={20} color="#374151" />,
+              onPress: () => onNavigate("MyReservations"),
+              roles: ["cliente_registrado"],
+            }
+          );
+        }
+        // Para clientes anónimos (sin pedido pagado): mantener "Unirse a Lista de Espera"
+        else if (user?.profile_code === "cliente_anonimo" && !hasAnonymousPaidOrder) {
+          clientActions.push({
+            id: "join-queue",
+            title: "Unirse a Lista de Espera",
+            subtitle: "Escanea el QR para reservar una mesa",
+            icon: <Users size={20} color="#374151" />,
+            onPress: () => onNavigate("ScanQR"),
+            roles: ["cliente_anonimo"],
+          });
+        }
         break;
 
       case "in_queue":

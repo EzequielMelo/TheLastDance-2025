@@ -45,6 +45,7 @@ import {
   submitTandaModifications,
 } from "../../api/orders";
 import { useCart } from "../../context/CartContext";
+import { useClientState } from "../../Hooks/useClientState";
 import FloatingCart from "../../components/cart/FloatingCart";
 import FloatingModifyCart from "../../components/cart/FloatingModifyCart";
 import CartModal from "../../components/cart/CartModal";
@@ -82,6 +83,7 @@ export default function MenuScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<MenuScreenRouteProp>();
   const { setActiveTab } = useBottomNav();
+  const { state: clientState } = useClientState();
   const {
     cartCount,
     addItem,
@@ -90,6 +92,9 @@ export default function MenuScreen() {
     hasPendingOrder,
     refreshOrders,
   } = useCart();
+
+  // El cliente no está sentado en una mesa
+  const isNotSeated = clientState !== "seated";
 
   // Efecto para actualizar el tab activo cuando se enfoque la pantalla
   useFocusEffect(
@@ -260,6 +265,16 @@ export default function MenuScreen() {
       return;
     }
 
+    // Verificar que el cliente esté sentado
+    if (isNotSeated) {
+      Alert.alert(
+        "No estás sentado",
+        "Debes estar sentado en una mesa para agregar productos al menú. Por favor, solicita una mesa primero.",
+        [{ text: "Entendido" }],
+      );
+      return;
+    }
+
     if (hasPendingOrder) {
       Alert.alert(
         "Pedido en proceso",
@@ -307,6 +322,16 @@ export default function MenuScreen() {
       return;
     }
 
+    // Verificar que el cliente esté sentado
+    if (isNotSeated) {
+      Alert.alert(
+        "No estás sentado",
+        "Debes estar sentado en una mesa para modificar tu pedido.",
+        [{ text: "Entendido" }],
+      );
+      return;
+    }
+
     updateQuantity(itemId, newQuantity);
   };
 
@@ -338,27 +363,15 @@ export default function MenuScreen() {
         (item: any) => item.status === "needs_modification",
       );
 
-      console.log("🔍 DEBUG - needsModificationItems:", needsModificationItems);
-
       // Items needs_modification que el usuario mantiene (están en selectedModifyItems)
       const keepItems = needsModificationItems
         .filter((item: any) => selectedModifyItems[item.menu_item_id])
         .map((item: any) => item.id);
 
-      console.log("🔍 DEBUG - keepItems:", keepItems);
 
       // IDs de los items needs_modification (NO incluir los rejected)
       const needsModificationMenuItemIds = needsModificationItems.map(
         (item: any) => item.menu_item_id,
-      );
-
-      console.log(
-        "🔍 DEBUG - needsModificationMenuItemIds:",
-        needsModificationMenuItemIds,
-      );
-      console.log(
-        "🔍 DEBUG - selectedModifyItems COMPLETO:",
-        selectedModifyItems,
       );
 
       // Items nuevos = todos los que están en selectedModifyItems pero NO son needs_modification
@@ -369,20 +382,12 @@ export default function MenuScreen() {
         )
         .map(([itemId, quantity]) => {
           const menuItem = menuItems.find(m => m.id === itemId);
-          console.log(`🔍 DEBUG - Procesando item nuevo: ${itemId}`, {
-            quantity,
-            menuItem: menuItem
-              ? { id: menuItem.id, name: menuItem.name, price: menuItem.price }
-              : null,
-          });
           return {
             menu_item_id: itemId,
             quantity,
             unit_price: menuItem?.price || 0,
           };
         });
-
-      console.log("🔍 DEBUG - formattedNewItems FINAL:", formattedNewItems);
 
       // Si no hay cambios (ni keepItems ni newItems), preguntar al usuario
       if (keepItems.length === 0 && formattedNewItems.length === 0) {
@@ -410,15 +415,8 @@ export default function MenuScreen() {
         newItems: formattedNewItems,
       };
 
-      console.log(
-        "📤 ENVIANDO AL BACKEND - Payload completo:",
-        JSON.stringify(payload, null, 2),
-      );
-
       // Enviar modificaciones de tanda
       const response = await submitTandaModifications(orderId, payload);
-
-      console.log("✅ RESPUESTA DEL BACKEND:", response);
 
       Alert.alert(
         "Cambios Enviados",
@@ -435,9 +433,6 @@ export default function MenuScreen() {
         ],
       );
     } catch (error: any) {
-      console.error("❌ ERROR COMPLETO:", error);
-      console.error("❌ ERROR MESSAGE:", error.message);
-      console.error("❌ ERROR RESPONSE:", error.response?.data);
       Alert.alert(
         "Error",
         error.message || "No se pudieron enviar los cambios",
@@ -951,12 +946,12 @@ export default function MenuScreen() {
                             style={{
                               flexDirection: "row",
                               alignItems: "center",
-                              backgroundColor: isRejected
+                              backgroundColor: isRejected || (isNotSeated && !isModifyMode)
                                 ? "#9ca3af"
                                 : "#d4af37",
                               borderRadius: 8,
                               paddingHorizontal: 4,
-                              opacity: isRejected ? 0.5 : 1,
+                              opacity: isRejected || (isNotSeated && !isModifyMode) ? 0.5 : 1,
                             }}
                           >
                             <TouchableOpacity
@@ -966,18 +961,18 @@ export default function MenuScreen() {
                                   getCurrentItemQuantity(item.id) - 1,
                                 )
                               }
-                              disabled={isRejected}
+                              disabled={isRejected || (isNotSeated && !isModifyMode)}
                               style={{ padding: 8 }}
                             >
                               <Minus
                                 size={16}
-                                color={isRejected ? "#ffffff" : "#1a1a1a"}
+                                color={(isRejected || (isNotSeated && !isModifyMode)) ? "#ffffff" : "#1a1a1a"}
                               />
                             </TouchableOpacity>
 
                             <Text
                               style={{
-                                color: isRejected ? "#ffffff" : "#1a1a1a",
+                                color: (isRejected || (isNotSeated && !isModifyMode)) ? "#ffffff" : "#1a1a1a",
                                 fontWeight: "600",
                                 fontSize: 16,
                                 marginHorizontal: 12,
@@ -993,23 +988,23 @@ export default function MenuScreen() {
                                   getCurrentItemQuantity(item.id) + 1,
                                 )
                               }
-                              disabled={isRejected}
+                              disabled={isRejected || (isNotSeated && !isModifyMode)}
                               style={{ padding: 8 }}
                             >
                               <Plus
                                 size={16}
-                                color={isRejected ? "#ffffff" : "#1a1a1a"}
+                                color={(isRejected || (isNotSeated && !isModifyMode)) ? "#ffffff" : "#1a1a1a"}
                               />
                             </TouchableOpacity>
                           </View>
                         ) : (
                           <TouchableOpacity
                             onPress={() => handleAddToCart(item)}
-                            disabled={isRejected}
+                            disabled={isRejected || (isNotSeated && !isModifyMode) || (hasPendingOrder && !isModifyMode)}
                             style={{
                               backgroundColor: isRejected
                                 ? "#9ca3af"
-                                : hasPendingOrder && !isModifyMode
+                                : (isNotSeated && !isModifyMode) || (hasPendingOrder && !isModifyMode)
                                   ? "#6b7280"
                                   : "#d4af37",
                               borderRadius: 8,
@@ -1019,7 +1014,7 @@ export default function MenuScreen() {
                               alignItems: "center",
                               opacity: isRejected
                                 ? 0.5
-                                : hasPendingOrder && !isModifyMode
+                                : (isNotSeated && !isModifyMode) || (hasPendingOrder && !isModifyMode)
                                   ? 0.8
                                   : 1,
                             }}
@@ -1037,7 +1032,7 @@ export default function MenuScreen() {
                                   No disponible
                                 </Text>
                               </>
-                            ) : hasPendingOrder && !isModifyMode ? (
+                            ) : (isNotSeated && !isModifyMode) || (hasPendingOrder && !isModifyMode) ? (
                               <>
                                 <Lock size={16} color="#ffffff" />
                                 <Text
