@@ -98,32 +98,32 @@ function NavigatorContent() {
             <Stack.Screen
               name="AddStaff"
               component={AddStaffScreen}
-              options={{ title: "Añadir miembro" }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="CreateTable"
               component={CreateTableScreen}
-              options={{ title: "Nueva Mesa", headerBackTitle: "Volver" }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="ManageWaitingList"
               component={ManageWaitingListScreen}
-              options={{ title: "Lista de Espera", headerBackTitle: "Volver" }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="GenerateWaitingListQR"
               component={GenerateWaitingListQRScreen}
-              options={{ title: "Generar QR", headerBackTitle: "Volver" }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="ScanQR"
               component={ScanQRScreen}
-              options={{ title: "Escanear QR", headerBackTitle: "Volver" }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="ScanTableQR"
               component={ScanTableQRScreen}
-              options={{ title: "Confirmar Mesa", headerBackTitle: "Volver" }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="ScanOrderQR"
@@ -165,7 +165,7 @@ function NavigatorContent() {
             <Stack.Screen
               name="JoinWaitingList"
               component={JoinWaitingListScreen}
-              options={{ title: "Unirse a Lista", headerBackTitle: "Volver" }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="MyWaitingPosition"
@@ -180,7 +180,7 @@ function NavigatorContent() {
             <Stack.Screen
               name="WaiterDashboard"
               component={WaiterDashboardScreen}
-              options={{ title: "Panel del Mesero", headerBackTitle: "Volver" }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="WaiterOrders"

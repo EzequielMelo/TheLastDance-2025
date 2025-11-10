@@ -7,8 +7,8 @@ import {
   Image,
   ToastAndroid,
   Modal,
-  Alert,
 } from "react-native";
+import CustomAlert from "../../components/common/CustomAlert";
 import {
   Table,
   ImagePlus,
@@ -44,6 +44,12 @@ export default function CreateTableScreen({ navigation }: any) {
   const [qrGenerated, setQrGenerated] = useState(false);
   const [qrMounted, setQrMounted] = useState(false);
   const qrRef = useRef<View>(null);
+
+  // Estados para CustomAlert
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertOnClose, setAlertOnClose] = useState<(() => void) | undefined>(undefined);
 
   // Solo dueño y supervisor pueden crear mesas
   const canCreate =
@@ -217,20 +223,10 @@ export default function CreateTableScreen({ navigation }: any) {
 
   // Función para mostrar opciones de foto de mesa
   const showPhotoOptions = () => {
-    Alert.alert("Foto de la mesa", "¿Cómo deseas agregar la foto?", [
-      {
-        text: "Tomar foto",
-        onPress: () => openCamera(),
-      },
-      {
-        text: "Seleccionar de galería",
-        onPress: () => pickFromGallery(0),
-      },
-      {
-        text: "Cancelar",
-        style: "cancel",
-      },
-    ]);
+    setAlertTitle("Foto de la mesa");
+    setAlertMessage("¿Cómo deseas agregar la foto?");
+    setAlertOnClose(undefined);
+    setShowAlert(true);
   };
 
   const removeAt = (index: 0) => {
@@ -621,6 +617,38 @@ export default function CreateTableScreen({ navigation }: any) {
           )}
         </View>
       </Modal>
+
+      {/* CustomAlert para opciones de foto */}
+      <CustomAlert
+        visible={showAlert}
+        title={alertTitle}
+        message={alertMessage}
+        type="info"
+        onClose={() => setShowAlert(false)}
+        buttons={[
+          {
+            text: "Tomar foto",
+            style: "default",
+            onPress: () => {
+              setShowAlert(false);
+              setTimeout(() => openCamera(), 100);
+            }
+          },
+          {
+            text: "Galería",
+            style: "default",
+            onPress: () => {
+              setShowAlert(false);
+              setTimeout(() => pickFromGallery(0), 100);
+            }
+          },
+          {
+            text: "Cancelar",
+            style: "cancel",
+            onPress: () => setShowAlert(false)
+          }
+        ]}
+      />
     </>
   );
 }

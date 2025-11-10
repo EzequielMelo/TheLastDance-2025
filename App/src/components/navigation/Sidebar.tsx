@@ -144,76 +144,6 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
   };
 
   const actionItems: ActionItem[] = [
-    // Dueño
-    {
-      id: "add-staff-owner",
-      title: "Añadir empleado/supervisor",
-      subtitle: "Crear nuevos perfiles del equipo",
-      icon: <Image source={IMGS.newStaff} style={{ width: 20, height: 20 }} />,
-      onPress: () => onNavigate("AddStaff", { userRole: "dueno" }),
-      roles: ["dueno"],
-    },
-    
-    // Supervisor
-    {
-      id: "add-staff-supervisor",
-      title: "Añadir empleado",
-      subtitle: "Crear nuevos empleados del equipo",
-      icon: <Image source={IMGS.newStaff} style={{ width: 20, height: 20 }} />,
-      onPress: () => onNavigate("AddStaff", { userRole: "supervisor" }),
-      roles: ["supervisor"],
-    },
-
-    // Cocinero
-    {
-      id: "kitchen-dashboard",
-      title: "Panel de Cocina",
-      subtitle: "Ver pedidos pendientes para preparar",
-      icon: <UtensilsCrossed size={20} color="#374151" />,
-      onPress: () => onNavigate("KitchenDashboard"),
-      roles: ["empleado"],
-      positions: ["cocinero"],
-    },
-    {
-      id: "add-plato",
-      title: "Agregar plato",
-      subtitle: "Publicá un nuevo plato en el menú",
-      icon: <Image source={IMGS.churrasco} style={{ width: 20, height: 20 }} />,
-      onPress: () => onNavigate("CreateMenuItem", { initialCategory: "plato" }),
-      roles: ["empleado"],
-      positions: ["cocinero"],
-    },
-
-    // Bartender
-    {
-      id: "bar-dashboard",
-      title: "Panel de Bar",
-      subtitle: "Ver bebidas pendientes para preparar",
-      icon: <Wine size={20} color="#374151" />,
-      onPress: () => onNavigate("BartenderDashboard"),
-      roles: ["empleado"],
-      positions: ["bartender"],
-    },
-    {
-      id: "add-bebida",
-      title: "Agregar bebida",
-      subtitle: "Sumá una nueva bebida al menú",
-      icon: <Image source={IMGS.fernet} style={{ width: 20, height: 20 }} />,
-      onPress: () => onNavigate("CreateMenuItem", { initialCategory: "bebida" }),
-      roles: ["empleado"],
-      positions: ["bartender"],
-    },
-
-    // Crear mesa (Dueño/Supervisor)
-    {
-      id: "create-table",
-      title: "Crear mesa",
-      subtitle: "Agregá una nueva mesa al restaurante",
-      icon: <Image source={IMGS.mesa} style={{ width: 20, height: 20 }} />,
-      onPress: () => onNavigate("CreateTable"),
-      roles: ["dueno", "supervisor"],
-    },
-
     // Maître
     {
       id: "manage-waiting-list",
@@ -243,25 +173,6 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
       onPress: () => onNavigate("WaiterDashboard"),
       roles: ["empleado"],
       positions: ["mozo"],
-    },
-
-    {
-      id: "manage-waiters",
-      title: "Distribución de Meseros",
-      subtitle: "Ver y supervisar meseros y sus mesas asignadas",
-      icon: <Image source={IMGS.mozo} style={{ width: 20, height: 20 }} />,
-      onPress: () => onNavigate("AllWaiters"),
-      roles: ["dueno", "supervisor"],
-    },
-    
-    // Gestión de Reservas (Admin)
-    {
-      id: "manage-reservations",
-      title: "Gestionar Reservas",
-      subtitle: "Aprobar o rechazar solicitudes de reserva",
-      icon: <Users size={20} color="#374151" />,
-      onPress: () => onNavigate("ManageReservations"),
-      roles: ["dueno", "supervisor"],
     },
   ];
 

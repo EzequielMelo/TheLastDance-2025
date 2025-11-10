@@ -32,6 +32,10 @@ import {
   Clock,
   BottleWine,
   Hamburger,
+  Table,
+  CalendarCheck,
+  Plus,
+  ListOrdered,
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User";
@@ -40,6 +44,7 @@ import Sidebar from "../components/navigation/Sidebar";
 import BottomNavbar from "../components/navigation/BottomNavbar";
 import CartModal from "../components/cart/CartModal";
 import ActionCard from "../components/common/ActionCard";
+import AdminActionButton from "../components/common/AdminActionButton";
 import UserProfileCard from "../components/common/UserProfileCard";
 import {
   getDishesForKitchen,
@@ -942,31 +947,62 @@ export default function HomeScreen({ navigation, route }: Props) {
               {/* Card del usuario */}
               <UserProfileCard user={user!} getProfileLabel={getProfileLabel} />
 
-              {/* Panel de acceso rápido para cocinero */}
-              <ActionCard
-                title="Panel de Cocina"
-                description="Ver pedidos pendientes y actualizar el estado de preparación"
-                icon={UtensilsCrossed}
-                onPress={() => handleNavigate("KitchenDashboard")}
-              />
+              {/* Botones de Acciones para Cocinero */}
+              <View
+                style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 16,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  <UtensilsCrossed size={20} color="#d4af37" />
+                  <Text
+                    style={{
+                      color: "#d4af37",
+                      fontSize: 16,
+                      fontWeight: "600",
+                      marginLeft: 8,
+                    }}
+                  >
+                    Acciones Rápidas
+                  </Text>
+                </View>
 
-              {/* Acceso a crear platos */}
-              <ActionCard
-                title="Agregar plato al menú"
-                description="Crear nuevos platos para el restaurante"
-                icon={Hamburger}
-                onPress={() =>
-                  handleNavigate("CreateMenuItem", { initialCategory: "plato" })
-                }
-              />
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-around",
+                  }}
+                >
+                  <AdminActionButton
+                    icon={UtensilsCrossed}
+                    label={"Panel de\nCocina"}
+                    onPress={() => handleNavigate("KitchenDashboard")}
+                  />
 
-              {/* Ver menú de platos */}
-              <ActionCard
-                title="Ver menú de platos"
-                description="Consultar todos los platos del menú"
-                icon={BookOpen}
-                onPress={loadDishesMenu}
-              />
+                  <AdminActionButton
+                    icon={Hamburger}
+                    label={"Agregar\nPlato"}
+                    onPress={() =>
+                      handleNavigate("CreateMenuItem", { initialCategory: "plato" })
+                    }
+                  />
+
+                  <AdminActionButton
+                    icon={BookOpen}
+                    label={"Ver\nMenú"}
+                    onPress={loadDishesMenu}
+                  />
+                </View>
+              </View>
 
               {/* Info adicional para cocineros */}
               <View
@@ -974,7 +1010,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                   backgroundColor: "rgba(59, 130, 246, 0.1)",
                   borderRadius: 12,
                   padding: 16,
-                  marginTop: 16,
+                  marginTop: 0,
                   borderWidth: 1,
                   borderColor: "rgba(59, 130, 246, 0.3)",
                 }}
@@ -1000,36 +1036,64 @@ export default function HomeScreen({ navigation, route }: Props) {
               {/* Card del usuario */}
               <UserProfileCard user={user!} getProfileLabel={getProfileLabel} />
 
-              {/* Panel de acceso rápido para bartender */}
-              <ActionCard
-                title="Panel de Bar"
-                description="Ver bebidas pendientes y actualizar el estado de preparación"
-                icon={Wine}
-                onPress={() => handleNavigate("BartenderDashboard")}
-              />
+              {/* Botones de Acciones para Bartender */}
+              <View
+                style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 16,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  <Wine size={20} color="#d4af37" />
+                  <Text
+                    style={{
+                      color: "#d4af37",
+                      fontSize: 16,
+                      fontWeight: "600",
+                      marginLeft: 8,
+                    }}
+                  >
+                    Acciones Rápidas
+                  </Text>
+                </View>
 
-              {/* Acceso a crear bebidas */}
-              <ActionCard
-                variant="secondary"
-                title="Agregar bebida al menú"
-                description="Crear nuevas bebidas para el restaurante"
-                icon={BottleWine}
-                onPress={() =>
-                  handleNavigate("CreateMenuItem", {
-                    initialCategory: "bebida",
-                  })
-                }
-                style={{ marginBottom: 12 }}
-              />
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-around",
+                  }}
+                >
+                  <AdminActionButton
+                    icon={Wine}
+                    label={"Panel de\nBar"}
+                    onPress={() => handleNavigate("BartenderDashboard")}
+                  />
 
-              {/* Ver menú de bebidas */}
-              <ActionCard
-                variant="secondary"
-                title="Ver menú de bebidas"
-                description="Consultar todas las bebidas del menú"
-                icon={BookOpen}
-                onPress={loadDrinksMenu}
-              />
+                  <AdminActionButton
+                    icon={BottleWine}
+                    label={"Agregar\nBebida"}
+                    onPress={() =>
+                      handleNavigate("CreateMenuItem", {
+                        initialCategory: "bebida",
+                      })
+                    }
+                  />
+
+                  <AdminActionButton
+                    icon={BookOpen}
+                    label={"Ver\nMenú"}
+                    onPress={loadDrinksMenu}
+                  />
+                </View>
+              </View>
 
               {/* Info adicional para bartenders */}
               <View
@@ -1037,7 +1101,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                   backgroundColor: "rgba(59, 130, 246, 0.1)",
                   borderRadius: 12,
                   padding: 16,
-                  marginTop: 16,
+                  marginTop: 0,
                   borderWidth: 1,
                   borderColor: "rgba(59, 130, 246, 0.3)",
                 }}
@@ -1063,21 +1127,60 @@ export default function HomeScreen({ navigation, route }: Props) {
               {/* Card del usuario */}
               <UserProfileCard user={user!} getProfileLabel={getProfileLabel} />
 
-              {/* Gestión de lista de espera */}
-              <ActionCard
-                title="📋 Gestionar Lista de Espera"
-                description="Administrar reservas y asignación de mesas"
-                icon={Users}
-                onPress={() => handleNavigate("ManageWaitingList")}
-              />
+              {/* Botones de Acciones para Maître */}
+              <View
+                style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 16,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  <Users size={20} color="#d4af37" />
+                  <Text
+                    style={{
+                      color: "#d4af37",
+                      fontSize: 16,
+                      fontWeight: "600",
+                      marginLeft: 8,
+                    }}
+                  >
+                    Acciones Rápidas
+                  </Text>
+                </View>
 
-              {/* Generar QR */}
-              <ActionCard
-                title="📱 Generar Código QR"
-                description="Crear QR para que clientes se unan a la lista"
-                icon={QrCode}
-                onPress={() => handleNavigate("GenerateWaitingListQR")}
-              />
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-around",
+                  }}
+                >
+                  <AdminActionButton
+                    icon={Users}
+                    label={"Gestionar\nLista"}
+                    onPress={() => handleNavigate("ManageWaitingList")}
+                  />
+
+                  <AdminActionButton
+                    icon={QrCode}
+                    label={"Generar\nQR"}
+                    onPress={() => handleNavigate("GenerateWaitingListQR")}
+                  />
+
+                  <AdminActionButton
+                    icon={Plus}
+                    label="Más"
+                    onPress={() => setSidebarVisible(true)}
+                  />
+                </View>
+              </View>
 
               {/* Info adicional para maître */}
               <View
@@ -1085,7 +1188,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                   backgroundColor: "rgba(168, 85, 247, 0.1)",
                   borderRadius: 12,
                   padding: 16,
-                  marginTop: 16,
+                  marginTop: 0,
                   borderWidth: 1,
                   borderColor: "rgba(168, 85, 247, 0.3)",
                 }}
@@ -1460,20 +1563,60 @@ export default function HomeScreen({ navigation, route }: Props) {
                 </View>
               )}
 
-              {/* Otros accesos del mozo */}
-              <ActionCard
-                title="📋 Panel del Mesero"
-                description="Gestionar tus mesas asignadas"
-                icon={Clock}
-                onPress={() => handleNavigate("WaiterDashboard")}
-              />
+              {/* Botones de Acciones para Mozo */}
+              <View
+                style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 16,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  <Clock size={20} color="#d4af37" />
+                  <Text
+                    style={{
+                      color: "#d4af37",
+                      fontSize: 16,
+                      fontWeight: "600",
+                      marginLeft: 8,
+                    }}
+                  >
+                    Acciones Rápidas
+                  </Text>
+                </View>
 
-              <ActionCard
-                title="📝 Órdenes Pendientes"
-                description="Ver todas las órdenes pendientes de entrega"
-                icon={Clock}
-                onPress={() => handleNavigate("WaiterOrders")}
-              />
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-around",
+                  }}
+                >
+                  <AdminActionButton
+                    icon={Clock}
+                    label={"Panel del\nMesero"}
+                    onPress={() => handleNavigate("WaiterDashboard")}
+                  />
+
+                  <AdminActionButton
+                    icon={ListOrdered}
+                    label={"Órdenes\nPendientes"}
+                    onPress={() => handleNavigate("WaiterOrders")}
+                  />
+
+                  <AdminActionButton
+                    icon={Plus}
+                    label="Más"
+                    onPress={() => setSidebarVisible(true)}
+                  />
+                </View>
+              </View>
 
               {/* Info para mozos */}
               <View
@@ -1481,7 +1624,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                   backgroundColor: "rgba(16, 185, 129, 0.1)",
                   borderRadius: 12,
                   padding: 16,
-                  marginTop: 16,
+                  marginTop: 0,
                   borderWidth: 1,
                   borderColor: "rgba(16, 185, 129, 0.3)",
                 }}
@@ -1700,37 +1843,72 @@ export default function HomeScreen({ navigation, route }: Props) {
                 </View>
               )}
 
-              {/* Cards de Acciones Principales */}
-              <ActionCard
-                title={
-                  user?.profile_code === "dueno"
-                    ? "👥 Añadir Personal"
-                    : "👤 Añadir Empleado"
-                }
-                description={
-                  user?.profile_code === "dueno"
-                    ? "Crear empleados y supervisores"
-                    : "Crear nuevos empleados"
-                }
-                icon={UserIcon}
-                onPress={() =>
-                  handleNavigate("AddStaff", { userRole: user?.profile_code })
-                }
-              />
+              {/* Botones de Acciones Principales estilo MercadoPago */}
+              <View
+                style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 16,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  <Users size={20} color="#d4af37" />
+                  <Text
+                    style={{
+                      color: "#d4af37",
+                      fontSize: 16,
+                      fontWeight: "600",
+                      marginLeft: 8,
+                    }}
+                  >
+                    Acciones Rápidas
+                  </Text>
+                </View>
 
-              <ActionCard
-                title="🪑 Crear Mesa"
-                description="Agregar nueva mesa al restaurante"
-                icon={QrCode}
-                onPress={() => handleNavigate("CreateTable")}
-              />
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-around",
+                  }}
+                >
+                  <AdminActionButton
+                    icon={UserIcon}
+                    label={
+                      user?.profile_code === "dueno"
+                        ? "Añadir\nPersonal"
+                        : "Añadir\nEmpleado"
+                    }
+                    onPress={() =>
+                      handleNavigate("AddStaff", { userRole: user?.profile_code })
+                    }
+                  />
 
-              <ActionCard
-                title="👨‍💼 Distribución de Meseros"
-                description="Supervisar meseros y sus mesas asignadas"
-                icon={Users}
-                onPress={() => handleNavigate("AllWaiters")}
-              />
+                  <AdminActionButton
+                    icon={Table}
+                    label={"Crear\nMesa"}
+                    onPress={() => handleNavigate("CreateTable")}
+                  />
+
+                  <AdminActionButton
+                    icon={CalendarCheck}
+                    label={"Gestionar\nReservas"}
+                    onPress={() => handleNavigate("ManageReservations")}
+                  />
+
+                  <AdminActionButton
+                    icon={Users}
+                    label="Meseros"
+                    onPress={() => handleNavigate("AllWaiters")}
+                  />
+                </View>
+              </View>
 
               {/* Info adicional */}
               <View

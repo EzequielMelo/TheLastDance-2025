@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -16,6 +15,7 @@ import { Logger } from "../../utils/Logger";
 import ChefLoading from "../../components/common/ChefLoading";
 import { useChatNotifications } from "../../Hooks/useChatNotifications";
 import { ChatNotificationBadge } from "../../components/chat/ChatNotificationBadge";
+import CustomAlert from "../../components/common/CustomAlert";
 
 interface WaiterTable {
   id: string;
@@ -47,6 +47,17 @@ export default function WaiterDashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showAvailableTables, setShowAvailableTables] = useState(false);
 
+  // Estados para CustomAlert
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertType, setAlertType] = useState<"success" | "error" | "warning" | "info">("info");
+  const [alertButtons, setAlertButtons] = useState<Array<{
+    text: string;
+    onPress?: () => void;
+    style?: "default" | "cancel" | "destructive";
+  }>>([]);
+
   // Hook para notificaciones de chat
   const { getUnreadCount, markTableAsRead, refreshNotifications } =
     useChatNotifications();
@@ -65,7 +76,11 @@ export default function WaiterDashboardScreen() {
       await Promise.all([loadWaiterInfo(), loadAvailableTables()]);
     } catch (error) {
       Logger.error("Error cargando datos del mesero:", error);
-      Alert.alert("Error", "No se pudieron cargar los datos");
+      setAlertType("error");
+      setAlertTitle("Error");
+      setAlertMessage("No se pudieron cargar los datos");
+      setAlertButtons([{ text: "OK", onPress: () => setShowAlert(false) }]);
+      setShowAlert(true);
     } finally {
       setLoading(false);
     }
@@ -127,14 +142,26 @@ export default function WaiterDashboardScreen() {
       const data = await response.json();
 
       if (response.ok) {
-        Alert.alert("¡Éxito!", "Mesa asignada correctamente");
+        setAlertType("success");
+        setAlertTitle("¡Éxito!");
+        setAlertMessage("Mesa asignada correctamente");
+        setAlertButtons([{ text: "OK", onPress: () => setShowAlert(false) }]);
+        setShowAlert(true);
         await loadWaiterData(); // Recargar datos
       } else {
-        Alert.alert("Error", data.message || "No se pudo asignar la mesa");
+        setAlertType("error");
+        setAlertTitle("Error");
+        setAlertMessage(data.message || "No se pudo asignar la mesa");
+        setAlertButtons([{ text: "OK", onPress: () => setShowAlert(false) }]);
+        setShowAlert(true);
       }
     } catch (error) {
       Logger.error("Error asignando mesa:", error);
-      Alert.alert("Error", "Error de conexión");
+      setAlertType("error");
+      setAlertTitle("Error");
+      setAlertMessage("Error de conexión");
+      setAlertButtons([{ text: "OK", onPress: () => setShowAlert(false) }]);
+      setShowAlert(true);
     }
   };
 
@@ -156,54 +183,72 @@ export default function WaiterDashboardScreen() {
       const checkData = await checkResponse.json();
 
       if (!checkData.data.canUnassign) {
-        Alert.alert("No se puede desasignar", checkData.data.message);
+        setAlertType("warning");
+        setAlertTitle("No se puede desasignar");
+        setAlertMessage(checkData.data.message);
+        setAlertButtons([{ text: "OK", onPress: () => setShowAlert(false) }]);
+        setShowAlert(true);
         return;
       }
 
       // Confirmar con el usuario
-      Alert.alert(
-        "Confirmar desasignación",
-        "¿Estás seguro de que quieres desasignar esta mesa?",
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Desasignar",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                const response = await fetch(
-                  `${API_BASE_URL}/waiter/unassign-table/${tableId}`,
-                  {
-                    method: "DELETE",
-                    headers: {
-                      Authorization: `Bearer ${token}`,
-                      "Content-Type": "application/json",
-                    },
+      setAlertType("warning");
+      setAlertTitle("Confirmar desasignación");
+      setAlertMessage("¿Estás seguro de que quieres desasignar esta mesa?");
+      setAlertButtons([
+        { text: "Cancelar", style: "cancel", onPress: () => setShowAlert(false) },
+        {
+          text: "Desasignar",
+          style: "destructive",
+          onPress: async () => {
+            setShowAlert(false);
+            try {
+              const response = await fetch(
+                `${API_BASE_URL}/waiter/unassign-table/${tableId}`,
+                {
+                  method: "DELETE",
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
                   },
-                );
+                },
+              );
 
-                const data = await response.json();
+              const data = await response.json();
 
-                if (response.ok) {
-                  Alert.alert("¡Éxito!", "Mesa desasignada correctamente");
-                  await loadWaiterData(); // Recargar datos
-                } else {
-                  Alert.alert(
-                    "Error",
-                    data.message || "No se pudo desasignar la mesa",
-                  );
-                }
-              } catch (error) {
-                Logger.error("Error desasignando mesa:", error);
-                Alert.alert("Error", "Error de conexión");
+              if (response.ok) {
+                setAlertType("success");
+                setAlertTitle("¡Éxito!");
+                setAlertMessage("Mesa desasignada correctamente");
+                setAlertButtons([{ text: "OK", onPress: () => setShowAlert(false) }]);
+                setShowAlert(true);
+                await loadWaiterData(); // Recargar datos
+              } else {
+                setAlertType("error");
+                setAlertTitle("Error");
+                setAlertMessage(data.message || "No se pudo desasignar la mesa");
+                setAlertButtons([{ text: "OK", onPress: () => setShowAlert(false) }]);
+                setShowAlert(true);
               }
-            },
+            } catch (error) {
+              Logger.error("Error desasignando mesa:", error);
+              setAlertType("error");
+              setAlertTitle("Error");
+              setAlertMessage("Error de conexión");
+              setAlertButtons([{ text: "OK", onPress: () => setShowAlert(false) }]);
+              setShowAlert(true);
+            }
           },
-        ],
-      );
+        },
+      ]);
+      setShowAlert(true);
     } catch (error) {
       Logger.error("Error verificando desasignación:", error);
-      Alert.alert("Error", "Error de conexión");
+      setAlertType("error");
+      setAlertTitle("Error");
+      setAlertMessage("Error de conexión");
+      setAlertButtons([{ text: "OK", onPress: () => setShowAlert(false) }]);
+      setShowAlert(true);
     }
   };
 
@@ -339,13 +384,13 @@ export default function WaiterDashboardScreen() {
                   <Text style={styles.statNumber}>
                     {waiterInfo.assigned_tables.length}
                   </Text>
-                  <Text style={styles.statLabel}>Mesas Asignadas</Text>
+                  <Text style={styles.statLabel}>Asignadas</Text>
                 </View>
                 <View style={styles.statCard}>
                   <Text style={styles.statNumber}>
                     {waiterInfo.available_slots}
                   </Text>
-                  <Text style={styles.statLabel}>Espacios Libres</Text>
+                  <Text style={styles.statLabel}>Libres</Text>
                 </View>
                 <View style={styles.statCard}>
                   <Text style={styles.statNumber}>
@@ -354,7 +399,7 @@ export default function WaiterDashboardScreen() {
                         .length
                     }
                   </Text>
-                  <Text style={styles.statLabel}>Mesas Ocupadas</Text>
+                  <Text style={styles.statLabel}>Ocupadas</Text>
                 </View>
               </View>
             )}
@@ -409,6 +454,15 @@ export default function WaiterDashboardScreen() {
             colors={["#d4af37"]}
           />
         }
+      />
+
+      <CustomAlert
+        visible={showAlert}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        buttons={alertButtons}
+        onClose={() => setShowAlert(false)}
       />
     </SafeAreaView>
   );

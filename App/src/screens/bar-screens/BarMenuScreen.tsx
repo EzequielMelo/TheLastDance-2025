@@ -128,24 +128,13 @@ export default function BarMenuScreen() {
             marginBottom: 16,
           }}
         >
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={{
-              backgroundColor: "rgba(255,255,255,0.1)",
-              borderRadius: 12,
-              padding: 8,
-              marginRight: 16,
-            }}
-          >
-            <ArrowLeft size={24} color="white" />
-          </TouchableOpacity>
-
           <View style={{ flex: 1, alignItems: "center" }}>
             <View
               style={{
                 flexDirection: "row",
                 alignItems: "center",
                 marginBottom: 4,
+                marginTop: 36,
               }}
             >
               <Martini size={24} color="#d4af37" />
@@ -164,17 +153,6 @@ export default function BarMenuScreen() {
               Visualiza todas las bebidas disponibles
             </Text>
           </View>
-
-          <TouchableOpacity
-            onPress={onRefresh}
-            style={{
-              backgroundColor: "rgba(255,255,255,0.1)",
-              borderRadius: 12,
-              padding: 8,
-            }}
-          >
-            <RefreshCw size={20} color="#d4af37" />
-          </TouchableOpacity>
         </View>
       </View>
 
