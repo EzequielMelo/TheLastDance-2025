@@ -677,7 +677,7 @@ export default function HomeScreen({ navigation, route }: Props) {
     useCallback(() => {
       if (isCliente) {
         setActiveTab("home");
-        
+
         // Refrescar estado del cliente cuando se regresa a la pantalla
         console.log("🔄 HomeScreen - Pantalla enfocada, refrescando estado...");
         checkWaitingListStatus();
@@ -992,7 +992,9 @@ export default function HomeScreen({ navigation, route }: Props) {
                     icon={Hamburger}
                     label={"Agregar\nPlato"}
                     onPress={() =>
-                      handleNavigate("CreateMenuItem", { initialCategory: "plato" })
+                      handleNavigate("CreateMenuItem", {
+                        initialCategory: "plato",
+                      })
                     }
                   />
 
@@ -1886,7 +1888,9 @@ export default function HomeScreen({ navigation, route }: Props) {
                         : "Añadir\nEmpleado"
                     }
                     onPress={() =>
-                      handleNavigate("AddStaff", { userRole: user?.profile_code })
+                      handleNavigate("AddStaff", {
+                        userRole: user?.profile_code,
+                      })
                     }
                   />
 
