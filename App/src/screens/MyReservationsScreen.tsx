@@ -15,6 +15,7 @@ import { useAuth } from '../auth/useAuth';
 import CustomAlert from '../components/common/CustomAlert';
 import { ReservationsService } from '../services/reservations/reservationsService';
 import { Reservation } from '../types/Reservation';
+import { formatDateLong, formatTime, parseLocalDateTime } from '../utils/dateUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -126,22 +127,8 @@ export default function MyReservationsScreen({}: MyReservationsScreenProps) {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-AR', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
-  const formatTime = (timeString: string) => {
-    return timeString.slice(0, 5); // HH:MM format
-  };
-
   const isReservationCancellable = (reservation: Reservation) => {
-    const reservationDateTime = new Date(`${reservation.date}T${reservation.time}`);
+    const reservationDateTime = parseLocalDateTime(reservation.date, reservation.time);
     const now = new Date();
     const hoursUntilReservation = (reservationDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
     
@@ -203,7 +190,7 @@ export default function MyReservationsScreen({}: MyReservationsScreenProps) {
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
           <Calendar size={16} color="#d4af37" />
           <Text style={{ color: 'white', fontSize: 16, fontWeight: '600', marginLeft: 8 }}>
-            {formatDate(reservation.date)}
+            {formatDateLong(reservation.date)}
           </Text>
         </View>
 

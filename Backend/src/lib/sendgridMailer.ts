@@ -28,8 +28,6 @@ export async function sendMail({
       throw new Error("SendGrid no está configurado correctamente");
     }
 
-    console.log("📧 Enviando email con SendGrid:", { to, subject, from: FROM_EMAIL });
-
     // Preparar el objeto de email
     const msg: any = {
       to: to,
@@ -53,11 +51,6 @@ export async function sendMail({
 
     const result = await sgMail.send(msg);
 
-    console.log("✅ Email enviado exitosamente con SendGrid:", {
-      messageId: result[0]?.headers?.['x-message-id'],
-      statusCode: result[0]?.statusCode
-    });
-    
     return { messageId: result[0]?.headers?.['x-message-id'] };
     
   } catch (error: any) {

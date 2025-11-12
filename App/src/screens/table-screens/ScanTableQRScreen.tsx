@@ -22,6 +22,7 @@ import {
 } from "lucide-react-native";
 import { useAuth } from "../../auth/AuthContext";
 import api from "../../api/axios";
+import CustomAlert from "../../components/common/CustomAlert";
 
 const { width, height } = Dimensions.get("window");
 
@@ -34,6 +35,23 @@ export default function ScanTableQRScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
+  
+  // Estados para CustomAlert
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertType, setAlertType] = useState<"success" | "error" | "warning" | "info">("info");
+
+  const showCustomAlert = (
+    title: string,
+    message: string,
+    type: "success" | "error" | "warning" | "info" = "info"
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertVisible(true);
+  };
 
   // Verificar que el usuario pueda confirmar mesa
   const canConfirm =
@@ -88,16 +106,17 @@ export default function ScanTableQRScreen() {
       console.log("✅ Respuesta del servidor:", response.data);
 
       if (response.data.success) {
-        // Mostrar éxito con Toast
-        ToastAndroid.show(
-          `🎉 ¡Mesa ${response.data.table.table_number} confirmada! Disfruta tu experiencia`,
-          ToastAndroid.LONG,
+        // Mostrar éxito con CustomAlert
+        showCustomAlert(
+          "¡Mesa Confirmada!",
+          `Mesa ${response.data.table.table_number} confirmada. ¡Disfruta tu experiencia en The Last Dance!`,
+          "success"
         );
 
         // Navegar después de un breve delay
         setTimeout(() => {
           navigation.navigate("Home");
-        }, 2000);
+        }, 2500);
       } else {
         throw new Error(response.data.message || "Error al activar la mesa");
       }
@@ -107,6 +126,29 @@ export default function ScanTableQRScreen() {
 
       let errorMessage = "No se pudo confirmar tu llegada a la mesa.";
       let alertTitle = "Error";
+      let alertType: "error" | "warning" | "info" = "error";
+
+      // Manejar caso especial: llegada temprana
+      if (error.response?.data?.earlyArrival) {
+        alertTitle = "Llegaste Temprano";
+        errorMessage = error.response.data.message;
+        alertType = "warning";
+        showCustomAlert(alertTitle, errorMessage, alertType);
+        setScanned(false);
+        setProcessing(false);
+        return;
+      }
+
+      // Manejar caso especial: mesa reservada a nombre de otro
+      if (error.response?.status === 403 && error.response?.data?.reservedFor) {
+        alertTitle = "🔒 Mesa Reservada";
+        errorMessage = error.response.data.error;
+        alertType = "warning";
+        showCustomAlert(alertTitle, errorMessage, alertType);
+        setScanned(false);
+        setProcessing(false);
+        return;
+      }
 
       if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
@@ -118,13 +160,19 @@ export default function ScanTableQRScreen() {
           alertTitle = "Mesa no asignada";
         } else if (errorMessage.includes("ya está activa")) {
           alertTitle = "Mesa ya activa";
+        } else if (errorMessage.includes("reservada a nombre de")) {
+          alertTitle = "🔒 Mesa Reservada";
+          alertType = "warning";
+        } else if (errorMessage.includes("tiempo límite de llegada expiró")) {
+          alertTitle = "Llegada Tardía";
+          alertType = "warning";
         }
       } else if (error.response?.status === 404) {
         alertTitle = "Mesa no encontrada";
         errorMessage = "Esta mesa no existe o ha sido eliminada.";
       } else if (error.response?.status === 403) {
         alertTitle = "Sin permisos";
-        errorMessage = "No tienes permisos para activar esta mesa.";
+        errorMessage = error.response?.data?.error || "No tienes permisos para activar esta mesa.";
       } else if (error.response?.status === 400) {
         alertTitle = "Solicitud inválida";
         errorMessage =
@@ -132,7 +180,7 @@ export default function ScanTableQRScreen() {
           "Esta mesa no puede ser activada en este momento.";
       }
 
-      ToastAndroid.show(`❌ ${alertTitle}: ${errorMessage}`, ToastAndroid.LONG);
+      showCustomAlert(alertTitle, errorMessage, alertType);
       setScanned(false);
     } finally {
       setProcessing(false);
@@ -466,6 +514,18 @@ export default function ScanTableQRScreen() {
           </View>
         </LinearGradient>
       </View>
+
+      {/* CustomAlert */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        onClose={() => {
+          setAlertVisible(false);
+          setScanned(false);
+        }}
+      />
     </View>
   );
 }

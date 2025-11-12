@@ -469,4 +469,168 @@ export class ReservationsController {
       });
     }
   }
+
+  /**
+   * Obtener mesas disponibles para fecha, hora, tipo y capacidad específicos
+   * GET /api/reservations/search-tables?date=YYYY-MM-DD&time=HH:MM&type=estandar&party_size=2
+   */
+  static async getAvailableTablesForReservation(req: Request, res: Response): Promise<void> {
+    try {
+      const { date, time, type, party_size } = req.query;
+
+      // Validaciones
+      if (!date || typeof date !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: 'Parámetro date es requerido (YYYY-MM-DD)'
+        });
+        return;
+      }
+
+      if (!time || typeof time !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: 'Parámetro time es requerido (HH:MM)'
+        });
+        return;
+      }
+
+      if (!type || typeof type !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: 'Parámetro type es requerido (estandar, vip, accesible)'
+        });
+        return;
+      }
+
+      if (!party_size || typeof party_size !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: 'Parámetro party_size es requerido'
+        });
+        return;
+      }
+
+      // Validar formato de fecha
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(date)) {
+        res.status(400).json({
+          success: false,
+          error: 'Formato de fecha inválido. Use YYYY-MM-DD'
+        });
+        return;
+      }
+
+      // Validar formato de hora
+      const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+      if (!timeRegex.test(time)) {
+        res.status(400).json({
+          success: false,
+          error: 'Formato de hora inválido. Use HH:MM'
+        });
+        return;
+      }
+
+      // Validar tipo de mesa
+      const validTypes = ['estandar', 'vip', 'accesible'];
+      if (!validTypes.includes(type)) {
+        res.status(400).json({
+          success: false,
+          error: 'Tipo de mesa inválido. Use: estandar, vip, o accesible'
+        });
+        return;
+      }
+
+      const partySizeNum = parseInt(party_size);
+      if (isNaN(partySizeNum) || partySizeNum < 1 || partySizeNum > 12) {
+        res.status(400).json({
+          success: false,
+          error: 'El número de personas debe estar entre 1 y 12'
+        });
+        return;
+      }
+
+      const tables = await ReservationsService.getAvailableTablesForReservation(
+        date,
+        time,
+        type,
+        partySizeNum
+      );
+
+      // Si no hay mesas disponibles, buscar horarios alternativos
+      let suggestedTimes: string[] = [];
+      if (tables.length === 0) {
+        suggestedTimes = await ReservationsService.suggestAlternativeTimes(
+          date,
+          time,
+          type,
+          partySizeNum
+        );
+      }
+
+      res.status(200).json({
+        success: true,
+        data: tables,
+        suggestedTimes: suggestedTimes.length > 0 ? suggestedTimes : undefined
+      });
+    } catch (error: any) {
+      console.error('Error getting available tables:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Error al buscar mesas disponibles'
+      });
+    }
+  }
+
+  /**
+   * Verificar y activar reservas que están en ventana de llegada
+   * POST /api/reservations/check-activation
+   */
+  static async checkAndActivateReservation(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.appUserId;
+
+      if (!userId) {
+        res.status(401).json({
+          success: false,
+          error: 'No autenticado'
+        });
+        return;
+      }
+
+      const result = await ReservationsService.checkAndActivateReservation(userId);
+
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+    } catch (error: any) {
+      console.error('Error en checkAndActivateReservation:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Error al verificar reservas'
+      });
+    }
+  }
+
+  /**
+   * Limpiar reservas expiradas (cron job o manual)
+   * POST /api/reservations/clean-expired
+   */
+  static async cleanExpiredReservations(_req: Request, res: Response): Promise<void> {
+    try {
+      await ReservationsService.cleanExpiredReservations();
+
+      res.status(200).json({
+        success: true,
+        message: 'Limpieza de reservas expiradas completada'
+      });
+    } catch (error: any) {
+      console.error('Error en cleanExpiredReservations:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Error al limpiar reservas expiradas'
+      });
+    }
+  }
 }

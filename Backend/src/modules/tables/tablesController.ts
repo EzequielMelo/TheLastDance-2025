@@ -8,6 +8,7 @@ import {
   assignClientToTable,
   activateTableByClient,
   freeTable,
+  cancelTableReservation,
   cancelWaitingListEntry,
   markAsNoShow,
   confirmTableDelivery,
@@ -334,6 +335,13 @@ export async function activateTableHandler(req: Request, res: Response) {
       table: result.table,
     });
   } catch (e: any) {
+    // Manejar errores específicos de reserva
+    if (e.status === 403 && e.reservedFor) {
+      return res.status(403).json({ 
+        error: e.message,
+        reservedFor: e.reservedFor 
+      });
+    }
     return res.status(500).json({ error: e.message });
   }
 }
@@ -353,6 +361,32 @@ export async function freeTableHandler(req: Request, res: Response) {
     }
 
     const result = await freeTable(tableId);
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.message });
+    }
+
+    return res.json({ message: result.message });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+// POST /api/tables/:id/cancel-reservation - Cancelar reserva de una mesa (Maitre)
+export async function cancelTableReservationHandler(req: Request, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    // El roleGuard ya verificó los permisos (maitre, supervisor, dueño)
+
+    const tableId = req.params["id"];
+    if (!tableId) {
+      return res.status(400).json({ error: "ID de mesa requerido" });
+    }
+
+    const result = await cancelTableReservation(tableId);
 
     if (!result.success) {
       return res.status(400).json({ error: result.message });

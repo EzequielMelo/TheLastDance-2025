@@ -4,17 +4,16 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Platform,
   TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Calendar, ArrowLeft, ChevronDown } from "lucide-react-native";
+import { Calendar, ArrowLeft, ChevronDown, Clock } from "lucide-react-native";
 import { Picker } from "@react-native-picker/picker";
 import { useAuth } from "../../auth/useAuth";
 import CustomAlert from "../../components/common/CustomAlert";
 import TableCard from "../../components/reservation/TableCard";
 import type { RootStackNavigationProp } from "../../navigation/RootStackParamList";
-import type { CreateReservationRequest, AvailableTablesResponse } from "../../types/Reservation";
+import type { CreateReservationRequest } from "../../types/Reservation";
 import { ReservationsService } from "../../services/reservations/reservationsService";
 
 interface MakeReservationScreenProps {
@@ -24,31 +23,23 @@ interface MakeReservationScreenProps {
 export default function MakeReservationScreen({ navigation }: MakeReservationScreenProps) {
   const { user } = useAuth();
   
-  // Función para obtener la fecha mínima (mañana)
-  const getTomorrowDate = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    return tomorrow;
-  };
-  
-  // Estados para el formulario
-  const [selectedDate, setSelectedDate] = useState(getTomorrowDate());
-  const [selectedTime, setSelectedTime] = useState("20:00");
-  const [partySize, setPartySize] = useState(2);
+  // Estados principales del flujo: Fecha -> Hora -> Tipo Mesa -> Capacidad -> Mesas disponibles
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedTime, setSelectedTime] = useState("");
   const [tableType, setTableType] = useState<"estandar" | "vip" | "accesible">("estandar");
+  const [partySize, setPartySize] = useState(2);
   const [notes, setNotes] = useState("");
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [loading, setLoading] = useState(false);
   
-  // Estados para selección de mesa
+  // Estados de UI
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [timeInputFocused, setTimeInputFocused] = useState(false);
+  
+  // Estados para mesas disponibles
   const [availableTables, setAvailableTables] = useState<any[]>([]);
   const [selectedTable, setSelectedTable] = useState<any>(null);
   const [loadingTables, setLoadingTables] = useState(false);
-  
-  // Estados para disponibilidad de horarios
-  const [availableSlots, setAvailableSlots] = useState<AvailableTablesResponse | null>(null);
-  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [suggestedTimes, setSuggestedTimes] = useState<string[]>([]);
   
   // Estados para CustomAlert
   const [showAlert, setShowAlert] = useState(false);
@@ -71,20 +62,30 @@ export default function MakeReservationScreen({ navigation }: MakeReservationScr
     setShowAlert(true);
   };
 
-  // Horarios disponibles (de 12:00 a 23:00)
-  const timeSlots = [
-    "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
-    "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
-    "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
-    "21:00", "21:30", "22:00", "22:30", "23:00"
-  ];
+  // Validar formato de hora (HH:MM en formato 24h)
+  const isValidTimeFormat = (time: string): boolean => {
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    return timeRegex.test(time);
+  };
 
-  // Verificar que solo se puedan hacer reservas para fechas futuras
-  const getMinimumDate = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    return tomorrow;
+  // Validar que la hora esté en el rango de operación (19:00-02:30)
+  const isTimeInOperatingHours = (time: string): boolean => {
+    if (!isValidTimeFormat(time)) return false;
+    
+    const [hours, minutes] = time.split(':').map(Number);
+    const timeInMinutes = (hours ?? 0) * 60 + (minutes ?? 0);
+    
+    // 19:00 a 23:59
+    if (timeInMinutes >= 19 * 60 && timeInMinutes <= 23 * 60 + 59) {
+      return true;
+    }
+    
+    // 00:00 a 02:30
+    if (timeInMinutes >= 0 && timeInMinutes <= 2 * 60 + 30) {
+      return true;
+    }
+    
+    return false;
   };
 
   const formatDateForDisplay = (date: Date) => {
@@ -106,86 +107,13 @@ export default function MakeReservationScreen({ navigation }: MakeReservationScr
     return date.toISOString().split('T')[0]; // YYYY-MM-DD
   };
 
-  // Verificar disponibilidad usando la API
-  const checkAvailability = async (date: string) => {
-    try {
-      setLoading(true);
-      console.log("Verificando disponibilidad para:", date);
-      
-      const availability = await ReservationsService.checkAvailability(date, partySize);
-      console.log("Availability response:", JSON.stringify(availability, null, 2));
-      console.log("Date requested:", date, "Party size:", partySize);
-      setAvailableSlots(availability);
-    } catch (error: any) {
-      console.error("Error checking availability:", error);
-      showCustomAlert("Error", error.message || "No se pudo verificar la disponibilidad");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Cargar mesas cuando cambia el tipo o capacidad
-  useEffect(() => {
-    loadAvailableTables();
-  }, [tableType, partySize]);
-
-  // Cargar horarios disponibles cuando se selecciona una mesa y fecha
-  useEffect(() => {
-    if (selectedTable) {
-      const dateStr = formatDateForAPI(selectedDate);
-      checkTableAvailability(dateStr);
-    }
-  }, [selectedTable, selectedDate]);
-
-  const loadAvailableTables = async () => {
-    try {
-      setLoadingTables(true);
-      console.log("Loading tables for:", tableType, partySize);
-      
-      const tables = await ReservationsService.getTablesByType(tableType, partySize);
-      setAvailableTables(tables);
-      
-      // Reset selecciones
-      setSelectedTable(null);
-      setSelectedTime("20:00");
-      setAvailableSlots(null);
-    } catch (error: any) {
-      console.error("Error loading tables:", error);
-      showCustomAlert("Error", error.message || "No se pudieron cargar las mesas");
-    } finally {
-      setLoadingTables(false);
-    }
-  };
-
-  const checkTableAvailability = async (date: string) => {
-    if (!selectedTable) return;
-    
-    try {
-      setLoadingSlots(true);
-      
-      const availability = await ReservationsService.checkTableAvailability(selectedTable.id, date);
-      setAvailableSlots(availability);
-    } catch (error: any) {
-      console.error("Error checking table availability:", error);
-      showCustomAlert("Error", error.message || "No se pudo verificar la disponibilidad");
-    } finally {
-      setLoadingSlots(false);
-    }
-  };
-
-  const handleDateChange = (event: any, date?: Date) => {
-    setShowDatePicker(false);
-    if (date) {
-      setSelectedDate(date);
-    }
-  };
-
-  // Generar lista de fechas disponibles (próximos 30 días)
+  // Generar lista de fechas disponibles (desde hoy, próximos 30 días)
   const getAvailableDates = () => {
     const dates = [];
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
-    for (let i = 1; i <= 30; i++) {
+    for (let i = 0; i <= 30; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
       dates.push(date);
@@ -194,10 +122,70 @@ export default function MakeReservationScreen({ navigation }: MakeReservationScr
     return dates;
   };
 
+  // Buscar mesas disponibles cuando se completan fecha, hora, tipo y capacidad
+  const searchAvailableTables = async () => {
+    // Validaciones silenciosas (no mostrar alertas, solo no buscar)
+    if (!selectedDate || !selectedTime || !isValidTimeFormat(selectedTime) || !isTimeInOperatingHours(selectedTime)) {
+      return;
+    }
+
+    try {
+      setLoadingTables(true);
+      setSelectedTable(null); // Reset mesa seleccionada
+      setSuggestedTimes([]); // Reset sugerencias
+      
+      const dateStr = formatDateForAPI(selectedDate);
+
+      // Llamar al endpoint que devuelve mesas disponibles para esa fecha/hora/tipo/capacidad
+      const response = await ReservationsService.getAvailableTablesForReservation(
+        dateStr,
+        selectedTime,
+        tableType,
+        partySize
+      );
+      
+      setAvailableTables(response.tables || response);
+      
+      // Si hay sugerencias de horarios alternativos, guardarlas
+      if (response.suggestedTimes && response.suggestedTimes.length > 0) {
+        setSuggestedTimes(response.suggestedTimes);
+      }
+      
+    } catch (error: any) {
+      console.error("Error buscando mesas:", error);
+      setAvailableTables([]);
+      setSuggestedTimes([]);
+    } finally {
+      setLoadingTables(false);
+    }
+  };
+
+  // Buscar automáticamente cuando cambian los parámetros y la hora es válida
+  useEffect(() => {
+    if (selectedDate && selectedTime && isValidTimeFormat(selectedTime) && isTimeInOperatingHours(selectedTime)) {
+      // Pequeño delay para evitar búsquedas mientras el usuario está escribiendo
+      const timer = setTimeout(() => {
+        searchAvailableTables();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    } else {
+      // Si los parámetros no son válidos, limpiar las mesas y sugerencias
+      setAvailableTables([]);
+      setSelectedTable(null);
+      setSuggestedTimes([]);
+    }
+  }, [selectedDate, selectedTime, tableType, partySize]);
+
   const handleSubmit = async () => {
     // Validaciones
-    if (!selectedTable || !selectedTime) {
-      showCustomAlert("Error", "Por favor selecciona una mesa y un horario disponible");
+    if (!selectedTable) {
+      showCustomAlert("Error", "Por favor selecciona una mesa disponible");
+      return;
+    }
+
+    if (!selectedDate || !selectedTime) {
+      showCustomAlert("Error", "Por favor completa fecha y hora");
       return;
     }
 
@@ -236,56 +224,39 @@ export default function MakeReservationScreen({ navigation }: MakeReservationScr
     }
   };
 
-  const isTimeAvailable = (time: string) => {
-    if (!availableSlots || !availableSlots.slots) return false;
-    const slot = availableSlots.slots.find(s => s.time === time);
-    return slot?.available === true;
-  };
-
-  const getTableForTime = (time: string) => {
-    if (!availableSlots || !availableSlots.slots) return null;
-    const slot = availableSlots.slots.find(s => s.time === time);
-    return slot?.available ? slot : null;
-  };
-
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
-      {/* Header */}
-      <View className="flex-row items-center px-4 pt-2 pb-4 bg-white border-b border-gray-200">
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color="#374151" />
-        </TouchableOpacity>
-        <Text className="ml-4 text-lg font-semibold text-gray-800">
-          Reservar Mesa
-        </Text>
-      </View>
-
+    <SafeAreaView className="flex-1 bg-neutral-900">
       <ScrollView className="flex-1 px-6">
         <View className="py-6">
-          <Text className="text-lg font-semibold text-gray-800 mb-6">
-            Solicita una reserva para una fecha y horario específico
+          <Text className="text-3xl font-semibold text-white mb-2">
+            Reservá tu mesa
+          </Text>
+          <Text className="text-sm text-gray-400 mb-6">
+            Completá la fecha, hora, tipo de mesa y cantidad de personas
           </Text>
 
-          {/* Selección de fecha */}
+          {/* Paso 1: Selección de fecha */}
           <View className="mb-6">
-            <Text className="text-sm font-medium text-gray-700 mb-2">
-              Fecha de la reserva
-            </Text>
+            <View className="flex-row items-center mb-3">
+              <Text className="text-sm font-semibold text-gray-200">
+                Fecha de la reserva
+              </Text>
+            </View>
             <TouchableOpacity
               onPress={() => setShowDatePicker(!showDatePicker)}
-              className="flex-row items-center p-4 border border-gray-300 rounded-lg bg-white"
+              className="flex-row items-center p-4 border border-golden/30 rounded-lg bg-neutral-800"
             >
-              <Calendar size={20} color="#374151" />
-              <Text className="ml-3 text-gray-800 flex-1" numberOfLines={2} style={{ flexShrink: 1 }}>
+              <Calendar size={20} color="#D4AF37" />
+              <Text className="ml-3 text-gray-200 flex-1" numberOfLines={2} style={{ flexShrink: 1 }}>
                 {formatDateForDisplay(selectedDate)}
               </Text>
-              <ChevronDown size={20} color="#374151" />
+              <ChevronDown size={20} color="#D4AF37" />
             </TouchableOpacity>
             
             {/* Date Picker Dropdown */}
             {showDatePicker && (
               <View 
-                className="mt-2 border border-gray-300 rounded-lg bg-white"
+                className="mt-2 border border-golden/30 rounded-lg bg-neutral-800"
                 style={{ maxHeight: 200 }}
               >
                 <ScrollView 
@@ -299,20 +270,20 @@ export default function MakeReservationScreen({ navigation }: MakeReservationScr
                       onPress={() => {
                         setSelectedDate(date);
                         setShowDatePicker(false);
-                        setSelectedTime("20:00"); // Reset time selection
-                        setSelectedTable(null); // Reset table selection
+                        setAvailableTables([]);
+                        setSelectedTable(null);
                       }}
                       style={{
                         padding: 12,
                         borderBottomWidth: index < getAvailableDates().length - 1 ? 1 : 0,
-                        borderBottomColor: '#f3f4f6',
+                        borderBottomColor: 'rgba(212, 175, 55, 0.2)',
                         backgroundColor: formatDateForAPI(date) === formatDateForAPI(selectedDate) 
-                          ? '#eff6ff' : 'white'
+                          ? 'rgba(212, 175, 55, 0.2)' : 'transparent'
                       }}
                     >
                       <Text style={{
                         color: formatDateForAPI(date) === formatDateForAPI(selectedDate)
-                          ? '#2563eb' : '#374151',
+                          ? '#D4AF37' : '#E5E7EB',
                         fontWeight: formatDateForAPI(date) === formatDateForAPI(selectedDate)
                           ? '600' : 'normal'
                       }}>
@@ -325,16 +296,67 @@ export default function MakeReservationScreen({ navigation }: MakeReservationScr
             )}
           </View>
 
-          {/* Tipo de mesa */}
+          {/* Paso 2: Hora */}
           <View className="mb-6">
-            <Text className="text-sm font-medium text-gray-700 mb-2">
-              Tipo de mesa
+            <View className="flex-row items-center mb-3">
+              <Text className="text-sm font-semibold text-gray-200">
+                Hora de la reserva
+              </Text>
+            </View>
+            <View className="flex-row items-center p-4 border border-golden/30 rounded-lg bg-neutral-800">
+              <Clock size={20} color="#D4AF37" />
+              <TextInput
+                placeholder="Ej: 20:30 o 01:45"
+                placeholderTextColor="#6B7280"
+                value={selectedTime}
+                onChangeText={(text) => {
+                  setSelectedTime(text);
+                  setAvailableTables([]);
+                  setSelectedTable(null);
+                }}
+                onFocus={() => setTimeInputFocused(true)}
+                onBlur={() => setTimeInputFocused(false)}
+                className="ml-3 text-gray-200 flex-1"
+                keyboardType="numbers-and-punctuation"
+                maxLength={5}
+              />
+            </View>
+            <Text className="text-xs text-gray-500 mt-1">
+              Horario de atención: 19:00 a 02:30
             </Text>
-            <View className="border border-gray-300 rounded-lg bg-white">
+            {selectedTime && isValidTimeFormat(selectedTime) && isTimeInOperatingHours(selectedTime) && (
+              <Text className="text-xs text-green-500 mt-1">
+                ✓ Hora válida
+              </Text>
+            )}
+            {selectedTime && isValidTimeFormat(selectedTime) && !isTimeInOperatingHours(selectedTime) && (
+              <Text className="text-xs text-red-500 mt-1">
+                ✗ La hora debe estar entre 19:00 y 02:30
+              </Text>
+            )}
+            {selectedTime && !isValidTimeFormat(selectedTime) && (
+              <Text className="text-xs text-red-500 mt-1">
+                ✗ Formato inválido (usa HH:MM)
+              </Text>
+            )}
+          </View>
+
+          {/* Paso 3: Tipo de mesa */}
+          <View className="mb-6">
+            <View className="flex-row items-center mb-3">
+              <Text className="text-sm font-semibold text-gray-200">
+                Tipo de mesa
+              </Text>
+            </View>
+            <View className="border border-golden/30 rounded-lg bg-neutral-800">
               <Picker
                 selectedValue={tableType}
-                onValueChange={(value) => setTableType(value as "estandar" | "vip" | "accesible")}
-                style={{ height: 50 }}
+                onValueChange={(value) => {
+                  setTableType(value as "estandar" | "vip" | "accesible");
+                  setAvailableTables([]);
+                  setSelectedTable(null);
+                }}
+                style={{ height: 50, color: '#E5E7EB' }}
               >
                 <Picker.Item label="Mesa Estándar" value="estandar" />
                 <Picker.Item label="Mesa VIP" value="vip" />
@@ -343,16 +365,22 @@ export default function MakeReservationScreen({ navigation }: MakeReservationScr
             </View>
           </View>
 
-          {/* Número de personas */}
+          {/* Paso 4: Capacidad */}
           <View className="mb-6">
-            <Text className="text-sm font-medium text-gray-700 mb-2">
-              Número de personas (mínimo)
-            </Text>
-            <View className="border border-gray-300 rounded-lg bg-white">
+            <View className="flex-row items-center mb-3">
+              <Text className="text-sm font-semibold text-gray-200">
+                Número de personas
+              </Text>
+            </View>
+            <View className="border border-golden/30 rounded-lg bg-neutral-800">
               <Picker
                 selectedValue={partySize}
-                onValueChange={setPartySize}
-                style={{ height: 50 }}
+                onValueChange={(value) => {
+                  setPartySize(value);
+                  setAvailableTables([]);
+                  setSelectedTable(null);
+                }}
+                style={{ height: 50, color: '#E5E7EB' }}
               >
                 {[...Array(12)].map((_, i) => (
                   <Picker.Item
@@ -365,20 +393,23 @@ export default function MakeReservationScreen({ navigation }: MakeReservationScr
             </View>
           </View>
 
-          {/* Mesas disponibles */}
-          <View className="mb-6">
-            <Text className="text-sm font-medium text-gray-700 mb-2">
-              Seleccionar mesa
-            </Text>
-            {loadingTables ? (
-              <Text className="text-gray-500 text-center py-4">
-                Cargando mesas disponibles...
+          {/* Resultado: Mesas disponibles */}
+          {loadingTables ? (
+            <View className="p-4 bg-neutral-800 rounded-lg border border-golden/30 mb-6">
+              <Text className="text-gray-400 text-center">
+                Buscando mesas disponibles...
               </Text>
-            ) : availableTables.length === 0 ? (
-              <Text className="text-gray-500 text-center py-4">
-                No hay mesas disponibles con estas características
-              </Text>
-            ) : (
+            </View>
+          ) : availableTables.length > 0 ? (
+            <View className="mb-6">
+              <View className="flex-row items-center mb-3">
+                <View className="w-7 h-7 rounded-full bg-golden items-center justify-center mr-2">
+                  <Text className="text-neutral-900 text-xs font-bold">5</Text>
+                </View>
+                <Text className="text-sm font-semibold text-gray-200">
+                  Seleccioná tu mesa ({availableTables.length} disponible{availableTables.length !== 1 ? 's' : ''})
+                </Text>
+              </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View className="flex-row gap-4">
                   {availableTables.map((table) => (
@@ -386,140 +417,109 @@ export default function MakeReservationScreen({ navigation }: MakeReservationScr
                       key={table.id}
                       table={table}
                       isSelected={selectedTable?.id === table.id}
-                      onSelect={() => {
-                        setSelectedTable(table);
-                        setSelectedTime("20:00");
-                      }}
+                      onSelect={() => setSelectedTable(table)}
                     />
                   ))}
                 </View>
               </ScrollView>
-            )}
-          </View>
+            </View>
+          ) : availableTables.length === 0 && !loadingTables && selectedTime && isValidTimeFormat(selectedTime) && isTimeInOperatingHours(selectedTime) ? null : null}
 
-            {/* Horarios disponibles */}
-            {selectedTable && (
-              <View className="mb-6">
-                <Text className="text-sm font-medium text-gray-700 mb-2">
-                  Horarios disponibles para Mesa #{selectedTable.number}
-                </Text>
-                {loadingSlots ? (
-                <Text className="text-gray-500 text-center py-4">
-                  Cargando horarios disponibles...
-                </Text>
-              ) : !availableSlots ? (
-                <Text className="text-gray-500 text-center py-4">
-                  Error al cargar disponibilidad
-                </Text>
-              ) : (
-                <>
-                  <View className="flex-row flex-wrap gap-2">
-                    {timeSlots.map((time) => {
-                      const available = isTimeAvailable(time);
-                      const table = getTableForTime(time);
-                      const isSelected = selectedTime === time && available;
-                      
-                      return (
-                        <TouchableOpacity
-                          key={time}
-                          onPress={() => {
-                            console.log(`Clicked time: ${time}, available: ${available}, table:`, table);
-                            if (available) {
-                              setSelectedTime(time);
-                            }
-                          }}
-                          disabled={!available}
-                          className={`px-4 py-2 rounded-lg border ${
-                            isSelected
-                              ? 'bg-blue-500 border-blue-500'
-                              : available
-                              ? 'bg-white border-gray-300'
-                              : 'bg-gray-100 border-gray-200'
-                          }`}
-                        >
-                          <Text className={`text-sm ${
-                            isSelected
-                              ? 'text-white font-medium'
-                              : available
-                              ? 'text-gray-700'
-                              : 'text-gray-400'
-                          }`}>
-                            {time}
-                          </Text>
-                          {available && table && (
-                            <Text className={`text-xs ${
-                              isSelected ? 'text-blue-100' : 'text-gray-500'
-                            }`}>
-                              Mesa {table.table_number}
-                            </Text>
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                  
-                  {/* Debug info */}
-                  <Text className="text-xs text-gray-400 mt-2">
-                    Debug: {availableSlots?.slots?.filter(s => s.available).length || 0} de {timeSlots.length} horarios disponibles
-                  </Text>
-                </>
-              )}            {selectedTime && selectedTable && (
-              <Text className="text-sm text-green-600 mt-2">
-                ✓ Horario seleccionado: {selectedTime}
+          {/* Sugerencias de horarios alternativos */}
+          {suggestedTimes.length > 0 && availableTables.length === 0 && !loadingTables && (
+            <View className="mb-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+              <Text className="text-blue-400 font-semibold mb-2">
+                💡 Horarios alternativos disponibles
               </Text>
-            )}
+              <Text className="text-gray-300 text-sm mb-3">
+                No hay mesas disponibles a las {selectedTime}, pero hay disponibilidad en estos horarios:
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                {suggestedTimes.map((time, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    onPress={() => {
+                      setSelectedTime(time);
+                      setSuggestedTimes([]);
+                    }}
+                    className="bg-blue-500/20 border border-blue-500/40 rounded-lg px-4 py-2"
+                  >
+                    <Text className="text-blue-300 font-medium">
+                      {time}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            )}
+            </View>
+          )}
 
           {/* Notas adicionales */}
-          <View className="mb-6">
-            <Text className="text-sm font-medium text-gray-700 mb-2">
-              Notas adicionales (opcional)
-            </Text>
-            <TextInput
-              placeholder="Ej: Celebración de cumpleaños, preferencia de mesa..."
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-              numberOfLines={3}
-              maxLength={200}
-              className="p-4 border border-gray-300 rounded-lg bg-white text-gray-800"
-              textAlignVertical="top"
-            />
-            <Text className="text-xs text-gray-500 mt-1">
-              {notes.length}/200 caracteres
-            </Text>
-          </View>
+          {selectedTable && (
+            <View className="mb-6">
+              <Text className="text-sm font-semibold text-gray-200 mb-2">
+                Notas adicionales (opcional)
+              </Text>
+              <TextInput
+                placeholder="Ej: Celebración de cumpleaños, preferencia de ubicación..."
+                placeholderTextColor="#6B7280"
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                numberOfLines={3}
+                maxLength={200}
+                className="p-4 border border-golden/30 rounded-lg bg-neutral-800 text-gray-200"
+                textAlignVertical="top"
+              />
+              <Text className="text-xs text-gray-500 mt-1">
+                {notes.length}/200 caracteres
+              </Text>
+            </View>
+          )}
 
-          {/* Botón de enviar */}
-          <TouchableOpacity
-            onPress={handleSubmit}
-            disabled={loading || !selectedTable || !selectedTime}
-            className={`py-4 rounded-lg ${
-              loading || !selectedTable || !selectedTime
-                ? 'bg-gray-300'
-                : 'bg-blue-500'
-            }`}
-          >
-            <Text className={`text-center font-semibold ${
-              loading || !selectedTable || !selectedTime
-                ? 'text-gray-500'
-                : 'text-white'
-            }`}>
-              {loading ? 'Enviando...' : 'Solicitar Reserva'}
-            </Text>
-          </TouchableOpacity>
+          {/* Botón de confirmar reserva */}
+          {selectedTable && (
+            <TouchableOpacity
+              onPress={handleSubmit}
+              disabled={loading}
+              style={{
+                backgroundColor: loading ? '#404040' : '#D4AF37',
+                paddingVertical: 16,
+                borderRadius: 8,
+                marginBottom: 24,
+                shadowColor: '#D4AF37',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: loading ? 0 : 0.3,
+                shadowRadius: 8,
+                elevation: loading ? 0 : 5,
+              }}
+            >
+              <Text className={`text-center font-bold text-base ${
+                loading ? 'text-gray-500' : 'text-neutral-900'
+              }`}>
+                {loading ? 'Enviando...' : 'Confirmar Reserva'}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {/* Información adicional */}
-          <View className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <Text className="text-sm text-blue-800 font-medium mb-2">
-              Información importante:
+          <View 
+            style={{
+              marginTop: 8,
+              padding: 16,
+              backgroundColor: 'rgba(212, 175, 55, 0.1)',
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: 'rgba(212, 175, 55, 0.3)',
+            }}
+          >
+            <Text className="text-sm text-white font-semibold mb-2">
+              💡 Información importante:
             </Text>
-            <Text className="text-sm text-blue-700">
+            <Text className="text-sm text-gray-300 leading-5">
               • Las reservas deben ser aprobadas por el restaurante{'\n'}
               • Te notificaremos por email cuando sea confirmada{'\n'}
-              • Puedes hacer múltiples reservas para diferentes fechas{'\n'}
-              • Las reservas solo se pueden hacer para fechas futuras
+              • Horario: 19:00 a 03:00 (última reserva 02:30){'\n'}
+              • Las mesas se bloquean 45 min antes y después de tu horario
             </Text>
           </View>
         </View>

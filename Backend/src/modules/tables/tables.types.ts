@@ -55,6 +55,14 @@ export interface TableWithClient extends TableOccupancy {
     profile_image?: string;
     profile_code: string;
   };
+  reservation?: {
+    id: string;
+    user_id: string;
+    date: string;
+    time: string;
+    party_size: number;
+    status: string;
+  };
 }
 
 // Tipos para respuestas de la API

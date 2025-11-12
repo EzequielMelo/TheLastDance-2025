@@ -44,6 +44,14 @@ export interface TableStatus {
     profile_image?: string;
     profile_code: string;
   };
+  reservation?: {
+    id: string;
+    user_id: string;
+    date: string;
+    time: string;
+    party_size: number;
+    status: string;
+  };
 }
 
 export interface TablesStatusResponse {

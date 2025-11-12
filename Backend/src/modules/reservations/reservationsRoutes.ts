@@ -9,6 +9,7 @@ const router = Router();
 router.use(authenticateUser);
 
 // Rutas específicas primero (para evitar conflictos con :id)
+router.get('/search-tables', ReservationsController.getAvailableTablesForReservation);
 router.get('/tables', ReservationsController.getTablesByType);
 router.get('/table-availability', ReservationsController.checkTableAvailability);
 router.get('/availability', ReservationsController.checkAvailability);
@@ -18,10 +19,12 @@ router.get('/check-table-reserved', roleGuard(['dueno', 'supervisor', 'maitre'])
 
 // Rutas para clientes
 router.post('/', ReservationsController.createReservation);
+router.post('/check-activation', ReservationsController.checkAndActivateReservation);
 router.put('/:id/cancel', ReservationsController.cancelReservation);
 router.get('/:id', ReservationsController.getReservationDetails);
 
 // Rutas para admin (dueño/supervisor)
 router.put('/:id/status', roleGuard(['dueno', 'supervisor']), ReservationsController.updateReservationStatus);
+router.post('/clean-expired', roleGuard(['dueno', 'supervisor']), ReservationsController.cleanExpiredReservations);
 
 export default router;

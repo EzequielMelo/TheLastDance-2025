@@ -6,6 +6,10 @@ import type {
 } from '../../types/Reservation';
 
 export class ReservationsService {
+  // Cache para evitar múltiples llamadas duplicadas
+  private static lastCheckTimestamp: number = 0;
+  private static lastCheckResult: any = null;
+  private static readonly CACHE_DURATION_MS = 5000; // 5 segundos
   /**
    * Crear una nueva reserva
    */
@@ -234,6 +238,84 @@ export class ReservationsService {
         error.message || 
         'Error al actualizar la reserva'
       );
+    }
+  }
+
+  /**
+   * Buscar mesas disponibles para fecha, hora, tipo y capacidad específicos
+   * Nuevo flujo: el usuario selecciona todo primero, luego ve qué mesas están libres
+   */
+  static async getAvailableTablesForReservation(
+    date: string,
+    time: string,
+    tableType: string,
+    partySize: number
+  ): Promise<{ tables: any[]; suggestedTimes?: string[] }> {
+    try {
+      const params = new URLSearchParams({
+        date,
+        time,
+        type: tableType,
+        party_size: partySize.toString()
+      });
+
+      const response = await api.get(`/reservations/search-tables?${params.toString()}`);
+      
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Error al buscar mesas disponibles');
+      }
+      
+      // Retornar tanto las mesas como las sugerencias de horarios (si las hay)
+      return {
+        tables: response.data.data,
+        suggestedTimes: response.data.suggestedTimes
+      };
+    } catch (error: any) {
+      console.error('Error searching available tables:', error);
+      throw new Error(
+        error.response?.data?.error || 
+        error.message || 
+        'Error al buscar mesas disponibles'
+      );
+    }
+  }
+
+  /**
+   * Verificar y activar reservas que están en ventana de llegada
+   * Se ejecuta cuando el usuario refresca su estado
+   * Incluye cache de 5 segundos para evitar llamadas duplicadas
+   */
+  static async checkAndActivateReservation(): Promise<{
+    activated: boolean;
+    message?: string;
+    tableNumber?: string;
+    reservationTime?: string;
+  }> {
+    try {
+      const now = Date.now();
+      
+      // Si la última llamada fue hace menos de 5 segundos, devolver resultado cacheado
+      if (now - this.lastCheckTimestamp < this.CACHE_DURATION_MS && this.lastCheckResult) {
+        console.log('⚡ checkAndActivateReservation: usando cache (evitando llamada duplicada)');
+        return this.lastCheckResult;
+      }
+      
+      const response = await api.post('/reservations/check-activation');
+      
+      if (!response.data.success) {
+        return { activated: false };
+      }
+      
+      const result = response.data.data;
+      
+      // Guardar resultado y timestamp en cache
+      this.lastCheckResult = result;
+      this.lastCheckTimestamp = now;
+      
+      return result;
+    } catch (error: any) {
+      console.error('Error checking reservation activation:', error);
+      return { activated: false };
     }
   }
 }
