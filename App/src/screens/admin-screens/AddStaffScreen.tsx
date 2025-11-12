@@ -30,7 +30,13 @@ interface FormData {
   password: string;
   confirmPassword: string;
   profile_code: "empleado" | "supervisor";
-  position_code: "cocinero" | "bartender" | "maitre" | "mozo" | "";
+  position_code:
+    | "cocinero"
+    | "bartender"
+    | "maitre"
+    | "mozo"
+    | "repartidor"
+    | "";
   file: any;
 }
 
@@ -68,13 +74,11 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
     if (userRole === "dueno") {
       return [
         { label: "Empleado", value: "empleado" },
-        { label: "Supervisor", value: "supervisor" }
+        { label: "Supervisor", value: "supervisor" },
       ];
     } else {
       // supervisor solo puede crear empleados
-      return [
-        { label: "Empleado", value: "empleado" }
-      ];
+      return [{ label: "Empleado", value: "empleado" }];
     }
   }, [userRole]);
 
@@ -96,21 +100,25 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
   }, [userRole]);
 
   const handleInputChange = (field: keyof FormData, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: "" }));
+      setErrors(prev => ({ ...prev, [field]: "" }));
     }
-    
+
     // Si cambió la contraseña, re-validar confirmPassword si tiene errores
     if (field === "password" && errors.confirmPassword) {
-      const confirmPasswordError = formData.confirmPassword !== value ? "Las contraseñas no coinciden" : "";
-      setErrors((prev) => ({ ...prev, confirmPassword: confirmPasswordError }));
+      const confirmPasswordError =
+        formData.confirmPassword !== value
+          ? "Las contraseñas no coinciden"
+          : "";
+      setErrors(prev => ({ ...prev, confirmPassword: confirmPasswordError }));
     }
-    
+
     // Si cambió confirmPassword, validar inmediatamente
     if (field === "confirmPassword") {
-      const confirmPasswordError = value !== formData.password ? "Las contraseñas no coinciden" : "";
-      setErrors((prev) => ({ ...prev, confirmPassword: confirmPasswordError }));
+      const confirmPasswordError =
+        value !== formData.password ? "Las contraseñas no coinciden" : "";
+      setErrors(prev => ({ ...prev, confirmPassword: confirmPasswordError }));
     }
   };
 
@@ -226,7 +234,7 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
           firstName = firstName
             .toLowerCase()
             .split(" ")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
             .join(" ");
         } else {
           firstName = "";
@@ -239,14 +247,15 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
           lastName = lastName
             .toLowerCase()
             .split(" ")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
             .join(" ");
         } else {
           lastName = "";
         }
       }
 
-      const result: { dni?: string; firstName?: string; lastName?: string } = {};
+      const result: { dni?: string; firstName?: string; lastName?: string } =
+        {};
       if (dni) result.dni = dni;
       if (firstName && firstName.length > 1) result.firstName = firstName;
       if (lastName && lastName.length > 1) result.lastName = lastName;
@@ -263,13 +272,13 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
 
     if (dni) {
       handleInputChange("dni", dni);
-      
+
       // Obtener el CUIL actual para preservar el primer y último dígito si ya están completados
       const currentCuil = formData.cuil || "--";
       const cuilParts = currentCuil.split("-");
       const firstDigits = cuilParts[0] || "";
       const lastDigit = cuilParts[2] || "";
-      
+
       // Crear el formato de CUIL con el DNI en el medio, preservando lo que ya estaba
       const cuilFormat = `${firstDigits}-${dni}-${lastDigit}`;
       handleInputChange("cuil", cuilFormat);
@@ -386,11 +395,12 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
 
   const pickImageFromGallery = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         ToastAndroid.show(
           "Se necesita permiso para acceder a la galería",
-          ToastAndroid.SHORT
+          ToastAndroid.SHORT,
         );
         return;
       }
@@ -409,7 +419,10 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
           name: "photo.jpg",
         };
         handleInputChange("file", photoFile);
-        ToastAndroid.show("Foto seleccionada correctamente", ToastAndroid.SHORT);
+        ToastAndroid.show(
+          "Foto seleccionada correctamente",
+          ToastAndroid.SHORT,
+        );
       }
     } catch (error) {
       console.error("Error seleccionando imagen:", error);
@@ -419,7 +432,10 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
 
   const handleSubmit = async () => {
     if (!validateForm()) {
-      ToastAndroid.show("Por favor corrige los errores en el formulario", ToastAndroid.LONG);
+      ToastAndroid.show(
+        "Por favor corrige los errores en el formulario",
+        ToastAndroid.LONG,
+      );
       return;
     }
 
@@ -433,21 +449,21 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
       formDataToSend.append("dni", formData.dni.trim());
       formDataToSend.append("cuil", formData.cuil.trim());
       formDataToSend.append("profile_code", formData.profile_code);
-      
+
       if (formData.profile_code === "empleado") {
         formDataToSend.append("position_code", formData.position_code);
       }
-      
+
       if (formData.file) {
         formDataToSend.append("file", formData.file as any);
       }
 
-      const response = await api.post('/admin/users/staff', formDataToSend, {
+      const response = await api.post("/admin/users/staff", formDataToSend, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          "Content-Type": "multipart/form-data",
         },
       });
-      
+
       ToastAndroid.show("¡Staff creado exitosamente!", ToastAndroid.LONG);
       navigation.goBack();
     } catch (error: any) {
@@ -455,7 +471,7 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
       console.error("Error response:", error?.response?.data);
       ToastAndroid.show(
         error?.response?.data?.error || "Error al crear el staff",
-        ToastAndroid.LONG
+        ToastAndroid.LONG,
       );
     } finally {
       setLoading(false);
@@ -485,7 +501,9 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
             className="bg-blue-600/20 px-4 py-2 rounded-lg border border-blue-500/30 self-start"
           >
             <View className="flex-row items-center">
-              <Text className="text-blue-300 text-lg font-medium">Escanear DNI</Text>
+              <Text className="text-blue-300 text-lg font-medium">
+                Escanear DNI
+              </Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -503,7 +521,9 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
               onFocus={() => setFocused("first_name")}
               error={errors.first_name}
             />
-            <Text className="text-white text-sm font-medium mb-1">Apellido</Text>
+            <Text className="text-white text-sm font-medium mb-1">
+              Apellido
+            </Text>
             <TextField
               placeholder="Apellido"
               value={formData.last_name}
@@ -547,7 +567,7 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
           onFocus={() => setFocused("cuil")}
           error={errors.cuil}
         />
-        
+
         <TextField
           placeholder="Correo electrónico"
           value={formData.email}
@@ -580,35 +600,45 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
 
         <View className="mb-4">
           <Text className="text-white text-sm font-medium mb-2">Perfil</Text>
-          <View className={`rounded-lg border ${userRole === "supervisor" ? "bg-gray-700 border-gray-500" : "bg-gray-800 border-gray-600"}`}>
+          <View
+            className={`rounded-lg border ${userRole === "supervisor" ? "bg-gray-700 border-gray-500" : "bg-gray-800 border-gray-600"}`}
+          >
             <Picker
               selectedValue={formData.profile_code}
-              onValueChange={(value) => handleInputChange("profile_code", value)}
+              onValueChange={value => handleInputChange("profile_code", value)}
               style={{ color: userRole === "supervisor" ? "#9ca3af" : "white" }}
-              dropdownIconColor={userRole === "supervisor" ? "#9ca3af" : "white"}
+              dropdownIconColor={
+                userRole === "supervisor" ? "#9ca3af" : "white"
+              }
               enabled={userRole === "dueno"}
             >
-              {availableProfiles.map((profile) => (
-                <Picker.Item 
-                  key={profile.value} 
-                  label={profile.label} 
-                  value={profile.value} 
+              {availableProfiles.map(profile => (
+                <Picker.Item
+                  key={profile.value}
+                  label={profile.label}
+                  value={profile.value}
                 />
               ))}
             </Picker>
           </View>
           {errors.profile_code && (
-            <Text className="text-red-400 text-xs mt-1">{errors.profile_code}</Text>
+            <Text className="text-red-400 text-xs mt-1">
+              {errors.profile_code}
+            </Text>
           )}
         </View>
 
         {formData.profile_code === "empleado" && (
           <View className="mb-4">
-            <Text className="text-white text-sm font-medium mb-2">Posición</Text>
+            <Text className="text-white text-sm font-medium mb-2">
+              Posición
+            </Text>
             <View className="bg-gray-800 rounded-lg border border-gray-600">
               <Picker
                 selectedValue={formData.position_code}
-                onValueChange={(value) => handleInputChange("position_code", value)}
+                onValueChange={value =>
+                  handleInputChange("position_code", value)
+                }
                 style={{ color: "white" }}
                 dropdownIconColor="white"
               >
@@ -616,10 +646,13 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
                 <Picker.Item label="Bartender" value="bartender" />
                 <Picker.Item label="Maitre" value="maitre" />
                 <Picker.Item label="Mozo" value="mozo" />
+                <Picker.Item label="Repartidor" value="repartidor" />
               </Picker>
             </View>
             {errors.position_code && (
-              <Text className="text-red-400 text-xs mt-1">{errors.position_code}</Text>
+              <Text className="text-red-400 text-xs mt-1">
+                {errors.position_code}
+              </Text>
             )}
           </View>
         )}

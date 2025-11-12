@@ -20,7 +20,10 @@ import {
 } from "lucide-react-native";
 import { useClientState, ClientState } from "../../Hooks/useClientState";
 import { useClientStateSocket } from "../../Hooks/useClientStateSocket";
-import { checkTableDeliveryStatus, getAnonymousOrderData } from "../../api/orders";
+import {
+  checkTableDeliveryStatus,
+  getAnonymousOrderData,
+} from "../../api/orders";
 import { PDFService } from "../../services/pdfService";
 import { useAuth } from "../../auth/useAuth";
 import type { RootStackNavigationProp } from "../../navigation/RootStackParamList";
@@ -81,7 +84,7 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
 
   const handleRefresh = async () => {
     await refresh();
-    
+
     // Verificar datos de orden para usuarios anónimos
     if (user?.profile_code === "cliente_anonimo") {
       try {
@@ -91,7 +94,7 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
         console.error("Error verificando datos de orden anónimos:", error);
       }
     }
-    
+
     onRefresh?.();
   };
 
@@ -115,7 +118,12 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
           .then(setDeliveryStatus)
           .catch(console.error);
       }
-    }, [state, occupiedTable?.id, deliveryConfirmationStatus, user?.profile_code]),
+    }, [
+      state,
+      occupiedTable?.id,
+      deliveryConfirmationStatus,
+      user?.profile_code,
+    ]),
   );
 
   // Solo ejecutar cuando se dispare refreshTrigger (pull-to-refresh)
@@ -146,7 +154,10 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
 
   const renderStateContent = () => {
     // Verificar si es usuario anónimo con pedido listo para facturar, independientemente del estado
-    if (user?.profile_code === "cliente_anonimo" && anonymousOrderData?.hasOrder) {
+    if (
+      user?.profile_code === "cliente_anonimo" &&
+      anonymousOrderData?.hasOrder
+    ) {
       return (
         <View className="items-center">
           {/* Header con ícono a la izquierda y textos a la derecha */}
@@ -168,8 +179,9 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
 
           <Text className="text-gray-300 text-center text-lg mb-6">
             Pago confirmado por $
-            {anonymousOrderData.orderData?.totalAmount?.toLocaleString()}. 
-            Si deseas realizar nuevos pedidos, crea una cuenta para disfrutar de beneficios exclusivos.
+            {anonymousOrderData.orderData?.totalAmount?.toLocaleString()}. Si
+            deseas realizar nuevos pedidos, crea una cuenta para disfrutar de
+            beneficios exclusivos.
           </Text>
 
           {/* Botón de descarga */}
@@ -178,12 +190,14 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
               onPress={async () => {
                 if (anonymousOrderData.orderData) {
                   try {
-                    await PDFService.generateInvoicePDF(anonymousOrderData.orderData);
+                    await PDFService.generateInvoicePDF(
+                      anonymousOrderData.orderData,
+                    );
                   } catch (error) {
                     console.error("Error generando PDF:", error);
                     Alert.alert(
-                      "Error", 
-                      "No se pudo generar la factura. Inténtalo de nuevo."
+                      "Error",
+                      "No se pudo generar la factura. Inténtalo de nuevo.",
                     );
                   }
                 }
@@ -722,8 +736,7 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
               <TouchableOpacity
                 onPress={handleRefresh}
                 className="bg-amber-600 px-6 py-3 rounded-lg flex-row items-center"
-              >
-              </TouchableOpacity>
+              ></TouchableOpacity>
             </View>
           </View>
         );
