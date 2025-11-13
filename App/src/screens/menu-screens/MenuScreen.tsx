@@ -13,6 +13,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
 } from "react-native";
+import { Accelerometer, Gyroscope } from "expo-sensors";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   useNavigation,
@@ -95,17 +96,6 @@ export default function MenuScreen() {
 
   // El cliente no está sentado en una mesa
   const isNotSeated = clientState !== "seated";
-
-  // Efecto para actualizar el tab activo cuando se enfoque la pantalla
-  useFocusEffect(
-    React.useCallback(() => {
-      setActiveTab("menu");
-      return () => {
-        // Cleanup cuando se pierde el foco para liberar memoria
-        setCurrentImageIndex({});
-      };
-    }, [setActiveTab]),
-  );
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -526,6 +516,126 @@ export default function MenuScreen() {
     return item.category === selectedCategory;
   });
 
+  // Estados para navegación con sensores (después de filteredItems)
+  const [currentProductIndex, setCurrentProductIndex] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
+  const lastMovementTime = useRef(0);
+  const shakeCount = useRef(0);
+  const lastShakeTime = useRef(0);
+  const MOVEMENT_COOLDOWN = 500; // ms entre movimientos
+  const SHAKE_RESET_TIME = 2000; // ms para resetear contador de shakes
+
+  // Efecto para actualizar el tab activo y configurar sensores cuando se enfoque la pantalla
+  useFocusEffect(
+    React.useCallback(() => {
+      setActiveTab("menu");
+      
+      // Configurar sensores
+      Accelerometer.setUpdateInterval(100);
+      Gyroscope.setUpdateInterval(100);
+      
+      const accelerometerSubscription = Accelerometer.addListener((accelerometerData: { x: number; y: number; z: number }) => {
+        const { x, y, z } = accelerometerData;
+        const now = Date.now();
+        
+        // Cooldown para evitar múltiples disparos
+        if (now - lastMovementTime.current < MOVEMENT_COOLDOWN) return;
+        
+        // Detección de shake (movimiento rápido izq-der repetido)
+        const horizontalForce = Math.abs(x);
+        if (horizontalForce > 2.5) {
+          const timeSinceLastShake = now - lastShakeTime.current;
+          
+          if (timeSinceLastShake < SHAKE_RESET_TIME) {
+            shakeCount.current++;
+            console.log("🔄 Shake detectado:", shakeCount.current);
+            
+            // Si hace 3 shakes seguidos, volver al inicio
+            if (shakeCount.current >= 3) {
+              console.log("🏠 Volviendo al inicio del menú");
+              setCurrentProductIndex(0);
+              flatListRef.current?.scrollToIndex({ index: 0, animated: true });
+              shakeCount.current = 0;
+              lastMovementTime.current = now;
+            }
+          } else {
+            // Reset contador si pasó mucho tiempo
+            shakeCount.current = 1;
+          }
+          
+          lastShakeTime.current = now;
+          return;
+        }
+        
+        // Movimiento hacia adelante (bajar el celular) - Siguiente producto
+        if (y > 0.6 && Math.abs(x) < 0.5) {
+          const nextIndex = Math.min(currentProductIndex + 1, filteredItems.length - 1);
+          if (nextIndex !== currentProductIndex) {
+            console.log("⬇️ Siguiente producto:", nextIndex);
+            setCurrentProductIndex(nextIndex);
+            flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+            lastMovementTime.current = now;
+          }
+        }
+        
+        // Movimiento hacia atrás (subir el celular) - Producto anterior
+        if (y < -0.6 && Math.abs(x) < 0.5) {
+          const prevIndex = Math.max(currentProductIndex - 1, 0);
+          if (prevIndex !== currentProductIndex) {
+            console.log("⬆️ Producto anterior:", prevIndex);
+            setCurrentProductIndex(prevIndex);
+            flatListRef.current?.scrollToIndex({ index: prevIndex, animated: true });
+            lastMovementTime.current = now;
+          }
+        }
+      });
+      
+      const gyroscopeSubscription = Gyroscope.addListener((gyroscopeData: { x: number; y: number; z: number }) => {
+        const { z } = gyroscopeData;
+        const now = Date.now();
+        
+        // Cooldown para evitar múltiples disparos
+        if (now - lastMovementTime.current < MOVEMENT_COOLDOWN) return;
+        
+        const currentItem = filteredItems[currentProductIndex];
+        if (!currentItem || !currentItem.menu_item_images || currentItem.menu_item_images.length <= 1) return;
+        
+        const currentImgIndex = currentImageIndex[currentItem.id] || 0;
+        const maxImages = currentItem.menu_item_images.length;
+        
+        // Girar a la izquierda (z positivo) - Siguiente foto
+        if (z > 2) {
+          const nextImgIndex = (currentImgIndex + 1) % maxImages;
+          console.log("➡️ Siguiente foto:", nextImgIndex);
+          setCurrentImageIndex(prev => ({
+            ...prev,
+            [currentItem.id]: nextImgIndex
+          }));
+          lastMovementTime.current = now;
+        }
+        
+        // Girar a la derecha (z negativo) - Foto anterior
+        if (z < -2) {
+          const prevImgIndex = (currentImgIndex - 1 + maxImages) % maxImages;
+          console.log("⬅️ Foto anterior:", prevImgIndex);
+          setCurrentImageIndex(prev => ({
+            ...prev,
+            [currentItem.id]: prevImgIndex
+          }));
+          lastMovementTime.current = now;
+        }
+      });
+      
+      return () => {
+        // Cleanup cuando se pierde el foco
+        accelerometerSubscription.remove();
+        gyroscopeSubscription.remove();
+        setCurrentImageIndex({});
+        shakeCount.current = 0;
+      };
+    }, [setActiveTab, currentProductIndex, filteredItems, currentImageIndex]),
+  );
+
   if (loading) {
     return (
       <LinearGradient
@@ -589,6 +699,22 @@ export default function MenuScreen() {
                   ? "Selecciona nuevos productos para reemplazar los rechazados"
                   : "Explora nuestros deliciosos platos y bebidas"}
               </Text>
+              {!isModifyMode && (
+                <View style={{ 
+                  backgroundColor: "rgba(212, 175, 55, 0.1)", 
+                  borderRadius: 8, 
+                  padding: 8, 
+                  marginTop: 8,
+                  borderWidth: 1,
+                  borderColor: "rgba(212, 175, 55, 0.3)"
+                }}>
+                  <Text style={{ color: "#d4af37", fontSize: 11, textAlign: "center", lineHeight: 16 }}>
+                    💡 Mueve tu celular para navegar{'\n'}
+                    ⬆️⬇️ Adelante/Atrás: Cambiar producto | ↔️ Girar: Cambiar foto{'\n'}
+                    🔄 Agitar repetidamente: Volver al inicio
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -640,12 +766,17 @@ export default function MenuScreen() {
 
         {/* Menu Items */}
         <FlatList
+          ref={flatListRef}
           data={filteredItems}
           keyExtractor={item => item.id}
           pagingEnabled
           decelerationRate="fast"
           snapToAlignment="start"
           showsVerticalScrollIndicator={false}
+          onMomentumScrollEnd={(event) => {
+            const index = Math.round(event.nativeEvent.contentOffset.y / ITEM_VISIBLE_HEIGHT);
+            setCurrentProductIndex(index);
+          }}
           // Optimizaciones de rendimiento
           removeClippedSubviews={true}
           maxToRenderPerBatch={2}
@@ -753,7 +884,7 @@ export default function MenuScreen() {
                       >
                         <FlatList
                           data={item.menu_item_images.sort(
-                            (a, b) => a.position - b.position,
+                            (a: MenuItemImage, b: MenuItemImage) => a.position - b.position,
                           )}
                           keyExtractor={img => img.id}
                           horizontal
@@ -792,7 +923,7 @@ export default function MenuScreen() {
                               alignItems: "center",
                             }}
                           >
-                            {item.menu_item_images.map((_, index) => (
+                            {item.menu_item_images.map((_: MenuItemImage, index: number) => (
                               <View
                                 key={index}
                                 style={{
