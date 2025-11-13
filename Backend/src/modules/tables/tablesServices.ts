@@ -993,25 +993,43 @@ export async function cancelTableReservation(
   tableId: string,
 ): Promise<{ success: boolean; message: string }> {
   try {
-    // 1. Buscar reserva approved para hoy en esta mesa
+    // 1. Buscar reservas approved para hoy en esta mesa
     const today = new Date().toLocaleDateString("en-CA", {
       timeZone: "America/Argentina/Buenos_Aires",
     });
 
-    const { data: reservation, error: reservationError } = await supabaseAdmin
+    const { data: reservations, error: reservationError } = await supabaseAdmin
       .from("reservations")
       .select("id, user_id, time, status")
       .eq("table_id", tableId)
       .eq("date", today)
       .eq("status", "approved")
-      .single();
+      .order("time", { ascending: true }); // Ordenar por hora, más temprana primero
 
-    if (reservationError || !reservation) {
+    if (reservationError || !reservations || reservations.length === 0) {
+      console.error("Error buscando reservas:", reservationError);
       return {
         success: false,
         message: "No se encontró una reserva activa para esta mesa",
       };
     }
+
+    // Obtener la reserva MÁS PRÓXIMA (la primera en el tiempo)
+    // Esto coincide con lo que muestra getTablesStatus()
+    const reservation = reservations[0];
+    
+    if (!reservation) {
+      return {
+        success: false,
+        message: "No se encontró una reserva activa para esta mesa",
+      };
+    }
+    
+    console.log(`🔍 Cancelando reserva más próxima para mesa ${tableId}:`, {
+      reservationId: reservation.id,
+      time: reservation.time,
+      totalReservations: reservations.length
+    });
 
     // 2. Cancelar la reserva
     const { error: updateError } = await supabaseAdmin

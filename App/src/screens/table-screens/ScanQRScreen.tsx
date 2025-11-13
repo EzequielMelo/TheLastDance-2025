@@ -20,6 +20,8 @@ import {
   CheckCircle,
 } from "lucide-react-native";
 import { useAuth } from "../../auth/AuthContext";
+import api from "../../api/axios";
+import CustomAlert from "../../components/common/CustomAlert";
 
 const { width, height } = Dimensions.get("window");
 
@@ -32,11 +34,28 @@ export default function ScanQRScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
+  
+  // Estados para CustomAlert
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertType, setAlertType] = useState<"success" | "error" | "warning" | "info">("info");
 
   // Verificar que el usuario pueda unirse a la lista
   const canJoin =
     user?.profile_code === "cliente_registrado" ||
     user?.profile_code === "cliente_anonimo";
+
+  const showCustomAlert = (
+    title: string,
+    message: string,
+    type: "success" | "error" | "warning" | "info" = "info"
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertVisible(true);
+  };
 
   useEffect(() => {
     if (!permission?.granted) {
@@ -51,54 +70,157 @@ export default function ScanQRScreen() {
     setProcessing(true);
 
     try {
-      // Validar que es nuestro QR
-      if (!data.includes("thelastdance://join-waiting-list")) {
-        Alert.alert(
+      console.log("📱 QR escaneado en ScanQRScreen:", data);
+
+      // Caso 1: QR de lista de espera (waiting list)
+      if (data.includes("thelastdance://join-waiting-list")) {
+        // Extraer y validar datos del QR
+        const url = new URL(data);
+        const encodedData = url.searchParams.get("data");
+
+        if (!encodedData) {
+          throw new Error("Datos del QR no válidos");
+        }
+
+        const qrData = JSON.parse(atob(encodedData));
+
+        // Verificar la acción
+        if (qrData.action !== "join_waiting_list") {
+          showCustomAlert(
+            "QR Incorrecto",
+            "Este código QR no es para unirse a la lista de espera.",
+            "error"
+          );
+          setScanned(false);
+          setProcessing(false);
+          return;
+        }
+
+        // Navegar al formulario con los datos del QR
+        try {
+          navigation.navigate("JoinWaitingList", { qrData });
+        } catch (navError) {
+          console.error("Navigation error:", navError);
+          showCustomAlert(
+            "Error de navegación",
+            "No se pudo navegar al formulario. Intenta de nuevo.",
+            "error"
+          );
+          setScanned(false);
+        }
+        setProcessing(false);
+        return;
+      }
+
+      // Caso 2: QR de mesa - Verificar si el usuario tiene reserva para esta mesa
+      console.log("📱 Detectado QR de mesa, verificando reserva...");
+      
+      let tableId: string;
+
+      if (data.includes("thelastdance://table/")) {
+        // Si es un deeplink estructurado
+        const url = new URL(data);
+        tableId = url.pathname.split("/").pop() || "";
+      } else {
+        // Asumir que el QR contiene directamente el ID de la mesa
+        tableId = data.trim();
+      }
+
+      if (!tableId) {
+        showCustomAlert(
           "QR Inválido",
-          "Este no es un código QR válido del restaurante The Last Dance.",
-          [{ text: "OK", onPress: () => setScanned(false) }],
+          "No se pudo leer la información de la mesa.",
+          "error"
         );
+        setScanned(false);
+        setProcessing(false);
         return;
       }
 
-      // Extraer y validar datos del QR
-      const url = new URL(data);
-      const encodedData = url.searchParams.get("data");
+      console.log("🔄 Intentando activar mesa con ID:", tableId);
+      console.log("👤 Usuario ID:", user?.id);
 
-      if (!encodedData) {
-        throw new Error("Datos del QR no válidos");
-      }
+      // Intentar activar la mesa (el backend validará si tiene reserva)
+      const response = await api.post(`/tables/${tableId}/activate`);
 
-      const qrData = JSON.parse(atob(encodedData));
+      console.log("✅ Respuesta del servidor:", response.data);
 
-      // Verificar la acción
-      if (qrData.action !== "join_waiting_list") {
-        Alert.alert(
-          "QR Incorrecto",
-          "Este código QR no es para unirse a la lista de espera.",
-          [{ text: "OK", onPress: () => setScanned(false) }],
+      if (response.data.success) {
+        // Mostrar éxito
+        showCustomAlert(
+          "¡Mesa Confirmada!",
+          `Mesa ${response.data.table.table_number} confirmada. ¡Disfruta tu experiencia en The Last Dance!`,
+          "success"
         );
+
+        // Navegar después de un breve delay
+        setTimeout(() => {
+          navigation.navigate("Home");
+        }, 2500);
+      } else {
+        throw new Error(response.data.message || "Error al activar la mesa");
+      }
+    } catch (error: any) {
+      console.error("❌ Error processing QR:", error);
+      console.error("❌ Error response:", error.response?.data);
+
+      let errorMessage = "No se pudo procesar el código QR.";
+      let alertTitle = "Error";
+      let alertType: "error" | "warning" | "info" = "error";
+
+      // Manejar caso especial: llegada temprana con reserva
+      if (error.response?.data?.earlyArrival) {
+        alertTitle = "Llegaste Temprano";
+        errorMessage = error.response.data.message;
+        alertType = "warning";
+        showCustomAlert(alertTitle, errorMessage, alertType);
+        setScanned(false);
+        setProcessing(false);
         return;
       }
 
-      // Navegar al formulario con los datos del QR
-      try {
-        navigation.navigate("JoinWaitingList", { qrData });
-      } catch (navError) {
-        console.error("Navigation error:", navError);
-        Alert.alert(
-          "Error de navegación",
-          "No se pudo navegar al formulario. Intenta de nuevo.",
-          [{ text: "OK", onPress: () => setScanned(false) }],
-        );
+      // Manejar caso especial: mesa reservada a nombre de otro
+      if (error.response?.status === 403 && error.response?.data?.reservedFor) {
+        alertTitle = "🔒 Mesa Reservada";
+        errorMessage = error.response.data.error;
+        alertType = "warning";
+        showCustomAlert(alertTitle, errorMessage, alertType);
+        setScanned(false);
+        setProcessing(false);
+        return;
       }
-    } catch (error) {
-      console.error("Error processing QR:", error);
-      Alert.alert(
-        "Error",
-        "No se pudo procesar el código QR. Intenta escanearlo nuevamente.",
-        [{ text: "OK", onPress: () => setScanned(false) }],
-      );
+
+      // Otros errores
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+
+        if (errorMessage.includes("Ya tienes la mesa")) {
+          alertTitle = "Mesa ya ocupada";
+        } else if (errorMessage.includes("no está asignada a tu usuario")) {
+          alertTitle = "Mesa no asignada";
+          alertType = "info";
+        } else if (errorMessage.includes("ya está activa")) {
+          alertTitle = "Mesa ya activa";
+        } else if (errorMessage.includes("reservada a nombre de")) {
+          alertTitle = "🔒 Mesa Reservada";
+          alertType = "warning";
+        } else if (errorMessage.includes("tiempo límite de llegada expiró")) {
+          alertTitle = "Llegada Tardía";
+          alertType = "warning";
+        }
+      } else if (error.response?.status === 404) {
+        alertTitle = "Mesa no encontrada";
+        errorMessage = "Esta mesa no existe o ha sido eliminada.";
+      } else if (error.response?.status === 403) {
+        alertTitle = "Sin permisos";
+        errorMessage = error.response?.data?.error || "No tienes permisos para activar esta mesa.";
+      } else if (error.response?.status === 400) {
+        alertTitle = "Solicitud inválida";
+        errorMessage = error.response?.data?.error || "Esta mesa no puede ser activada en este momento.";
+      }
+
+      showCustomAlert(alertTitle, errorMessage, alertType);
+      setScanned(false);
     } finally {
       setProcessing(false);
     }
@@ -201,8 +323,7 @@ export default function ScanQRScreen() {
               </Text>
             </View>
             <Text className="text-gray-300 text-center">
-              Escanea el código QR que te proporcione el maitre para unirte a la
-              lista de espera
+              Escanea el código QR del maitre (lista de espera) o el QR de tu mesa (si tienes reserva)
             </Text>
           </View>
         </LinearGradient>
@@ -271,6 +392,18 @@ export default function ScanQRScreen() {
           </View>
         </LinearGradient>
       </View>
+
+      {/* CustomAlert */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        onClose={() => {
+          setAlertVisible(false);
+          setScanned(false);
+        }}
+      />
     </View>
   );
 }

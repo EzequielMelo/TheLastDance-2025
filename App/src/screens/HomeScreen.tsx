@@ -510,7 +510,12 @@ export default function HomeScreen({ navigation, route }: Props) {
       console.log("✅ Navegando a ScanTableQR (confirmar llegada)");
       navigation.navigate("ScanTableQR");
     }
-    // Para otros estados (seated, in_queue, etc.), usar el escáner general
+    // Si está en la lista de espera (incluyendo reservas activadas), también debe escanear mesa
+    else if (clientState === "in_queue") {
+      console.log("✅ Navegando a ScanTableQR (confirmar llegada - lista de espera)");
+      navigation.navigate("ScanTableQR");
+    }
+    // Para otros estados (seated, displaced, confirm_pending), usar el escáner general
     else {
       console.log("✅ Navegando a QRScanner (orden/pago)");
       navigateToQRScanner();
