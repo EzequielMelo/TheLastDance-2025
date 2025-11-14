@@ -1,6 +1,6 @@
-import fs from 'fs';
-import path from 'path';
-import { supabaseAdmin } from '../../config/supabase';
+import fs from "fs";
+import path from "path";
+import { supabaseAdmin } from "../../config/supabase";
 
 interface InvoiceData {
   tableNumber: string;
@@ -39,19 +39,20 @@ export class InvoiceService {
     try {
       // Obtener datos de la factura
       const invoiceData = await this.getInvoiceData(tableId, clientId);
-      
+
       if (!invoiceData) {
-        return { success: false, error: 'No se encontraron datos para la factura' };
+        return {
+          success: false,
+          error: "No se encontraron datos para la factura",
+        };
       }
 
       // Generar solo el HTML sin guardarlo
       const htmlContent = this.createHTMLInvoice(invoiceData);
-      
-      console.log(`📧 Factura HTML generada para cliente registrado (no se guarda archivo)`);
       return { success: true, htmlContent };
     } catch (error) {
-      console.error('Error generando factura HTML:', error);
-      return { success: false, error: 'Error interno generando factura' };
+      console.error("Error generando factura HTML:", error);
+      return { success: false, error: "Error interno generando factura" };
     }
   }
 
@@ -59,27 +60,34 @@ export class InvoiceService {
   static async generateInvoiceWithFile(
     tableId: string,
     clientId: string,
-  ): Promise<{ success: boolean; filePath?: string; fileName?: string; htmlContent?: string; error?: string }> {
+  ): Promise<{
+    success: boolean;
+    filePath?: string;
+    fileName?: string;
+    htmlContent?: string;
+    error?: string;
+  }> {
     try {
       // Obtener datos de la factura
       const invoiceData = await this.getInvoiceData(tableId, clientId);
-      
+
       if (!invoiceData) {
-        return { success: false, error: 'No se encontraron datos para la factura' };
+        return {
+          success: false,
+          error: "No se encontraron datos para la factura",
+        };
       }
 
       // Generar el HTML
       const htmlContent = this.createHTMLInvoice(invoiceData);
-      
+
       // Guardar el archivo HTML para usuarios anónimos
       const filePath = await this.saveHTMLFile(invoiceData, htmlContent);
       const fileName = path.basename(filePath);
-      
-      console.log(`📁 Factura HTML generada y guardada para cliente anónimo: ${fileName}`);
       return { success: true, filePath, fileName, htmlContent };
     } catch (error) {
-      console.error('Error generando factura con archivo:', error);
-      return { success: false, error: 'Error interno generando factura' };
+      console.error("Error generando factura con archivo:", error);
+      return { success: false, error: "Error interno generando factura" };
     }
   }
 
@@ -87,8 +95,12 @@ export class InvoiceService {
   static async generateInvoiceHTML(
     tableId: string,
     clientId: string,
-  ): Promise<{ success: boolean; filePath?: string; htmlContent?: string; error?: string }> {
-    console.log(`⚠️ Usando método legacy generateInvoiceHTML - considerar usar generateInvoiceHTMLOnly o generateInvoiceWithFile`);
+  ): Promise<{
+    success: boolean;
+    filePath?: string;
+    htmlContent?: string;
+    error?: string;
+  }> {
     return this.generateInvoiceWithFile(tableId, clientId);
   }
 
@@ -99,43 +111,44 @@ export class InvoiceService {
     try {
       // Obtener datos de la mesa
       const { data: tableData, error: tableError } = await supabaseAdmin
-        .from('tables')
-        .select('number, id_waiter')
-        .eq('id', tableId)
+        .from("tables")
+        .select("number, id_waiter")
+        .eq("id", tableId)
         .single();
 
       if (tableError || !tableData) {
-        console.error('Error obteniendo datos de mesa:', tableError);
-        throw new Error('Error obteniendo datos de mesa');
+        console.error("Error obteniendo datos de mesa:", tableError);
+        throw new Error("Error obteniendo datos de mesa");
       }
 
       // Obtener datos del mozo usando el id_waiter de la mesa
       const { data: waiterData, error: waiterError } = await supabaseAdmin
-        .from('users')
-        .select('first_name, last_name')
-        .eq('id', tableData.id_waiter)
+        .from("users")
+        .select("first_name, last_name")
+        .eq("id", tableData.id_waiter)
         .single();
 
       if (waiterError || !waiterData) {
-        console.error('Error obteniendo datos del mozo:', waiterError);
-        throw new Error('Error obteniendo datos del mozo');
+        console.error("Error obteniendo datos del mozo:", waiterError);
+        throw new Error("Error obteniendo datos del mozo");
       }
 
       const { data: clientData, error: clientError } = await supabaseAdmin
-        .from('users')
-        .select('first_name, last_name')
-        .eq('id', clientId)
+        .from("users")
+        .select("first_name, last_name")
+        .eq("id", clientId)
         .single();
 
       if (clientError || !clientData) {
-        console.error('Error obteniendo datos del cliente:', clientError);
-        throw new Error('Error obteniendo datos del cliente');
+        console.error("Error obteniendo datos del cliente:", clientError);
+        throw new Error("Error obteniendo datos del cliente");
       }
 
       // Usar exactamente la misma consulta que funciona en billController.ts
       const { data: orders, error: ordersError } = await supabaseAdmin
-        .from('orders')
-        .select(`
+        .from("orders")
+        .select(
+          `
           id,
           total_amount,
           created_at,
@@ -151,34 +164,34 @@ export class InvoiceService {
               category
             )
           )
-        `)
-        .eq('table_id', tableId)
-        .eq('user_id', clientId)
-        .eq('is_paid', false) // CORREGIDO: Consultar órdenes NO pagadas
-        .eq('order_items.status', 'delivered')
-        .order('created_at', { ascending: true });
-
-      console.log('📊 Debug factura - orders obtenidas:', orders?.length || 0);
-      console.log('📊 Debug factura - primer order:', orders?.[0]);
-      console.log('📊 Debug factura - items primera order:', orders?.[0]?.order_items?.length || 0);
+        `,
+        )
+        .eq("table_id", tableId)
+        .eq("user_id", clientId)
+        .eq("is_paid", false) // CORREGIDO: Consultar órdenes NO pagadas
+        .eq("order_items.status", "delivered")
+        .order("created_at", { ascending: true });
 
       if (ordersError) {
-        console.error('Error obteniendo órdenes:', ordersError);
-        throw new Error('Error obteniendo órdenes');
+        console.error("Error obteniendo órdenes:", ordersError);
+        throw new Error("Error obteniendo órdenes");
       }
 
       if (!orders || orders.length === 0) {
-        console.error('No se encontraron órdenes pendientes de pago para la mesa');
-        throw new Error('No se encontraron órdenes pendientes de pago');
+        console.error(
+          "No se encontraron órdenes pendientes de pago para la mesa",
+        );
+        throw new Error("No se encontraron órdenes pendientes de pago");
       }
 
       // Formatear los datos
-      const clientName = `${clientData.first_name} ${clientData.last_name}`.trim();
-      
+      const clientName =
+        `${clientData.first_name} ${clientData.last_name}`.trim();
+
       // Formatear el nombre del mozo (ya tenemos waiterData de la consulta anterior)
-      const waiterName = waiterData 
+      const waiterName = waiterData
         ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
-        : 'N/A';
+        : "N/A";
 
       // Procesar los datos exactamente como lo hace billController.ts
       let billItems: any[] = [];
@@ -201,22 +214,20 @@ export class InvoiceService {
         });
       });
 
-      console.log('📊 Debug factura - billItems procesados:', billItems.length);
-      console.log('📊 Debug factura - primer item:', billItems[0]);
-      console.log('📊 Debug factura - subtotal:', subtotal);
-
-      const formattedOrders = [{
-        id: 'consolidated',
-        items: billItems,
-        total_amount: subtotal,
-        created_at: new Date().toISOString(),
-      }];
+      const formattedOrders = [
+        {
+          id: "consolidated",
+          items: billItems,
+          total_amount: subtotal,
+          created_at: new Date().toISOString(),
+        },
+      ];
 
       const totalAmount = subtotal;
 
       // Generar número y fecha de factura
       const invoiceNumber = `INV-${Date.now()}`;
-      const invoiceDate = new Date().toLocaleDateString('es-AR');
+      const invoiceDate = new Date().toLocaleDateString("es-AR");
 
       return {
         tableNumber: tableData.number.toString(),
@@ -230,26 +241,31 @@ export class InvoiceService {
         invoiceDate,
       };
     } catch (error) {
-      console.error('Error obteniendo datos de factura:', error);
+      console.error("Error obteniendo datos de factura:", error);
       return null;
     }
   }
 
   private static createHTMLInvoice(data: InvoiceData): string {
-    const currentDate = new Date().toLocaleDateString('es-AR');
-    const currentTime = new Date().toLocaleTimeString('es-AR');
-    const invoiceNumber = data.invoiceNumber.replace('INV-', '').padStart(8, '0');
-    
+    const currentDate = new Date().toLocaleDateString("es-AR");
+    const currentTime = new Date().toLocaleTimeString("es-AR");
+    const invoiceNumber = data.invoiceNumber
+      .replace("INV-", "")
+      .padStart(8, "0");
+
     // Calcular correctamente con IVA ya incluido en precios
     const totalConIVA = data.totalAmount; // Total que ya incluye IVA
     const netoGravado = totalConIVA / 1.21; // Base sin IVA (dividir por 1.21)
-    
-    const totalDiscount = data.discounts.reduce((sum, discount) => sum + discount.amount, 0);
+
+    const totalDiscount = data.discounts.reduce(
+      (sum, discount) => sum + discount.amount,
+      0,
+    );
     const finalTotal = totalConIVA - totalDiscount + data.tip;
-    
+
     // Crear items para la tabla - usar directamente los items de la primera orden consolidada
     const allItems = data.orders[0]?.items || [];
-    
+
     return `
 <!DOCTYPE html>
 <html lang="es">
@@ -423,23 +439,27 @@ export class InvoiceService {
         </thead>
         <tbody>
             ${(() => {
-              const tableRows = allItems.map((item, index) => {
-                return `
+              const tableRows = allItems
+                .map((item, index) => {
+                  return `
                 <tr>
                     <td class="text-left">${index + 1}</td>
                     <td class="text-left">${item.name}</td>
                     <td class="text-right">${item.quantity.toFixed(0)}</td>
                     <td class="text-center">un.</td>
-                    <td class="text-right">$${item.price.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+                    <td class="text-right">$${item.price.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</td>
                     <td class="text-center">0,00</td>
-                    <td class="text-right">$${(item.total / 1.21).toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+                    <td class="text-right">$${(item.total / 1.21).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</td>
                     <td class="text-right">21,00</td>
-                    <td class="text-right">$${item.total.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+                    <td class="text-right">$${item.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</td>
                 </tr>`;
-              }).join('');
+                })
+                .join("");
               return tableRows;
             })()}
-            ${data.discounts.map((discount, index) => `
+            ${data.discounts
+              .map(
+                (discount, index) => `
                 <tr class="discount-row">
                     <td class="text-left">DESC${index + 1}</td>
                     <td class="text-left">Descuento ${discount.game}</td>
@@ -451,8 +471,12 @@ export class InvoiceService {
                     <td class="text-right">0,00</td>
                     <td class="text-right">-${discount.amount.toFixed(2)}</td>
                 </tr>
-            `).join('')}
-            ${data.tip > 0 ? `
+            `,
+              )
+              .join("")}
+            ${
+              data.tip > 0
+                ? `
                 <tr class="tip-row">
                     <td class="text-left">TIP</td>
                     <td class="text-left">Propina</td>
@@ -464,7 +488,9 @@ export class InvoiceService {
                     <td class="text-right">0,00</td>
                     <td class="text-right">${data.tip.toFixed(2)}</td>
                 </tr>
-            ` : ''}
+            `
+                : ""
+            }
         </tbody>
     </table>
 
@@ -474,17 +500,17 @@ export class InvoiceService {
                 <div class="wrapper" style="padding: 10px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                         <span><b>Importe Neto Gravado:</b></span>
-                        <span><b>$${netoGravado.toLocaleString('es-AR', {minimumFractionDigits: 2})}</b></span>
+                        <span><b>$${netoGravado.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</b></span>
                     </div>
                     
                     <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                         <span><b>IVA 21%:</b></span>
-                        <span><b>$${(totalConIVA - netoGravado).toLocaleString('es-AR', {minimumFractionDigits: 2})}</b></span>
+                        <span><b>$${(totalConIVA - netoGravado).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</b></span>
                     </div>
                     
                     <div style="display: flex; justify-content: space-between; margin-top: 10px; border-top: 1px solid #000; padding-top: 5px;">
                         <span><b>IMPORTE TOTAL:</b></span>
-                        <span><b>$${finalTotal.toLocaleString('es-AR', {minimumFractionDigits: 2})}</b></span>
+                        <span><b>$${finalTotal.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</b></span>
                     </div>
                 </div>
             </div>
@@ -514,20 +540,23 @@ export class InvoiceService {
 </html>`;
   }
 
-  private static async saveHTMLFile(data: InvoiceData, htmlContent: string): Promise<string> {
+  private static async saveHTMLFile(
+    data: InvoiceData,
+    htmlContent: string,
+  ): Promise<string> {
     // Crear directorio de facturas si no existe
-    const invoicesDir = path.join(process.cwd(), 'invoices');
+    const invoicesDir = path.join(process.cwd(), "invoices");
     if (!fs.existsSync(invoicesDir)) {
       fs.mkdirSync(invoicesDir, { recursive: true });
     }
 
     // Generar nombre único para el archivo
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const fileName = `factura-mesa-${data.tableNumber}-${timestamp}.html`;
     const filePath = path.join(invoicesDir, fileName);
 
     // Guardar el archivo
-    fs.writeFileSync(filePath, htmlContent, 'utf8');
+    fs.writeFileSync(filePath, htmlContent, "utf8");
 
     return filePath;
   }

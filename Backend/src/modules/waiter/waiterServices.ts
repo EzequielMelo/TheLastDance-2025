@@ -222,7 +222,7 @@ export async function canUnassignTable(tableId: string): Promise<boolean> {
 // Marcar items como entregados (para meseros)
 export async function markItemsAsDelivered(
   itemIds: string[],
-  waiterId: string
+  waiterId: string,
 ): Promise<{ success: boolean; message: string; checkedTables: string[] }> {
   try {
     console.log(`📦 Mozo ${waiterId} marcando items como entregados:`, itemIds);
@@ -234,14 +234,16 @@ export async function markItemsAsDelivered(
     // Verificar que todos los items están en estado 'ready'
     const { data: items, error: itemsError } = await supabaseAdmin
       .from("order_items")
-      .select(`
+      .select(
+        `
         id,
         status,
         orders!inner(
           table_id,
           user_id
         )
-      `)
+      `,
+      )
       .in("id", itemIds)
       .eq("status", "ready");
 
@@ -250,7 +252,9 @@ export async function markItemsAsDelivered(
     }
 
     if (!items || items.length !== itemIds.length) {
-      throw new Error("Algunos items no están listos para entrega o no existen");
+      throw new Error(
+        "Algunos items no están listos para entrega o no existen",
+      );
     }
 
     // Actualizar todos los items a 'delivered'
@@ -258,7 +262,7 @@ export async function markItemsAsDelivered(
       .from("order_items")
       .update({
         status: "delivered",
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .in("id", itemIds);
 
@@ -270,13 +274,13 @@ export async function markItemsAsDelivered(
 
     // Obtener las mesas únicas afectadas y verificar su estado de entrega
     const uniqueTables = new Map<string, { tableId: string; userId: string }>();
-    
+
     items.forEach(item => {
       const orders = item.orders as any;
       if (orders.table_id && orders.user_id) {
         uniqueTables.set(orders.table_id, {
           tableId: orders.table_id,
-          userId: orders.user_id
+          userId: orders.user_id,
         });
       }
     });
@@ -284,17 +288,23 @@ export async function markItemsAsDelivered(
     const checkedTables: string[] = [];
 
     // Verificar cada mesa para actualizar su table_status si es necesario
-    for (const [, {tableId, userId}] of uniqueTables) {
+    for (const [, { tableId, userId }] of uniqueTables) {
       try {
-        console.log(`🔍 Verificando entrega completa para mesa ${tableId} y usuario ${userId}`);
-        
+        console.log(
+          `🔍 Verificando entrega completa para mesa ${tableId} y usuario ${userId}`,
+        );
+
         // Importar aquí para evitar dependencias circulares
-        const { checkAllItemsDelivered } = await import("../orders/ordersServices");
+        const { checkAllItemsDelivered } = await import(
+          "../orders/ordersServices"
+        );
         const deliveryCheck = await checkAllItemsDelivered(tableId, userId);
-        
-        console.log(`📊 Resultado verificación mesa ${tableId}:`, deliveryCheck);
+
+        console.log(
+          `📊 Resultado verificación mesa ${tableId}:`,
+          deliveryCheck,
+        );
         checkedTables.push(tableId);
-        
       } catch (error) {
         console.warn(`⚠️ Error verificando mesa ${tableId}:`, error);
         // No fallar la operación completa por esto
@@ -304,15 +314,15 @@ export async function markItemsAsDelivered(
     return {
       success: true,
       message: `${itemIds.length} items marcados como entregados`,
-      checkedTables
+      checkedTables,
     };
-
   } catch (error) {
     console.error("❌ Error en markItemsAsDelivered:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Error interno del servidor",
-      checkedTables: []
+      message:
+        error instanceof Error ? error.message : "Error interno del servidor",
+      checkedTables: [],
     };
   }
 }

@@ -48,10 +48,6 @@ export const useSocialAuth = () => {
         path: "auth/callback",
       });
 
-      console.log("🔑 Iniciando OAuth con:", provider);
-      console.log("📱 Modo:", isExpoGo ? "Expo Go" : "Standalone");
-      console.log("🔗 App Redirect URL:", appRedirectUrl);
-
       // Paso 1: Solicitar al backend la URL de autenticación
       // El backend pasará el appRedirectUrl a Supabase para el redirect final
       const initResponse = await api.post(`${API_BASE_URL}/auth/social/init`, {
@@ -64,8 +60,6 @@ export const useSocialAuth = () => {
       }
 
       const authUrl = initResponse.data.url;
-      console.log("🌐 Abriendo navegador para OAuth...");
-      console.log("🔗 URL de OAuth:", authUrl);
 
       // Paso 2: Abrir navegador para autenticación
       // Supabase manejará el callback de Google y luego redirigirá a tu app
@@ -74,37 +68,18 @@ export const useSocialAuth = () => {
         appRedirectUrl, // Tu app espera el callback aquí
       );
 
-      console.log("📱 Resultado del navegador:", result.type);
-
       if (result.type === "success") {
         const url = result.url;
-        console.log("🔗 URL completa recibida:", url);
-
         // Extraer tokens del callback URL
         const fragment = url.split("#")[1];
         const query = url.split("?")[1];
-
-        console.log("📝 Fragment (#):", fragment);
-        console.log("📝 Query (?):", query);
-
         const params = new URLSearchParams(fragment || query);
         const accessToken = params.get("access_token");
         const refreshToken = params.get("refresh_token");
 
-        console.log(
-          "🔑 Access Token extraído:",
-          accessToken ? "✓ Presente" : "✗ Faltante",
-        );
-        console.log(
-          "🔑 Refresh Token extraído:",
-          refreshToken ? "✓ Presente" : "✗ Faltante",
-        );
-
         if (!accessToken || !refreshToken) {
           throw new Error("No se recibieron tokens de autenticación");
         }
-
-        console.log("✅ Tokens recibidos, enviando al backend...");
 
         // Paso 3: Enviar tokens al backend
         // - Si es usuario nuevo: guarda en memoria y devuelve session_id
@@ -128,8 +103,6 @@ export const useSocialAuth = () => {
 
         // Usuario nuevo: necesita completar registro
         if (requires_completion && session_id) {
-          console.log("📋 Usuario nuevo, necesita completar registro");
-          console.log("🆔 Session ID:", session_id);
           return {
             success: true,
             requires_completion: true,
@@ -149,7 +122,6 @@ export const useSocialAuth = () => {
         // Usuario existente: guardar tokens y continuar
         if (session?.access_token) {
           await SecureStore.setItemAsync("authToken", session.access_token);
-          console.log("💾 Token guardado en SecureStore");
         }
 
         if (session?.refresh_token) {
@@ -159,37 +131,29 @@ export const useSocialAuth = () => {
         // Actualizar el contexto de autenticación
         if (session?.access_token && mappedUser) {
           await login(session.access_token, mappedUser, session.refresh_token);
-          console.log("✅ Contexto de autenticación actualizado");
         }
-
-        console.log("✅ Autenticación completada");
 
         return {
           success: true,
           user: mappedUser,
         };
       } else if (result.type === "cancel") {
-        console.log("⚠️ Usuario canceló la autenticación");
         return {
           success: false,
           error: "Autenticación cancelada por el usuario",
         };
       } else if (result.type === "dismiss") {
-        console.log("⚠️ Navegador cerrado sin completar");
         return {
           success: false,
           error: "Ventana de autenticación cerrada",
         };
       } else {
-        console.log("❌ Tipo de resultado desconocido:", result.type);
         return {
           success: false,
           error: `Error en la autenticación: ${result.type}`,
         };
       }
     } catch (error: any) {
-      console.error("❌ Error en autenticación social:", error);
-      console.error("❌ Stack trace:", error.stack);
       return {
         success: false,
         error:
@@ -213,8 +177,6 @@ export const useSocialAuth = () => {
     try {
       setLoading(true);
 
-      console.log("📝 Completando registro con session_id:", data.session_id);
-
       const response = await api.post(
         `${API_BASE_URL}/auth/social/complete-registration`,
         data,
@@ -237,7 +199,6 @@ export const useSocialAuth = () => {
       // Guardar tokens
       if (session?.access_token) {
         await SecureStore.setItemAsync("authToken", session.access_token);
-        console.log("💾 Token guardado en SecureStore");
       }
 
       if (session?.refresh_token) {
@@ -247,19 +208,13 @@ export const useSocialAuth = () => {
       // Actualizar el contexto de autenticación
       if (session?.access_token && mappedUser) {
         await login(session.access_token, mappedUser, session.refresh_token);
-        console.log(
-          "✅ Contexto de autenticación actualizado después de completar registro",
-        );
       }
-
-      console.log("✅ Registro completado exitosamente");
 
       return {
         success: true,
         user: mappedUser,
       };
     } catch (error: any) {
-      console.error("❌ Error completando registro:", error);
       return {
         success: false,
         error:

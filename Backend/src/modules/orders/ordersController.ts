@@ -131,8 +131,6 @@ export async function createOrderHandler(
 
     const order = await createOrder(orderData, userId);
 
-    console.log("✅ Pedido creado exitosamente:", order.id);
-
     // Enviar notificación push al mozo si hay mesa asignada
     if (parsed.table_id) {
       try {
@@ -621,8 +619,6 @@ export async function waiterOrderActionHandler(
         res.status(400).json({ error: "Acción no válida" });
         return;
     }
-
-    console.log(`✅ Acción de mozo ${action} completada para orden ${orderId}`);
   } catch (error: any) {
     console.error("❌ Error en waiterOrderActionHandler:", error);
 
@@ -659,16 +655,7 @@ export async function addItemsToPartialOrderHandler(
 
     const parsed = addItemToPartialOrderSchema.parse(req.body);
     const userId = req.user.appUserId;
-
-    console.log(
-      `🛒 Agregando items a pedido parcial ${orderId} para usuario:`,
-      userId,
-    );
-    console.log("📦 Items a agregar:", JSON.stringify(parsed.items, null, 2));
-
     const result = await addItemsToPartialOrder(orderId, parsed.items, userId);
-
-    console.log(`✅ Items agregados exitosamente a pedido ${orderId}`);
     res.json({
       success: true,
       message:
@@ -711,16 +698,7 @@ export async function addItemsToExistingOrderHandler(
 
     const parsed = addItemToPartialOrderSchema.parse(req.body);
     const userId = req.user.appUserId;
-
-    console.log(
-      `🛒 Agregando items a orden existente ${orderId} para usuario:`,
-      userId,
-    );
-    console.log("📦 Items a agregar:", JSON.stringify(parsed.items, null, 2));
-
     const result = await addItemsToExistingOrder(orderId, parsed.items, userId);
-
-    console.log(`✅ Items agregados exitosamente a orden ${orderId}`);
     res.json({
       success: true,
       message:
@@ -788,10 +766,6 @@ export async function waiterItemsActionHandler(
       return;
     }
 
-    console.log(
-      `🔄 Mozo ${action} items [${itemIds.join(", ")}] en orden ${orderId}`,
-    );
-
     const result = await waiterItemsActionNew(
       orderId,
       action as "accept" | "reject",
@@ -837,11 +811,6 @@ export async function getWaiterPendingBatchesHandler(
   res: Response,
 ): Promise<void> {
   try {
-    console.log(
-      "📦 Obteniendo tandas pendientes para mozo:",
-      req.user?.appUserId,
-    );
-
     if (!req.user?.appUserId) {
       res.status(401).json({
         success: false,
@@ -889,11 +858,6 @@ export async function getWaiterPendingItemsHandler(
   res: Response,
 ): Promise<void> {
   try {
-    console.log(
-      "📋 Obteniendo items pendientes para mozo:",
-      req.user?.appUserId,
-    );
-
     if (!req.user?.appUserId) {
       res.status(401).json({
         success: false,
@@ -957,10 +921,6 @@ export async function replaceRejectedItemsHandler(
       return;
     }
 
-    console.log(
-      `🔄 Reemplazando items rechazados en orden ${orderId} para usuario ${userId}`,
-    );
-
     const updatedOrder = await replaceRejectedItems(
       orderId,
       userId,
@@ -1001,10 +961,6 @@ export async function getKitchenPendingOrdersHandler(
       });
       return;
     }
-
-    console.log(
-      `👨‍🍳 Obteniendo pedidos pendientes para cocinero ${req.user.appUserId}`,
-    );
 
     const pendingOrders = await getKitchenPendingOrders();
 
@@ -1060,10 +1016,6 @@ export async function updateKitchenItemStatusHandler(
       });
       return;
     }
-
-    console.log(
-      `👨‍🍳 Actualizando item ${itemId} a status ${status} por cocinero ${req.user.appUserId}`,
-    );
 
     const result = await updateKitchenItemStatus(
       itemId,
@@ -1203,10 +1155,6 @@ export async function getBartenderPendingOrdersHandler(
       return;
     }
 
-    console.log(
-      `🍷 Obteniendo pedidos pendientes para bartender: ${req.user.appUserId}`,
-    );
-
     const pendingOrders = await getBartenderPendingOrders();
 
     res.json({
@@ -1260,10 +1208,6 @@ export async function updateBartenderItemStatusHandler(
       });
       return;
     }
-
-    console.log(
-      `🍷 Actualizando item ${itemId} a status ${status} por bartender ${req.user.appUserId}`,
-    );
 
     const result = await updateBartenderItemStatus(
       itemId,
@@ -1400,11 +1344,6 @@ export async function getTableOrdersStatusHandler(
       });
       return;
     }
-
-    console.log(
-      `📱 Obteniendo estado de pedidos para mesa ${tableId} y usuario ${req.user.appUserId}`,
-    );
-
     const orders = await getTableOrdersStatus(tableId, req.user.appUserId);
 
     // Calcular estadísticas de los pedidos
@@ -1489,10 +1428,6 @@ export async function rejectIndividualItemsHandler(
       return;
     }
 
-    console.log(
-      `❌ Rechazando items individuales en orden ${orderId} por mozo ${waiterId}`,
-    );
-
     const updatedOrder = await rejectIndividualItemsFromBatch(
       orderId,
       waiterId,
@@ -1548,10 +1483,6 @@ export async function approveBatchCompletelyHandler(
       res.status(400).json({ error: "ID del pedido y batch ID requeridos" });
       return;
     }
-
-    console.log(
-      `✅ Aprobando tanda completa ${batchId} en orden ${orderId} por mozo ${waiterId}`,
-    );
 
     const updatedOrder = await approveBatchCompletely(
       orderId,
@@ -1628,12 +1559,6 @@ export async function payOrderHandler(
       res.status(400).json({ error: "ID de mesa requerido" });
       return;
     }
-
-    console.log(`💰 PayOrderHandler - Datos recibidos:`, {
-      tableId,
-      clientId,
-      paymentDetails,
-    });
 
     const result = await payOrder(tableId, clientId, paymentDetails);
 
@@ -1750,8 +1675,6 @@ export async function confirmPaymentHandler(
     };
 
     try {
-      console.log(`📄 Generando factura para mesa ${tableId}`);
-
       // Obtener el cliente de la mesa para generar la factura
       const { data: tableData, error: tableError } = await supabaseAdmin
         .from("tables")
@@ -1764,21 +1687,16 @@ export async function confirmPaymentHandler(
         const { getAuthEmailById } = await import("../admin/adminServices");
         const clientEmail = await getAuthEmailById(payingClientId);
         const isRegisteredUser = !!clientEmail;
-
-        console.log(`👤 Cliente ${payingClientId} es ${isRegisteredUser ? 'REGISTRADO' : 'ANÓNIMO'}`);
-
         let invoiceResult;
-        
+
         if (isRegisteredUser) {
           // CLIENTE REGISTRADO: Solo generar HTML (no guardar archivo)
-          console.log(`📧 Generando factura HTML para cliente registrado (envío por email)`);
           invoiceResult = await InvoiceService.generateInvoiceHTMLOnly(
             tableId,
             payingClientId,
           );
-          
+
           if (invoiceResult.success && invoiceResult.htmlContent) {
-            console.log(`✅ Factura HTML generada para cliente registrado`);
             invoiceInfo = {
               generated: true,
               htmlContent: invoiceResult.htmlContent,
@@ -1786,7 +1704,9 @@ export async function confirmPaymentHandler(
               message: "Factura generada exitosamente para envío por email",
             } as typeof invoiceInfo;
           } else {
-            console.error(`❌ Error generando factura HTML: ${invoiceResult.error}`);
+            console.error(
+              `❌ Error generando factura HTML: ${invoiceResult.error}`,
+            );
             invoiceInfo = {
               generated: false,
               error: invoiceResult.error || "Error generando factura HTML",
@@ -1794,14 +1714,12 @@ export async function confirmPaymentHandler(
           }
         } else {
           // CLIENTE ANÓNIMO: Generar HTML y guardar archivo
-          console.log(`📁 Generando factura con archivo para cliente anónimo (descarga)`);
           invoiceResult = await InvoiceService.generateInvoiceWithFile(
             tableId,
             payingClientId,
           );
-          
+
           if (invoiceResult.success && invoiceResult.filePath) {
-            console.log(`✅ Factura generada y guardada: ${invoiceResult.filePath}`);
             const fileName = invoiceResult.filePath
               ? path.basename(invoiceResult.filePath)
               : undefined;
@@ -1814,10 +1732,13 @@ export async function confirmPaymentHandler(
               message: "Factura generada exitosamente para descarga",
             } as typeof invoiceInfo;
           } else {
-            console.error(`❌ Error generando factura con archivo: ${invoiceResult.error}`);
+            console.error(
+              `❌ Error generando factura con archivo: ${invoiceResult.error}`,
+            );
             invoiceInfo = {
               generated: false,
-              error: invoiceResult.error || "Error generando factura con archivo",
+              error:
+                invoiceResult.error || "Error generando factura con archivo",
             };
           }
         }
@@ -2036,9 +1957,6 @@ export async function submitTandaModificationsHandler(
       res.status(400).json({ error: "ID de orden requerido" });
       return;
     }
-
-    console.log("📥 Controlador recibió:", { keepItems, newItems });
-
     await submitTandaModifications(orderId, clientId, keepItems, newItems);
 
     // Enviar notificación push al mozo sobre la resubmisión
@@ -2120,7 +2038,10 @@ export async function submitTandaModificationsHandler(
 }
 
 // Obtener datos de pedido para generar factura en cliente anónimo
-export async function getAnonymousOrderData(req: Request, res: Response): Promise<void> {
+export async function getAnonymousOrderData(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
     const userId = req.user?.appUserId;
 
@@ -2131,34 +2052,34 @@ export async function getAnonymousOrderData(req: Request, res: Response): Promis
 
     // Verificar que sea un usuario anónimo
     const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('profile_code, first_name, last_name')
-      .eq('id', userId)
+      .from("users")
+      .select("profile_code, first_name, last_name")
+      .eq("id", userId)
       .single();
 
     if (userError) {
-      console.error('Error obteniendo usuario:', userError);
-      res.status(500).json({ error: 'Error obteniendo datos del usuario' });
+      console.error("Error obteniendo usuario:", userError);
+      res.status(500).json({ error: "Error obteniendo datos del usuario" });
       return;
     }
 
-    if (!user || user.profile_code !== 'cliente_anonimo') {
+    if (!user || user.profile_code !== "cliente_anonimo") {
       res.json({ hasOrder: false });
       return;
     }
 
     // Buscar si tiene una orden pagada
     const { data: paidOrders, error: ordersError } = await supabaseAdmin
-      .from('orders')
-      .select('id, total_amount, created_at, table_id')
-      .eq('user_id', userId)
-      .eq('is_paid', true)
-      .order('created_at', { ascending: false })
+      .from("orders")
+      .select("id, total_amount, created_at, table_id")
+      .eq("user_id", userId)
+      .eq("is_paid", true)
+      .order("created_at", { ascending: false })
       .limit(1);
 
     if (ordersError) {
-      console.error('Error buscando órdenes pagadas:', ordersError);
-      res.status(500).json({ error: 'Error obteniendo datos del pedido' });
+      console.error("Error buscando órdenes pagadas:", ordersError);
+      res.status(500).json({ error: "Error obteniendo datos del pedido" });
       return;
     }
 
@@ -2175,49 +2096,55 @@ export async function getAnonymousOrderData(req: Request, res: Response): Promis
 
     // Obtener datos de la mesa
     const { data: tableData, error: tableError } = await supabaseAdmin
-      .from('tables')
-      .select('number')
-      .eq('id', order.table_id)
+      .from("tables")
+      .select("number")
+      .eq("id", order.table_id)
       .single();
 
     if (tableError) {
-      console.error('Error obteniendo datos de mesa:', tableError);
+      console.error("Error obteniendo datos de mesa:", tableError);
     }
 
     // Obtener items de la orden
     const { data: orderItems, error: itemsError } = await supabaseAdmin
-      .from('order_items')
-      .select(`
+      .from("order_items")
+      .select(
+        `
         quantity,
         unit_price,
         menu_items(name, description, category)
-      `)
-      .eq('order_id', order.id);
+      `,
+      )
+      .eq("order_id", order.id);
 
     if (itemsError) {
-      console.error('Error obteniendo items de la orden:', itemsError);
-      res.status(500).json({ error: 'Error obteniendo items del pedido' });
+      console.error("Error obteniendo items de la orden:", itemsError);
+      res.status(500).json({ error: "Error obteniendo items del pedido" });
       return;
     }
 
     // Formatear datos básicos para el PDF
-    const tableNumber = tableData?.number || 'N/A';
-    
-    const items = orderItems?.map((item: any) => ({
-      name: item.menu_items.name,
-      description: item.menu_items.description,
-      category: item.menu_items.category,
-      quantity: item.quantity,
-      unitPrice: item.unit_price,
-      totalPrice: item.quantity * item.unit_price
-    })) || [];
+    const tableNumber = tableData?.number || "N/A";
 
-    const subtotal = items.reduce((sum: number, item: any) => sum + item.totalPrice, 0);
-    
+    const items =
+      orderItems?.map((item: any) => ({
+        name: item.menu_items.name,
+        description: item.menu_items.description,
+        category: item.menu_items.category,
+        quantity: item.quantity,
+        unitPrice: item.unit_price,
+        totalPrice: item.quantity * item.unit_price,
+      })) || [];
+
+    const subtotal = items.reduce(
+      (sum: number, item: any) => sum + item.totalPrice,
+      0,
+    );
+
     res.json({
       hasOrder: true,
       orderData: {
-        clientName: `${user.first_name || 'Cliente'} ${user.last_name || 'Anónimo'}`,
+        clientName: `${user.first_name || "Cliente"} ${user.last_name || "Anónimo"}`,
         tableNumber: tableNumber.toString(),
         items,
         subtotal,
@@ -2225,15 +2152,14 @@ export async function getAnonymousOrderData(req: Request, res: Response): Promis
         gameDiscountAmount: 0,
         gameDiscountPercentage: 0,
         totalAmount: order.total_amount,
-        satisfactionLevel: '',
-        orderDate: new Date(order.created_at).toLocaleDateString('es-AR'),
-        orderTime: new Date(order.created_at).toLocaleTimeString('es-AR'),
+        satisfactionLevel: "",
+        orderDate: new Date(order.created_at).toLocaleDateString("es-AR"),
+        orderTime: new Date(order.created_at).toLocaleTimeString("es-AR"),
         invoiceNumber: `INV-${order.id.slice(0, 8).toUpperCase()}`,
-      }
+      },
     });
-
   } catch (error: any) {
-    console.error('❌ Error obteniendo datos del pedido:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    console.error("❌ Error obteniendo datos del pedido:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
   }
 }

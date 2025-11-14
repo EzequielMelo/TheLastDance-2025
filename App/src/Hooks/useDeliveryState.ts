@@ -46,11 +46,9 @@ export const useDeliveryState = (): DeliveryStateData => {
       setState("loading");
 
       const response = await api.get("/deliveries/active");
-      console.log("📦 Response de /deliveries/active:", response.data);
 
       if (response.data.success && response.data.hasActiveDelivery) {
         const activeDelivery = response.data.delivery;
-        console.log("✅ Delivery activo encontrado:", activeDelivery);
         setDelivery(activeDelivery);
         setHasActiveDelivery(true);
 
@@ -81,7 +79,6 @@ export const useDeliveryState = (): DeliveryStateData => {
             setState("no_delivery");
         }
       } else {
-        console.log("ℹ️ No hay delivery activo");
         setState("no_delivery");
         setDelivery(null);
         setHasActiveDelivery(false);

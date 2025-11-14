@@ -34,12 +34,14 @@ export default function ScanQRScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
-  
+
   // Estados para CustomAlert
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
-  const [alertType, setAlertType] = useState<"success" | "error" | "warning" | "info">("info");
+  const [alertType, setAlertType] = useState<
+    "success" | "error" | "warning" | "info"
+  >("info");
 
   // Verificar que el usuario pueda unirse a la lista
   const canJoin =
@@ -49,7 +51,7 @@ export default function ScanQRScreen() {
   const showCustomAlert = (
     title: string,
     message: string,
-    type: "success" | "error" | "warning" | "info" = "info"
+    type: "success" | "error" | "warning" | "info" = "info",
   ) => {
     setAlertTitle(title);
     setAlertMessage(message);
@@ -70,8 +72,6 @@ export default function ScanQRScreen() {
     setProcessing(true);
 
     try {
-      console.log("📱 QR escaneado en ScanQRScreen:", data);
-
       // Caso 1: QR de lista de espera (waiting list)
       if (data.includes("thelastdance://join-waiting-list")) {
         // Extraer y validar datos del QR
@@ -89,7 +89,7 @@ export default function ScanQRScreen() {
           showCustomAlert(
             "QR Incorrecto",
             "Este código QR no es para unirse a la lista de espera.",
-            "error"
+            "error",
           );
           setScanned(false);
           setProcessing(false);
@@ -104,17 +104,14 @@ export default function ScanQRScreen() {
           showCustomAlert(
             "Error de navegación",
             "No se pudo navegar al formulario. Intenta de nuevo.",
-            "error"
+            "error",
           );
           setScanned(false);
         }
         setProcessing(false);
         return;
       }
-
-      // Caso 2: QR de mesa - Verificar si el usuario tiene reserva para esta mesa
-      console.log("📱 Detectado QR de mesa, verificando reserva...");
-      
+      // Caso 2: QR de mesa (table QR)
       let tableId: string;
 
       if (data.includes("thelastdance://table/")) {
@@ -130,27 +127,22 @@ export default function ScanQRScreen() {
         showCustomAlert(
           "QR Inválido",
           "No se pudo leer la información de la mesa.",
-          "error"
+          "error",
         );
         setScanned(false);
         setProcessing(false);
         return;
       }
 
-      console.log("🔄 Intentando activar mesa con ID:", tableId);
-      console.log("👤 Usuario ID:", user?.id);
-
       // Intentar activar la mesa (el backend validará si tiene reserva)
       const response = await api.post(`/tables/${tableId}/activate`);
-
-      console.log("✅ Respuesta del servidor:", response.data);
 
       if (response.data.success) {
         // Mostrar éxito
         showCustomAlert(
           "¡Mesa Confirmada!",
           `Mesa ${response.data.table.table_number} confirmada. ¡Disfruta tu experiencia en The Last Dance!`,
-          "success"
+          "success",
         );
 
         // Navegar después de un breve delay
@@ -213,10 +205,14 @@ export default function ScanQRScreen() {
         errorMessage = "Esta mesa no existe o ha sido eliminada.";
       } else if (error.response?.status === 403) {
         alertTitle = "Sin permisos";
-        errorMessage = error.response?.data?.error || "No tienes permisos para activar esta mesa.";
+        errorMessage =
+          error.response?.data?.error ||
+          "No tienes permisos para activar esta mesa.";
       } else if (error.response?.status === 400) {
         alertTitle = "Solicitud inválida";
-        errorMessage = error.response?.data?.error || "Esta mesa no puede ser activada en este momento.";
+        errorMessage =
+          error.response?.data?.error ||
+          "Esta mesa no puede ser activada en este momento.";
       }
 
       showCustomAlert(alertTitle, errorMessage, alertType);
@@ -323,7 +319,8 @@ export default function ScanQRScreen() {
               </Text>
             </View>
             <Text className="text-gray-300 text-center">
-              Escanea el código QR del maitre (lista de espera) o el QR de tu mesa (si tienes reserva)
+              Escanea el código QR del maitre (lista de espera) o el QR de tu
+              mesa (si tienes reserva)
             </Text>
           </View>
         </LinearGradient>

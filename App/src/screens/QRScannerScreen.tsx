@@ -40,7 +40,14 @@ export default function QRScannerScreen({ navigation, route }: Props) {
     setProcessing(true);
 
     try {
-      // Extraer tableId del QR (similar a ScanTableQRScreen)
+      // Si el modo es delivery_payment, pasar el dato completo (JSON)
+      if (mode === "delivery_payment") {
+        await onScanSuccess(data);
+        // El callback es responsable de cerrar el scanner si es necesario
+        return;
+      }
+
+      // Para otros modos, extraer tableId del QR (similar a ScanTableQRScreen)
       let tableId: string;
 
       if (data.includes("thelastdance://table/")) {

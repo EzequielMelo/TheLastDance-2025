@@ -35,17 +35,19 @@ export default function ScanTableQRScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
-  
+
   // Estados para CustomAlert
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
-  const [alertType, setAlertType] = useState<"success" | "error" | "warning" | "info">("info");
+  const [alertType, setAlertType] = useState<
+    "success" | "error" | "warning" | "info"
+  >("info");
 
   const showCustomAlert = (
     title: string,
     message: string,
-    type: "success" | "error" | "warning" | "info" = "info"
+    type: "success" | "error" | "warning" | "info" = "info",
   ) => {
     setAlertTitle(title);
     setAlertMessage(message);
@@ -71,8 +73,6 @@ export default function ScanTableQRScreen() {
     setProcessing(true);
 
     try {
-      console.log("📱 QR escaneado - datos crudos:", data);
-
       // Por ahora, vamos a simular que el QR contiene el ID de la mesa
       // En el futuro, esto será un deeplink como: thelastdance://table/{tableId}
       let tableId: string;
@@ -81,11 +81,9 @@ export default function ScanTableQRScreen() {
         // Si es un deeplink estructurado
         const url = new URL(data);
         tableId = url.pathname.split("/").pop() || "";
-        console.log("📱 Deeplink detectado - tableId extraído:", tableId);
       } else {
         // Por ahora, asumimos que el QR contiene directamente el ID de la mesa
         tableId = data.trim();
-        console.log("📱 QR simple - usando como tableId:", tableId);
       }
 
       if (!tableId) {
@@ -97,20 +95,15 @@ export default function ScanTableQRScreen() {
         return;
       }
 
-      console.log("🔄 Intentando activar mesa con ID:", tableId);
-      console.log("👤 Usuario ID:", user?.id);
-
       // Llamar al endpoint para activar la mesa
       const response = await api.post(`/tables/${tableId}/activate`);
-
-      console.log("✅ Respuesta del servidor:", response.data);
 
       if (response.data.success) {
         // Mostrar éxito con CustomAlert
         showCustomAlert(
           "¡Mesa Confirmada!",
           `Mesa ${response.data.table.table_number} confirmada. ¡Disfruta tu experiencia en The Last Dance!`,
-          "success"
+          "success",
         );
 
         // Navegar después de un breve delay
@@ -172,7 +165,9 @@ export default function ScanTableQRScreen() {
         errorMessage = "Esta mesa no existe o ha sido eliminada.";
       } else if (error.response?.status === 403) {
         alertTitle = "Sin permisos";
-        errorMessage = error.response?.data?.error || "No tienes permisos para activar esta mesa.";
+        errorMessage =
+          error.response?.data?.error ||
+          "No tienes permisos para activar esta mesa.";
       } else if (error.response?.status === 400) {
         alertTitle = "Solicitud inválida";
         errorMessage =

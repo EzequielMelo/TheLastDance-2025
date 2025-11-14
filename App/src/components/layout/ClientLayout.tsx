@@ -46,24 +46,19 @@ export default function ClientLayout({
   };
 
   const handleScanQR = () => {
-    console.log("🔍 ClientLayout - handleScanQR - Estado actual:", state);
-
     // Si el cliente no está en la lista de espera o tiene mesa asignada:
     // Usar ScanTableQR que maneja tanto:
     // - Unirse a lista de espera (si escanea QR del maitre)
     // - Activar reserva (si escanea QR de mesa y tiene reserva)
     // - Confirmar llegada (si escanea QR de mesa asignada)
     if (state === "not_in_queue" || state === "assigned") {
-      console.log("✅ Navegando a ScanTableQR (verificar reserva/mesa asignada/unirse)");
       navigation.navigate("ScanTableQR");
     }
     // Para otros estados (seated, in_queue, etc.), usar el escáner general
     else {
-      console.log("✅ Navegando a QRScanner (orden/pago)");
       navigation.navigate("QRScanner", {
         mode: "order_status",
         onScanSuccess: async (tableId: string) => {
-          console.log("QR escaneado:", tableId);
           // La lógica de verificación y navegación se maneja en HomeScreen
           // Este callback solo se usa como referencia del modo de escaneo
         },
@@ -90,9 +85,7 @@ export default function ClientLayout({
     try {
       await logout();
       navigation.navigate("Login");
-    } catch (error) {
-      console.error("Error al cerrar sesión:", error);
-    }
+    } catch (error) {}
   };
 
   const handleNavigate = (screen: string, params?: any) => {

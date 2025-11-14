@@ -108,7 +108,6 @@ export default function DeliveryChatScreen() {
   // Conectar Socket.IO
   const connectSocket = (chatId: string) => {
     if (socketRef.current?.connected) {
-      console.log("Socket ya conectado");
       return;
     }
 
@@ -127,23 +126,19 @@ export default function DeliveryChatScreen() {
     });
 
     socket.on("connect", () => {
-      console.log("✅ Socket conectado para delivery chat");
       setIsConnected(true);
       socket.emit("join_delivery_chat", chatId);
     });
 
     socket.on("disconnect", reason => {
-      console.log("🔴 Socket desconectado:", reason);
       setIsConnected(false);
     });
 
     socket.on("joined_delivery_room", data => {
-      console.log("✅ Unido a sala de delivery:", data);
       markDeliveryMessagesAsRead(chatId).catch(console.error);
     });
 
     socket.on("new_delivery_message", (msg: any) => {
-      console.log("📨 Nuevo mensaje de delivery:", msg);
       const newMessage: DeliveryChatMessageWithSender = {
         id: msg.id,
         delivery_chat_id: chatId,
@@ -168,16 +163,11 @@ export default function DeliveryChatScreen() {
       }
     });
 
-    socket.on("delivery_message_sent", data => {
-      console.log("✅ Mensaje enviado:", data);
-    });
+    socket.on("delivery_message_sent", data => {});
 
-    socket.on("delivery_messages_read", data => {
-      console.log("👁️ Mensajes leídos por:", data.readByName);
-    });
+    socket.on("delivery_messages_read", data => {});
 
     socket.on("delivery_chat_closed", data => {
-      console.log("📪 Chat cerrado:", data);
       setIsChatClosed(true);
       ToastAndroid.show(
         "El pedido fue entregado. Este chat ya no está disponible.",
@@ -185,9 +175,7 @@ export default function DeliveryChatScreen() {
       );
     });
 
-    socket.on("user_joined_delivery", data => {
-      console.log("👤 Usuario se unió:", data.userName);
-    });
+    socket.on("user_joined_delivery", data => {});
 
     socket.on("error", error => {
       console.error("❌ Socket error:", error);

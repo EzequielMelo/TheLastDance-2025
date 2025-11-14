@@ -43,12 +43,6 @@ export interface DeliveryOrder {
 export const createDeliveryOrder = async (
   orderData: CreateDeliveryOrderDTO,
 ): Promise<DeliveryOrder> => {
-  console.log("📦 Creando delivery order...", {
-    userId: orderData.userId,
-    itemsCount: orderData.items.length,
-    totalAmount: orderData.totalAmount,
-  });
-
   // 1. Validar que los productos existen en la BD
   const menuItemIds = orderData.items.map(item => item.id);
   const { data: menuItems, error: menuError } = await supabaseAdmin
@@ -115,8 +109,6 @@ export const createDeliveryOrder = async (
       `Error creando items de delivery order: ${itemsError.message}`,
     );
 
-  console.log("✅ Delivery order creada exitosamente:", newOrder.id);
-
   return newOrder;
 };
 
@@ -177,12 +169,6 @@ export const updateItemsBatch = async (
   status: OrderItemStatus,
   station: "kitchen" | "bar",
 ): Promise<void> => {
-  console.log(`📋 Actualizando items en batch para orden ${orderId}:`, {
-    itemIds,
-    status,
-    station,
-  });
-
   // Verificar que la orden existe
   const { data: order, error: orderError } = await supabaseAdmin
     .from("delivery_orders")
@@ -212,6 +198,4 @@ export const updateItemsBatch = async (
     console.error("❌ Error actualizando items:", updateError);
     throw new Error(`Error al actualizar items: ${updateError.message}`);
   }
-
-  console.log(`✅ Items actualizados exitosamente (batch: ${batchId})`);
 };

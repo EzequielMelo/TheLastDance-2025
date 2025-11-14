@@ -90,10 +90,6 @@ export default function ManageWaitingListScreen() {
       // Debug: verificar estructura de mesas ocupadas
       const occupiedTables =
         tablesData.tables?.filter(t => t.is_occupied) || [];
-      console.log(
-        "Mesas ocupadas recibidas:",
-        JSON.stringify(occupiedTables, null, 2),
-      );
     } catch (error: any) {
       console.error("Error loading data:", error);
       ToastAndroid.show("Error al cargar datos", ToastAndroid.SHORT);
@@ -242,12 +238,6 @@ export default function ManageWaitingListScreen() {
     // Encontrar la mesa en los datos para mostrar información específica
     const table = tables.find(t => t.id === tableId);
     const tableNumber = table?.number || "desconocida";
-
-    // Debug: verificar estructura de datos
-    console.log(
-      "Mesa encontrada para liberar:",
-      JSON.stringify(table, null, 2),
-    );
 
     // Si la mesa tiene una reserva próxima, mostrar opción de cancelar reserva
     if (table?.reservation) {

@@ -22,25 +22,20 @@ export function useDeliveryStateSocket(onUpdate: () => void) {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("🔌 Socket conectado para delivery updates");
       // Unirse a la sala del usuario
       socket.emit("join_user_room", user.id);
     });
 
     // Escuchar actualizaciones de delivery
     socket.on("delivery_updated", data => {
-      console.log("� Socket: Delivery actualizado", data);
       onUpdate();
     });
 
     socket.on("delivery_status_changed", data => {
-      console.log("� Socket: Estado de delivery cambió", data);
       onUpdate();
     });
 
-    socket.on("disconnect", reason => {
-      console.log("🔌 Socket desconectado:", reason);
-    });
+    socket.on("disconnect", reason => {});
 
     // Cleanup
     return () => {

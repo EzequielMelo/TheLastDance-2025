@@ -50,7 +50,6 @@ export default function GenerateWaitingListQRScreen() {
   };
 
   const generateQR = () => {
-    console.log("GenerateWaitingListQRScreen - generateQR iniciado");
     try {
       if (!canGenerate) {
         Alert.alert(
@@ -73,16 +72,9 @@ export default function GenerateWaitingListQRScreen() {
       const encodedData = btoa(JSON.stringify(qrPayload));
       const deeplink = `thelastdance://join-waiting-list?data=${encodedData}`;
 
-      console.log("GenerateWaitingListQRScreen - Deeplink generado:", deeplink);
-      console.log("GenerateWaitingListQRScreen - Payload:", qrPayload);
-
       setQrData(deeplink);
       setExpiresAt(null); // Sin expiración
       setIsActive(true);
-
-      console.log(
-        "GenerateWaitingListQRScreen - Estado actualizado correctamente",
-      );
     } catch (error) {
       console.error(
         "GenerateWaitingListQRScreen - Error en generateQR:",
@@ -125,13 +117,6 @@ export default function GenerateWaitingListQRScreen() {
   const regenerateQR = () => {
     generateQR();
   };
-
-  console.log(
-    "GenerateWaitingListQRScreen - Render. isActive:",
-    isActive,
-    "qrData:",
-    qrData,
-  );
 
   return (
     <LinearGradient

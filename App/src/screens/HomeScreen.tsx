@@ -581,7 +581,6 @@ export default function HomeScreen({ navigation, route }: Props) {
       activeDelivery?.payment_method === "qr" &&
       user?.profile_code === "cliente_registrado"
     ) {
-      console.log("✅ Navegando a QRScanner (pago de delivery)");
       navigation.navigate("QRScanner", {
         mode: "delivery_payment",
         onScanSuccess: handleDeliveryPaymentQRScan,
@@ -601,7 +600,9 @@ export default function HomeScreen({ navigation, route }: Props) {
     }
     // Si está en la lista de espera (incluyendo reservas activadas), también debe escanear mesa
     else if (clientState === "in_queue") {
-      console.log("✅ Navegando a ScanTableQR (confirmar llegada - lista de espera)");
+      console.log(
+        "✅ Navegando a ScanTableQR (confirmar llegada - lista de espera)",
+      );
       navigation.navigate("ScanTableQR");
     }
     // Para otros estados (seated, displaced, confirm_pending), usar el escáner general

@@ -83,13 +83,6 @@ const DeliveryTrackingScreen: React.FC = () => {
   // Debug: Monitorear cambios en delivery y actualizar ref
   useEffect(() => {
     deliveryRef.current = delivery; // 📌 Actualizar ref
-    console.log("📦 Estado delivery cambió:", {
-      existe: !!delivery,
-      id: delivery?.id,
-      status: delivery?.status,
-      hasOrder: !!delivery?.delivery_order,
-      totalAmount: delivery?.delivery_order?.total_amount,
-    });
   }, [delivery]);
 
   // Obtener permisos de ubicación
@@ -172,25 +165,12 @@ const DeliveryTrackingScreen: React.FC = () => {
   ).current;
 
   const handleCompleteDelivery = async () => {
-    console.log("🎯 handleCompleteDelivery llamado");
-    console.log("🎯 isDelivering:", isDelivering);
-    console.log("🎯 delivery desde state:", !!delivery);
-    console.log("🎯 delivery desde ref:", !!deliveryRef.current);
-
     // Usar deliveryRef.current en lugar de delivery para evitar stale closure
     const currentDelivery = deliveryRef.current;
 
     if (isDelivering || !currentDelivery) {
-      console.log("⚠️ Bloqueado: isDelivering o no hay delivery");
       return;
     }
-
-    console.log("✅ Abriendo modal de pago...");
-    console.log("✅ Delivery ID:", currentDelivery.id);
-    console.log(
-      "✅ Total Amount:",
-      currentDelivery.delivery_order?.total_amount,
-    );
 
     // En lugar de completar directamente, abrir modal de pago
     setShowPaymentModal(true);
@@ -254,10 +234,6 @@ const DeliveryTrackingScreen: React.FC = () => {
     destination: { latitude: number; longitude: number },
   ) => {
     try {
-      console.log("🗺️ === INICIO FETCH ROUTE ===");
-      console.log("📍 Origen:", JSON.stringify(origin));
-      console.log("📍 Destino:", JSON.stringify(destination));
-
       // Llamar al backend que tiene la API key
       const response = await api.get("/deliveries/route", {
         params: {
@@ -268,23 +244,9 @@ const DeliveryTrackingScreen: React.FC = () => {
         },
       });
 
-      console.log("📦 Respuesta del backend:", JSON.stringify(response.data));
-
       if (response.data.success && response.data.polyline) {
         const points = decodePolyline(response.data.polyline);
-        console.log(`✅ Ruta calculada: ${points.length} puntos`);
-        console.log(`📏 Distancia: ${response.data.distance}`);
-        console.log(`⏱️ Duración: ${response.data.duration}`);
-        console.log(
-          "🎯 Primeros 3 puntos:",
-          JSON.stringify(points.slice(0, 3)),
-        );
         setRouteCoordinates(points);
-        console.log(
-          "✅ routeCoordinates actualizado con",
-          points.length,
-          "puntos",
-        );
       } else {
         console.warn("⚠️ No se pudo calcular ruta, usando línea recta");
         console.warn("Response data:", JSON.stringify(response.data));
@@ -342,51 +304,30 @@ const DeliveryTrackingScreen: React.FC = () => {
 
   const fetchDeliveryDetails = async () => {
     try {
-      console.log("🔄 fetchDeliveryDetails iniciado");
-      console.log("🔄 deliveryId buscado:", deliveryId);
-      console.log("🔄 user profile_code:", user?.profile_code);
-
       // Si es repartidor, obtener deliveries del driver, si no, obtener delivery activo del cliente
       const endpoint =
         user?.profile_code === "empleado"
           ? "/deliveries/driver"
           : "/deliveries/active";
-
-      console.log("🔄 Endpoint:", endpoint);
       const response = await api.get(endpoint);
-      console.log("✅ Response recibida:", response.data.success);
 
       if (response.data.success) {
         let activeDelivery = null;
 
         // Si es repartidor, buscar el delivery específico en el array
         if (user?.profile_code === "empleado" && response.data.deliveries) {
-          console.log(
-            "👤 Soy repartidor. Buscando en array de",
-            response.data.deliveries.length,
-            "deliveries",
-          );
           activeDelivery = response.data.deliveries.find(
             (d: any) => d.id === deliveryId,
           );
-          console.log("👤 Delivery encontrado:", !!activeDelivery);
         } else if (response.data.delivery) {
-          console.log("👤 Soy cliente. Verificando delivery");
           // Si es cliente, verificar que sea el delivery correcto
           activeDelivery =
             response.data.delivery.id === deliveryId
               ? response.data.delivery
               : null;
-          console.log("👤 Delivery correcto:", !!activeDelivery);
         }
 
         if (activeDelivery) {
-          console.log(
-            "✅ Seteando delivery:",
-            activeDelivery.id,
-            "Status:",
-            activeDelivery.status,
-          );
           setDelivery(activeDelivery);
 
           // La ruta se calcula automáticamente en el useEffect cuando driverLocation está disponible
@@ -447,12 +388,9 @@ const DeliveryTrackingScreen: React.FC = () => {
     const isOnTheWay = delivery.status === "on_the_way";
 
     if (isDriver && isOnTheWay) {
-      console.log("📍 Enviando ubicación del repartidor al backend...");
-
       const sendLocation = async () => {
         try {
           await updateDriverLocation(deliveryId, driverLocation);
-          console.log("✅ Ubicación del repartidor actualizada");
         } catch (error) {
           console.error("❌ Error actualizando ubicación:", error);
         }
@@ -481,8 +419,6 @@ const DeliveryTrackingScreen: React.FC = () => {
     const isClient = delivery.user_id === user.id;
     if (!isClient) return;
 
-    console.log("🔌 Conectando Socket.IO para actualizaciones de ubicación...");
-
     // Crear conexión Socket.IO
     const socket = io(SERVER_BASE_URL, {
       auth: { token: user.id }, // Usar el token real de autenticación
@@ -492,7 +428,6 @@ const DeliveryTrackingScreen: React.FC = () => {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("🔌 Socket conectado para tracking de delivery");
       socket.emit("join_user_room", user.id);
     });
 
@@ -505,11 +440,6 @@ const DeliveryTrackingScreen: React.FC = () => {
         longitude: number;
         updatedAt: string;
       }) => {
-        console.log(
-          "📍 Ubicación del repartidor actualizada vía Socket.IO:",
-          data,
-        );
-
         if (data.deliveryId === deliveryId) {
           setDriverLocation({
             latitude: data.latitude,
@@ -519,9 +449,7 @@ const DeliveryTrackingScreen: React.FC = () => {
       },
     );
 
-    socket.on("disconnect", reason => {
-      console.log("🔌 Socket desconectado:", reason);
-    });
+    socket.on("disconnect", reason => {});
 
     return () => {
       socket.off("driver_location_updated");
@@ -532,7 +460,6 @@ const DeliveryTrackingScreen: React.FC = () => {
   // Calcular ruta cuando cambie la ubicación del driver o el delivery
   useEffect(() => {
     if (driverLocation && delivery && delivery.delivery_latitude) {
-      console.log("🔄 Ubicación actualizada, recalculando ruta...");
       fetchRoute(driverLocation, {
         latitude: delivery.delivery_latitude,
         longitude: delivery.delivery_longitude,
@@ -719,15 +646,6 @@ const DeliveryTrackingScreen: React.FC = () => {
 
             {/* Ruta calculada desde ubicación actual hasta destino */}
             {(() => {
-              console.log(
-                "🔍 RENDER - routeCoordinates.length:",
-                routeCoordinates.length,
-              );
-              console.log("🔍 RENDER - delivery.status:", delivery.status);
-              console.log(
-                "🔍 RENDER - Mostrará polyline?",
-                routeCoordinates.length > 0 && delivery.status === "on_the_way",
-              );
               return null;
             })()}
             {routeCoordinates.length > 0 &&

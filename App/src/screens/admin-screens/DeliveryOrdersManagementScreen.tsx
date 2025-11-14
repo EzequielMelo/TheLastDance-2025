@@ -95,19 +95,10 @@ const DeliveryOrdersManagementScreen = () => {
         },
       );
 
-      console.log(
-        "📦 Pedidos pendientes:",
-        JSON.stringify(pendingResponse.data.deliveries, null, 2),
-      );
-
       // Verificar items de cada pedido pendiente
       pendingResponse.data.deliveries?.forEach((delivery: any) => {
         const itemCount =
           delivery.delivery_order?.delivery_order_items?.length || 0;
-        console.log(`📦 Delivery pendiente ${delivery.id}: ${itemCount} items`);
-        if (itemCount > 0) {
-          console.log("Items:", delivery.delivery_order.delivery_order_items);
-        }
       });
 
       setPendingOrders(pendingResponse.data.deliveries || []);
@@ -120,26 +111,14 @@ const DeliveryOrdersManagementScreen = () => {
         },
       );
 
-      console.log(
-        "✅ Pedidos confirmados:",
-        JSON.stringify(confirmedResponse.data.deliveries, null, 2),
-      );
-
       // Verificar items de cada pedido confirmado
       confirmedResponse.data.deliveries?.forEach((delivery: any) => {
         const itemCount =
           delivery.delivery_order?.delivery_order_items?.length || 0;
-        console.log(
-          `✅ Delivery confirmado ${delivery.id}: ${itemCount} items`,
-        );
-        if (itemCount > 0) {
-          console.log("Items:", delivery.delivery_order.delivery_order_items);
-        }
       });
 
       setConfirmedOrders(confirmedResponse.data.deliveries || []);
     } catch (error: any) {
-      console.error("Error fetching delivery orders:", error);
       showCustomAlert("Error", "No se pudieron cargar los pedidos", "error", [
         { text: "OK", onPress: () => setAlertVisible(false) },
       ]);
@@ -189,7 +168,6 @@ const DeliveryOrdersManagementScreen = () => {
                 },
               ]);
             } catch (error: any) {
-              console.error("Error accepting order:", error);
               showCustomAlert(
                 "Error",
                 error.response?.data?.error || "No se pudo confirmar el pedido",
@@ -286,7 +264,6 @@ const DeliveryOrdersManagementScreen = () => {
               Items ({delivery.delivery_order.delivery_order_items.length}):
             </Text>
             {delivery.delivery_order.delivery_order_items.map((item, index) => {
-              console.log(`Renderizando item ${index + 1}:`, item);
               return (
                 <View
                   key={`${delivery.id}-${item.id}-${index}`}
@@ -340,17 +317,6 @@ const DeliveryOrdersManagementScreen = () => {
     const pendingBar = barItems.filter(
       item => item.status === "pending",
     ).length;
-
-    console.log(`📦 Renderizando delivery confirmado ${delivery.id}:`, {
-      totalItems: items.length,
-      kitchenItems: kitchenItems.length,
-      barItems: barItems.length,
-      items: items.map(i => ({
-        name: i.menu_item?.name,
-        category: i.menu_item?.category,
-        status: i.status,
-      })),
-    });
 
     return (
       <View
@@ -456,7 +422,6 @@ const DeliveryOrdersManagementScreen = () => {
               )}
             </View>
             {kitchenItems.map((item, index) => {
-              console.log(`🍳 Renderizando item cocina ${index + 1}:`, item);
               return (
                 <View
                   key={`kitchen-${delivery.id}-${item.id}-${index}`}
@@ -523,7 +488,6 @@ const DeliveryOrdersManagementScreen = () => {
               )}
             </View>
             {barItems.map((item, index) => {
-              console.log(`🍷 Renderizando item bar ${index + 1}:`, item);
               return (
                 <View
                   key={`bar-${delivery.id}-${item.id}-${index}`}

@@ -1,8 +1,14 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import Constants from 'expo-constants';
-import { NotificationService } from '../services/notificationService';
-import { AuthContext } from './AuthContext';
-import api from '../api/axios';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
+import Constants from "expo-constants";
+import { NotificationService } from "../services/notificationService";
+import { AuthContext } from "./AuthContext";
+import api from "../api/axios";
 
 interface NotificationContextType {
   expoPushToken: string | null;
@@ -24,7 +30,9 @@ interface NotificationProviderProps {
   children: ReactNode;
 }
 
-export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
+export const NotificationProvider: React.FC<NotificationProviderProps> = ({
+  children,
+}) => {
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const { user, token } = useContext(AuthContext);
 
@@ -42,16 +50,17 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     try {
       // Configurar listeners de notificaciones
       NotificationService.setupNotificationListeners();
-      
+
       // Agregar handler para notificaciones de pago
-      NotificationService.addNotificationHandler((data) => {
-        if (data.type === 'payment_confirmed' || data.type === 'anonymous_invoice_ready') {
+      NotificationService.addNotificationHandler(data => {
+        if (
+          data.type === "payment_confirmed" ||
+          data.type === "anonymous_invoice_ready"
+        ) {
           handler(data);
         }
       });
-    } catch (error) {
-      console.error('❌ Error setting up notification handlers:', error);
-    }
+    } catch (error) {}
   };
 
   const generateToken = () => {
@@ -65,35 +74,28 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     try {
       // Configurar canal de notificaciones para Android
       await NotificationService.setupNotificationChannel();
-      
+
       // SIEMPRE intentar obtener token REAL primero
       let token = await NotificationService.registerForPushNotifications();
-      
+
       if (token) {
-        console.log('✅ REAL token obtained:', token);
         setExpoPushToken(token);
         return;
       }
-      
+
       // Solo usar token simulado si es Expo Go Y falló el real
-      const isExpoGo = Constants.executionEnvironment === 'storeClient';
+      const isExpoGo = Constants.executionEnvironment === "storeClient";
       if (isExpoGo) {
-        console.log('📱 Expo Go detected, using simulated token as fallback');
         const simulatedToken = generateToken();
         setExpoPushToken(simulatedToken);
         return;
       }
-      
-      console.log('❌ Could not obtain any token');
+
       setExpoPushToken(null);
-      
     } catch (error) {
-      console.error('❌ Error in setupNotifications:', error);
-      
       // Solo en caso de error crítico, usar token simulado
-      const isExpoGo = Constants.executionEnvironment === 'storeClient';
+      const isExpoGo = Constants.executionEnvironment === "storeClient";
       if (isExpoGo) {
-        console.log('🆘 Using simulated token due to error');
         setExpoPushToken(generateToken());
       }
     }
@@ -104,29 +106,27 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       return;
     }
 
-    try {   
-      await api.post('/auth/update-push-token', {
+    try {
+      await api.post("/auth/update-push-token", {
         pushToken: expoPushToken,
       });
-    } catch (error: any) {
-      console.error('Error enviando token:', error);
-    }
+    } catch (error: any) {}
   };
 
   const showTestNotification = async () => {
     await NotificationService.showLocalNotification(
-      'Nuevo cliente registrado',
-      'Un nuevo cliente se ha registrado y necesita aprobación',
+      "Nuevo cliente registrado",
+      "Un nuevo cliente se ha registrado y necesita aprobación",
       {
-        type: 'new_client_registration',
-        clientId: 'test123',
-        clientName: 'Cliente de Prueba',
-      }
+        type: "new_client_registration",
+        clientId: "test123",
+        clientName: "Cliente de Prueba",
+      },
     );
   };
 
   return (
-    <NotificationContext.Provider 
+    <NotificationContext.Provider
       value={{
         expoPushToken,
         sendTokenToBackend,

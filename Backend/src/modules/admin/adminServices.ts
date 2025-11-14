@@ -90,10 +90,7 @@ export async function rejectClientById(
   id: string,
 ): Promise<ClientApprovalData> {
   try {
-    console.log("🔄 Iniciando rejectClientById:", { id });
-    
     // Actualizar estado a 'rechazado'
-    console.log("🔄 Ejecutando query de actualización en Supabase...");
     const { data, error } = await supabaseAdmin
       .from("users")
       .update({ state: "rechazado" })
@@ -106,15 +103,12 @@ export async function rejectClientById(
       console.error("❌ Error de Supabase:", error);
       throw new Error(`Error en base de datos: ${error.message}`);
     }
-    
+
     if (!data) {
       console.error("❌ No se encontró el usuario o no se pudo actualizar");
       throw new Error("Usuario no encontrado o no se pudo actualizar");
     }
-
-    console.log("✅ Cliente rechazado exitosamente en BD:", data);
     return data;
-    
   } catch (error) {
     console.error("❌ Error en rejectClientById:", error);
     throw error;
@@ -149,35 +143,36 @@ export async function sendClientRejectionEmail(
 }
 
 // Servicio completo para aprobar cliente (actualizar estado + enviar email + push notification)
-export async function processClientApproval(id: string, approverId: string): Promise<void> {
+export async function processClientApproval(
+  id: string,
+  approverId: string,
+): Promise<void> {
   try {
-    console.log("🔄 Iniciando processClientApproval:", { id, approverId });
-    
     // Paso 1: Actualizar estado en base de datos
     const clientData = await approveClientById(id);
-    console.log("✅ Cliente aprobado en BD:", clientData);
-    
+
     // Paso 2: Obtener información del administrador que aprueba
     const { data: approverData, error: approverError } = await supabaseAdmin
       .from("users")
       .select("first_name, last_name, profile_code")
       .eq("id", approverId)
       .single();
-    
-    const approverName = approverError || !approverData 
-      ? "Administrador" 
-      : `${approverData.first_name || ''} ${approverData.last_name || ''}`.trim() || "Administrador";
-    
-    console.log("✅ Información del aprobador:", { approverName, profile: approverData?.profile_code });
-    
+
+    const approverName =
+      approverError || !approverData
+        ? "Administrador"
+        : `${approverData.first_name || ""} ${approverData.last_name || ""}`.trim() ||
+          "Administrador";
+
     // Paso 3: Enviar email de aprobación
     await sendClientApprovalEmail(id, clientData.first_name);
-    console.log("✅ Email de aprobación enviado");
-    
+
     // Paso 4: Enviar notificación push
-    await notifyClientAccountApproved(id, `${clientData.first_name} ${clientData.last_name}`.trim(), approverName);
-    console.log("✅ Push notification de aprobación enviada");
-    
+    await notifyClientAccountApproved(
+      id,
+      `${clientData.first_name} ${clientData.last_name}`.trim(),
+      approverName,
+    );
   } catch (error) {
     console.error("❌ Error en processClientApproval:", error);
     throw error instanceof Error ? error : new Error("Error aprobando cliente");
@@ -191,35 +186,36 @@ export async function processClientRejection(
   rejectorId: string,
 ): Promise<void> {
   try {
-    console.log("🔄 Iniciando processClientRejection:", { id, reason, rejectorId });
-    
     // Paso 1: Actualizar estado en base de datos
-    console.log("🔄 Paso 1: Rechazando cliente en BD...");
     const clientData = await rejectClientById(id);
-    console.log("✅ Cliente rechazado en BD:", clientData);
-    
+
     // Paso 2: Obtener información del administrador que rechaza
     const { data: rejectorData, error: rejectorError } = await supabaseAdmin
       .from("users")
       .select("first_name, last_name, profile_code")
       .eq("id", rejectorId)
       .single();
-    
-    const rejectorName = rejectorError || !rejectorData 
-      ? "Administrador" 
-      : `${rejectorData.first_name || ''} ${rejectorData.last_name || ''}`.trim() || "Administrador";
-    
-    console.log("✅ Información del rechazador:", { rejectorName, profile: rejectorData?.profile_code });
-    
+
+    const rejectorName =
+      rejectorError || !rejectorData
+        ? "Administrador"
+        : `${rejectorData.first_name || ""} ${rejectorData.last_name || ""}`.trim() ||
+          "Administrador";
+
+    console.log("✅ Información del rechazador:", {
+      rejectorName,
+      profile: rejectorData?.profile_code,
+    });
+
     // Paso 3: Enviar email de rechazo
-    console.log("🔄 Paso 3: Enviando email de rechazo...");
     await sendClientRejectionEmail(id, clientData.first_name, reason);
-    console.log("✅ Email de rechazo enviado exitosamente");
-    
   } catch (error) {
     console.error("❌ Error en processClientRejection:", error);
-    console.error("❌ Stack trace:", error instanceof Error ? error.stack : "No stack");
-    
+    console.error(
+      "❌ Stack trace:",
+      error instanceof Error ? error.stack : "No stack",
+    );
+
     // Re-lanzar el error con más contexto
     if (error instanceof Error) {
       throw new Error(`Error rechazando cliente: ${error.message}`);
@@ -234,14 +230,6 @@ export async function createStaff(
   body: CreateStaffBody,
   file?: Express.Multer.File,
 ) {
-  console.log("🔄 Iniciando createStaff con:", {
-    actor: actor.profile_code,
-    bodyKeys: Object.keys(body),
-    hasFile: !!file,
-    profileCode: body.profile_code,
-    email: body.email,
-  });
-
   // Permisos
   if (body.profile_code === "supervisor" && actor.profile_code !== "dueno") {
     throw new Error("Solo el dueño puede crear supervisores");
@@ -305,14 +293,6 @@ export async function createStaff(
     if (body.profile_code === "empleado") {
       row.position_code = body.position_code!;
     }
-
-    console.log("💾 Insertando en tabla users:", {
-      id: userId,
-      profile_code: row.profile_code,
-      state: row.state,
-      position_code: row.position_code,
-      hasImage: !!row.profile_image,
-    });
 
     const { error: dbErr } = await supabaseAdmin.from("users").insert(row);
     if (dbErr) {

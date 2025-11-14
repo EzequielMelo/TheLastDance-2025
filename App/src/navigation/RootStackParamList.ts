@@ -27,7 +27,12 @@ export type RootStackParamList = {
   ScanTableQR: undefined; // Escanear QR de mesa para confirmar llegada
   ScanOrderQR: undefined; // Escanear QR para confirmar pedido entregado
   QRScanner: {
-    mode: "order_status" | "confirm_arrival" | "confirm_delivery" | "payment";
+    mode:
+      | "order_status"
+      | "confirm_arrival"
+      | "confirm_delivery"
+      | "payment"
+      | "delivery_payment";
     onScanSuccess: (data: string) => void;
   }; // Scanner QR genérico
 

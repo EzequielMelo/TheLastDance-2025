@@ -49,51 +49,37 @@ export async function approveClient(req: Request, res: Response) {
 }
 // POST /api/admin/clients/:id/reject
 export async function rejectClient(req: Request, res: Response) {
-  console.log("🚀 [BACKEND] PETICIÓN DE RECHAZO RECIBIDA!");
-  console.log("🚀 [BACKEND] Method:", req.method);
-  console.log("🚀 [BACKEND] URL:", req.url);
-  console.log("🚀 [BACKEND] Headers:", req.headers);
-  
   try {
-    console.log("🔄 Iniciando rechazo de cliente - Controller");
-    console.log("📥 Request params:", req.params);
-    console.log("📥 Request body:", req.body);
-    
     const id = req.params["id"];
     if (!id) {
-      console.log("❌ ID faltante en params");
       res.status(400).json({ error: "id requerido en params" });
       return;
     }
 
     if (!req.user) {
-      console.log("❌ Usuario no autenticado");
       res.status(401).json({ error: "No autenticado" });
       return;
     }
 
     const reason = (req.body?.reason as string) || "";
-    console.log("🔄 Procesando rechazo:", { id, reason });
-    
+
     await processClientRejection(id, reason, req.user.appUserId);
-    
-    console.log("✅ Cliente rechazado exitosamente");
+
     res.json({ ok: true });
     return;
   } catch (e: any) {
     console.error("❌ Error en rejectClient controller:", e);
     console.error("❌ Stack trace:", e.stack);
-    
+
     // Determinar el código de estado basado en el mensaje de error
     const statusCode = e.message.includes("no encontrado") ? 404 : 400;
-    
+
     // Enviar mensaje de error más descriptivo
     const errorMessage = e.message || "Error rechazando cliente";
-    console.log("📤 Enviando respuesta de error:", { statusCode, errorMessage });
-    
-    res.status(statusCode).json({ 
+
+    res.status(statusCode).json({
       error: errorMessage,
-      details: process.env["NODE_ENV"] === "development" ? e.stack : undefined
+      details: process.env["NODE_ENV"] === "development" ? e.stack : undefined,
     });
     return;
   }
@@ -101,16 +87,6 @@ export async function rejectClient(req: Request, res: Response) {
 
 export async function createStaffController(req: Request, res: Response) {
   try {
-    console.log("📥 Petición createStaff recibida:", {
-      hasUser: !!req.user,
-      userProfile: req.user?.profile_code,
-      bodyKeys: Object.keys(req.body || {}),
-      hasFile: !!req.file,
-      fileName: req.file?.originalname,
-      fileSize: req.file?.size,
-      contentType: req.headers["content-type"],
-    });
-
     if (!req.user) {
       return res.status(401).json({ error: "No autenticado" });
     }

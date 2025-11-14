@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
 import { ChatServices } from "./chatServices";
 import { supabaseAdmin } from "../../config/supabase";
-import { 
+import {
   notifyWaitersNewClientMessage,
   notifyWaiterClientMessage,
-  notifyClientWaiterMessage
+  notifyClientWaiterMessage,
 } from "../../services/pushNotificationService";
 
 export class ChatController {
@@ -196,7 +196,7 @@ export class ChatController {
       }
 
       // Determinar tipo de remitente
-      const senderType = userId === tableData.id_client ? 'client' : 'waiter';
+      const senderType = userId === tableData.id_client ? "client" : "waiter";
 
       // Obtener o crear el chat
       const chat = await ChatServices.getOrCreateChat(
@@ -206,7 +206,7 @@ export class ChatController {
       );
 
       // NOTIFICACIONES TIPO WHATSAPP - Siempre enviar notificación en cada mensaje
-      if (senderType === 'client') {
+      if (senderType === "client") {
         // Cliente envía mensaje al mozo específico
         try {
           // Obtener nombre del cliente para la notificación
@@ -224,7 +224,7 @@ export class ChatController {
             clientName,
             tableData.number.toString(),
             message,
-            chat.id
+            chat.id,
           );
 
           // Si es el primer mensaje del cliente, también notificar a todos los mozos
@@ -235,21 +235,25 @@ export class ChatController {
             .eq("sender_type", "client")
             .limit(1);
 
-          const isFirstMessage = !previousMessages || previousMessages.length === 0;
+          const isFirstMessage =
+            !previousMessages || previousMessages.length === 0;
 
           if (isFirstMessage) {
             // Enviar notificación a todos los mozos (solo el primer mensaje)
             await notifyWaitersNewClientMessage(
               clientName,
               tableData.number.toString(),
-              message
+              message,
             );
           }
         } catch (notifyError) {
-          console.error("Error enviando notificaciones de cliente:", notifyError);
+          console.error(
+            "Error enviando notificaciones de cliente:",
+            notifyError,
+          );
           // No bloqueamos el envío del mensaje por error de notificación
         }
-      } else if (senderType === 'waiter') {
+      } else if (senderType === "waiter") {
         // Mozo envía mensaje al cliente
         try {
           // Obtener nombre del mozo para la notificación
@@ -259,7 +263,7 @@ export class ChatController {
             .eq("id", userId)
             .single();
 
-          const waiterName = waiterData 
+          const waiterName = waiterData
             ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
             : "Mesero";
 
@@ -269,7 +273,7 @@ export class ChatController {
             waiterName,
             tableData.number.toString(),
             message,
-            chat.id
+            chat.id,
           );
         } catch (notifyError) {
           console.error("Error enviando notificación de mozo:", notifyError);
@@ -282,7 +286,7 @@ export class ChatController {
         chat.id,
         userId,
         senderType,
-        message
+        message,
       );
 
       return res.json({

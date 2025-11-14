@@ -81,12 +81,6 @@ export async function getActiveDelivery(
       req.user.appUserId,
     );
 
-    console.log("📦 Delivery activo encontrado:", {
-      hasDelivery: !!delivery,
-      deliveryId: delivery?.id,
-      status: delivery?.status,
-    });
-
     res.json({
       success: true,
       delivery,
@@ -315,8 +309,6 @@ export async function updateDeliveryStatus(
     if (status === "delivered") {
       try {
         await DeliveryChatServices.deactivateChat(delivery.id);
-        console.log(`📪 Chat de delivery ${delivery.id} desactivado`);
-
         // Notificar a ambos usuarios que el chat se cerró
         const io = getIOInstance();
         if (io) {
@@ -342,7 +334,6 @@ export async function updateDeliveryStatus(
         deliveryId: delivery.id,
         newStatus: delivery.status,
       });
-      console.log(`🔔 Socket.IO: Emitido delivery_updated a ${userRoom}`);
     }
 
     res.json({
@@ -401,7 +392,6 @@ export async function takeDelivery(req: Request, res: Response): Promise<void> {
         delivery.user_id,
         req.user.appUserId,
       );
-      console.log(`💬 Chat de delivery creado para delivery ${delivery.id}`);
     } catch (chatError) {
       console.error("❌ Error al crear chat de delivery:", chatError);
       // No bloqueamos el takeDelivery si falla el chat
@@ -767,7 +757,6 @@ export async function confirmPayment(
         paymentMethod: payment_method,
         tipAmount: tip_amount,
       });
-      console.log(`🔔 Socket.IO: Pago confirmado para delivery ${delivery.id}`);
     }
 
     res.json({

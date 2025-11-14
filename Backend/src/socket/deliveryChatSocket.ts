@@ -48,14 +48,9 @@ export const setupDeliveryChatSocket = (io: Server) => {
           userType: isClient ? "client" : "driver",
         });
 
-        console.log(
-          `✅ Usuario ${user.first_name} se unió al chat de delivery ${deliveryChatId} [Sala: ${roomName}] [Socket: ${socket.id}]`,
-        );
-
         // Debug: mostrar cuántos usuarios hay en la sala
         const roomClients = io.sockets.adapter.rooms.get(roomName);
         const userCount = roomClients?.size || 0;
-        console.log(`👥 Usuarios en sala ${roomName}: ${userCount}`);
 
         // Confirmar al cliente que se unió exitosamente
         socket.emit("joined_delivery_room", {
@@ -79,7 +74,6 @@ export const setupDeliveryChatSocket = (io: Server) => {
           const { deliveryChatId, message } = data;
 
           if (!message.trim()) {
-            console.log("❌ Mensaje vacío rechazado");
             socket.emit("error", {
               message: "El mensaje no puede estar vacío",
             });
@@ -94,7 +88,6 @@ export const setupDeliveryChatSocket = (io: Server) => {
           }
 
           if (!chat.is_active) {
-            console.log("❌ Chat de delivery inactivo");
             socket.emit("error", {
               message: "Este chat ya no está activo (el pedido fue entregado)",
             });
@@ -144,7 +137,6 @@ export const setupDeliveryChatSocket = (io: Server) => {
 
           // Emitir a la sala completa
           const roomName = `delivery_chat_${deliveryChatId}`;
-          console.log("📡 Emitiendo mensaje de delivery a sala:", roomName);
           io.to(roomName).emit("new_delivery_message", messageData);
 
           // También confirmar al remitente
@@ -185,10 +177,6 @@ export const setupDeliveryChatSocket = (io: Server) => {
               readByUserId: user.appUserId,
               readByName: `${user.first_name} ${user.last_name}`,
             });
-
-          console.log(
-            `✅ Usuario ${user.first_name} marcó mensajes como leídos en chat ${deliveryChatId}`,
-          );
         } catch (error) {
           console.error("Error al marcar como leído en delivery chat:", error);
           socket.emit("error", {
@@ -202,13 +190,8 @@ export const setupDeliveryChatSocket = (io: Server) => {
     socket.on("leave_delivery_chat", (deliveryChatId: string) => {
       const roomName = `delivery_chat_${deliveryChatId}`;
       socket.leave(roomName);
-      console.log(
-        `👋 Usuario ${user.first_name} salió del chat de delivery ${deliveryChatId} [Socket: ${socket.id}]`,
-      );
     });
   });
-
-  console.log("✅ Socket.IO para delivery chat configurado");
 };
 
 /**
@@ -224,5 +207,4 @@ export const notifyDeliveryChatClosed = (
     deliveryChatId,
     message: "El pedido ha sido entregado. Este chat ya no está disponible.",
   });
-  console.log(`📪 Chat de delivery ${deliveryChatId} cerrado y notificado`);
 };

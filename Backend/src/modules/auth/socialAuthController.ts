@@ -61,13 +61,6 @@ async function downloadImageAsFile(
     // Mejorar calidad de la URL de Google
     const improvedUrl = improveGooglePhotoUrl(imageUrl);
 
-    console.log("� Procesando foto de perfil de Google...");
-    console.log(`🔗 URL original: ${imageUrl}`);
-    if (improvedUrl !== imageUrl) {
-      console.log(`🔗 URL mejorada: ${improvedUrl}`);
-    }
-
-    console.log("📥 Descargando imagen de perfil...");
     const response = await fetch(improvedUrl);
 
     if (!response.ok) {
@@ -99,9 +92,6 @@ async function downloadImageAsFile(
       size: buffer.length,
     } as Express.Multer.File;
 
-    console.log(
-      `✅ Imagen descargada exitosamente (${buffer.length} bytes, ${contentType})`,
-    );
     return file;
   } catch (error) {
     console.error("❌ Error descargando imagen de Google:", error);
@@ -115,7 +105,6 @@ setInterval(
     const now = Date.now();
     for (const [sessionId, session] of pendingOAuthSessions.entries()) {
       if (now > session.expires_at) {
-        console.log(`🧹 Limpiando sesión expirada: ${sessionId}`);
         pendingOAuthSessions.delete(sessionId);
       }
     }
@@ -160,8 +149,6 @@ export async function initSocialAuth(
     const parsed = socialAuthSchema.parse(req.body);
     const { provider, redirectUrl } = parsed;
 
-    console.log(`🔑 Iniciando OAuth con ${provider}`);
-
     // Generar URL de autenticación con Supabase
     const { data, error } = await supabaseAdmin.auth.signInWithOAuth({
       provider: provider as Provider,
@@ -187,8 +174,6 @@ export async function initSocialAuth(
       });
       return;
     }
-
-    console.log("✅ URL de OAuth generada");
 
     res.json({
       success: true,
@@ -226,8 +211,6 @@ export async function processSocialCallback(
     const parsed = callbackSchema.parse(req.body);
     const { access_token, refresh_token } = parsed;
 
-    console.log("📱 Procesando callback de OAuth (guardando en memoria)");
-
     // Obtener datos del usuario desde Supabase Auth (solo para validar)
     const {
       data: { user: supabaseUser },
@@ -242,8 +225,6 @@ export async function processSocialCallback(
       });
       return;
     }
-
-    console.log("👤 Usuario de OAuth obtenido:", supabaseUser.email);
 
     // Verificar si el usuario YA existe en nuestra base de datos
     const { data: existingUser, error: queryError } = await supabaseAdmin
@@ -262,15 +243,11 @@ export async function processSocialCallback(
     }
 
     if (existingUser) {
-      // Usuario ya existe, validar estado de aprobación
-      console.log("✅ Usuario existente encontrado, validando estado");
-
       // Bloqueo por estado (solo cliente_registrado)
       if (
         existingUser.profile_code === "cliente_registrado" &&
         existingUser.state !== "aprobado"
       ) {
-        console.log(`⚠️ Usuario con estado: ${existingUser.state}`);
         if (existingUser.state === "pendiente") {
           res.status(403).json({
             success: false,
@@ -285,8 +262,6 @@ export async function processSocialCallback(
           return;
         }
       }
-
-      console.log("✅ Usuario aprobado, permitiendo login");
 
       const needsAdditionalInfo = !existingUser.dni || !existingUser.cuil;
 
@@ -318,9 +293,6 @@ export async function processSocialCallback(
       created_at: now,
       expires_at: now + 5 * 60 * 1000, // 5 minutos para completar registro
     });
-
-    console.log(`💾 Sesión temporal guardada: ${sessionId} (expira en 5 min)`);
-    console.log(`📊 Sesiones activas en memoria: ${pendingOAuthSessions.size}`);
 
     // Extraer nombre del metadata
     const metadata = supabaseUser.user_metadata;
@@ -377,8 +349,6 @@ export async function completeRegistration(
     const parsed = completeRegistrationSchema.parse(req.body);
     const { session_id, dni, cuil } = parsed;
 
-    console.log(`📝 Completando registro con session_id: ${session_id}`);
-
     // Buscar sesión en memoria
     const session = pendingOAuthSessions.get(session_id);
 
@@ -393,8 +363,6 @@ export async function completeRegistration(
 
     const { access_token, refresh_token, user_metadata, supabase_user_id } =
       session;
-
-    console.log(`✅ Sesión encontrada para usuario: ${session.email}`);
 
     // Extraer nombre del metadata
     const firstName =
@@ -412,7 +380,6 @@ export async function completeRegistration(
       user_metadata?.["avatar_url"] || user_metadata?.["picture"];
 
     if (googleImageUrl) {
-      console.log("📸 Iniciando proceso de descarga de foto de Google...");
       const imageFile = await downloadImageAsFile(
         googleImageUrl,
         supabase_user_id,
@@ -420,9 +387,7 @@ export async function completeRegistration(
 
       if (imageFile) {
         try {
-          console.log("📤 Subiendo imagen al bucket de Supabase...");
           profileImageUrl = await uploadAvatar(supabase_user_id, imageFile);
-          console.log("✅ Foto de perfil subida al bucket:", profileImageUrl);
         } catch (uploadError) {
           console.error("❌ Error subiendo foto de perfil:", uploadError);
           // Continuar sin foto si falla
@@ -438,8 +403,6 @@ export async function completeRegistration(
 
     try {
       // Crear usuario en la tabla users
-      console.log("🆕 Creando usuario en la base de datos con todos los datos");
-
       const { data: newUser, error: insertError } = await supabaseAdmin
         .from("users")
         .insert({
@@ -464,14 +427,8 @@ export async function completeRegistration(
         return;
       }
 
-      console.log("✅ Usuario creado exitosamente con todos los datos");
-
       // Eliminar sesión de memoria
       pendingOAuthSessions.delete(session_id);
-      console.log(`🧹 Sesión ${session_id} eliminada de memoria`);
-      console.log(
-        `📊 Sesiones activas restantes: ${pendingOAuthSessions.size}`,
-      );
 
       // Responder con tokens y usuario completo
       res.json({

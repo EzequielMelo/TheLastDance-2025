@@ -16,8 +16,6 @@ export class DeliveryChatServices {
     driverId: string,
   ): Promise<DeliveryChat> {
     try {
-      console.log("🔍 Buscando chat para delivery:", deliveryId);
-
       // Verificar si ya existe un chat activo para este delivery
       const { data: existingChat, error: searchError } = await supabaseAdmin
         .from("delivery_chats")
@@ -31,12 +29,10 @@ export class DeliveryChatServices {
       }
 
       if (existingChat) {
-        console.log("✅ Chat existente encontrado:", existingChat.id);
         return existingChat;
       }
 
       // Si no existe, crear uno nuevo
-      console.log("📝 Creando nuevo chat de delivery");
       const { data: newChat, error: createError } = await supabaseAdmin
         .from("delivery_chats")
         .insert({
@@ -52,7 +48,6 @@ export class DeliveryChatServices {
         throw createError;
       }
 
-      console.log("✅ Chat creado:", newChat.id);
       return newChat;
     } catch (error) {
       console.error("❌ Error en getOrCreateChat:", error);
@@ -206,12 +201,6 @@ export class DeliveryChatServices {
     message: string,
   ): Promise<DeliveryChatMessage> {
     try {
-      console.log("💾 Creando mensaje de delivery:", {
-        deliveryChatId,
-        senderId,
-        messagePreview: message.substring(0, 50),
-      });
-
       const { data, error } = await supabaseAdmin
         .from("delivery_chat_messages")
         .insert({
@@ -226,8 +215,6 @@ export class DeliveryChatServices {
       if (error) {
         throw error;
       }
-
-      console.log("✅ Mensaje creado:", data.id);
       return data;
     } catch (error) {
       console.error("❌ Error en createMessage:", error);
@@ -254,8 +241,6 @@ export class DeliveryChatServices {
       if (error) {
         throw error;
       }
-
-      console.log("✅ Mensajes marcados como leídos en chat:", deliveryChatId);
     } catch (error) {
       console.error("❌ Error en markMessagesAsRead:", error);
       throw new Error("Error al marcar mensajes como leídos");
@@ -293,8 +278,6 @@ export class DeliveryChatServices {
    */
   static async deactivateChat(deliveryId: string): Promise<void> {
     try {
-      console.log("🔒 Desactivando chat de delivery:", deliveryId);
-
       const { error } = await supabaseAdmin
         .from("delivery_chats")
         .update({ is_active: false })
@@ -304,8 +287,6 @@ export class DeliveryChatServices {
       if (error) {
         throw error;
       }
-
-      console.log("✅ Chat desactivado");
     } catch (error) {
       console.error("❌ Error en deactivateChat:", error);
       throw new Error("Error al desactivar chat de delivery");
