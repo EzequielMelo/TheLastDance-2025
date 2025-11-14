@@ -74,6 +74,10 @@ export interface CartContextType {
   // Estado de carga
   isLoading: boolean;
 
+  // 🚚 Funciones para modo delivery
+  isDeliveryOrder: boolean;
+  setIsDeliveryOrder: (value: boolean) => void;
+
   // Totales
   cartAmount: number;
   pendingOrderAmount: number;
@@ -116,6 +120,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   const [hasAnonymousPaidOrder, setHasAnonymousPaidOrder] = useState(false);
   const [acceptedOrderItems, setAcceptedOrderItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  // 🚚 Estado para indicar si el pedido es para delivery
+  const [isDeliveryOrder, setIsDeliveryOrder] = useState(false);
   const { user } = useAuth();
 
   // Función para convertir OrderItem a CartItem
@@ -532,7 +538,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
   // Verificar si usuario anónimo tiene pedidos pagados
   const checkAnonymousPaidOrder = async () => {
-    if (!user || user.profile_code !== 'cliente_anonimo') {
+    if (!user || user.profile_code !== "cliente_anonimo") {
       setHasAnonymousPaidOrder(false);
       return;
     }
@@ -644,7 +650,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
       // Refrescar órdenes para obtener el estado actualizado
       await refreshOrders();
-
     } catch (error) {
       console.error("Error enviando items a pedido parcial:", error);
       throw error;
@@ -728,7 +733,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
       // Refrescar órdenes para obtener el estado actualizado
       await refreshOrders();
-
     } catch (error) {
       console.error("Error enviando items a pedido aceptado:", error);
       throw error;
@@ -784,6 +788,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
   const clearCart = () => {
     setCartItems([]);
+    setIsDeliveryOrder(false); // 🚚 Reset delivery mode
   };
 
   const getItemQuantity = (itemId: string): number => {
@@ -795,6 +800,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     // Esta función ahora solo limpia el carrito local
     // El verdadero envío del pedido se hace desde CartModal usando createOrder
     setCartItems([]);
+    setIsDeliveryOrder(false); // 🚚 Reset delivery mode
     // Refrescamos desde la BD para obtener el estado actualizado
     await refreshOrders();
   };
@@ -1009,6 +1015,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     pendingOrderCount,
     partialOrderCount,
     acceptedOrderCount,
+    // 🚚 Delivery mode
+    isDeliveryOrder,
+    setIsDeliveryOrder,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

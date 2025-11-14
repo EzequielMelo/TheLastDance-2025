@@ -46,6 +46,7 @@ import {
 } from "../../api/orders";
 import { useCart } from "../../context/CartContext";
 import { useClientState } from "../../Hooks/useClientState";
+import { useAuth } from "../../auth/useAuth";
 import FloatingCart from "../../components/cart/FloatingCart";
 import FloatingModifyCart from "../../components/cart/FloatingModifyCart";
 import CartModal from "../../components/cart/CartModal";
@@ -84,6 +85,7 @@ export default function MenuScreen() {
   const route = useRoute<MenuScreenRouteProp>();
   const { setActiveTab } = useBottomNav();
   const { state: clientState } = useClientState();
+  const { user } = useAuth();
   const {
     cartCount,
     addItem,
@@ -91,10 +93,11 @@ export default function MenuScreen() {
     getItemQuantity,
     hasPendingOrder,
     refreshOrders,
+    isDeliveryOrder,
   } = useCart();
 
-  // El cliente no está sentado en una mesa
-  const isNotSeated = clientState !== "seated";
+  // El cliente no está sentado en una mesa (excepto si es delivery)
+  const isNotSeated = clientState !== "seated" && !isDeliveryOrder;
 
   // Efecto para actualizar el tab activo cuando se enfoque la pantalla
   useFocusEffect(
@@ -367,7 +370,6 @@ export default function MenuScreen() {
       const keepItems = needsModificationItems
         .filter((item: any) => selectedModifyItems[item.menu_item_id])
         .map((item: any) => item.id);
-
 
       // IDs de los items needs_modification (NO incluir los rejected)
       const needsModificationMenuItemIds = needsModificationItems.map(
@@ -672,6 +674,7 @@ export default function MenuScreen() {
             const CategoryIcon = getCategoryIcon(item.category);
             const categoryColor = getCategoryColor(item.category);
             const isRejected = wasItemRejected(item.id);
+            const isAnonymous = user?.profile_code === "cliente_anonimo";
 
             // Calculamos un espacio más optimizado para dispositivos reales
             const RESERVED_BOTTOM = 130; // Optimizado para mejor aprovechamiento
@@ -946,12 +949,18 @@ export default function MenuScreen() {
                             style={{
                               flexDirection: "row",
                               alignItems: "center",
-                              backgroundColor: isRejected || (isNotSeated && !isModifyMode)
-                                ? "#9ca3af"
-                                : "#d4af37",
+                              backgroundColor:
+                                isRejected || (isNotSeated && !isModifyMode)
+                                  ? "#9ca3af"
+                                  : "#d4af37",
                               borderRadius: 8,
                               paddingHorizontal: 4,
-                              opacity: isRejected || (isNotSeated && !isModifyMode) ? 0.5 : 1,
+                              opacity:
+                                isRejected ||
+                                (isNotSeated && !isModifyMode) ||
+                                isAnonymous
+                                  ? 0.5
+                                  : 1,
                             }}
                           >
                             <TouchableOpacity
@@ -961,18 +970,33 @@ export default function MenuScreen() {
                                   getCurrentItemQuantity(item.id) - 1,
                                 )
                               }
-                              disabled={isRejected || (isNotSeated && !isModifyMode)}
+                              disabled={
+                                isRejected ||
+                                (isNotSeated && !isModifyMode) ||
+                                isAnonymous
+                              }
                               style={{ padding: 8 }}
                             >
                               <Minus
                                 size={16}
-                                color={(isRejected || (isNotSeated && !isModifyMode)) ? "#ffffff" : "#1a1a1a"}
+                                color={
+                                  isRejected ||
+                                  (isNotSeated && !isModifyMode) ||
+                                  isAnonymous
+                                    ? "#ffffff"
+                                    : "#1a1a1a"
+                                }
                               />
                             </TouchableOpacity>
 
                             <Text
                               style={{
-                                color: (isRejected || (isNotSeated && !isModifyMode)) ? "#ffffff" : "#1a1a1a",
+                                color:
+                                  isRejected ||
+                                  (isNotSeated && !isModifyMode) ||
+                                  isAnonymous
+                                    ? "#ffffff"
+                                    : "#1a1a1a",
                                 fontWeight: "600",
                                 fontSize: 16,
                                 marginHorizontal: 12,
@@ -988,23 +1012,40 @@ export default function MenuScreen() {
                                   getCurrentItemQuantity(item.id) + 1,
                                 )
                               }
-                              disabled={isRejected || (isNotSeated && !isModifyMode)}
+                              disabled={
+                                isRejected ||
+                                (isNotSeated && !isModifyMode) ||
+                                isAnonymous
+                              }
                               style={{ padding: 8 }}
                             >
                               <Plus
                                 size={16}
-                                color={(isRejected || (isNotSeated && !isModifyMode)) ? "#ffffff" : "#1a1a1a"}
+                                color={
+                                  isRejected ||
+                                  (isNotSeated && !isModifyMode) ||
+                                  isAnonymous
+                                    ? "#ffffff"
+                                    : "#1a1a1a"
+                                }
                               />
                             </TouchableOpacity>
                           </View>
                         ) : (
                           <TouchableOpacity
                             onPress={() => handleAddToCart(item)}
-                            disabled={isRejected || (isNotSeated && !isModifyMode) || (hasPendingOrder && !isModifyMode)}
+                            disabled={
+                              isRejected ||
+                              (isNotSeated && !isModifyMode) ||
+                              (hasPendingOrder && !isModifyMode) ||
+                              isAnonymous
+                            }
                             style={{
                               backgroundColor: isRejected
                                 ? "#9ca3af"
-                                : (isNotSeated && !isModifyMode) || (hasPendingOrder && !isModifyMode)
+                                : (isNotSeated && !isModifyMode) ||
+                                    (hasPendingOrder && !isModifyMode) ||
+                                    isAnonymous
                                   ? "#6b7280"
                                   : "#d4af37",
                               borderRadius: 8,
@@ -1014,7 +1055,8 @@ export default function MenuScreen() {
                               alignItems: "center",
                               opacity: isRejected
                                 ? 0.5
-                                : (isNotSeated && !isModifyMode) || (hasPendingOrder && !isModifyMode)
+                                : (isNotSeated && !isModifyMode) ||
+                                    (hasPendingOrder && !isModifyMode)
                                   ? 0.8
                                   : 1,
                             }}
@@ -1032,7 +1074,8 @@ export default function MenuScreen() {
                                   No disponible
                                 </Text>
                               </>
-                            ) : (isNotSeated && !isModifyMode) || (hasPendingOrder && !isModifyMode) ? (
+                            ) : (isNotSeated && !isModifyMode) ||
+                              (hasPendingOrder && !isModifyMode) ? (
                               <>
                                 <Lock size={16} color="#ffffff" />
                                 <Text

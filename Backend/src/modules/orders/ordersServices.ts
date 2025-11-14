@@ -1609,14 +1609,15 @@ export async function replaceRejectedItems(
 // ============= FUNCIONES PARA COCINA =============
 
 // Obtener pedidos para cocina (items con category "plato" en estados activos)
+// UNIFICA items de mesas (order_items) + items de delivery (delivery_order_items)
 export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
   try {
     console.log(
-      "👨‍🍳 Obteniendo pedidos para cocina (todos los estados activos)...",
+      "👨‍🍳 Obteniendo pedidos para cocina (mesas + deliveries, todos los estados activos)...",
     );
 
-    // Obtener todos los items activos que son platos
-    const { data: kitchenItems, error: itemsError } = await supabaseAdmin
+    // 1. Obtener items de MESAS (order_items)
+    const { data: tableItems, error: tableError } = await supabaseAdmin
       .from("order_items")
       .select(
         `
@@ -1655,37 +1656,130 @@ export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
       .eq("menu_items.category", "plato")
       .order("created_at", { ascending: true });
 
-    if (itemsError) {
+    if (tableError) {
+      console.error("❌ Error obteniendo items de mesas:", tableError);
       throw new Error(
-        `Error obteniendo items de cocina: ${itemsError.message}`,
+        `Error obteniendo items de cocina (mesas): ${tableError.message}`,
       );
     }
 
-    if (!kitchenItems || kitchenItems.length === 0) {
+    // 2. Obtener items de DELIVERIES (delivery_order_items)
+    const { data: deliveryItems, error: deliveryError } = await supabaseAdmin
+      .from("delivery_order_items")
+      .select(
+        `
+        id,
+        delivery_order_id,
+        menu_item_id,
+        quantity,
+        unit_price,
+        subtotal,
+        status,
+        created_at,
+        menu_items!inner(
+          id,
+          name,
+          description,
+          prep_minutes,
+          price,
+          category
+        ),
+        delivery_orders!inner(
+          id,
+          user_id,
+          total_amount,
+          estimated_time,
+          is_paid,
+          notes,
+          created_at,
+          updated_at,
+          users(id, first_name, last_name, profile_image)
+        )
+      `,
+      )
+      .in("status", ["accepted", "preparing", "ready"])
+      .eq("menu_items.category", "plato")
+      .order("created_at", { ascending: true });
+
+    if (deliveryError) {
+      console.error("❌ Error obteniendo items de deliveries:", deliveryError);
+      throw new Error(
+        `Error obteniendo items de cocina (deliveries): ${deliveryError.message}`,
+      );
+    }
+
+    // 3. Combinar items de ambas fuentes en una lista única
+    const allItems: any[] = [];
+
+    // Normalizar items de mesas
+    if (tableItems && tableItems.length > 0) {
+      tableItems.forEach((item: any) => {
+        allItems.push({
+          ...item,
+          is_delivery: false,
+          order_id: item.order_id,
+          delivery_order_id: null,
+          order: item.orders,
+          delivery_order: null,
+        });
+      });
+    }
+
+    // Normalizar items de deliveries
+    if (deliveryItems && deliveryItems.length > 0) {
+      deliveryItems.forEach((item: any) => {
+        allItems.push({
+          ...item,
+          is_delivery: true,
+          order_id: null,
+          delivery_order_id: item.delivery_order_id,
+          order: null,
+          delivery_order: item.delivery_orders,
+        });
+      });
+    }
+
+    // 4. Ordenar por created_at (más antiguo primero = mayor prioridad)
+    allItems.sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return dateA - dateB;
+    });
+
+    if (allItems.length === 0) {
       console.log("👨‍🍳 No hay items pendientes para cocina");
       return [];
     }
 
-    // Agrupar items por orden
+    console.log(
+      `👨‍🍳 Items encontrados: ${tableItems?.length || 0} de mesas, ${deliveryItems?.length || 0} de deliveries`,
+    );
+
+    // 5. Agrupar items por orden (respetando el orden cronológico)
     const ordersMap = new Map<string, OrderWithItems>();
 
-    kitchenItems.forEach(item => {
-      const order = (item as any).orders;
+    allItems.forEach(item => {
       const menuItem = (item as any).menu_items;
+      const isDelivery = item.is_delivery;
+      const sourceOrder = isDelivery ? item.delivery_order : item.order;
+      const orderId = isDelivery ? item.delivery_order_id : item.order_id;
 
-      if (!ordersMap.has(order.id)) {
-        ordersMap.set(order.id, {
-          ...order,
-          table: order.tables,
-          user: order.users,
+      if (!ordersMap.has(orderId)) {
+        ordersMap.set(orderId, {
+          ...sourceOrder,
+          id: orderId,
+          table: isDelivery ? null : sourceOrder.tables,
+          user: sourceOrder.users,
+          is_delivery: isDelivery,
           order_items: [],
         });
       }
 
-      const orderInMap = ordersMap.get(order.id)!;
+      const orderInMap = ordersMap.get(orderId)!;
       orderInMap.order_items.push({
         id: item.id,
         order_id: item.order_id,
+        delivery_order_id: item.delivery_order_id,
         menu_item_id: item.menu_item_id,
         quantity: item.quantity,
         unit_price: item.unit_price,
@@ -1693,12 +1787,13 @@ export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
         status: item.status,
         created_at: item.created_at,
         menu_item: menuItem,
+        is_delivery: isDelivery,
       });
     });
 
     const ordersArray = Array.from(ordersMap.values());
     console.log(
-      `👨‍🍳 Encontradas ${ordersArray.length} órdenes con items para cocina`,
+      `👨‍🍳 Encontradas ${ordersArray.length} órdenes con items para cocina (${allItems.length} items totales)`,
     );
 
     return ordersArray;
@@ -1709,6 +1804,7 @@ export async function getKitchenPendingOrders(): Promise<OrderWithItems[]> {
 }
 
 // Actualizar status de items de cocina
+// SOPORTA items de mesas (order_items) + items de delivery (delivery_order_items)
 export async function updateKitchenItemStatus(
   itemId: string,
   newStatus: OrderItemStatus,
@@ -1725,21 +1821,40 @@ export async function updateKitchenItemStatus(
       throw new Error(`Status inválido para cocina: ${newStatus}`);
     }
 
-    // Verificar que el item existe y es un plato
-    const { data: item, error: itemError } = await supabaseAdmin
+    // 1. Intentar encontrar el item en order_items (mesas)
+    const { data: tableItem } = await supabaseAdmin
       .from("order_items")
       .select(
         `
         id,
         status,
+        order_id,
         menu_items!inner(category)
       `,
       )
       .eq("id", itemId)
       .single();
 
-    if (itemError || !item) {
-      throw new Error("Item no encontrado");
+    // 2. Si no se encuentra en mesas, buscar en delivery_order_items
+    const { data: deliveryItem } = await supabaseAdmin
+      .from("delivery_order_items")
+      .select(
+        `
+        id,
+        status,
+        delivery_order_id,
+        menu_items!inner(category)
+      `,
+      )
+      .eq("id", itemId)
+      .single();
+
+    // Determinar si el item existe y de qué tipo es
+    const isDelivery = !tableItem && deliveryItem;
+    const item = isDelivery ? deliveryItem : tableItem;
+
+    if (!item) {
+      throw new Error("Item no encontrado en ninguna tabla");
     }
 
     if ((item.menu_items as any).category !== "plato") {
@@ -1750,24 +1865,42 @@ export async function updateKitchenItemStatus(
       throw new Error(`No se puede cambiar el status desde ${item.status}`);
     }
 
-    // Actualizar el status
-    const { error: updateError } = await supabaseAdmin
-      .from("order_items")
-      .update({
-        status: newStatus,
-      })
-      .eq("id", itemId);
+    // 3. Actualizar el status en la tabla correspondiente
+    if (isDelivery) {
+      console.log(`📦 Actualizando item de DELIVERY ${itemId}`);
+      const { error: updateError } = await supabaseAdmin
+        .from("delivery_order_items")
+        .update({ status: newStatus })
+        .eq("id", itemId);
 
-    if (updateError) {
-      throw new Error(`Error actualizando status: ${updateError.message}`);
+      if (updateError) {
+        throw new Error(
+          `Error actualizando status (delivery): ${updateError.message}`,
+        );
+      }
+
+      // Sincronizar estado con tabla deliveries
+      await syncDeliveryStatus(deliveryItem.delivery_order_id);
+    } else {
+      console.log(`🍽️ Actualizando item de MESA ${itemId}`);
+      const { error: updateError } = await supabaseAdmin
+        .from("order_items")
+        .update({ status: newStatus })
+        .eq("id", itemId);
+
+      if (updateError) {
+        throw new Error(
+          `Error actualizando status (mesa): ${updateError.message}`,
+        );
+      }
     }
 
     console.log(`✅ Item ${itemId} actualizado a ${newStatus}`);
 
     // Si el item fue marcado como "ready", verificar si todos los items de la mesa están listos para delivery
-    if (newStatus === "ready") {
+    if (newStatus === "ready" && !isDelivery) {
       console.log(
-        `🔍 Item marcado como ready, verificando si se debe actualizar mesa status...`,
+        `🔍 Item de mesa marcado como ready, verificando si se debe actualizar mesa status...`,
       );
 
       // Obtener información de la orden y mesa para este item
@@ -1908,10 +2041,15 @@ export async function getTableOrdersStatus(
 // ============= FUNCIONES PARA BAR =============
 
 // Obtener pedidos pendientes para bar (items con category "bebida" y status "accepted")
+// UNIFICA items de mesas (order_items) + items de delivery (delivery_order_items)
 export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
   try {
-    // Obtener todos los items activos que son bebidas
-    const { data: barItems, error: itemsError } = await supabaseAdmin
+    console.log(
+      "🍷 Obteniendo pedidos para bar (mesas + deliveries, todos los estados activos)...",
+    );
+
+    // 1. Obtener items de MESAS (order_items)
+    const { data: tableItems, error: tableError } = await supabaseAdmin
       .from("order_items")
       .select(
         `
@@ -1950,35 +2088,130 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
       .eq("menu_items.category", "bebida")
       .order("created_at", { ascending: true });
 
-    if (itemsError) {
-      throw new Error(`Error obteniendo items de bar: ${itemsError.message}`);
+    if (tableError) {
+      console.error("❌ Error obteniendo items de mesas:", tableError);
+      throw new Error(
+        `Error obteniendo items de bar (mesas): ${tableError.message}`,
+      );
     }
 
-    if (!barItems || barItems.length === 0) {
+    // 2. Obtener items de DELIVERIES (delivery_order_items)
+    const { data: deliveryItems, error: deliveryError } = await supabaseAdmin
+      .from("delivery_order_items")
+      .select(
+        `
+        id,
+        delivery_order_id,
+        menu_item_id,
+        quantity,
+        unit_price,
+        subtotal,
+        status,
+        created_at,
+        menu_items!inner(
+          id,
+          name,
+          description,
+          prep_minutes,
+          price,
+          category
+        ),
+        delivery_orders!inner(
+          id,
+          user_id,
+          total_amount,
+          estimated_time,
+          is_paid,
+          notes,
+          created_at,
+          updated_at,
+          users(id, first_name, last_name, profile_image)
+        )
+      `,
+      )
+      .in("status", ["accepted", "preparing", "ready"])
+      .eq("menu_items.category", "bebida")
+      .order("created_at", { ascending: true });
+
+    if (deliveryError) {
+      console.error("❌ Error obteniendo items de deliveries:", deliveryError);
+      throw new Error(
+        `Error obteniendo items de bar (deliveries): ${deliveryError.message}`,
+      );
+    }
+
+    // 3. Combinar items de ambas fuentes en una lista única
+    const allItems: any[] = [];
+
+    // Normalizar items de mesas
+    if (tableItems && tableItems.length > 0) {
+      tableItems.forEach((item: any) => {
+        allItems.push({
+          ...item,
+          is_delivery: false,
+          order_id: item.order_id,
+          delivery_order_id: null,
+          order: item.orders,
+          delivery_order: null,
+        });
+      });
+    }
+
+    // Normalizar items de deliveries
+    if (deliveryItems && deliveryItems.length > 0) {
+      deliveryItems.forEach((item: any) => {
+        allItems.push({
+          ...item,
+          is_delivery: true,
+          order_id: null,
+          delivery_order_id: item.delivery_order_id,
+          order: null,
+          delivery_order: item.delivery_orders,
+        });
+      });
+    }
+
+    // 4. Ordenar por created_at (más antiguo primero = mayor prioridad)
+    allItems.sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return dateA - dateB;
+    });
+
+    if (allItems.length === 0) {
       console.log("🍷 No hay items pendientes para bar");
       return [];
     }
 
-    // Agrupar items por orden
+    console.log(
+      `🍷 Items encontrados: ${tableItems?.length || 0} de mesas, ${deliveryItems?.length || 0} de deliveries`,
+    );
+
+    // 5. Agrupar items por orden (respetando el orden cronológico)
     const ordersMap = new Map<string, OrderWithItems>();
 
-    barItems.forEach(item => {
-      const order = (item as any).orders;
+    allItems.forEach(item => {
       const menuItem = (item as any).menu_items;
+      const isDelivery = item.is_delivery;
+      const sourceOrder = isDelivery ? item.delivery_order : item.order;
+      const orderId = isDelivery ? item.delivery_order_id : item.order_id;
 
-      if (!ordersMap.has(order.id)) {
-        ordersMap.set(order.id, {
-          ...order,
-          table: order.tables,
-          user: order.users,
+      if (!ordersMap.has(orderId)) {
+        ordersMap.set(orderId, {
+          ...sourceOrder,
+          id: orderId,
+          table: isDelivery ? null : sourceOrder.tables,
+          user: sourceOrder.users,
+          is_delivery: isDelivery,
           order_items: [],
         });
       }
 
-      const orderInMap = ordersMap.get(order.id)!;
+      const orderInMap = ordersMap.get(orderId)!;
       orderInMap.order_items.push({
         id: item.id,
         order_id: item.order_id,
+        delivery_order_id: item.delivery_order_id,
         menu_item_id: item.menu_item_id,
         quantity: item.quantity,
         unit_price: item.unit_price,
@@ -1986,10 +2219,15 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
         status: item.status,
         created_at: item.created_at,
         menu_item: menuItem,
+        is_delivery: isDelivery,
       });
     });
 
     const ordersArray = Array.from(ordersMap.values());
+    console.log(
+      `🍷 Encontradas ${ordersArray.length} órdenes con items para bar (${allItems.length} items totales)`,
+    );
+
     return ordersArray;
   } catch (error) {
     console.error("❌ Error en getBartenderPendingOrders:", error);
@@ -1998,6 +2236,7 @@ export async function getBartenderPendingOrders(): Promise<OrderWithItems[]> {
 }
 
 // Actualizar status de items de bar
+// SOPORTA items de mesas (order_items) + items de delivery (delivery_order_items)
 export async function updateBartenderItemStatus(
   itemId: string,
   newStatus: OrderItemStatus,
@@ -2014,23 +2253,40 @@ export async function updateBartenderItemStatus(
       throw new Error(`Status inválido para bar: ${newStatus}`);
     }
 
-    // Verificar que el item existe y es una bebida
-    const { data: item, error: itemError } = await supabaseAdmin
+    // 1. Intentar encontrar el item en order_items (mesas)
+    const { data: tableItem } = await supabaseAdmin
       .from("order_items")
       .select(
         `
         id,
         status,
+        order_id,
         menu_items!inner(category)
       `,
       )
       .eq("id", itemId)
       .single();
 
-    if (itemError || !item) {
-      throw new Error(
-        `Item no encontrado: ${itemError?.message || "Item inexistente"}`,
-      );
+    // 2. Si no se encuentra en mesas, buscar en delivery_order_items
+    const { data: deliveryItem } = await supabaseAdmin
+      .from("delivery_order_items")
+      .select(
+        `
+        id,
+        status,
+        delivery_order_id,
+        menu_items!inner(category)
+      `,
+      )
+      .eq("id", itemId)
+      .single();
+
+    // Determinar si el item existe y de qué tipo es
+    const isDelivery = !tableItem && deliveryItem;
+    const item = isDelivery ? deliveryItem : tableItem;
+
+    if (!item) {
+      throw new Error("Item no encontrado en ninguna tabla");
     }
 
     // Verificar que es una bebida
@@ -2053,17 +2309,40 @@ export async function updateBartenderItemStatus(
       throw new Error(`No se puede cambiar de ${currentStatus} a ${newStatus}`);
     }
 
-    // Actualizar status
-    const { error: updateError } = await supabaseAdmin
-      .from("order_items")
-      .update({
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", itemId);
+    // 3. Actualizar el status en la tabla correspondiente
+    if (isDelivery) {
+      console.log(`📦 Actualizando item de DELIVERY ${itemId}`);
+      const { error: updateError } = await supabaseAdmin
+        .from("delivery_order_items")
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", itemId);
 
-    if (updateError) {
-      throw new Error(`Error actualizando status: ${updateError.message}`);
+      if (updateError) {
+        throw new Error(
+          `Error actualizando status (delivery): ${updateError.message}`,
+        );
+      }
+
+      // Sincronizar estado con tabla deliveries
+      await syncDeliveryStatus(deliveryItem.delivery_order_id);
+    } else {
+      console.log(`🍽️ Actualizando item de MESA ${itemId}`);
+      const { error: updateError } = await supabaseAdmin
+        .from("order_items")
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", itemId);
+
+      if (updateError) {
+        throw new Error(
+          `Error actualizando status (mesa): ${updateError.message}`,
+        );
+      }
     }
 
     const statusMessages: Record<"preparing" | "ready", string> = {
@@ -2203,7 +2482,7 @@ export async function payOrder(
     gameDiscountAmount?: number;
     gameDiscountPercentage?: number;
     satisfactionLevel?: string;
-  }
+  },
 ): Promise<{
   success: boolean;
   message: string;
@@ -2256,25 +2535,36 @@ export async function payOrder(
     console.log(`📝 Encontradas ${orders.length} órdenes para procesar pago`);
 
     // 3. ACTUALIZAR TOTAL_AMOUNT si hay descuentos de juegos
-    if (paymentDetails?.gameDiscountAmount && paymentDetails.gameDiscountAmount > 0) {
-      console.log(`🎮 Aplicando descuento de juegos: $${paymentDetails.gameDiscountAmount} (${paymentDetails.gameDiscountPercentage}%)`);
-      
+    if (
+      paymentDetails?.gameDiscountAmount &&
+      paymentDetails.gameDiscountAmount > 0
+    ) {
+      console.log(
+        `🎮 Aplicando descuento de juegos: $${paymentDetails.gameDiscountAmount} (${paymentDetails.gameDiscountPercentage}%)`,
+      );
+
       // Calcular el total original de todas las órdenes
-      const originalTotal = orders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+      const originalTotal = orders.reduce(
+        (sum, order) => sum + (order.total_amount || 0),
+        0,
+      );
       console.log(`💵 Total original: $${originalTotal}`);
-      
+
       // Calcular el nuevo total después del descuento (sin incluir propina)
       const discountedTotal = originalTotal - paymentDetails.gameDiscountAmount;
       console.log(`💵 Total después del descuento: $${discountedTotal}`);
-      
+
       // Actualizar proporcionalmente cada orden
       for (const order of orders) {
         const orderProportion = (order.total_amount || 0) / originalTotal;
-        const orderDiscount = paymentDetails.gameDiscountAmount * orderProportion;
+        const orderDiscount =
+          paymentDetails.gameDiscountAmount * orderProportion;
         const newOrderTotal = (order.total_amount || 0) - orderDiscount;
-        
-        console.log(`📋 Orden ${order.id}: $${order.total_amount} → $${newOrderTotal.toFixed(2)} (descuento: $${orderDiscount.toFixed(2)})`);
-        
+
+        console.log(
+          `📋 Orden ${order.id}: $${order.total_amount} → $${newOrderTotal.toFixed(2)} (descuento: $${orderDiscount.toFixed(2)})`,
+        );
+
         const { error: updateError } = await supabaseAdmin
           .from("orders")
           .update({
@@ -2284,11 +2574,16 @@ export async function payOrder(
           .eq("id", order.id);
 
         if (updateError) {
-          console.error(`❌ Error actualizando orden ${order.id}:`, updateError);
-          throw new Error(`Error aplicando descuento a la orden: ${updateError.message}`);
+          console.error(
+            `❌ Error actualizando orden ${order.id}:`,
+            updateError,
+          );
+          throw new Error(
+            `Error aplicando descuento a la orden: ${updateError.message}`,
+          );
         }
       }
-      
+
       console.log(`✅ Descuentos de juegos aplicados a todas las órdenes`);
     }
 
@@ -2455,7 +2750,7 @@ export async function confirmPaymentAndReleaseTable(
     isRegistered?: boolean;
     message?: string;
     error?: string;
-  }
+  },
 ): Promise<{ success: boolean; message: string }> {
   try {
     console.log(`💰 Mozo ${waiterId} confirmando pago para mesa ${tableId}`);
@@ -2613,25 +2908,28 @@ export async function confirmPaymentAndReleaseTable(
           .single();
 
         if (clientError || !clientData) {
-          console.error('❌ Error obteniendo datos del cliente:', clientError);
-          throw new Error('No se pudieron obtener datos del cliente');
+          console.error("❌ Error obteniendo datos del cliente:", clientError);
+          throw new Error("No se pudieron obtener datos del cliente");
         }
 
-        const clientName = `${clientData.first_name} ${clientData.last_name}`.trim();
+        const clientName =
+          `${clientData.first_name} ${clientData.last_name}`.trim();
 
         if (invoiceInfo.isRegistered && invoiceInfo.htmlContent) {
           // USUARIO REGISTRADO: Enviar factura por email (HTML embebido)
           console.log(`📧 Enviando factura por email a usuario registrado`);
-          
+
           // Obtener email del cliente desde Firebase Auth
           const { getAuthEmailById } = await import("../admin/adminServices");
           const clientEmail = await getAuthEmailById(payingClientId);
-          
+
           if (!clientEmail) {
-            throw new Error('No se pudo obtener email del cliente registrado');
+            throw new Error("No se pudo obtener email del cliente registrado");
           }
-          
-          const { InvoiceEmailService } = await import("../../services/invoiceEmailService");
+
+          const { InvoiceEmailService } = await import(
+            "../../services/invoiceEmailService"
+          );
           const emailResult = await InvoiceEmailService.sendInvoiceByEmail(
             clientEmail,
             invoiceInfo.htmlContent,
@@ -2640,20 +2938,32 @@ export async function confirmPaymentAndReleaseTable(
               tableNumber: table.number.toString(),
               invoiceNumber: `INV-${Date.now()}`,
               totalAmount: finalTotalAmount,
-              invoiceDate: new Date().toLocaleDateString('es-AR')
-            }
+              invoiceDate: new Date().toLocaleDateString("es-AR"),
+            },
           );
 
           if (emailResult.success) {
-            console.log(`✅ Factura enviada por email exitosamente a: ${clientEmail}`);
+            console.log(
+              `✅ Factura enviada por email exitosamente a: ${clientEmail}`,
+            );
           } else {
-            console.error(`❌ Error enviando factura por email: ${emailResult.error}`);
+            console.error(
+              `❌ Error enviando factura por email: ${emailResult.error}`,
+            );
           }
-        } else if (!invoiceInfo.isRegistered && invoiceInfo.filePath && invoiceInfo.fileName) {
+        } else if (
+          !invoiceInfo.isRegistered &&
+          invoiceInfo.filePath &&
+          invoiceInfo.fileName
+        ) {
           // USUARIO ANÓNIMO: Enviar notificación push con enlace de descarga
-          console.log(`📱 Enviando notificación push con enlace de descarga a usuario anónimo`);
-          
-          const { notifyAnonymousClientInvoiceReady } = await import("../../services/pushNotificationService");
+          console.log(
+            `📱 Enviando notificación push con enlace de descarga a usuario anónimo`,
+          );
+
+          const { notifyAnonymousClientInvoiceReady } = await import(
+            "../../services/pushNotificationService"
+          );
           await notifyAnonymousClientInvoiceReady(
             payingClientId,
             table.number.toString(),
@@ -2662,14 +2972,19 @@ export async function confirmPaymentAndReleaseTable(
               generated: true,
               filePath: invoiceInfo.filePath,
               fileName: invoiceInfo.fileName,
-              message: invoiceInfo.message || "Factura generada exitosamente"
-            }
+              message: invoiceInfo.message || "Factura generada exitosamente",
+            },
           );
         } else {
-          console.warn(`⚠️ Factura generada pero faltan datos para entrega: isRegistered=${invoiceInfo.isRegistered}, hasHTML=${!!invoiceInfo.htmlContent}, hasFile=${!!invoiceInfo.filePath}`);
+          console.warn(
+            `⚠️ Factura generada pero faltan datos para entrega: isRegistered=${invoiceInfo.isRegistered}, hasHTML=${!!invoiceInfo.htmlContent}, hasFile=${!!invoiceInfo.filePath}`,
+          );
         }
       } catch (deliveryError) {
-        console.error(`❌ Error en entrega diferenciada de factura:`, deliveryError);
+        console.error(
+          `❌ Error en entrega diferenciada de factura:`,
+          deliveryError,
+        );
         // Continúa con notificación normal como fallback
       }
     }
@@ -2686,7 +3001,9 @@ export async function confirmPaymentAndReleaseTable(
         finalTotalAmount,
         invoiceInfo,
       );
-      console.log(`📱 Notificación de pago confirmado enviada al cliente ${invoiceInfo?.generated ? 'con información de factura' : 'sin factura'}`);
+      console.log(
+        `📱 Notificación de pago confirmado enviada al cliente ${invoiceInfo?.generated ? "con información de factura" : "sin factura"}`,
+      );
     } catch (notifyError) {
       console.warn(`⚠️ Error enviando notificación al cliente:`, notifyError);
       // No falla la función por esto
@@ -3209,6 +3526,139 @@ export async function submitTandaModifications(
     console.log("✅ Modificaciones de tanda procesadas exitosamente");
   } catch (error) {
     console.error("❌ Error en submitTandaModifications:", error);
+    throw error;
+  }
+}
+
+// ============= FUNCIÓN PARA SINCRONIZAR ESTADO DE DELIVERY =============
+
+/**
+ * Sincroniza el estado de la tabla deliveries basándose en el estado de los delivery_order_items
+ * Lógica de transición:
+ * - Si algún item está en 'preparing' -> delivery status = 'preparing'
+ * - Si todos los items están en 'ready' -> delivery status = 'ready'
+ * - Si todos los items están en 'delivered' -> delivery status = 'delivered'
+ */
+export async function syncDeliveryStatus(
+  deliveryOrderId: string,
+): Promise<void> {
+  try {
+    console.log(
+      `🔄 Sincronizando estado de delivery para orden ${deliveryOrderId}`,
+    );
+
+    // 1. Obtener todos los items de esta delivery order
+    const { data: items, error: itemsError } = await supabaseAdmin
+      .from("delivery_order_items")
+      .select("id, status")
+      .eq("delivery_order_id", deliveryOrderId);
+
+    if (itemsError || !items || items.length === 0) {
+      console.warn(
+        `⚠️ No se encontraron items para delivery_order ${deliveryOrderId}`,
+      );
+      return;
+    }
+
+    console.log(
+      `📊 Items encontrados: ${items.length}, estados: ${items.map(i => i.status).join(", ")}`,
+    );
+
+    // 2. Determinar el nuevo estado de la delivery según los items
+    const statuses = items.map(item => item.status);
+    const allDelivered = statuses.every(status => status === "delivered");
+    const allReady = statuses.every(status => status === "ready");
+    const somePreparing = statuses.some(status => status === "preparing");
+    const someReady = statuses.some(status => status === "ready");
+
+    let newDeliveryStatus: string;
+
+    // Lógica de prioridad (de más avanzado a menos):
+    if (allDelivered) {
+      // Todos entregados → delivery completado
+      newDeliveryStatus = "delivered";
+    } else if (allReady) {
+      // Todos listos → delivery listo para enviar
+      newDeliveryStatus = "ready";
+    } else if (someReady || somePreparing) {
+      // Si hay al menos un item en preparing o ready → delivery en preparación
+      newDeliveryStatus = "preparing";
+    } else {
+      // Todos en 'accepted' → mantener confirmed
+      newDeliveryStatus = "confirmed";
+    }
+
+    console.log(
+      `➡️ Nuevo estado de delivery determinado: ${newDeliveryStatus} (todos delivered: ${allDelivered}, todos ready: ${allReady}, alguno preparing/ready: ${somePreparing || someReady})`,
+    );
+
+    // 3. Obtener el delivery actual para verificar si necesita actualización
+    const { data: delivery, error: deliveryError } = await supabaseAdmin
+      .from("deliveries")
+      .select("id, status, delivery_order_id, user_id")
+      .eq("delivery_order_id", deliveryOrderId)
+      .single();
+
+    if (deliveryError || !delivery) {
+      console.warn(
+        `⚠️ No se encontró delivery para delivery_order ${deliveryOrderId}`,
+      );
+      return;
+    }
+
+    // 4. Solo actualizar si el estado cambió
+    if (delivery.status === newDeliveryStatus) {
+      console.log(
+        `✅ Estado ya es ${newDeliveryStatus}, no se requiere actualización`,
+      );
+      return;
+    }
+
+    // 5. Actualizar el estado de la delivery
+    const { error: updateError } = await supabaseAdmin
+      .from("deliveries")
+      .update({
+        status: newDeliveryStatus,
+      })
+      .eq("id", delivery.id);
+
+    if (updateError) {
+      console.error(`❌ Error actualizando delivery:`, updateError);
+      throw new Error(`Error actualizando delivery: ${updateError.message}`);
+    }
+
+    console.log(
+      `✅ Delivery ${delivery.id} actualizado de ${delivery.status} a ${newDeliveryStatus}`,
+    );
+
+    // 6. Emitir evento Socket.IO para notificar al cliente
+    try {
+      const { getIOInstance } = await import("../../socket/chatSocket");
+      const io = getIOInstance();
+
+      if (io && delivery.user_id) {
+        const userRoom = `user_${delivery.user_id}`;
+        io.to(userRoom).emit("delivery_status_changed", {
+          deliveryId: delivery.id,
+          deliveryOrderId: deliveryOrderId,
+          oldStatus: delivery.status,
+          newStatus: newDeliveryStatus,
+          updatedAt: new Date().toISOString(),
+        });
+
+        console.log(
+          `📡 Evento Socket.IO emitido a room ${userRoom}: delivery_status_changed`,
+        );
+      }
+    } catch (socketError) {
+      console.error(
+        `⚠️ Error emitiendo evento Socket.IO (no crítico):`,
+        socketError,
+      );
+      // No lanzar error, el estado se actualizó correctamente
+    }
+  } catch (error) {
+    console.error(`❌ Error en syncDeliveryStatus:`, error);
     throw error;
   }
 }

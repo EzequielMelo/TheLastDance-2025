@@ -48,7 +48,9 @@ export type RootStackParamList = {
   WaiterOrders: undefined; // Gestión de órdenes del mesero
   AllWaiters: undefined; // Gestión de meseros (admin/supervisor)
   TableChat: { tableId: string; autoMessage?: string }; // Chat entre cliente y mesero
+  DeliveryChat: { deliveryId: string }; // Chat entre cliente y repartidor
   BillPayment: { tableNumber?: number; tableId?: string }; // Pantalla de pago de cuenta
+  DeliveryOrdersManagement: undefined; // Gestión de pedidos de delivery (admin/supervisor)
   InvoiceView: {
     invoiceData: {
       generated: boolean;
@@ -63,12 +65,40 @@ export type RootStackParamList = {
   KitchenMenu: undefined; // Menú de platos para cocineros (solo vista)
   BartenderDashboard: undefined; // Panel de bar para bartenders
   BarMenu: undefined; // Menú de bebidas para bartenders (solo vista)
-  
+
   // Sistema de Reservas
   MakeReservation: undefined; // Crear nueva reserva (clientes registrados)
   MyReservations: undefined; // Ver mis reservas (clientes registrados)
   ManageReservations: undefined; // Gestionar reservas (dueño/supervisor)
   ReservationDetails: { reservationId: string }; // Ver detalles de una reserva
+
+  // Sistema de Delivery
+  DeliveryLocation: undefined; // Seleccionar ubicación en mapa para delivery
+  DeliveryTracking: { deliveryId: string }; // Seguimiento en tiempo real del delivery
+  DeliveryHistory: undefined; // Historial de deliveries del usuario
+  DriverDeliveries: undefined; // Pantalla de pedidos disponibles para repartidor (empleado)
+  MyDeliveries: undefined; // Pantalla de entregas activas del repartidor
+
+  // Sistema de Pago para Deliveries
+  DeliveryPaymentQR: {
+    deliveryId: string;
+    paymentData: {
+      totalAmount: number;
+      tipAmount: number;
+      tipPercentage: number;
+      satisfactionLevel: string;
+    };
+  }; // Mostrar QR para pago de delivery
+  DeliveryCashConfirm: {
+    deliveryId: string;
+    paymentData: {
+      totalAmount: number;
+      tipAmount: number;
+      tipPercentage: number;
+      satisfactionLevel: string;
+    };
+  }; // Confirmar pago en efectivo
+  PaymentQRScanner: undefined; // Scanner QR para cliente pagar delivery
 };
 
 export type RootStackNavigationProp = StackNavigationProp<RootStackParamList>;

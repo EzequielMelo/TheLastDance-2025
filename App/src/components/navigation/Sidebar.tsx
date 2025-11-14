@@ -25,9 +25,12 @@ import {
   UtensilsCrossed,
   Wine,
   Gamepad2,
+  Truck,
+  History,
 } from "lucide-react-native";
 import { User } from "../../types/User";
 import { useClientState } from "../../Hooks/useClientState";
+import { useDeliveryState } from "../../Hooks/useDeliveryState";
 import { useCart } from "../../context/CartContext";
 import { getAnonymousOrderData } from "../../api/orders";
 
@@ -53,27 +56,44 @@ interface ActionItem {
   positions?: string[];
 }
 
-export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, onOpenCart }: SidebarProps) {
+export default function Sidebar({
+  visible,
+  onClose,
+  user,
+  onLogout,
+  onNavigate,
+  onOpenCart,
+}: SidebarProps) {
   const slideAnim = React.useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
-  
+
   // Solo usar el hook si el usuario es cliente
-  const isClient = user?.profile_code === "cliente_registrado" || user?.profile_code === "cliente_anonimo";
+  const isClient =
+    user?.profile_code === "cliente_registrado" ||
+    user?.profile_code === "cliente_anonimo";
   const clientState = useClientState();
-  
+
+  // Hook de delivery state para verificar si hay delivery activo
+  const { hasActiveDelivery } = useDeliveryState();
+
   // Hook del carrito para obtener información de items
-  const { cartCount, pendingOrderCount, hasPendingOrder } = useCart();
-  
+  const { cartCount, pendingOrderCount, hasPendingOrder, setIsDeliveryOrder } =
+    useCart();
+
   // Estado para verificar si usuario anónimo tiene pedido pagado
-  const [hasAnonymousPaidOrder, setHasAnonymousPaidOrder] = React.useState(false);
-  
+  const [hasAnonymousPaidOrder, setHasAnonymousPaidOrder] =
+    React.useState(false);
+
   // Extraer datos del cliente si corresponde
-  const { state, waitingPosition, assignedTable, occupiedTable, refresh } = isClient ? clientState : {
-    state: null,
-    waitingPosition: null,
-    assignedTable: null,
-    occupiedTable: null,
-    refresh: () => {}
-  };
+  const { state, waitingPosition, assignedTable, occupiedTable, refresh } =
+    isClient
+      ? clientState
+      : {
+          state: null,
+          waitingPosition: null,
+          assignedTable: null,
+          occupiedTable: null,
+          refresh: () => {},
+        };
 
   React.useEffect(() => {
     if (visible) {
@@ -174,19 +194,29 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
       roles: ["empleado"],
       positions: ["mozo"],
     },
+
+    // Dueño y Supervisor - Gestión de Deliveries
+    {
+      id: "delivery-management",
+      title: "Gestión de Deliveries",
+      subtitle: "Administrá pedidos de delivery",
+      icon: <Truck size={20} color="#374151" />,
+      onPress: () => onNavigate("DeliveryOrdersManagement"),
+      roles: ["dueno", "supervisor"],
+    },
   ];
 
   const getFilteredActions = () => {
     if (!user) return [];
-    
+
     let actions = actionItems.filter(item => {
       const hasRole = item.roles.includes(user.profile_code);
       if (!hasRole) return false;
-      
+
       if (item.positions && user.position_code) {
         return item.positions.includes(user.position_code);
       }
-      
+
       return true;
     });
 
@@ -206,29 +236,58 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
 
     switch (state) {
       case "not_in_queue":
-        // Para clientes registrados: mostrar "Reservar Mesa" y "Mis Reservas"
+        // Para clientes registrados: mostrar "Reservar Mesa", "Mis Reservas" y opciones de Delivery
         if (user?.profile_code === "cliente_registrado") {
+          // Solo mostrar opciones de mesa si no hay delivery activo
+          if (!hasActiveDelivery) {
+            clientActions.push(
+              {
+                id: "make-reservation",
+                title: "Reservar Mesa",
+                subtitle:
+                  "Reservá una mesa para una fecha y horario específico",
+                icon: <Users size={20} color="#374151" />,
+                onPress: () => onNavigate("MakeReservation"),
+                roles: ["cliente_registrado"],
+              },
+              {
+                id: "my-reservations",
+                title: "Mis Reservas",
+                subtitle: "Ver y gestionar tus reservas",
+                icon: <Clock size={20} color="#374151" />,
+                onPress: () => onNavigate("MyReservations"),
+                roles: ["cliente_registrado"],
+              },
+            );
+          }
+          // Opciones de Delivery siempre disponibles
           clientActions.push(
             {
-              id: "make-reservation",
-              title: "Reservar Mesa",
-              subtitle: "Reservá una mesa para una fecha y horario específico",
-              icon: <Users size={20} color="#374151" />,
-              onPress: () => onNavigate("MakeReservation"),
+              id: "delivery-order",
+              title: "Pedir Delivery",
+              subtitle: "Realizá tu pedido a domicilio",
+              icon: <Truck size={20} color="#374151" />,
+              onPress: () => {
+                setIsDeliveryOrder(true); // Activar modo delivery
+                onNavigate("Menu"); // Navegar al menú para seleccionar productos
+              },
               roles: ["cliente_registrado"],
             },
             {
-              id: "my-reservations",
-              title: "Mis Reservas",
-              subtitle: "Ver y gestionar tus reservas",
-              icon: <Clock size={20} color="#374151" />,
-              onPress: () => onNavigate("MyReservations"),
+              id: "delivery-history",
+              title: "Historial de Deliveries",
+              subtitle: "Ver tus pedidos anteriores",
+              icon: <History size={20} color="#374151" />,
+              onPress: () => onNavigate("DeliveryHistory"),
               roles: ["cliente_registrado"],
-            }
+            },
           );
         }
         // Para clientes anónimos (sin pedido pagado): mantener "Unirse a Lista de Espera"
-        else if (user?.profile_code === "cliente_anonimo" && !hasAnonymousPaidOrder) {
+        else if (
+          user?.profile_code === "cliente_anonimo" &&
+          !hasAnonymousPaidOrder
+        ) {
           clientActions.push({
             id: "join-queue",
             title: "Unirse a Lista de Espera",
@@ -260,7 +319,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
               onClose();
             },
             roles: ["cliente_registrado", "cliente_anonimo"],
-          }
+          },
         );
         break;
 
@@ -283,7 +342,8 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
             title: "Chat con Mesero",
             subtitle: `Mesa #${occupiedTable.number} - Comunícate con tu mesero`,
             icon: <MessageCircle size={20} color="#374151" />,
-            onPress: () => onNavigate("TableChat", { tableId: occupiedTable.id }),
+            onPress: () =>
+              onNavigate("TableChat", { tableId: occupiedTable.id }),
             roles: ["cliente_registrado", "cliente_anonimo"],
           });
         }
@@ -319,7 +379,7 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
               onClose();
             },
             roles: ["cliente_registrado", "cliente_anonimo"],
-          }
+          },
         );
         break;
 
@@ -351,73 +411,82 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
             icon: <RefreshCcw size={20} color="#374151" />,
             title: "Verificando estado...",
             subtitle: "Conectando con el servidor",
-            color: "#d4af37"
+            color: "#d4af37",
           };
         case "not_in_queue":
+          // Si hay delivery activo, no mostrar este estado
+          if (hasActiveDelivery) {
+            return null;
+          }
           return {
             icon: <Users size={20} color="#6b7280" />,
             title: "Sin reserva",
             subtitle: "Únete a la lista de espera",
-            color: "#6b7280"
+            color: "#6b7280",
           };
         case "in_queue":
           return {
             icon: <Clock size={20} color="#374151" />,
             title: `Posición #${waitingPosition || "..."}`,
             subtitle: "En lista de espera",
-            color: "#d4af37"
+            color: "#d4af37",
           };
         case "assigned":
           return {
             icon: <MapPin size={20} color="#22c55e" />,
             title: `Mesa #${assignedTable?.number || "..."}`,
             subtitle: "Mesa asignada - confirma tu llegada",
-            color: "#22c55e"
+            color: "#22c55e",
           };
         case "seated":
           return {
             icon: <CheckCircle size={20} color="#22c55e" />,
             title: `Mesa #${occupiedTable?.number || "..."}`,
             subtitle: "Sentado - ¡disfruta tu experiencia!",
-            color: "#22c55e"
+            color: "#22c55e",
           };
         case "displaced":
           return {
             icon: <AlertCircle size={20} color="#f59e0b" />,
             title: "Mesa liberada",
             subtitle: "Tu sesión fue interrumpida",
-            color: "#f59e0b"
+            color: "#f59e0b",
           };
         case "error":
           return {
             icon: <AlertCircle size={20} color="#ef4444" />,
             title: "Error de conexión",
             subtitle: "No se pudo verificar tu estado",
-            color: "#ef4444"
+            color: "#ef4444",
           };
         default:
           return {
             icon: <AlertCircle size={20} color="#6b7280" />,
             title: "Estado desconocido",
             subtitle: "Actualiza para verificar",
-            color: "#6b7280"
+            color: "#6b7280",
           };
       }
     };
 
     const statusInfo = getStatusInfo();
 
+    // Si statusInfo es null, no renderizar nada
+    if (!statusInfo) return null;
+
     return (
       <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <View style={{
-          width: 36,
-          height: 36,
-          borderRadius: 8,
-          backgroundColor: `${statusInfo.color}20`,
-          alignItems: "center",
-          justifyContent: "center",
-          marginRight: 12,
-        }}>
+        <View
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            backgroundColor: `${statusInfo.color}20`,
+            alignItems: "center",
+            justifyContent: "center",
+            marginRight: 12,
+          }}
+        >
           {statusInfo.icon}
         </View>
         <View style={{ flex: 1 }}>
@@ -475,8 +544,16 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
                 borderBottomColor: "rgba(255,255,255,0.1)",
               }}
             >
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                <Text style={{ color: "white", fontSize: 22, fontWeight: "600" }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Text
+                  style={{ color: "white", fontSize: 22, fontWeight: "600" }}
+                >
                   Menú
                 </Text>
                 <TouchableOpacity
@@ -549,7 +626,13 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
 
                     {/* User Info */}
                     <View style={{ marginLeft: 12, flex: 1 }}>
-                      <Text style={{ color: "white", fontSize: 18, fontWeight: "600" }}>
+                      <Text
+                        style={{
+                          color: "white",
+                          fontSize: 18,
+                          fontWeight: "600",
+                        }}
+                      >
                         {user.first_name} {user.last_name}
                       </Text>
                       <View
@@ -562,12 +645,27 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
                           alignSelf: "flex-start",
                         }}
                       >
-                        <Text style={{ color: "white", fontSize: 12, fontWeight: "500" }}>
-                          {getProfileLabel(user.profile_code, user.position_code || undefined)}
+                        <Text
+                          style={{
+                            color: "white",
+                            fontSize: 12,
+                            fontWeight: "500",
+                          }}
+                        >
+                          {getProfileLabel(
+                            user.profile_code,
+                            user.position_code || undefined,
+                          )}
                         </Text>
                       </View>
                       {user.email && (
-                        <Text style={{ color: "#9ca3af", fontSize: 14, marginTop: 4 }}>
+                        <Text
+                          style={{
+                            color: "#9ca3af",
+                            fontSize: 14,
+                            marginTop: 4,
+                          }}
+                        >
                           {user.email}
                         </Text>
                       )}
@@ -578,26 +676,30 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
             )}
 
             {/* Client Status Section */}
-            {isClient && state && (
-              <View style={{ marginBottom: 20 }}>
-                <Text style={{
-                  color: "#9ca3af",
-                  fontSize: 16,
-                  fontWeight: "600",
-                  marginBottom: 12,
-                  textTransform: "uppercase",
-                }}>
+            {isClient && state && getClientStatusDisplay() && (
+              <View style={{ marginBottom: 20, paddingHorizontal: 20 }}>
+                <Text
+                  style={{
+                    color: "#9ca3af",
+                    fontSize: 16,
+                    fontWeight: "600",
+                    marginBottom: 12,
+                    textTransform: "uppercase",
+                  }}
+                >
                   Estado actual
                 </Text>
-                
-                <View style={{
-                  backgroundColor: "rgba(212, 175, 55, 0.1)",
-                  borderRadius: 12,
-                  padding: 16,
-                  marginBottom: 16,
-                  borderWidth: 1,
-                  borderColor: "rgba(212, 175, 55, 0.3)",
-                }}>
+
+                <View
+                  style={{
+                    backgroundColor: "rgba(212, 175, 55, 0.1)",
+                    borderRadius: 12,
+                    padding: 16,
+                    marginBottom: 16,
+                    borderWidth: 1,
+                    borderColor: "rgba(212, 175, 55, 0.3)",
+                  }}
+                >
                   {getClientStatusDisplay()}
                 </View>
               </View>
@@ -605,17 +707,19 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
 
             {/* Actions */}
             <ScrollView style={{ flex: 1, paddingHorizontal: 20 }}>
-              <Text style={{
-                color: "#9ca3af",
-                fontSize: 16,
-                fontWeight: "600",
-                marginBottom: 12,
-                textTransform: "uppercase",
-              }}>
+              <Text
+                style={{
+                  color: "#9ca3af",
+                  fontSize: 16,
+                  fontWeight: "600",
+                  marginBottom: 12,
+                  textTransform: "uppercase",
+                }}
+              >
                 {isClient ? "Acciones disponibles" : "Acciones disponibles"}
               </Text>
 
-              {filteredActions.map((action) => (
+              {filteredActions.map(action => (
                 <TouchableOpacity
                   key={action.id}
                   onPress={() => {
@@ -645,10 +749,18 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
                       {action.icon}
                     </View>
                     <View style={{ marginLeft: 12, flex: 1 }}>
-                      <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
+                      <Text
+                        style={{
+                          color: "white",
+                          fontSize: 16,
+                          fontWeight: "600",
+                        }}
+                      >
                         {action.title}
                       </Text>
-                      <Text style={{ color: "#9ca3af", fontSize: 14, marginTop: 2 }}>
+                      <Text
+                        style={{ color: "#9ca3af", fontSize: 14, marginTop: 2 }}
+                      >
                         {action.subtitle}
                       </Text>
                     </View>
@@ -685,7 +797,14 @@ export default function Sidebar({ visible, onClose, user, onLogout, onNavigate, 
                 }}
               >
                 <LogOut size={18} color="#ef4444" />
-                <Text style={{ color: "#ef4444", marginLeft: 8, fontWeight: "600", fontSize: 16 }}>
+                <Text
+                  style={{
+                    color: "#ef4444",
+                    marginLeft: 8,
+                    fontWeight: "600",
+                    fontSize: 16,
+                  }}
+                >
                   Cerrar sesión
                 </Text>
               </TouchableOpacity>

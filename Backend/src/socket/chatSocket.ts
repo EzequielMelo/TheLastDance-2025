@@ -115,6 +115,15 @@ export const setupSocketIO = (httpServer: HttpServer) => {
       `🟢 Usuario ${user.first_name} ${user.last_name} (${user.profile_code}) conectado al chat [ID: ${socket.id}]`,
     );
 
+    // Usuario se une a su sala personal para recibir notificaciones
+    socket.on("join_user_room", (userId: string) => {
+      const userRoom = `user_${userId}`;
+      socket.join(userRoom);
+      console.log(
+        `✅ Usuario ${user.first_name} se unió a su sala personal [Sala: ${userRoom}] [Socket: ${socket.id}]`,
+      );
+    });
+
     // Cliente o mesero se une al chat de una mesa
     socket.on("join_table_chat", async (tableId: string) => {
       try {
@@ -306,7 +315,6 @@ export const setupSocketIO = (httpServer: HttpServer) => {
             );
             // No bloqueamos el mensaje por error de notificación
           }
-
         } catch (error) {
           console.error("💥 Error completo al enviar mensaje:", error);
           console.error(
@@ -372,4 +380,15 @@ export const setupSocketIO = (httpServer: HttpServer) => {
   setupClientStateSocket(io);
 
   return io;
+};
+
+// Singleton para acceder a la instancia de Socket.IO desde otros módulos
+let ioInstance: Server | null = null;
+
+export const setIOInstance = (io: Server) => {
+  ioInstance = io;
+};
+
+export const getIOInstance = (): Server | null => {
+  return ioInstance;
 };

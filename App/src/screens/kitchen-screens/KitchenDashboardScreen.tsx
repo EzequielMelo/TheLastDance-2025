@@ -11,7 +11,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
-import { ArrowLeft, Clock, Users, Utensils, CheckCircle } from "lucide-react-native";
+import {
+  ArrowLeft,
+  Clock,
+  Users,
+  Utensils,
+  CheckCircle,
+} from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import ChefLoading from "../../components/common/ChefLoading";
 import api from "../../api/axios";
@@ -39,10 +45,11 @@ interface KitchenOrder {
   estimated_time: number;
   notes?: string;
   created_at: string;
+  is_delivery?: boolean;
   table?: {
     id: string;
     number: string;
-  };
+  } | null;
   user?: {
     id: string;
     first_name: string;
@@ -56,12 +63,14 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingItems, setUpdatingItems] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<"accepted" | "preparing" | "ready">("accepted");
+  const [activeTab, setActiveTab] = useState<
+    "accepted" | "preparing" | "ready"
+  >("accepted");
 
   const loadKitchenOrders = useCallback(async () => {
     try {
       const response = await api.get("/orders/kitchen/pending");
-      
+
       if (response.data.success) {
         setOrders(response.data.data || []);
       } else {
@@ -71,7 +80,7 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
       console.error("Error loading kitchen orders:", error);
       ToastAndroid.show(
         error.response?.data?.message || "Error de conexión",
-        ToastAndroid.SHORT
+        ToastAndroid.SHORT,
       );
     } finally {
       setLoading(false);
@@ -88,20 +97,23 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
     loadKitchenOrders();
   }, [loadKitchenOrders]);
 
-  const updateItemStatus = async (itemId: string, newStatus: "preparing" | "ready") => {
+  const updateItemStatus = async (
+    itemId: string,
+    newStatus: "preparing" | "ready",
+  ) => {
     try {
       setUpdatingItems(prev => new Set([...prev, itemId]));
 
       const response = await api.put(`/orders/kitchen/item/${itemId}/status`, {
-        status: newStatus
+        status: newStatus,
       });
 
       if (response.data.success) {
         ToastAndroid.show(
           `Item marcado como ${newStatus === "preparing" ? "preparando" : "listo"}`,
-          ToastAndroid.SHORT
+          ToastAndroid.SHORT,
         );
-        
+
         // Recargar datos
         await loadKitchenOrders();
       } else {
@@ -111,7 +123,7 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
       console.error("Error updating item status:", error);
       ToastAndroid.show(
         error.response?.data?.message || "Error actualizando producto",
-        ToastAndroid.SHORT
+        ToastAndroid.SHORT,
       );
     } finally {
       setUpdatingItems(prev => {
@@ -124,18 +136,19 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
 
   const handleItemStatusChange = (item: KitchenOrderItem) => {
     const nextStatus = item.status === "accepted" ? "preparing" : "ready";
-    const actionText = nextStatus === "preparing" ? "empezar a preparar" : "marcar como listo";
-    
+    const actionText =
+      nextStatus === "preparing" ? "empezar a preparar" : "marcar como listo";
+
     Alert.alert(
       "Confirmar acción",
       `¿Quieres ${actionText} "${item.menu_item.name}"?`,
       [
         { text: "Cancelar", style: "cancel" },
-        { 
-          text: "Confirmar", 
-          onPress: () => updateItemStatus(item.id, nextStatus)
-        }
-      ]
+        {
+          text: "Confirmar",
+          onPress: () => updateItemStatus(item.id, nextStatus),
+        },
+      ],
     );
   };
 
@@ -144,7 +157,7 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
     return date.toLocaleTimeString("es-AR", {
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit"
+      second: "2-digit",
     });
   };
 
@@ -153,7 +166,7 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
     return date.toLocaleDateString("es-AR", {
       day: "2-digit",
       month: "2-digit",
-      year: "numeric"
+      year: "numeric",
     });
   };
 
@@ -198,22 +211,31 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
 
   // Renderizar item individual (nuevo)
   const renderIndividualItem = ({ item }: { item: any }) => (
-    <View style={{
-      backgroundColor: "#1a1a1a",
-      marginHorizontal: 16,
-      marginVertical: 8,
-      borderRadius: 12,
-      padding: 16,
-      borderLeftWidth: 4,
-      borderLeftColor: getStatusColor(item.status),
-      elevation: 2,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-    }}>
+    <View
+      style={{
+        backgroundColor: "#1a1a1a",
+        marginHorizontal: 16,
+        marginVertical: 8,
+        borderRadius: 12,
+        padding: 16,
+        borderLeftWidth: 4,
+        borderLeftColor: getStatusColor(item.status),
+        elevation: 2,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      }}
+    >
       {/* Info de la mesa y cliente */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 12,
+        }}
+      >
         <View>
           <Text style={{ fontSize: 16, fontWeight: "600", color: "#d4af37" }}>
             Mesa #{item.table_number}
@@ -225,7 +247,13 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
         <View style={{ alignItems: "flex-end" }}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             {getStatusIcon(item.status)}
-            <Text style={{ marginLeft: 6, color: getStatusColor(item.status), fontWeight: "600" }}>
+            <Text
+              style={{
+                marginLeft: 6,
+                color: getStatusColor(item.status),
+                fontWeight: "600",
+              }}
+            >
               {getStatusText(item.status)}
             </Text>
           </View>
@@ -233,9 +261,22 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
       </View>
 
       {/* Info del plato */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+        }}
+      >
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 18, fontWeight: "600", color: "#ffffff", marginBottom: 4 }}>
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: "600",
+              color: "#ffffff",
+              marginBottom: 4,
+            }}
+          >
             {item.menu_item.name}
           </Text>
           <Text style={{ fontSize: 14, color: "#999", marginBottom: 8 }}>
@@ -245,7 +286,7 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
             Cantidad: {item.quantity}
           </Text>
         </View>
-        
+
         <View style={{ alignItems: "flex-end", marginLeft: 16 }}>
           <Clock size={16} color="#6b7280" />
           <Text style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
@@ -266,7 +307,7 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
               borderRadius: 8,
               alignItems: "center",
               flexDirection: "row",
-              justifyContent: "center"
+              justifyContent: "center",
             }}
             disabled={updatingItems.has(item.id)}
           >
@@ -275,14 +316,21 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
             ) : (
               <>
                 <Utensils size={16} color="#000" />
-                <Text style={{ color: "#000", fontSize: 16, fontWeight: "600", marginLeft: 8 }}>
+                <Text
+                  style={{
+                    color: "#000",
+                    fontSize: 16,
+                    fontWeight: "600",
+                    marginLeft: 8,
+                  }}
+                >
                   Empezar preparación
                 </Text>
               </>
             )}
           </TouchableOpacity>
         )}
-        
+
         {item.status === "preparing" && (
           <TouchableOpacity
             onPress={() => updateItemStatus(item.id, "ready")}
@@ -293,7 +341,7 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
               borderRadius: 8,
               alignItems: "center",
               flexDirection: "row",
-              justifyContent: "center"
+              justifyContent: "center",
             }}
             disabled={updatingItems.has(item.id)}
           >
@@ -302,7 +350,9 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
             ) : (
               <>
                 <CheckCircle size={16} color="#fff" />
-                <Text style={{ color: "#fff", fontWeight: "600", marginLeft: 8 }}>
+                <Text
+                  style={{ color: "#fff", fontWeight: "600", marginLeft: 8 }}
+                >
                   Marcar como listo
                 </Text>
               </>
@@ -318,10 +368,31 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
       {/* Header de la orden */}
       <View style={styles.orderHeader}>
         <View style={styles.orderInfo}>
-          <Text style={styles.tableNumber}>Mesa #{order.table?.number || "?"}</Text>
-          <Text style={styles.customerName}>
-            {order.user ? `${order.user.first_name} ${order.user.last_name}` : "Cliente"}
-          </Text>
+          {order.is_delivery ? (
+            <>
+              <Text
+                style={[styles.tableNumber, { backgroundColor: "#10b981" }]}
+              >
+                🛵 DELIVERY
+              </Text>
+              <Text style={styles.customerName}>
+                {order.user
+                  ? `${order.user.first_name} ${order.user.last_name}`
+                  : "Cliente"}
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.tableNumber}>
+                Mesa #{order.table?.number || "?"}
+              </Text>
+              <Text style={styles.customerName}>
+                {order.user
+                  ? `${order.user.first_name} ${order.user.last_name}`
+                  : "Cliente"}
+              </Text>
+            </>
+          )}
         </View>
         <View style={styles.timeInfo}>
           <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
@@ -331,12 +402,12 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
 
       {/* Items de la orden */}
       <View style={styles.itemsContainer}>
-        {order.order_items.map((item) => (
+        {order.order_items.map(item => (
           <TouchableOpacity
             key={item.id}
             style={[
               styles.itemCard,
-              { borderLeftColor: getStatusColor(item.status) }
+              { borderLeftColor: getStatusColor(item.status) },
             ]}
             onPress={() => handleItemStatusChange(item)}
             disabled={updatingItems.has(item.id)}
@@ -359,17 +430,25 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
             <View style={styles.itemFooter}>
               <View style={styles.statusContainer}>
                 {getStatusIcon(item.status)}
-                <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+                <Text
+                  style={[
+                    styles.statusText,
+                    { color: getStatusColor(item.status) },
+                  ]}
+                >
                   {getStatusText(item.status)}
                 </Text>
               </View>
-              
+
               {updatingItems.has(item.id) ? (
                 <ChefLoading size="small" />
               ) : (
                 <Text style={styles.actionHint}>
-                  {item.status === "accepted" ? "Tocar para empezar" : 
-                   item.status === "preparing" ? "Tocar para finalizar" : "Completado"}
+                  {item.status === "accepted"
+                    ? "Tocar para empezar"
+                    : item.status === "preparing"
+                      ? "Tocar para finalizar"
+                      : "Completado"}
                 </Text>
               )}
             </View>
@@ -387,13 +466,18 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
   );
 
   // Aplanar todos los items de todas las órdenes
-  const allItems = orders.flatMap(order => 
+  const allItems = orders.flatMap(order =>
     order.order_items.map(item => ({
       ...item,
       order_id: order.id,
-      table_number: order.table?.number || "N/A",
-      customer_name: order.user ? `${order.user.first_name} ${order.user.last_name}` : "Cliente"
-    }))
+      is_delivery: order.is_delivery,
+      table_number: order.is_delivery
+        ? "DELIVERY"
+        : order.table?.number || "N/A",
+      customer_name: order.user
+        ? `${order.user.first_name} ${order.user.last_name}`
+        : "Cliente",
+    })),
   );
 
   // Filtrar items por tab activo
@@ -419,10 +503,7 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <LinearGradient
-        colors={["#1a1a1a", "#2d2d2d"]}
-        style={styles.header}
-      >
+      <LinearGradient colors={["#1a1a1a", "#2d2d2d"]} style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -432,11 +513,13 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
         <View style={styles.headerTextContainer}>
           <Text style={styles.headerTitle}>Cocina</Text>
           <Text style={styles.headerSubtitle}>
-            {filteredItems.length} {filteredItems.length === 1 ? "plato" : "platos"} {
-              activeTab === "accepted" ? "pendiente" + (filteredItems.length === 1 ? "" : "s") :
-              activeTab === "preparing" ? "preparando" + (filteredItems.length === 1 ? "se" : "") :
-              "listo" + (filteredItems.length === 1 ? "" : "s")
-            }
+            {filteredItems.length}{" "}
+            {filteredItems.length === 1 ? "plato" : "platos"}{" "}
+            {activeTab === "accepted"
+              ? "pendiente" + (filteredItems.length === 1 ? "" : "s")
+              : activeTab === "preparing"
+                ? "preparando" + (filteredItems.length === 1 ? "se" : "")
+                : "listo" + (filteredItems.length === 1 ? "" : "s")}
           </Text>
         </View>
         <View style={styles.headerStats}>
@@ -445,14 +528,16 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
       </LinearGradient>
 
       {/* Stats Card */}
-      <View style={{
-        margin: 16,
-        backgroundColor: "#1a1a1a",
-        borderRadius: 12,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: "#333",
-      }}>
+      <View
+        style={{
+          margin: 16,
+          backgroundColor: "#1a1a1a",
+          borderRadius: 12,
+          padding: 16,
+          borderWidth: 1,
+          borderColor: "#333",
+        }}
+      >
         <View style={{ flexDirection: "row", justifyContent: "space-around" }}>
           <View style={{ alignItems: "center" }}>
             <Text style={{ fontSize: 24, fontWeight: "700", color: "#d4af37" }}>
@@ -476,56 +561,64 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
       </View>
 
       {/* Tabs */}
-      <View style={{
-        flexDirection: "row",
-        marginHorizontal: 16,
-        marginBottom: 16,
-        backgroundColor: "#1a1a1a",
-        borderRadius: 12,
-        padding: 4,
-        borderWidth: 1,
-        borderColor: "#333",
-      }}>
+      <View
+        style={{
+          flexDirection: "row",
+          marginHorizontal: 16,
+          marginBottom: 16,
+          backgroundColor: "#1a1a1a",
+          borderRadius: 12,
+          padding: 4,
+          borderWidth: 1,
+          borderColor: "#333",
+        }}
+      >
         <TouchableOpacity
           style={{
             flex: 1,
             paddingVertical: 12,
             paddingHorizontal: 16,
             borderRadius: 8,
-            backgroundColor: activeTab === "accepted" ? "#d4af37" : "transparent",
+            backgroundColor:
+              activeTab === "accepted" ? "#d4af37" : "transparent",
           }}
           onPress={() => setActiveTab("accepted")}
         >
-          <Text style={{
-            textAlign: "center",
-            fontWeight: "600",
-            fontSize: 14,
-            color: activeTab === "accepted" ? "#000" : "#999",
-          }}>
+          <Text
+            style={{
+              textAlign: "center",
+              fontWeight: "600",
+              fontSize: 14,
+              color: activeTab === "accepted" ? "#000" : "#999",
+            }}
+          >
             Pendientes ({stats.accepted})
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={{
             flex: 1,
             paddingVertical: 12,
             paddingHorizontal: 16,
             borderRadius: 8,
-            backgroundColor: activeTab === "preparing" ? "#d4af37" : "transparent",
+            backgroundColor:
+              activeTab === "preparing" ? "#d4af37" : "transparent",
           }}
           onPress={() => setActiveTab("preparing")}
         >
-          <Text style={{
-            textAlign: "center",
-            fontWeight: "600",
-            fontSize: 14,
-            color: activeTab === "preparing" ? "#000" : "#999",
-          }}>
+          <Text
+            style={{
+              textAlign: "center",
+              fontWeight: "600",
+              fontSize: 14,
+              color: activeTab === "preparing" ? "#000" : "#999",
+            }}
+          >
             Preparando ({stats.preparing})
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={{
             flex: 1,
@@ -536,12 +629,14 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
           }}
           onPress={() => setActiveTab("ready")}
         >
-          <Text style={{
-            textAlign: "center",
-            fontWeight: "600",
-            fontSize: 14,
-            color: activeTab === "ready" ? "#000" : "#999",
-          }}>
+          <Text
+            style={{
+              textAlign: "center",
+              fontWeight: "600",
+              fontSize: 14,
+              color: activeTab === "ready" ? "#000" : "#999",
+            }}
+          >
             Listos ({stats.ready})
           </Text>
         </TouchableOpacity>
@@ -552,21 +647,25 @@ export default function KitchenDashboardScreen({ navigation }: Props) {
         <View style={styles.emptyContainer}>
           <Utensils size={64} color="#6b7280" />
           <Text style={styles.emptyTitle}>
-            {activeTab === "accepted" ? "No hay platos pendientes" :
-             activeTab === "preparing" ? "No hay platos preparándose" :
-             "No hay platos listos"}
+            {activeTab === "accepted"
+              ? "No hay platos pendientes"
+              : activeTab === "preparing"
+                ? "No hay platos preparándose"
+                : "No hay platos listos"}
           </Text>
           <Text style={styles.emptySubtitle}>
-            {activeTab === "accepted" ? "Los platos aparecerán aquí cuando los mozos los acepten" :
-             activeTab === "preparing" ? "Los platos en preparación aparecerán aquí" :
-             "Los platos terminados aparecerán aquí"}
+            {activeTab === "accepted"
+              ? "Los platos aparecerán aquí cuando los mozos los acepten"
+              : activeTab === "preparing"
+                ? "Los platos en preparación aparecerán aquí"
+                : "Los platos terminados aparecerán aquí"}
           </Text>
         </View>
       ) : (
         <FlatList
           data={filteredItems}
           renderItem={renderIndividualItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           contentContainerStyle={styles.listContainer}
           refreshControl={
             <RefreshControl

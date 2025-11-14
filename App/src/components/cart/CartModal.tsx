@@ -71,6 +71,7 @@ export default function CartModal({
     submitOrder,
     submitToAcceptedOrder,
     refreshOrders,
+    isDeliveryOrder, // 🚚 Flag para detectar modo delivery
   } = useCart();
 
   const {
@@ -115,7 +116,7 @@ export default function CartModal({
       onPress?: () => void;
       style?: "default" | "cancel" | "destructive";
     }> = [{ text: "OK" }],
-    type: "success" | "error" | "warning" | "info" = "info"
+    type: "success" | "error" | "warning" | "info" = "info",
   ) => {
     setAlertConfig({
       visible: true,
@@ -248,7 +249,7 @@ export default function CartModal({
         "Error",
         "No se pudo obtener la información de tu mesa",
         undefined,
-        "error"
+        "error",
       );
       return;
     }
@@ -273,14 +274,14 @@ export default function CartModal({
               },
             },
           ],
-          "success"
+          "success",
         );
       } else {
         showAlert(
           "Error",
           "No se pudo confirmar la recepción. Intenta de nuevo.",
           undefined,
-          "error"
+          "error",
         );
       }
     } catch (error: any) {
@@ -289,7 +290,7 @@ export default function CartModal({
         "Error",
         error.message || "No se pudo confirmar la recepción del pedido",
         undefined,
-        "error"
+        "error",
       );
     } finally {
       setConfirmingDelivery(false);
@@ -308,6 +309,13 @@ export default function CartModal({
       } else {
         Alert.alert("Error", "No hay productos en el carrito para enviar");
       }
+      return;
+    }
+
+    // 🚚 Si es un pedido de delivery, navegar a la pantalla de ubicación
+    if (isDeliveryOrder) {
+      onClose(); // Cerrar el modal del carrito
+      navigation.navigate("DeliveryLocation" as never);
       return;
     }
 
@@ -492,13 +500,15 @@ export default function CartModal({
                   marginLeft: 8,
                 }}
               >
-                {cartItems.length > 0
-                  ? canAddMoreItems
-                    ? "Nueva Tanda"
-                    : "Mi Carrito"
-                  : hasActiveOrder
-                    ? "Mi Pedido"
-                    : "Mi Carrito"}
+                {isDeliveryOrder
+                  ? "🚚 Pedido Delivery"
+                  : cartItems.length > 0
+                    ? canAddMoreItems
+                      ? "Nueva Tanda"
+                      : "Mi Carrito"
+                    : hasActiveOrder
+                      ? "Mi Pedido"
+                      : "Mi Carrito"}
               </Text>
             </View>
 
@@ -521,13 +531,15 @@ export default function CartModal({
               marginTop: 4,
             }}
           >
-            {cartItems.length > 0
-              ? canAddMoreItems
-                ? `${cartCount} ${cartCount === 1 ? "producto" : "productos"} • Se agregará a tu pedido existente`
-                : `${cartCount} ${cartCount === 1 ? "producto" : "productos"} • Tiempo estimado: ${cartTime} min`
-              : hasActiveOrder
-                ? "Revisá el estado de tu pedido actual"
-                : "Tu carrito está vacío"}
+            {isDeliveryOrder
+              ? `${cartCount} ${cartCount === 1 ? "producto" : "productos"} • Seleccioná tu ubicación en el siguiente paso`
+              : cartItems.length > 0
+                ? canAddMoreItems
+                  ? `${cartCount} ${cartCount === 1 ? "producto" : "productos"} • Se agregará a tu pedido existente`
+                  : `${cartCount} ${cartCount === 1 ? "producto" : "productos"} • Tiempo estimado: ${cartTime} min`
+                : hasActiveOrder
+                  ? "Revisá el estado de tu pedido actual"
+                  : "Tu carrito está vacío"}
           </Text>
         </View>
 
@@ -958,9 +970,11 @@ export default function CartModal({
               >
                 {loadingTable
                   ? "Verificando mesa..."
-                  : canAddMoreItems
-                    ? `Agregar Nueva Tanda • ${formatPrice(cartAmount)}`
-                    : `Enviar Pedido • ${formatPrice(cartAmount)}`}
+                  : isDeliveryOrder
+                    ? `Continuar a Ubicación • ${formatPrice(cartAmount)}`
+                    : canAddMoreItems
+                      ? `Agregar Nueva Tanda • ${formatPrice(cartAmount)}`
+                      : `Enviar Pedido • ${formatPrice(cartAmount)}`}
               </Text>
             </TouchableOpacity>
           </View>

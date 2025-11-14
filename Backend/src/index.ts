@@ -7,6 +7,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import { createServer } from "http";
 import { setupSocketIO } from "./socket/chatSocket";
+import { setupDeliveryChatSocket } from "./socket/deliveryChatSocket";
 
 // Import routes
 import authRoutes from "./auth/authRoutes";
@@ -18,6 +19,9 @@ import waiterRoutes from "./modules/waiter/waiterRoutes";
 import chatRoutes from "./modules/chat/chatRoutes";
 import { invoiceRoutes } from "./modules/invoices/invoiceRoutes";
 import reservationsRoutes from "./modules/reservations/reservationsRoutes";
+import deliveryRoutes from "./modules/delivery/deliveryRoutes";
+import deliveryOrdersRoutes from "./modules/delivery/deliveryOrdersRoutes";
+import deliveryChatRoutes from "./modules/delivery/deliveryChatRoutes";
 
 const app = express();
 const PORT = parseInt(process.env["PORT"] || "3000", 10);
@@ -161,7 +165,7 @@ app.post("/api/test-email", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Error interno del servidor",
-      message: error instanceof Error ? error.message : "Error desconocido"
+      message: error instanceof Error ? error.message : "Error desconocido",
     });
   }
 });
@@ -176,7 +180,9 @@ app.use("/api/waiter", waiterRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/invoices", invoiceRoutes);
 app.use("/api/reservations", reservationsRoutes);
-app.use("/api/reservations", reservationsRoutes);
+app.use("/api/deliveries", deliveryRoutes);
+app.use("/api/delivery-orders", deliveryOrdersRoutes); // 🚚 Rutas para órdenes de delivery
+app.use("/api/delivery-chat", deliveryChatRoutes); // 💬 Rutas para chat delivery
 /*
 app.use("/api/users", userRoutes);
 app.use("/api/payments", paymentRoutes);
@@ -213,6 +219,9 @@ app.use(
 const httpServer = createServer(app);
 const io = setupSocketIO(httpServer);
 
+// Setup delivery chat socket
+setupDeliveryChatSocket(io);
+
 // Hacer io accesible para debugging (solo en desarrollo)
 if (process.env["NODE_ENV"] !== "production") {
   app.set("socketio", io);
@@ -225,6 +234,10 @@ const server = httpServer.listen(PORT, "0.0.0.0", () => {
 
 // Make io available for other modules
 export { io };
+
+// Guardar instancia de io para usar en otros módulos
+import { setIOInstance } from "./socket/chatSocket";
+setIOInstance(io);
 
 // Graceful shutdown
 const handleSignal = (sig: NodeJS.Signals) => {

@@ -326,6 +326,19 @@ export const LoginScreen = ({ navigation }: Props) => {
           >
             <Text className="text-red-300 text-center text-sm">👑 Dueño</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              setEmail("davo@email.com");
+              setPassword("123456");
+              login({ email: "davo@email.com", password: "123456" });
+            }}
+            className="px-3 py-2 mx-1 rounded-lg bg-red-600/20 border border-red-500/30 min-w-[120px]"
+          >
+            <Text className="text-red-300 text-center text-sm">
+              🏍️ Repartidor
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </View>
 
