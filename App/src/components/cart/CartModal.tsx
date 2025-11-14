@@ -567,7 +567,7 @@ export default function CartModal({
                   }}
                 >
                   {canAddMoreItems ? "Nueva Tanda" : "En el Carrito"} (
-                  {cartCount} items)
+                  {cartCount} producto{cartCount === 1 ? "" : "s"})
                 </Text>
               </View>
 

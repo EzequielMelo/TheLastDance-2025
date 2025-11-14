@@ -12,6 +12,7 @@ import {
   assignTableHandler,
   activateTableHandler,
   freeTableHandler,
+  cancelTableReservationHandler,
   getMyTableHandler,
   getMyAssignedTableHandler,
   getMyStatusHandler,
@@ -98,6 +99,14 @@ router.post(
   authenticateUser,
   roleGuard(["dueno", "supervisor", "maitre", "mozo"]),
   freeTableHandler,
+);
+
+// POST /api/tables/:id/cancel-reservation - Cancelar reserva de una mesa (staff)
+router.post(
+  "/:id/cancel-reservation",
+  authenticateUser,
+  roleGuard(["dueno", "supervisor", "maitre"]),
+  cancelTableReservationHandler,
 );
 
 // POST /api/tables/:id/confirm-delivery - Confirmar entrega de pedido (solo clientes)

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "../api/axios";
 import { useAuth } from "../auth/useAuth";
+import { ReservationsService } from "../services/reservations/reservationsService";
 
 export type ClientState =
   | "not_in_queue" // No está en lista de espera
@@ -54,9 +55,18 @@ export const useClientState = (): ClientStateData => {
       setIsRefreshing(true);
       setState("loading");
 
-      // Usar el nuevo endpoint que nos da el estado completo
+      // Primero verificar el estado actual
       const response = await api.get("/tables/my-status");
       const status = response.data.status;
+
+      // Solo verificar reservas si NO está seated (optimización para evitar llamadas innecesarias)
+      if (status !== "seated" && status !== "confirm_pending") {
+        await ReservationsService.checkAndActivateReservation();
+        
+        // Re-verificar estado después de activar reserva (por si cambió)
+        const updatedResponse = await api.get("/tables/my-status");
+        response.data = updatedResponse.data;
+      }
 
       // Limpiar estado anterior
       setWaitingPosition(undefined);
@@ -65,7 +75,7 @@ export const useClientState = (): ClientStateData => {
       setOccupiedTable(undefined);
       setDeliveryConfirmationStatus(undefined);
 
-      switch (status) {
+      switch (response.data.status) {
         case "seated":
           setOccupiedTable(response.data.table);
           setDeliveryConfirmationStatus(response.data.table_status);

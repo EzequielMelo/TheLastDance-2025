@@ -48,14 +48,13 @@ export default function ClientLayout({
   const handleScanQR = () => {
     console.log("🔍 ClientLayout - handleScanQR - Estado actual:", state);
 
-    // Si el cliente no está en la lista de espera, escanear QR del maitre para unirse
-    if (state === "not_in_queue") {
-      console.log("✅ Navegando a ScanQR (unirse a lista de espera)");
-      navigation.navigate("ScanQR");
-    }
-    // Si el cliente tiene una mesa asignada pero no está sentado, escanear para confirmar llegada
-    else if (state === "assigned") {
-      console.log("✅ Navegando a ScanTableQR (confirmar llegada)");
+    // Si el cliente no está en la lista de espera o tiene mesa asignada:
+    // Usar ScanTableQR que maneja tanto:
+    // - Unirse a lista de espera (si escanea QR del maitre)
+    // - Activar reserva (si escanea QR de mesa y tiene reserva)
+    // - Confirmar llegada (si escanea QR de mesa asignada)
+    if (state === "not_in_queue" || state === "assigned") {
+      console.log("✅ Navegando a ScanTableQR (verificar reserva/mesa asignada/unirse)");
       navigation.navigate("ScanTableQR");
     }
     // Para otros estados (seated, in_queue, etc.), usar el escáner general

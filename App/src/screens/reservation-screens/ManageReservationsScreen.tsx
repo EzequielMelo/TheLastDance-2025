@@ -23,6 +23,7 @@ import CustomAlert from "../../components/common/CustomAlert";
 import type { RootStackNavigationProp } from "../../navigation/RootStackParamList";
 import { ReservationsService } from "../../services/reservations/reservationsService";
 import type { Reservation } from "../../types/Reservation";
+import { formatDateLong, formatTime } from "../../utils/dateUtils";
 
 interface ManageReservationsScreenProps {
   navigation: RootStackNavigationProp;
@@ -171,19 +172,7 @@ export default function ManageReservationsScreen({ navigation }: ManageReservati
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('es-ES', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  const formatTime = (timeStr: string) => {
-    return timeStr.substring(0, 5); // HH:MM
-  };
+  // Funciones de formateo importadas desde dateUtils
 
   if (loading) {
     return (
@@ -308,7 +297,7 @@ export default function ManageReservationsScreen({ navigation }: ManageReservati
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Calendar size={18} color="#d4af37" />
                     <Text style={{ marginLeft: 10, fontSize: 16, color: 'white', fontWeight: '500' }}>
-                      {formatDate(reservation.date)}
+                      {formatDateLong(reservation.date)}
                     </Text>
                   </View>
                   

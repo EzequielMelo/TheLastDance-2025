@@ -249,6 +249,47 @@ export default function ManageWaitingListScreen() {
       JSON.stringify(table, null, 2),
     );
 
+    // Si la mesa tiene una reserva próxima, mostrar opción de cancelar reserva
+    if (table?.reservation) {
+      Alert.alert(
+        "🔒 Mesa Reservada",
+        `La mesa ${tableNumber} tiene una reserva aprobada:\n\n` +
+          `Hora: ${table.reservation.time}\n` +
+          `Personas: ${table.reservation.party_size}\n\n` +
+          `¿Qué deseas hacer?`,
+        [
+          {
+            text: "Volver",
+            style: "cancel",
+          },
+          {
+            text: "Cancelar Reserva",
+            style: "destructive",
+            onPress: async () => {
+              setFreeingTable(tableId);
+              try {
+                await api.post(`/tables/${tableId}/cancel-reservation`);
+                ToastAndroid.show(
+                  `Reserva cancelada para mesa ${tableNumber}`,
+                  ToastAndroid.LONG,
+                );
+                await loadData();
+              } catch (error: any) {
+                const message =
+                  error.response?.data?.error || "Error al cancelar reserva";
+                ToastAndroid.show(message, ToastAndroid.LONG);
+                console.error("Error cancelando reserva:", error);
+              } finally {
+                setFreeingTable(null);
+              }
+            },
+          },
+        ],
+      );
+      return;
+    }
+
+    // Flujo normal para mesas sin reserva
     const clientName = table?.client
       ? `${table.client.first_name} ${table.client.last_name}`
       : "Sin cliente asignado";
@@ -346,12 +387,15 @@ export default function ManageWaitingListScreen() {
     );
 
   const availableTables = tables.filter(
-    table => !table.is_occupied && !table.client,
+    table => !table.is_occupied && !table.client && !table.reservation,
   );
   const assignedTables = tables.filter(
     table => !table.is_occupied && table.client,
   );
   const occupiedTables = tables.filter(table => table.is_occupied);
+  const reservedTables = tables.filter(
+    table => !table.is_occupied && !table.client && table.reservation,
+  );
 
   function TablesStatusModal({
     visible,
@@ -454,12 +498,15 @@ export default function ManageWaitingListScreen() {
       : pan;
 
     const availableTables = tables.filter(
-      table => !table.is_occupied && !table.client,
+      table => !table.is_occupied && !table.client && !table.reservation,
     );
     const assignedTables = tables.filter(
       table => !table.is_occupied && table.client,
     );
     const occupiedTables = tables.filter(table => table.is_occupied);
+    const reservedTables = tables.filter(
+      table => !table.is_occupied && !table.client && table.reservation,
+    );
 
     return (
       <Modal
@@ -497,20 +544,26 @@ export default function ManageWaitingListScreen() {
             </View>
 
             {/* Estadísticas rápidas */}
-            <View className="flex-row gap-2 mb-4">
-              <View className="flex-1 bg-green-500/20 rounded-xl p-3 border border-green-500/30">
+            <View className="flex-row flex-wrap gap-2 mb-4">
+              <View className="flex-1 min-w-[100px] bg-green-500/20 rounded-xl p-3 border border-green-500/30">
                 <Text className="text-green-400 text-2xl font-bold">
                   {availableTables.length}
                 </Text>
                 <Text className="text-green-400 text-xs">Disponibles</Text>
               </View>
-              <View className="flex-1 bg-yellow-500/20 rounded-xl p-3 border border-yellow-500/30">
+              <View className="flex-1 min-w-[100px] bg-yellow-500/20 rounded-xl p-3 border border-yellow-500/30">
                 <Text className="text-yellow-400 text-2xl font-bold">
                   {assignedTables.length}
                 </Text>
                 <Text className="text-yellow-400 text-xs">Asignadas</Text>
               </View>
-              <View className="flex-1 bg-red-500/20 rounded-xl p-3 border border-red-500/30">
+              <View className="flex-1 min-w-[100px] bg-purple-500/20 rounded-xl p-3 border border-purple-500/30">
+                <Text className="text-purple-400 text-2xl font-bold">
+                  {reservedTables.length}
+                </Text>
+                <Text className="text-purple-400 text-xs">Reservadas</Text>
+              </View>
+              <View className="flex-1 min-w-[100px] bg-red-500/20 rounded-xl p-3 border border-red-500/30">
                 <Text className="text-red-400 text-2xl font-bold">
                   {occupiedTables.length}
                 </Text>
@@ -565,6 +618,28 @@ export default function ManageWaitingListScreen() {
               </View>
             )}
 
+            {/* Mesas Reservadas */}
+            {reservedTables.length > 0 && (
+              <View className="mb-6">
+                <Text className="text-white text-base font-semibold mb-3">
+                  🔒 Mesas Reservadas ({reservedTables.length})
+                </Text>
+                <Text className="text-gray-400 text-xs mb-3">
+                  Estas mesas tienen reservas confirmadas para hoy
+                </Text>
+                <View className="flex-row flex-wrap gap-1">
+                  {reservedTables.map(table => (
+                    <TableCard
+                      key={table.id}
+                      table={table}
+                      onFree={() => onFreeTable(table.id)}
+                      isFreeing={freeingTable === table.id}
+                    />
+                  ))}
+                </View>
+              </View>
+            )}
+
             {/* Mesas Disponibles */}
             {availableTables.length > 0 && (
               <View className="mb-6">
@@ -597,8 +672,26 @@ export default function ManageWaitingListScreen() {
       colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
       className="flex-1"
     >
+      {/* Header fijo con título */}
+      <View className="px-4 pt-12 pb-4 border-b border-gray-800">
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center">
+            <Users size={28} color="#d4af37" />
+            <Text className="text-white text-2xl font-bold ml-3">
+              Gestión de Espera
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            className="bg-white/10 rounded-full p-2"
+          >
+            <XCircle size={24} color="#d4af37" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <ScrollView
-        className="flex-1 px-4 pt-4"
+        className="flex-1 px-4 pt-6"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -1060,6 +1153,7 @@ function TableCard({
   const getTableState = () => {
     if (table.is_occupied) return "occupied";
     if (table.client) return "assigned";
+    if (table.reservation) return "reserved"; // Nueva categoría para mesas con reserva próxima
     return "available";
   };
 
@@ -1074,6 +1168,10 @@ function TableCard({
     assigned: {
       bg: "bg-yellow-500/20 border border-yellow-500/30",
       text: "text-yellow-400",
+    },
+    reserved: {
+      bg: "bg-purple-500/20 border border-purple-500/30",
+      text: "text-purple-400",
     },
     available: {
       bg: "bg-green-500/20 border border-green-500/30",
@@ -1149,6 +1247,35 @@ function TableCard({
             >
               <Text className="text-white text-xs font-semibold">
                 {isFreeing ? "🔄 Liberando..." : "↩️ Reasignar"}
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : tableState === "reserved" ? (
+          <>
+            {table.reservation && (
+              <>
+                <Text className="text-purple-400 text-xs mt-1 font-semibold">
+                  🔒 Reservada
+                </Text>
+                <Text className="text-gray-300 text-xs text-center">
+                  {table.reservation.time}
+                </Text>
+                <Text className="text-gray-400 text-xs">
+                  {table.reservation.party_size} personas
+                </Text>
+              </>
+            )}
+            <TouchableOpacity
+              onPress={onFree}
+              disabled={isFreeing}
+              className={`rounded px-3 py-2 mt-2 border ${
+                isFreeing
+                  ? "bg-gray-600 border-gray-500"
+                  : "bg-purple-600 hover:bg-purple-700 border-purple-500"
+              }`}
+            >
+              <Text className="text-white text-xs font-semibold">
+                {isFreeing ? "🔄 Cancelando..." : "❌ Cancelar Reserva"}
               </Text>
             </TouchableOpacity>
           </>

@@ -8,6 +8,7 @@ import type {
   WaitingListResponse,
   TablesStatusResponse,
 } from "./tables.types";
+import { ReservationsService } from "../reservations/reservationsService";
 
 // ========== SERVICIOS PARA LISTA DE ESPERA ==========
 
@@ -241,24 +242,84 @@ export async function getTablesStatus(): Promise<TablesStatusResponse> {
     }
   }
 
-  // Mapear los datos para incluir información del cliente
+  // Obtener reservas approved para el día de hoy que están próximas (< 45 minutos)
+  const today = new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+  });
+  
+  const { data: reservationsData, error: reservationsError } = await supabaseAdmin
+    .from("reservations")
+    .select("id, user_id, table_id, date, time, party_size, status")
+    .eq("date", today)
+    .eq("status", "approved");
+
+  if (reservationsError) {
+    console.warn("Error obteniendo reservas:", reservationsError.message);
+  }
+
+  // Filtrar reservas approved del día
+  const now = new Date();
+  const nowArgentina = new Date(
+    now.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" })
+  );
+  
+  const allApprovedReservations = reservationsData || [];
+
+  console.log("🔍 Reservas approved encontradas:", {
+    total: reservationsData?.length || 0,
+    approved_today: allApprovedReservations.length,
+    time: nowArgentina.toLocaleTimeString("es-AR"),
+  });
+
+  // OPCIÓN 3: Para cada mesa, encontrar solo la reserva más próxima en el tiempo
+  // y SOLO si la mesa NO está ocupada actualmente
+  const tableReservationsMap = new Map<string, any>();
+  
+  allApprovedReservations.forEach(reservation => {
+    const existing = tableReservationsMap.get(reservation.table_id);
+    
+    // Si no hay reserva para esta mesa, o esta es más temprana, guardarla
+    if (!existing || reservation.time < existing.time) {
+      tableReservationsMap.set(reservation.table_id, reservation);
+    }
+  });
+
+  console.log("📋 Mesas con reservas (más próxima por mesa):", tableReservationsMap.size);
+
+  // Mapear los datos para incluir información del cliente y reserva
   const tables: TableWithClient[] = tablesData.map(table => {
     const client = table.id_client
       ? clientsData.find(c => c.id === table.id_client)
       : undefined;
 
+    // SOLO mostrar reserva si la mesa NO está ocupada
+    // Esto previene conflictos: si Cliente A está sentado, no muestra la reserva de Cliente B
+    let reservation = undefined;
+    if (!table.is_occupied) {
+      reservation = tableReservationsMap.get(table.id);
+    }
+
     return {
       ...table,
       client,
+      reservation,
     };
   });
+  
+  // Calcular contadores considerando también las reservas
   const occupiedCount = tables.filter(t => t.is_occupied).length;
   const assignedCount = tables.filter(
     t => t.id_client && !t.is_occupied,
   ).length;
-  const unavailableCount = tables.filter(
-    t => t.is_occupied || t.id_client,
+  const reservedCount = tables.filter(
+    t => !t.is_occupied && !t.id_client && t.reservation
   ).length;
+  
+  // Mesas NO disponibles = ocupadas + asignadas + reservadas
+  const unavailableCount = tables.filter(
+    t => t.is_occupied || t.id_client || t.reservation,
+  ).length;
+  
   const totalCapacity = tables.reduce((sum, t) => sum + t.capacity, 0);
   const occupiedCapacity = tables
     .filter(t => t.is_occupied)
@@ -266,6 +327,14 @@ export async function getTablesStatus(): Promise<TablesStatusResponse> {
   const assignedCapacity = tables
     .filter(t => t.id_client && !t.is_occupied)
     .reduce((sum, t) => sum + t.capacity, 0);
+
+  console.log("📊 Estadísticas de mesas:", {
+    total: tables.length,
+    occupied: occupiedCount,
+    assigned: assignedCount,
+    reserved: reservedCount,
+    available: tables.length - unavailableCount
+  });
 
   return {
     tables,
@@ -385,7 +454,7 @@ export async function assignClientToTable({
 export async function activateTableByClient(
   tableIdOrNumber: string,
   clientId: string,
-): Promise<{ success: boolean; message: string; table?: any }> {
+): Promise<{ success: boolean; message: string; table?: any; earlyArrival?: boolean; reservationTime?: string; userName?: string }> {
   try {
     console.log("🔍 [activateTableByClient] Iniciando...");
     console.log("📋 tableIdOrNumber:", tableIdOrNumber);
@@ -489,29 +558,235 @@ export async function activateTableByClient(
     console.log("   Usuario clientId:", clientId);
     console.log("   ¿Son iguales?:", table.id_client === clientId);
 
-    // 3. Verificar que la mesa esté asignada al cliente correcto
+    // 3. Verificar que la mesa esté asignada al cliente correcto O que tenga una reserva válida
     if (table.id_client !== clientId) {
-      console.error("❌ Mesa no asignada al usuario correcto");
-      return {
-        success: false,
-        message:
-          "Esta mesa no está asignada a tu usuario. Solo puedes activar mesas que te hayan sido asignadas por el maitre.",
-      };
+      console.log("⚠️ Mesa no asignada directamente, verificando reservas...");
+      
+      // Verificar si el usuario tiene una reserva para esta mesa hoy
+      const today = new Date();
+      const localDate = new Date(today.getTime() - (3 * 60 * 60 * 1000)); // UTC-3
+      const dateString = localDate.toISOString().split('T')[0] || '';
+      
+      const reservation = await ReservationsService.getTableReservationForDate(
+        table.id.toString(),
+        dateString
+      );
+
+      // Si tiene una reserva válida, permitir el escaneo (no asignar todavía)
+      if (reservation && reservation.user_id === clientId) {
+        console.log("✅ Usuario tiene reserva válida para esta mesa");
+        
+        // NO asignar id_client aquí - solo marcar que tiene reserva
+        // La asignación se hará más adelante en las validaciones de tiempo
+        // si la mesa está libre
+        table.id_client = null; // Mantener como null para que las validaciones de tiempo continúen
+        console.log("✅ Reserva válida - continuando con validaciones de tiempo");
+      } else {
+        console.error("❌ Mesa no asignada y sin reserva válida");
+        return {
+          success: false,
+          message:
+            "Esta mesa no está asignada a tu usuario. Solo puedes activar mesas que te hayan sido asignadas por el maitre o que tengas reservadas.",
+        };
+      }
     }
 
-    // 4. Verificar que no esté ya ocupada
+    // 4. Verificar si hay una reserva para esta mesa y validar el horario
+    // (Movemos esto ANTES de verificar is_occupied porque los usuarios con reserva
+    // deben poder escanear el QR para recibir mensajes de llegada temprana/tardía)
+    const now = new Date();
+    const dateString = now.toLocaleDateString('es-AR', { 
+      timeZone: 'America/Argentina/Buenos_Aires',
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit' 
+    }).split('/').reverse().join('-'); // YYYY-MM-DD
+    
+    const currentHour = parseInt(now.toLocaleString('es-AR', { 
+      timeZone: 'America/Argentina/Buenos_Aires',
+      hour: '2-digit', 
+      hour12: false 
+    }));
+    const currentMinute = parseInt(now.toLocaleString('es-AR', { 
+      timeZone: 'America/Argentina/Buenos_Aires',
+      minute: '2-digit' 
+    }));
+    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+    
+    const reservation = await ReservationsService.getTableReservationForDate(
+      table.id.toString(),
+      dateString
+    );
+
+    if (reservation) {
+      console.log("📅 Mesa tiene reserva:", reservation);
+      
+      // Verificar que el cliente que escanea sea el dueño de la reserva
+      if (reservation.user_id !== clientId) {
+        console.log("⚠️ Cliente no es dueño de la reserva");
+        throw {
+          status: 403,
+          message: `Esta mesa está reservada a nombre de ${reservation.user_name}. No puedes ocuparla.`,
+          reservedFor: reservation.user_name
+        };
+      }
+
+      // Obtener hora de reserva
+      const [resHours, resMinutes] = reservation.time.split(':').map(Number);
+      const reservationTimeInMinutes = (resHours ?? 0) * 60 + (resMinutes ?? 0);
+
+      // Ventanas de tiempo:
+      // - Activación temprana: -45min antes de la hora de reserva
+      // - Ventana de confirmación: desde la hora de reserva hasta +45min
+      const earlyActivationTime = reservationTimeInMinutes - 45; // 19:15 para reserva de 20:00
+      const confirmationStartTime = reservationTimeInMinutes; // 20:00
+      const latestValidTime = reservationTimeInMinutes + 45; // 20:45
+
+      console.log(`⏰ Hora actual: ${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')} (${currentTimeInMinutes} mins)`);
+      console.log(`📋 Hora reserva: ${reservation.time} (${reservationTimeInMinutes} mins)`);
+      console.log(`🕐 Activación temprana desde: ${Math.floor(earlyActivationTime/60)}:${(earlyActivationTime%60).toString().padStart(2,'0')}`);
+      console.log(`🕐 Ventana confirmación: ${Math.floor(confirmationStartTime/60)}:${(confirmationStartTime%60).toString().padStart(2,'0')} - ${Math.floor(latestValidTime/60)}:${(latestValidTime%60).toString().padStart(2,'0')}`);
+
+      // CASO 1: Llega muy tarde (después de las 20:45 para reserva de 20:00)
+      if (currentTimeInMinutes > latestValidTime) {
+        console.log("❌ Cliente llegó muy tarde, cancelando reserva...");
+        
+        // Cancelar reserva
+        await supabaseAdmin
+          .from('reservations')
+          .update({ status: 'cancelled' })
+          .eq('id', reservation.id);
+        
+        console.log(`✅ Reserva ${reservation.id} cancelada por llegada tardía`);
+        
+        return {
+          success: false,
+          message: `Tu reserva para las ${reservation.time.substring(0, 5)}hs expiró. El tiempo límite era hasta las ${Math.floor(latestValidTime/60)}:${(latestValidTime%60).toString().padStart(2,'0')}hs. Por favor, contacta al personal si aún deseas una mesa.`,
+        };
+      }
+
+      // CASO 2: Llega en ventana temprana (19:15-19:59 para reserva de 20:00)
+      if (currentTimeInMinutes >= earlyActivationTime && currentTimeInMinutes < confirmationStartTime) {
+        console.log("⏰ Cliente llegó en ventana temprana (antes de hora de reserva)");
+        
+        // Verificar si ya existe waiting_list
+        // Buscar por client_id solamente (no hay reservation_id en el schema)
+        const { data: existingWaiting } = await supabaseAdmin
+          .from('waiting_list')
+          .select('id, status')
+          .eq('client_id', clientId)
+          .single();
+
+        if (existingWaiting && existingWaiting.status === 'waiting') {
+          // Ya escaneó antes, recordarle que debe esperar hasta la hora
+          console.log("ℹ️  Cliente ya escaneó temprano, recordando que debe esperar");
+          return {
+            success: false,
+            earlyArrival: true,
+            reservationTime: reservation.time.substring(0, 5),
+            userName: reservation.user_name,
+            message: `Tu mesa está reservada para las ${reservation.time.substring(0, 5)}hs. Vuelve a escanear el QR a partir de esa hora para ocupar tu mesa.`,
+          };
+        }
+
+        if (!existingWaiting) {
+          // Crear waiting_list con status 'waiting'
+          const { data: fullReservation } = await supabaseAdmin
+            .from('reservations')
+            .select('party_size')
+            .eq('id', reservation.id)
+            .single();
+
+          console.log("📝 Creando waiting_list en estado 'waiting'...");
+          await supabaseAdmin
+            .from('waiting_list')
+            .insert({
+              client_id: clientId,
+              party_size: fullReservation?.party_size || 2,
+              status: 'waiting',
+              priority: 10,
+              joined_at: new Date().toISOString()
+            });
+
+          console.log("✅ waiting_list creado en 'waiting'");
+        }
+
+        // NO asignar id_client en ventana temprana - solo crear waiting_list
+        // La asignación se hará cuando llegue la hora correcta y la mesa esté libre
+        console.log("✅ Llegada temprana registrada (NO se asigna id_client todavía)");
+
+        return {
+          success: false,
+          earlyArrival: true,
+          reservationTime: reservation.time.substring(0, 5),
+          userName: reservation.user_name,
+          message: `¡Bienvenido/a ${reservation.user_name}! Tu mesa está reservada para las ${reservation.time.substring(0, 5)}hs. Por favor, vuelve a escanear el QR a partir de esa hora para confirmar tu llegada.`,
+        };
+      }
+
+      // CASO 3: Llega en la ventana correcta (hora reserva hasta +45min)
+      if (currentTimeInMinutes >= confirmationStartTime && currentTimeInMinutes <= latestValidTime) {
+        console.log("✅ Cliente llegó en el horario correcto de su reserva");
+        // Continuar con la activación normal (se hace más abajo)
+      } else if (currentTimeInMinutes < earlyActivationTime) {
+        // CASO 4: Intenta confirmar MUY temprano (antes de -45min)
+        console.log("❌ Cliente intentó confirmar demasiado temprano");
+        return {
+          success: false,
+          message: `Tu reserva es para las ${reservation.time.substring(0, 5)}hs. Podrás escanear el QR a partir de las ${Math.floor(earlyActivationTime/60)}:${(earlyActivationTime%60).toString().padStart(2,'0')}hs.`,
+        };
+      }
+    } else {
+      // Si NO tiene reserva, verificar que la mesa no esté ocupada
+      if (table.is_occupied) {
+        console.log("⚠️ Mesa ya está ocupada (sin reserva)");
+        return { success: false, message: "La mesa ya está activa" };
+      }
+    }
+
+    console.log("✅ Validaciones pasadas, verificando disponibilidad de mesa...");
+
+    // 4.9. Verificar que la mesa esté libre antes de activar
     if (table.is_occupied) {
-      console.log("⚠️ Mesa ya está ocupada");
+      console.log("⚠️ Mesa ocupada por otro cliente");
+      
+      // Si tiene reserva, dar mensaje específico
+      if (reservation) {
+        return {
+          success: false,
+          message: `Tu mesa está actualmente ocupada por otro cliente. Por favor, espera a que se libere o contacta al personal.`,
+        };
+      }
+      
       return { success: false, message: "La mesa ya está activa" };
     }
 
-    console.log("✅ Validaciones pasadas, activando mesa...");
+    // 5. Asignar id_client si no estaba asignado (para reservas)
+    if (!table.id_client || table.id_client !== clientId) {
+      console.log("📝 Asignando id_client antes de activar...");
+      const { error: assignError } = await supabaseAdmin
+        .from("tables")
+        .update({
+          id_client: clientId
+        })
+        .eq("id", table.id);
 
-    // 5. Activar la mesa
+      if (assignError) {
+        console.error("❌ Error asignando id_client:", assignError);
+        return {
+          success: false,
+          message: "Error al asignar la mesa"
+        };
+      }
+      console.log("✅ id_client asignado");
+    }
+
+    // 6. Activar la mesa: is_occupied=true y table_status='pending'
     const { error: updateError } = await supabaseAdmin
       .from("tables")
       .update({
         is_occupied: true,
+        table_status: 'pending'
       })
       .eq("id", table.id);
 
@@ -520,9 +795,55 @@ export async function activateTableByClient(
       throw new Error(`Error activando mesa: ${updateError.message}`);
     }
 
-    console.log("✅ Mesa activada exitosamente");
+    // 6. Actualizar waiting_list status a 'seated' si existe entrada activa
+    try {
+      const { data: waitingEntry, error: waitingError } = await supabaseAdmin
+        .from("waiting_list")
+        .select("id, status")
+        .eq("client_id", clientId)
+        .eq("status", "waiting")
+        .limit(1)
+        .single();
 
-    // 6. Actualizar el client_id en la tabla chats si existe un chat activo para esta mesa
+      if (!waitingError && waitingEntry) {
+        const { error: updateWaitingError } = await supabaseAdmin
+          .from("waiting_list")
+          .update({ 
+            status: "seated", 
+            seated_at: new Date().toISOString() 
+          })
+          .eq("id", waitingEntry.id);
+
+        if (updateWaitingError) {
+          console.error("❌ Error actualizando waiting_list:", updateWaitingError);
+        } else {
+          console.log(`✅ waiting_list actualizado: status=seated para usuario ${clientId}`);
+        }
+      }
+    } catch (waitingUpdateError) {
+      console.error("❌ Error actualizando waiting_list:", waitingUpdateError);
+      // No lanzar error porque la mesa se activó correctamente
+    }
+
+    // 6.5. Si había una reserva, marcarla como 'completed'
+    if (reservation) {
+      try {
+        const { error: updateReservationError } = await supabaseAdmin
+          .from("reservations")
+          .update({ status: "completed" })
+          .eq("id", reservation.id);
+
+        if (updateReservationError) {
+          console.error("❌ Error actualizando reserva a completed:", updateReservationError);
+        } else {
+          console.log(`✅ Reserva ${reservation.id} marcada como completed`);
+        }
+      } catch (reservationUpdateError) {
+        console.error("❌ Error actualizando reserva:", reservationUpdateError);
+      }
+    }
+
+    // 7. Actualizar el client_id en la tabla chats si existe un chat activo para esta mesa
     try {
       const { data: existingChat, error: chatError } = await supabaseAdmin
         .from("chats")
@@ -659,6 +980,76 @@ export async function freeTable(
     }
 
     return { success: true, message: "Mesa liberada exitosamente" };
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error.message || "Error interno del servidor",
+    };
+  }
+}
+
+// Cancelar reserva asociada a una mesa
+export async function cancelTableReservation(
+  tableId: string,
+): Promise<{ success: boolean; message: string }> {
+  try {
+    // 1. Buscar reservas approved para hoy en esta mesa
+    const today = new Date().toLocaleDateString("en-CA", {
+      timeZone: "America/Argentina/Buenos_Aires",
+    });
+
+    const { data: reservations, error: reservationError } = await supabaseAdmin
+      .from("reservations")
+      .select("id, user_id, time, status")
+      .eq("table_id", tableId)
+      .eq("date", today)
+      .eq("status", "approved")
+      .order("time", { ascending: true }); // Ordenar por hora, más temprana primero
+
+    if (reservationError || !reservations || reservations.length === 0) {
+      console.error("Error buscando reservas:", reservationError);
+      return {
+        success: false,
+        message: "No se encontró una reserva activa para esta mesa",
+      };
+    }
+
+    // Obtener la reserva MÁS PRÓXIMA (la primera en el tiempo)
+    // Esto coincide con lo que muestra getTablesStatus()
+    const reservation = reservations[0];
+    
+    if (!reservation) {
+      return {
+        success: false,
+        message: "No se encontró una reserva activa para esta mesa",
+      };
+    }
+    
+    console.log(`🔍 Cancelando reserva más próxima para mesa ${tableId}:`, {
+      reservationId: reservation.id,
+      time: reservation.time,
+      totalReservations: reservations.length
+    });
+
+    // 2. Cancelar la reserva
+    const { error: updateError } = await supabaseAdmin
+      .from("reservations")
+      .update({
+        status: "cancelled",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", reservation.id);
+
+    if (updateError) {
+      throw new Error(`Error cancelando reserva: ${updateError.message}`);
+    }
+
+    console.log(`✅ Reserva ${reservation.id} cancelada por staff (Maitre)`);
+
+    return {
+      success: true,
+      message: `Reserva para las ${reservation.time} cancelada exitosamente`,
+    };
   } catch (error: any) {
     return {
       success: false,
