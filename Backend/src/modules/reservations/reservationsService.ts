@@ -1000,7 +1000,6 @@ export class ReservationsService {
       }
 
       if (!reservations || reservations.length === 0) {
-        console.log('ℹ️  No hay reservas aprobadas para hoy');
         return { activated: false };
       }
 
@@ -1152,8 +1151,6 @@ export class ReservationsService {
       }));
       const currentTimeInMinutes = currentHour * 60 + currentMinute;
 
-      console.log(`🧹 [cleanExpiredReservations] Limpiando reservas expiradas - ${dateString} ${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`);
-
       // Buscar reservas aprobadas de hoy
       const { data: reservations, error: reservationsError } = await supabase
         .from('reservations')
@@ -1162,7 +1159,6 @@ export class ReservationsService {
         .eq('status', 'approved');
 
       if (reservationsError || !reservations || reservations.length === 0) {
-        console.log('ℹ️  No hay reservas para limpiar');
         return;
       }
 

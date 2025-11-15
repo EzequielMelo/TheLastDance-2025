@@ -41,6 +41,8 @@ import {
   Truck,
   MapPin,
   Package,
+  Check,
+  X,
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User";
@@ -49,6 +51,7 @@ import DeliveryFlowNavigation from "../components/navigation/DeliveryFlowNavigat
 import Sidebar from "../components/navigation/Sidebar";
 import BottomNavbar from "../components/navigation/BottomNavbar";
 import CartModal from "../components/cart/CartModal";
+import CustomAlert from "../components/common/CustomAlert";
 import ActionCard from "../components/common/ActionCard";
 import AdminActionButton from "../components/common/AdminActionButton";
 import UserProfileCard from "../components/common/UserProfileCard";
@@ -99,6 +102,19 @@ export default function HomeScreen({ navigation, route }: Props) {
   const [clientRefreshTrigger, setClientRefreshTrigger] = useState(0);
   // Estado para pull-to-refresh
   const [refreshing, setRefreshing] = useState(false);
+
+  // Estados para CustomAlert
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    type: "info" as "success" | "error" | "warning" | "info",
+    title: "",
+    message: "",
+    buttons: [] as Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "default" | "cancel" | "destructive";
+    }>,
+  });
 
   // Estados específicos para dueño/supervisor
   const [pendingUsers, setPendingUsers] = useState<any[]>([]);
@@ -339,36 +355,38 @@ export default function HomeScreen({ navigation, route }: Props) {
   };
 
   // Función para rechazar usuario
-  const rejectUser = async (
-    userId: string,
-    userName: string,
-    reason?: string,
-  ) => {
-    try {
-      const response = await api.post(`/admin/clients/${userId}/reject`, {
-        reason: reason || "",
-      });
-
-      console.log("✅ [FRONTEND] Respuesta recibida:", response.data);
-      ToastAndroid.show(`❌ Usuario ${userName} rechazado`, ToastAndroid.SHORT);
-      await loadPendingUsers(); // Recargar lista
-    } catch (error: any) {
-      console.error("❌ [FRONTEND] Error rechazando usuario:", error);
-      console.error("❌ [FRONTEND] Detalles del error:", {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        config: {
-          url: error.config?.url,
-          method: error.config?.method,
-          data: error.config?.data,
+  const rejectUser = async (userId: string, userName: string) => {
+    setAlertConfig({
+      type: "warning",
+      title: "Rechazar Usuario",
+      message: `¿Estás seguro que quieres rechazar a ${userName}?`,
+      buttons: [
+        {
+          text: "Cancelar",
+          style: "cancel",
         },
-      });
-      ToastAndroid.show(
-        error.response?.data?.error || "Error al rechazar usuario",
-        ToastAndroid.SHORT,
-      );
-    }
+        {
+          text: "Rechazar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.post(`/admin/clients/${userId}/reject`, {
+                reason: "",
+              });
+              ToastAndroid.show(`❌ Usuario ${userName} rechazado`, ToastAndroid.SHORT);
+              await loadPendingUsers();
+            } catch (error: any) {
+              console.error("❌ [FRONTEND] Error rechazando usuario:", error);
+              ToastAndroid.show(
+                error.response?.data?.error || "Error al rechazar usuario",
+                ToastAndroid.SHORT,
+              );
+            }
+          },
+        },
+      ],
+    });
+    setShowAlert(true);
   };
 
   // Cargar usuarios pendientes para dueño/supervisor
@@ -1866,6 +1884,48 @@ export default function HomeScreen({ navigation, route }: Props) {
                         borderTopColor: "#333",
                       }}
                     >
+                      {/* Foto de perfil */}
+                      <View
+                        style={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 24,
+                          backgroundColor: "#d4af37",
+                          marginRight: 12,
+                          overflow: "hidden",
+                        }}
+                      >
+                        {pendingUser.profile_image ? (
+                          <Image
+                            source={{ uri: pendingUser.profile_image }}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                            }}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              justifyContent: "center",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: "#1a1a1a",
+                                fontSize: 18,
+                                fontWeight: "700",
+                              }}
+                            >
+                              {pendingUser.first_name?.charAt(0)}{pendingUser.last_name?.charAt(0)}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
                       <View style={{ flex: 1 }}>
                         <Text
                           style={{
@@ -1890,6 +1950,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                       </View>
 
                       <View style={{ flexDirection: "row", gap: 8 }}>
+                        {/* Botón Aprobar con ícono Check */}
                         <TouchableOpacity
                           onPress={() =>
                             approveUser(
@@ -1899,68 +1960,34 @@ export default function HomeScreen({ navigation, route }: Props) {
                           }
                           style={{
                             backgroundColor: "#22c55e",
-                            paddingHorizontal: 12,
-                            paddingVertical: 6,
-                            borderRadius: 6,
+                            width: 40,
+                            height: 40,
+                            borderRadius: 20,
+                            justifyContent: "center",
+                            alignItems: "center",
                           }}
                         >
-                          <Text
-                            style={{
-                              color: "white",
-                              fontSize: 12,
-                              fontWeight: "600",
-                            }}
-                          >
-                            ✓ Aprobar
-                          </Text>
+                          <Check size={20} color="white" strokeWidth={3} />
                         </TouchableOpacity>
 
+                        {/* Botón Rechazar con ícono X */}
                         <TouchableOpacity
-                          onPress={() => {
-                            Alert.alert(
-                              "Rechazar Usuario",
-                              `¿Estás seguro de que quieres rechazar a ${pendingUser.first_name} ${pendingUser.last_name}?`,
-                              [
-                                { text: "Cancelar", style: "cancel" },
-                                {
-                                  text: "Rechazar sin motivo",
-                                  style: "destructive",
-                                  onPress: () =>
-                                    rejectUser(
-                                      pendingUser.id,
-                                      `${pendingUser.first_name} ${pendingUser.last_name}`,
-                                      "",
-                                    ),
-                                },
-                                {
-                                  text: "Rechazar con motivo",
-                                  style: "destructive",
-                                  onPress: () =>
-                                    rejectUser(
-                                      pendingUser.id,
-                                      `${pendingUser.first_name} ${pendingUser.last_name}`,
-                                      "Información incompleta o incorrecta",
-                                    ),
-                                },
-                              ],
-                            );
-                          }}
+                          onPress={() =>
+                            rejectUser(
+                              pendingUser.id,
+                              `${pendingUser.first_name} ${pendingUser.last_name}`,
+                            )
+                          }
                           style={{
                             backgroundColor: "#ef4444",
-                            paddingHorizontal: 12,
-                            paddingVertical: 6,
-                            borderRadius: 6,
+                            width: 40,
+                            height: 40,
+                            borderRadius: 20,
+                            justifyContent: "center",
+                            alignItems: "center",
                           }}
                         >
-                          <Text
-                            style={{
-                              color: "white",
-                              fontSize: 12,
-                              fontWeight: "600",
-                            }}
-                          >
-                            ✕ Rechazar
-                          </Text>
+                          <X size={20} color="white" strokeWidth={3} />
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -2427,6 +2454,16 @@ export default function HomeScreen({ navigation, route }: Props) {
       )}
 
       <CartModal visible={cartModalVisible} onClose={handleCloseCart} />
+
+      {/* CustomAlert */}
+      <CustomAlert
+        visible={showAlert}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        buttons={alertConfig.buttons}
+        onClose={() => setShowAlert(false)}
+      />
     </LinearGradient>
   );
 }

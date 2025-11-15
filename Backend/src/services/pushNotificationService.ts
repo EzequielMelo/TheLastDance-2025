@@ -202,7 +202,7 @@ export async function notifyClientAccountCreated(clientId: string) {
 }
 
 // Función para actualizar el push token de un usuario
-export async function updateUserPushToken(userId: string, pushToken: string) {
+export async function updateUserPushToken(userId: string, pushToken: string | null) {
   try {
     const { error } = await supabaseAdmin
       .from("users")

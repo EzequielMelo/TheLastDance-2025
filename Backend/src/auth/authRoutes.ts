@@ -7,6 +7,7 @@ import {
   updatePushToken,
   deleteAnonymousUser,
   refreshToken,
+  logout,
 } from "./authController";
 import {
   initSocialAuth,
@@ -23,6 +24,7 @@ router.post("/anonymous", upload.single("image"), registerAnonymousUser);
 router.post("/login", loginUser);
 router.post("/refresh", refreshToken);
 router.post("/update-push-token", updatePushToken);
+router.post("/logout", logout);
 router.delete("/anonymous", deleteAnonymousUser);
 router.get("/validate-token", checkTokenValidity);
 

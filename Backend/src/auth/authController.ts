@@ -283,3 +283,39 @@ export const deleteAnonymousUser: RequestHandler = async (req, res) => {
     res.status(500).json({ error: (error as Error).message });
   }
 };
+
+export const logout: RequestHandler = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      res.status(401).json({ error: "Token no proporcionado." });
+      return;
+    }
+
+    const token = authHeader.slice(7);
+    let userId: string;
+
+    // Verificar si es un token anónimo o normal
+    if (token.startsWith("anon_")) {
+      // Los usuarios anónimos se eliminan completamente, no solo limpian el push_token
+      res.status(400).json({ error: "Los usuarios anónimos deben usar el endpoint /auth/anonymous" });
+      return;
+    } else {
+      // Token normal de Supabase Auth
+      const authUser = await authService.verifyToken(token);
+      if (!authUser.id) {
+        res.status(401).json({ error: "ID de usuario no encontrado." });
+        return;
+      }
+      userId = authUser.id;
+    }
+
+    // Limpiar el push_token del usuario
+    await updateUserPushToken(userId, null);
+
+    res.status(200).json({ message: "Logout exitoso, push token eliminado" });
+  } catch (error) {
+    console.error("❌ Error en logout:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+};

@@ -117,6 +117,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } catch (error) {
           // Continuar con el logout local aunque falle la eliminación remota
         }
+      } else if (token) {
+        // Para usuarios normales, limpiar push_token
+        try {
+          await api.post("/auth/logout", {}, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+        } catch (error) {
+          // Continuar con el logout local aunque falle la limpieza del push_token
+          console.log("Error limpiando push_token:", error);
+        }
       }
 
       // Limpiar ambos storages
