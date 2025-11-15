@@ -403,7 +403,14 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                     {/* Encuesta */}
                     <View className="items-center">
                       <TouchableOpacity
-                        onPress={() => navigation.navigate("Survey")}
+                        onPress={() => {
+                          if (occupiedTable) {
+                            navigation.navigate("Survey", {
+                              tableId: occupiedTable.id,
+                              waiterId: occupiedTable.id_waiter || ""
+                            });
+                          }
+                        }}
                         className="bg-blue-600 w-16 h-16 rounded-full items-center justify-center mb-2"
                         style={{
                           elevation: 4,
@@ -523,7 +530,14 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                     {/* Encuesta */}
                     <View className="items-center">
                       <TouchableOpacity
-                        onPress={() => navigation.navigate("Survey")}
+                        onPress={() => {
+                          if (occupiedTable) {
+                            navigation.navigate("Survey", {
+                              tableId: occupiedTable.id,
+                              waiterId: occupiedTable.id_waiter || ""
+                            });
+                          }
+                        }}
                         className="bg-green-600 w-16 h-16 rounded-full items-center justify-center mb-2"
                         style={{
                           elevation: 4,

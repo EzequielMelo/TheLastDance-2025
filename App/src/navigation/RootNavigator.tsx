@@ -25,6 +25,7 @@ import MyWaitingPositionScreen from "../screens/table-screens/MyWaitingPositionS
 import MenuScreen from "../screens/menu-screens/MenuScreen";
 import GamesScreen from "../screens/games/GamesScreen";
 import SurveyScreen from "../screens/SurveyScreen";
+import SurveyStatsScreen from "../screens/SurveyStatsScreen";
 import { CartProvider } from "../context/CartContext";
 import { BottomNavProvider } from "../context/BottomNavContext";
 import WaiterDashboardScreen from "../screens/waiter-screens/WaiterDashboardScreen";
@@ -160,6 +161,11 @@ function NavigatorContent() {
             <Stack.Screen
               name="Survey"
               component={SurveyScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="SurveyStats"
+              component={SurveyStatsScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen

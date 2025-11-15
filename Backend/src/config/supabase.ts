@@ -16,6 +16,12 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 /* Cliente con permisos de administrador (Service Role Key) */
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
+  db: { schema: 'public' },
+  global: {
+    headers: {
+      'apikey': supabaseServiceKey,
+    },
+  },
 });
 
 /* Función para testear la conexión a Supabase */

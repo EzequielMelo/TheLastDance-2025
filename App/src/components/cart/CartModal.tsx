@@ -238,8 +238,13 @@ export default function CartModal({
   };
 
   const handleAddMoreItems = () => {
-    // Cerrar el modal de carrito para que el usuario pueda agregar más items
+    // Cerrar el modal de carrito
     onClose();
+    
+    // Navegar al menú para que el usuario pueda agregar más items
+    if (navigation) {
+      navigation.navigate("Menu");
+    }
   };
 
   const handleConfirmDelivery = async () => {
@@ -259,17 +264,34 @@ export default function CartModal({
       const result = await confirmTableDelivery(occupiedTable.id);
 
       if (result.success) {
+        // Obtener el id_waiter de la mesa para la encuesta
+        const waiterId = occupiedTable.id_waiter || "";
+        
         showAlert(
           "✅ Recepción Confirmada",
-          "¡Perfecto! Has confirmado la recepción de tu pedido. Ahora tienes acceso a juegos y encuestas.",
+          "¡Perfecto! Has confirmado la recepción de tu pedido. ¿Te gustaría responder una breve encuesta sobre tu experiencia?",
           [
             {
-              text: "OK",
+              text: "Responder encuesta",
               onPress: async () => {
                 onClose();
-                // Refrescar para actualizar el estado
-                await refreshClientState(); // Refresca el estado del cliente
-                refreshOrders(); // Refresca las órdenes
+                // Refrescar estado
+                await refreshClientState();
+                refreshOrders();
+                // Navegar a encuesta
+                navigation.navigate("Survey", { 
+                  tableId: occupiedTable.id,
+                  waiterId: waiterId
+                });
+              },
+            },
+            {
+              text: "Más tarde",
+              style: "cancel",
+              onPress: async () => {
+                onClose();
+                await refreshClientState();
+                refreshOrders();
               },
             },
           ],

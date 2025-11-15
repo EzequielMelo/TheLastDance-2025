@@ -36,7 +36,8 @@ export type RootStackParamList = {
   FastMath: undefined; // Juego de
   Puzzle: undefined; // Juego de puzzle
 
-  Survey: undefined; // Pantalla de encuesta
+  Survey: { tableId: string; waiterId: string }; // Pantalla de encuesta (después de confirmar pedido)
+  SurveyStats: undefined; // Estadísticas históricas de encuestas
   Menu:
     | {
         mode?: "normal" | "modify-rejected";

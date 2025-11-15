@@ -633,7 +633,7 @@ export default function MenuScreen() {
         setCurrentImageIndex({});
         shakeCount.current = 0;
       };
-    }, [setActiveTab, currentProductIndex, filteredItems, currentImageIndex]),
+    }, [setActiveTab, currentProductIndex, filteredItems]),
   );
 
   if (loading) {
@@ -699,22 +699,6 @@ export default function MenuScreen() {
                   ? "Selecciona nuevos productos para reemplazar los rechazados"
                   : "Explora nuestros deliciosos platos y bebidas"}
               </Text>
-              {!isModifyMode && (
-                <View style={{ 
-                  backgroundColor: "rgba(212, 175, 55, 0.1)", 
-                  borderRadius: 8, 
-                  padding: 8, 
-                  marginTop: 8,
-                  borderWidth: 1,
-                  borderColor: "rgba(212, 175, 55, 0.3)"
-                }}>
-                  <Text style={{ color: "#d4af37", fontSize: 11, textAlign: "center", lineHeight: 16 }}>
-                    💡 Mueve tu celular para navegar{'\n'}
-                    ⬆️⬇️ Adelante/Atrás: Cambiar producto | ↔️ Girar: Cambiar foto{'\n'}
-                    🔄 Agitar repetidamente: Volver al inicio
-                  </Text>
-                </View>
-              )}
             </View>
           </View>
 

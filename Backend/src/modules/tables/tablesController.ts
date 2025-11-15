@@ -501,7 +501,7 @@ export async function getMyStatusHandler(req: Request, res: Response) {
     // 2. Verificar mesa ocupada
     const { data: occupiedTable, error: occupiedError } = await supabaseAdmin
       .from("tables")
-      .select("id, number, table_status")
+      .select("id, number, table_status, id_waiter")
       .eq("id_client", clientId)
       .eq("is_occupied", true)
       .maybeSingle();
@@ -509,7 +509,11 @@ export async function getMyStatusHandler(req: Request, res: Response) {
     if (occupiedTable && !occupiedError) {
       const result = {
         status: "seated",
-        table: occupiedTable,
+        table: {
+          id: occupiedTable.id,
+          number: occupiedTable.number,
+          id_waiter: occupiedTable.id_waiter,
+        },
         table_status: occupiedTable.table_status || "pending",
       };
       return res.json(result);

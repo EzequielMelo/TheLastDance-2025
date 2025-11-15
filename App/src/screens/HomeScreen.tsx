@@ -444,8 +444,62 @@ export default function HomeScreen({ navigation, route }: Props) {
         }, 100);
 
         console.log("✅ Navegación a BillPayment programada");
+      } else if (tableStatus === "confirmed") {
+        // Si el estado es confirmed, verificar si todos los productos están entregados
+        console.log("📊 Verificando estado de entrega completo...");
+        
+        try {
+          const deliveryResponse = await api.get(`/orders/table/${myTableId}/delivery-status`);
+          const { allDelivered, totalItems, deliveredItems } = deliveryResponse.data.data;
+          
+          console.log(`📦 Estado entrega: ${deliveredItems}/${totalItems} items entregados`);
+          
+          if (allDelivered && totalItems > 0) {
+            // Todos los productos entregados -> Mostrar estadísticas de encuestas
+            console.log("📈 Navegando a SurveyStatsScreen...");
+            ToastAndroid.show(
+              "✅ Ver estadísticas de encuestas del restaurante",
+              ToastAndroid.SHORT,
+            );
+            
+            // Cerrar el scanner primero
+            navigation.goBack();
+            
+            // Navegar a SurveyStatsScreen
+            setTimeout(() => {
+              navigation.navigate("SurveyStats");
+            }, 100);
+          } else {
+            // Hay productos pendientes -> Abrir CartModal
+            console.log("🛒 Productos pendientes - Abriendo CartModal...");
+            
+            // Cerrar el scanner primero
+            navigation.goBack();
+            
+            // Abrir el modal después de un pequeño delay
+            setTimeout(() => {
+              setCartModalVisible(true);
+            }, 100);
+            
+            ToastAndroid.show(
+              "✅ Mesa verificada - Consultando tus productos...",
+              ToastAndroid.SHORT,
+            );
+          }
+        } catch (deliveryError) {
+          console.error("❌ Error verificando estado de entrega:", deliveryError);
+          // En caso de error, abrir CartModal por defecto
+          navigation.goBack();
+          setTimeout(() => {
+            setCartModalVisible(true);
+          }, 100);
+          ToastAndroid.show(
+            "✅ Mesa verificada - Consultando tus productos...",
+            ToastAndroid.SHORT,
+          );
+        }
       } else {
-        // Para otros estados (pending, confirmed), abrir el CartModal
+        // Para otros estados (pending), abrir el CartModal
         console.log("🛒 Abriendo CartModal...");
 
         // Cerrar el scanner primero

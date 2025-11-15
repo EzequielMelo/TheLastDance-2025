@@ -654,17 +654,14 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   // ===== FUNCIONES PARA PEDIDOS ACEPTADOS =====
   const addToAcceptedOrder = async (newItem: Omit<CartItem, "quantity">) => {
     try {
-      // Obtener orden con items aceptados (sin pendientes)
+      // Obtener las órdenes del usuario
       const orders = await getUserOrders();
-      const acceptedOrder = orders.find(
-        order =>
-          !order.is_paid &&
-          order.order_items.some(item => item.status === "accepted") &&
-          !order.order_items.some(item => item.status === "pending"),
-      );
+      
+      // Buscar cualquier orden activa (no pagada)
+      const activeOrder = orders.find(order => !order.is_paid);
 
-      if (!acceptedOrder) {
-        throw new Error("No se encontró pedido aceptado");
+      if (!activeOrder) {
+        throw new Error("No se encontró pedido activo");
       }
 
       // Convertir item al formato requerido
@@ -678,13 +675,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         image_url: newItem.image_url,
       };
 
-      // Enviar item a la orden aceptada
-      await addItemsToExistingOrder(acceptedOrder.id, [itemToAdd]);
+      // Enviar item a la orden activa
+      await addItemsToExistingOrder(activeOrder.id, [itemToAdd]);
 
       // Refrescar órdenes para obtener el estado actualizado
       await refreshOrders();
     } catch (error) {
-      console.error("Error agregando item a pedido aceptado:", error);
+      console.error("Error agregando item a pedido activo:", error);
       throw error;
     }
   };
@@ -696,18 +693,23 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     }
 
     try {
-      // Obtener el ID de la orden aceptada
+      // Obtener las órdenes del usuario
       const orders = await getUserOrders();
-      const acceptedOrder = orders.find(
-        order =>
-          !order.is_paid &&
-          order.order_items.some(item => item.status === "accepted") &&
-          !order.order_items.some(item => item.status === "pending"),
-      );
+      console.log("🔍 Órdenes obtenidas:", orders.length);
+      console.log("📊 Estados de órdenes:", orders.map(o => `ID: ${o.id.substring(0, 8)}... | is_paid: ${o.is_paid} | items: ${o.order_items.length}`).join(" | "));
+      
+      // Buscar cualquier orden activa (no pagada)
+      // El cliente puede agregar nuevas tandas a cualquier pedido activo,
+      // independientemente del estado de los items existentes
+      const activeOrder = orders.find(order => !order.is_paid);
 
-      if (!acceptedOrder) {
-        throw new Error("No se encontró pedido aceptado sin items pendientes");
+      if (!activeOrder) {
+        console.error("❌ No se encontró orden activa. Todas las órdenes están pagadas o no hay órdenes.");
+        throw new Error("No se encontró pedido activo para agregar items");
       }
+
+      console.log("📦 Agregando nueva tanda a orden:", activeOrder.id);
+      console.log("📋 Items existentes:", activeOrder.order_items.map(i => `${i.menu_item?.name} (${i.status})`).join(", "));
 
       // Convertir items del carrito al formato requerido
       const itemsToAdd = cartItems.map(item => ({
@@ -720,8 +722,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         image_url: item.image_url,
       }));
 
-      // Enviar items a la orden aceptada
-      await addItemsToExistingOrder(acceptedOrder.id, itemsToAdd);
+      // Enviar items a la orden activa (se crearán como "pending")
+      await addItemsToExistingOrder(activeOrder.id, itemsToAdd);
 
       // Limpiar carrito local
       setCartItems([]);
@@ -730,7 +732,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       await refreshOrders();
 
     } catch (error) {
-      console.error("Error enviando items a pedido aceptado:", error);
+      console.error("Error enviando items a pedido activo:", error);
       throw error;
     }
   };

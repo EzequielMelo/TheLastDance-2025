@@ -24,6 +24,7 @@ export interface ClientStateData {
   occupiedTable?: {
     id: string;
     number: number;
+    id_waiter?: string;
   };
   deliveryConfirmationStatus?: 'pending' | 'confirmed' | 'bill_requested';
   refresh: () => Promise<void>;
@@ -40,6 +41,7 @@ export const useClientState = (): ClientStateData => {
   const [occupiedTable, setOccupiedTable] = useState<{
     id: string;
     number: number;
+    id_waiter?: string;
   }>();
   const [deliveryConfirmationStatus, setDeliveryConfirmationStatus] = useState<'pending' | 'confirmed' | 'bill_requested'>();
   const [isRefreshing, setIsRefreshing] = useState(false);

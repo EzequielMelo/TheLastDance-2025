@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { Camera, CameraView, useCameraPermissions } from "expo-camera";
 import { LinearGradient } from "expo-linear-gradient";
-import { ArrowLeft, QrCode } from "lucide-react-native";
+import { QrCode } from "lucide-react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootStackParamList";
 import ChefLoading from "../components/common/ChefLoading";
@@ -128,12 +128,6 @@ export default function QRScannerScreen({ navigation, route }: Props) {
           colors={["rgba(0,0,0,0.8)", "transparent"]}
           style={styles.header}
         >
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <ArrowLeft size={24} color="#ffffff" />
-          </TouchableOpacity>
         </LinearGradient>
 
         {/* Scanner frame */}

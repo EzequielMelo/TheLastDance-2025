@@ -1015,7 +1015,7 @@ export async function addItemsToExistingOrder(
     if (insertError)
       throw new Error(`Error insertando items: ${insertError.message}`);
 
-    // 7. Recalcular totales de la orden (solo items aceptados + pendientes)
+    // 7. Recalcular totales de la orden (incluir TODOS los items excepto rechazados)
     const { data: allOrderItems, error: itemsError } = await supabaseAdmin
       .from("order_items")
       .select(
@@ -1028,7 +1028,7 @@ export async function addItemsToExistingOrder(
       `,
       )
       .eq("order_id", orderId)
-      .in("status", ["accepted", "pending"]); // Solo contar items no rechazados
+      .neq("status", "rejected"); // Excluir solo items rechazados
 
     if (itemsError)
       throw new Error(`Error obteniendo items: ${itemsError.message}`);
@@ -1413,12 +1413,12 @@ export async function waiterItemsActionNew(
       }
     }
 
-    // 4. Recalcular total de la orden (solo items aceptados + accepted)
+    // 4. Recalcular total de la orden (todos los items excepto rechazados)
     const { data: acceptedItems, error: acceptedError } = await supabaseAdmin
       .from("order_items")
       .select("subtotal")
       .eq("order_id", orderId)
-      .in("status", ["accepted"]);
+      .neq("status", "rejected");
 
     if (acceptedError) {
       throw new Error(
