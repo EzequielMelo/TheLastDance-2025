@@ -56,13 +56,15 @@ interface MenuItem {
 
 export default function KitchenMenuScreen() {
   const navigation = useNavigation<NavigationProp>();
-  
+
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
+
   // Estado para manejar los indicadores de imagen
-  const [currentImageIndex, setCurrentImageIndex] = useState<{[key: string]: number}>({});
+  const [currentImageIndex, setCurrentImageIndex] = useState<{
+    [key: string]: number;
+  }>({});
 
   useEffect(() => {
     loadMenuItems();
@@ -194,25 +196,27 @@ export default function KitchenMenuScreen() {
             colors={["#d4af37"]}
           />
         }
-        contentContainerStyle={{ 
-          paddingBottom: 40 // Espacio inferior sin carrito flotante
+        contentContainerStyle={{
+          paddingBottom: 40, // Espacio inferior sin carrito flotante
         }}
         renderItem={({ item }) => {
           // Calculamos un espacio más optimizado para dispositivos reales
           const RESERVED_BOTTOM = 80; // Menos espacio reservado sin carrito
-          
+
           const innerCardHeight = Math.max(
             ITEM_VISIBLE_HEIGHT - RESERVED_BOTTOM - 15,
             360,
           );
 
           // Función para manejar el scroll de imágenes
-          const handleImageScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+          const handleImageScroll = (
+            event: NativeSyntheticEvent<NativeScrollEvent>,
+          ) => {
             const scrollPosition = event.nativeEvent.contentOffset.x;
             const imageIndex = Math.round(scrollPosition / (width - 48));
             setCurrentImageIndex(prev => ({
               ...prev,
-              [item.id]: imageIndex
+              [item.id]: imageIndex,
             }));
           };
 
@@ -240,7 +244,12 @@ export default function KitchenMenuScreen() {
               >
                 {/* Images Section */}
                 {item.menu_item_images && item.menu_item_images.length > 0 && (
-                  <View style={{ height: innerCardHeight * 0.5, position: 'relative' }}>
+                  <View
+                    style={{
+                      height: innerCardHeight * 0.5,
+                      position: "relative",
+                    }}
+                  >
                     <FlatList
                       data={item.menu_item_images.sort(
                         (a, b) => a.position - b.position,
@@ -264,18 +273,18 @@ export default function KitchenMenuScreen() {
                         />
                       )}
                     />
-                    
+
                     {/* Indicadores de página para las imágenes */}
                     {item.menu_item_images.length > 1 && (
                       <View
                         style={{
-                          position: 'absolute',
+                          position: "absolute",
                           bottom: 12,
                           left: 0,
                           right: 0,
-                          flexDirection: 'row',
-                          justifyContent: 'center',
-                          alignItems: 'center',
+                          flexDirection: "row",
+                          justifyContent: "center",
+                          alignItems: "center",
                         }}
                       >
                         {item.menu_item_images.map((_, index) => (
@@ -285,7 +294,10 @@ export default function KitchenMenuScreen() {
                               width: 8,
                               height: 8,
                               borderRadius: 4,
-                              backgroundColor: currentImageIdx === index ? '#d4af37' : 'rgba(255,255,255,0.4)',
+                              backgroundColor:
+                                currentImageIdx === index
+                                  ? "#d4af37"
+                                  : "rgba(255,255,255,0.4)",
                               marginHorizontal: 4,
                             }}
                           />

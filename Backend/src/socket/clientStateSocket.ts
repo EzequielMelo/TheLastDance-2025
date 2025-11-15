@@ -22,8 +22,6 @@ export function emitClientStateUpdate(
 
     // Emitir a la sala del usuario específico
     io.to(`user:${userId}`).emit(eventType, data);
-
-    console.log(`📡 [Socket] Evento ${eventType} emitido al usuario ${userId}`);
   } catch (error) {
     console.error("❌ Error emitiendo evento de estado del cliente:", error);
   }
@@ -37,13 +35,11 @@ export function setupClientStateSocket(io: Server) {
     // Cliente se une a su sala de actualizaciones
     socket.on("join:client-updates", ({ userId }: { userId: string }) => {
       socket.join(`user:${userId}`);
-      console.log(`✅ Usuario ${userId} unido a sala de actualizaciones`);
     });
 
     // Cliente abandona su sala de actualizaciones
     socket.on("leave:client-updates", ({ userId }: { userId: string }) => {
       socket.leave(`user:${userId}`);
-      console.log(`👋 Usuario ${userId} abandonó sala de actualizaciones`);
     });
   });
 }

@@ -111,9 +111,12 @@ export const setupSocketIO = (httpServer: HttpServer) => {
 
   io.on("connection", socket => {
     const user = socket.data.user as SocketUser;
-    console.log(
-      `🟢 Usuario ${user.first_name} ${user.last_name} (${user.profile_code}) conectado al chat [ID: ${socket.id}]`,
-    );
+
+    // Usuario se une a su sala personal para recibir notificaciones
+    socket.on("join_user_room", (userId: string) => {
+      const userRoom = `user_${userId}`;
+      socket.join(userRoom);
+    });
 
     // Cliente o mesero se une al chat de una mesa
     socket.on("join_table_chat", async (tableId: string) => {
@@ -143,14 +146,9 @@ export const setupSocketIO = (httpServer: HttpServer) => {
               : "waiter",
         });
 
-        console.log(
-          `✅ Usuario ${user.first_name} se unió al chat de mesa ${tableId} [Sala: ${roomName}] [Socket: ${socket.id}]`,
-        );
-
         // Debug: mostrar cuántos usuarios hay en la sala
         const roomClients = io.sockets.adapter.rooms.get(roomName);
         const userCount = roomClients?.size || 0;
-        console.log(`👥 Usuarios en sala ${roomName}: ${userCount}`);
 
         // Confirmar al cliente que se unió exitosamente
         socket.emit("joined_room", {
@@ -172,7 +170,6 @@ export const setupSocketIO = (httpServer: HttpServer) => {
           const { chatId, message, tableId } = data;
 
           if (!message.trim()) {
-            console.log("❌ Mensaje vacío rechazado");
             socket.emit("error", {
               message: "El mensaje no puede estar vacío",
             });
@@ -200,7 +197,6 @@ export const setupSocketIO = (httpServer: HttpServer) => {
           }
 
           if (!chatExists.is_active) {
-            console.log("❌ Chat inactivo");
             socket.emit("error", { message: "Chat no está activo" });
             return;
           }
@@ -227,7 +223,6 @@ export const setupSocketIO = (httpServer: HttpServer) => {
 
           // Emitir a la sala completa
           const roomName = `mesa_${tableId}`;
-          console.log("📡 Emitiendo mensaje a sala:", roomName);
           io.to(roomName).emit("new_message", messageData);
 
           // También confirmar al remitente
@@ -306,7 +301,6 @@ export const setupSocketIO = (httpServer: HttpServer) => {
             );
             // No bloqueamos el mensaje por error de notificación
           }
-
         } catch (error) {
           console.error("💥 Error completo al enviar mensaje:", error);
           console.error(
@@ -372,4 +366,15 @@ export const setupSocketIO = (httpServer: HttpServer) => {
   setupClientStateSocket(io);
 
   return io;
+};
+
+// Singleton para acceder a la instancia de Socket.IO desde otros módulos
+let ioInstance: Server | null = null;
+
+export const setIOInstance = (io: Server) => {
+  ioInstance = io;
+};
+
+export const getIOInstance = (): Server | null => {
+  return ioInstance;
 };

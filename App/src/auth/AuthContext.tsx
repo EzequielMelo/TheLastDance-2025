@@ -37,12 +37,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Escuchar eventos de autenticación
     const handleSessionExpired = () => {
-      console.log("🚨 Sesión expirada - ejecutando logout automático");
       logout();
     };
 
     const handleTokenRefreshed = (newToken: string) => {
-      console.log("✅ Token renovado - actualizando estado");
       setToken(newToken);
     };
 
@@ -73,7 +71,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(JSON.parse(storedUser) as User);
       }
     } catch (error) {
-      console.error("Error loading auth data:", error);
       // En caso de error, limpiar datos corruptos
       await clearAuthData();
     } finally {
@@ -101,7 +98,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setRefreshToken(newRefreshToken || null);
       setUser(userData);
     } catch (error) {
-      console.error("Error saving auth data:", error);
       throw error;
     }
   };
@@ -112,16 +108,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Si es un usuario anónimo, eliminar de la base de datos
       if (user?.profile_code === "cliente_anonimo" && token) {
-        console.log("🗑️ Eliminando usuario anónimo del servidor...");
         try {
           await api.delete("/auth/anonymous", {
             headers: {
               Authorization: `Bearer ${token}`,
             },
           });
-          console.log("✅ Usuario anónimo eliminado del servidor");
         } catch (error) {
-          console.error("❌ Error eliminando usuario anónimo:", error);
           // Continuar con el logout local aunque falle la eliminación remota
         }
       }
@@ -137,7 +130,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setRefreshToken(null);
       setUser(null);
     } catch (error) {
-      console.error("Error during logout:", error);
     } finally {
       setIsLoading(false);
     }
@@ -146,16 +138,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Función para renovar el token usando el refresh token
   const refreshAuthToken = async (): Promise<string | null> => {
     try {
-      console.log("🔄 Intentando renovar token...");
-
       // Si es usuario anónimo, no necesita renovar token
       if (user?.profile_code === "cliente_anonimo") {
-        console.log("👤 Usuario anónimo - token no expira");
         return token;
       }
 
       if (!refreshToken) {
-        console.log("❌ No hay refresh token disponible");
         return null;
       }
 
@@ -174,11 +162,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       setToken(access_token);
-      console.log("✅ Token renovado exitosamente");
 
       return access_token;
     } catch (error) {
-      console.error("❌ Error renovando token:", error);
       return null;
     }
   };
@@ -191,9 +177,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         SecureStore.deleteItemAsync("refreshToken").catch(() => {}),
         AsyncStorage.removeItem("userData").catch(() => {}),
       ]);
-    } catch (error) {
-      console.warn("Error clearing auth data:", error);
-    }
+    } catch (error) {}
   };
 
   return (

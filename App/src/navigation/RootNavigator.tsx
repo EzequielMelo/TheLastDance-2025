@@ -31,6 +31,7 @@ import { BottomNavProvider } from "../context/BottomNavContext";
 import WaiterDashboardScreen from "../screens/waiter-screens/WaiterDashboardScreen";
 import AllWaitersScreen from "../screens/admin-screens/AllWaitersScreen";
 import TableChatScreen from "../screens/chat/TableChatScreen";
+import DeliveryChatScreen from "../screens/chat/DeliveryChatScreen";
 import BillPaymentScreen from "../screens/table-screens/BillPaymentScreen";
 import InvoiceViewScreen from "../screens/table-screens/InvoiceViewScreen";
 import WaiterOrdersScreen from "../components/orders/WaiterOrdersScreen";
@@ -42,8 +43,18 @@ import MemoryGame from "../screens/games/MemoryGame";
 import FastMathGame from "../screens/games/FastMathGame";
 import PuzzleGame from "../screens/games/PuzzleGame";
 import MakeReservationScreen from "../screens/reservation-screens/MakeReservationScreen";
-import ManageReservationsScreen from '../screens/reservation-screens/ManageReservationsScreen';
-import MyReservationsScreen from '../screens/MyReservationsScreen';
+import ManageReservationsScreen from "../screens/reservation-screens/ManageReservationsScreen";
+import MyReservationsScreen from "../screens/MyReservationsScreen";
+// 🚚 Delivery Screens
+import DeliveryLocationScreen from "../screens/delivery-screens/DeliveryLocationScreen";
+import DeliveryTrackingScreen from "../screens/delivery-screens/DeliveryTrackingScreen";
+import DeliveryHistoryScreen from "../screens/delivery-screens/DeliveryHistoryScreen";
+import DriverDeliveriesScreen from "../screens/delivery-screens/DriverDeliveriesScreen";
+import MyDeliveriesScreen from "../screens/delivery-screens/MyDeliveriesScreen";
+import DeliveryOrdersManagementScreen from "../screens/admin-screens/DeliveryOrdersManagementScreen";
+import DeliveryQRScreen from "../screens/delivery-screens/DeliveryQRScreen";
+import DeliveryCashConfirmScreen from "../screens/delivery-screens/DeliveryCashConfirmScreen";
+import PaymentQRScanner from "../screens/delivery-screens/PaymentQRScanner";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -204,6 +215,11 @@ function NavigatorContent() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
+              name="DeliveryChat"
+              component={DeliveryChatScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
               name="BillPayment"
               component={BillPaymentScreen}
               options={{ title: "Pagar Cuenta", headerBackTitle: "Volver" }}
@@ -246,6 +262,52 @@ function NavigatorContent() {
             <Stack.Screen
               name="MyReservations"
               component={MyReservationsScreen}
+              options={{ headerShown: false }}
+            />
+            {/* 🚚 Sistema de Delivery */}
+            <Stack.Screen
+              name="DeliveryLocation"
+              component={DeliveryLocationScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="DeliveryTracking"
+              component={DeliveryTrackingScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="DeliveryHistory"
+              component={DeliveryHistoryScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="DriverDeliveries"
+              component={DriverDeliveriesScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="MyDeliveries"
+              component={MyDeliveriesScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="DeliveryOrdersManagement"
+              component={DeliveryOrdersManagementScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="DeliveryPaymentQR"
+              component={DeliveryQRScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="DeliveryCashConfirm"
+              component={DeliveryCashConfirmScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="PaymentQRScanner"
+              component={PaymentQRScanner}
               options={{ headerShown: false }}
             />
           </>

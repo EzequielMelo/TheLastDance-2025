@@ -74,7 +74,6 @@ export const useAuthActions = () => {
       await contextLogout();
       return { success: true };
     } catch (err) {
-      console.warn("Error durante logout:", err);
       return { success: false };
     } finally {
       setLoading(false);

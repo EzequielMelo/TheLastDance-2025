@@ -49,7 +49,9 @@ export default function CreateTableScreen({ navigation }: any) {
   const [showAlert, setShowAlert] = useState(false);
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
-  const [alertOnClose, setAlertOnClose] = useState<(() => void) | undefined>(undefined);
+  const [alertOnClose, setAlertOnClose] = useState<(() => void) | undefined>(
+    undefined,
+  );
 
   // Solo dueño y supervisor pueden crear mesas
   const canCreate =
@@ -58,12 +60,7 @@ export default function CreateTableScreen({ navigation }: any) {
 
   // Montar el componente QR cuando hay número
   useEffect(() => {
-    console.log("🔄 useEffect qrMounted - number:", number);
-    console.log("🔄 Number(number):", Number(number));
-    console.log("🔄 Number(number) > 0:", Number(number) > 0);
-    
     if (number && Number(number) > 0) {
-      console.log("✅ Activando qrMounted");
       setQrMounted(true);
       setQrGenerated(false);
       // Limpiar QR anterior
@@ -71,7 +68,6 @@ export default function CreateTableScreen({ navigation }: any) {
       next[1] = null;
       setImages(next);
     } else {
-      console.log("❌ Desactivando qrMounted");
       setQrMounted(false);
       setQrGenerated(false);
     }
@@ -135,9 +131,7 @@ export default function CreateTableScreen({ navigation }: any) {
     // Formato: thelastdance://table/{tableId}
     const idToUse = tableId || tableNumber;
     const qrContent = `thelastdance://table/${idToUse}`;
-    
-    console.log("🔍 Generando QR:", { tableNumber, tableId, idToUse, qrContent });
-    
+
     return qrContent;
   };
 
@@ -508,7 +502,6 @@ export default function CreateTableScreen({ navigation }: any) {
       {/* QR Generator (siempre montado cuando hay número) */}
       {qrMounted && (
         <>
-          {console.log("🏗️ Renderizando componente QR montado")}
           <View
             ref={qrRef}
             style={{
@@ -521,60 +514,64 @@ export default function CreateTableScreen({ navigation }: any) {
               opacity: 0,
             }}
           >
-          <View
-            style={{
-              padding: 50,
-              backgroundColor: "white",
-              width: 400,
-              height: 400,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {number && number.trim() !== "" ? (
-              <View style={{ alignItems: "center" }}>
-                <QRCode
-                  value={`thelastdance://table/${number}`}
-                  size={250}
-                  color="black"
-                  backgroundColor="white"
-                />
-                <Text style={{ 
-                  fontSize: 18, 
-                  fontWeight: "bold", 
-                  color: "#000", 
-                  marginTop: 20,
-                  textAlign: "center" 
-                }}>
-                  Mesa #{number}
-                </Text>
-                <Text style={{ 
-                  fontSize: 14, 
-                  color: "#666", 
-                  marginTop: 5,
-                  textAlign: "center" 
-                }}>
-                  thelastdance://table/{number}
-                </Text>
-              </View>
-            ) : (
-              <View
-                style={{
-                  width: 300,
-                  height: 300,
-                  backgroundColor: "#f3f4f6",
-                  borderRadius: 10,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Text style={{ color: "#6b7280", fontSize: 16 }}>
-                  Generando QR...
-                </Text>
-              </View>
-            )}
+            <View
+              style={{
+                padding: 50,
+                backgroundColor: "white",
+                width: 400,
+                height: 400,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {number && number.trim() !== "" ? (
+                <View style={{ alignItems: "center" }}>
+                  <QRCode
+                    value={`thelastdance://table/${number}`}
+                    size={250}
+                    color="black"
+                    backgroundColor="white"
+                  />
+                  <Text
+                    style={{
+                      fontSize: 18,
+                      fontWeight: "bold",
+                      color: "#000",
+                      marginTop: 20,
+                      textAlign: "center",
+                    }}
+                  >
+                    Mesa #{number}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      color: "#666",
+                      marginTop: 5,
+                      textAlign: "center",
+                    }}
+                  >
+                    thelastdance://table/{number}
+                  </Text>
+                </View>
+              ) : (
+                <View
+                  style={{
+                    width: 300,
+                    height: 300,
+                    backgroundColor: "#f3f4f6",
+                    borderRadius: 10,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Text style={{ color: "#6b7280", fontSize: 16 }}>
+                    Generando QR...
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
-        </View>
         </>
       )}
 
@@ -632,7 +629,7 @@ export default function CreateTableScreen({ navigation }: any) {
             onPress: () => {
               setShowAlert(false);
               setTimeout(() => openCamera(), 100);
-            }
+            },
           },
           {
             text: "Galería",
@@ -640,13 +637,13 @@ export default function CreateTableScreen({ navigation }: any) {
             onPress: () => {
               setShowAlert(false);
               setTimeout(() => pickFromGallery(0), 100);
-            }
+            },
           },
           {
             text: "Cancelar",
             style: "cancel",
-            onPress: () => setShowAlert(false)
-          }
+            onPress: () => setShowAlert(false),
+          },
         ]}
       />
     </>

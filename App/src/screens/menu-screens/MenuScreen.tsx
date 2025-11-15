@@ -47,6 +47,7 @@ import {
 } from "../../api/orders";
 import { useCart } from "../../context/CartContext";
 import { useClientState } from "../../Hooks/useClientState";
+import { useAuth } from "../../auth/useAuth";
 import FloatingCart from "../../components/cart/FloatingCart";
 import FloatingModifyCart from "../../components/cart/FloatingModifyCart";
 import CartModal from "../../components/cart/CartModal";
@@ -85,6 +86,7 @@ export default function MenuScreen() {
   const route = useRoute<MenuScreenRouteProp>();
   const { setActiveTab } = useBottomNav();
   const { state: clientState } = useClientState();
+  const { user } = useAuth();
   const {
     cartCount,
     addItem,
@@ -92,10 +94,11 @@ export default function MenuScreen() {
     getItemQuantity,
     hasPendingOrder,
     refreshOrders,
+    isDeliveryOrder,
   } = useCart();
 
-  // El cliente no está sentado en una mesa
-  const isNotSeated = clientState !== "seated";
+  // El cliente no está sentado en una mesa (excepto si es delivery)
+  const isNotSeated = clientState !== "seated" && !isDeliveryOrder;
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,11 +178,6 @@ export default function MenuScreen() {
           activeOrder.order_items
             .filter((item: any) => item.status === "rejected")
             .map((item: any) => item.menu_item_id as string),
-        );
-
-        console.log(
-          "🚫 Items rechazados en esta sesión:",
-          Array.from(rejectedIds),
         );
         setAllRejectedItemIds(rejectedIds);
       } else {
@@ -358,7 +356,6 @@ export default function MenuScreen() {
         .filter((item: any) => selectedModifyItems[item.menu_item_id])
         .map((item: any) => item.id);
 
-
       // IDs de los items needs_modification (NO incluir los rejected)
       const needsModificationMenuItemIds = needsModificationItems.map(
         (item: any) => item.menu_item_id,
@@ -529,103 +526,118 @@ export default function MenuScreen() {
   useFocusEffect(
     React.useCallback(() => {
       setActiveTab("menu");
-      
+
       // Configurar sensores
       Accelerometer.setUpdateInterval(100);
       Gyroscope.setUpdateInterval(100);
-      
-      const accelerometerSubscription = Accelerometer.addListener((accelerometerData: { x: number; y: number; z: number }) => {
-        const { x, y, z } = accelerometerData;
-        const now = Date.now();
-        
-        // Cooldown para evitar múltiples disparos
-        if (now - lastMovementTime.current < MOVEMENT_COOLDOWN) return;
-        
-        // Detección de shake (movimiento rápido izq-der repetido)
-        const horizontalForce = Math.abs(x);
-        if (horizontalForce > 2.5) {
-          const timeSinceLastShake = now - lastShakeTime.current;
-          
-          if (timeSinceLastShake < SHAKE_RESET_TIME) {
-            shakeCount.current++;
-            console.log("🔄 Shake detectado:", shakeCount.current);
-            
-            // Si hace 3 shakes seguidos, volver al inicio
-            if (shakeCount.current >= 3) {
-              console.log("🏠 Volviendo al inicio del menú");
-              setCurrentProductIndex(0);
-              flatListRef.current?.scrollToIndex({ index: 0, animated: true });
-              shakeCount.current = 0;
+
+      const accelerometerSubscription = Accelerometer.addListener(
+        (accelerometerData: { x: number; y: number; z: number }) => {
+          const { x, y, z } = accelerometerData;
+          const now = Date.now();
+
+          // Cooldown para evitar múltiples disparos
+          if (now - lastMovementTime.current < MOVEMENT_COOLDOWN) return;
+
+          // Detección de shake (movimiento rápido izq-der repetido)
+          const horizontalForce = Math.abs(x);
+          if (horizontalForce > 2.5) {
+            const timeSinceLastShake = now - lastShakeTime.current;
+
+            if (timeSinceLastShake < SHAKE_RESET_TIME) {
+              shakeCount.current++;
+
+              // Si hace 3 shakes seguidos, volver al inicio
+              if (shakeCount.current >= 3) {
+                setCurrentProductIndex(0);
+                flatListRef.current?.scrollToIndex({
+                  index: 0,
+                  animated: true,
+                });
+                shakeCount.current = 0;
+                lastMovementTime.current = now;
+              }
+            } else {
+              // Reset contador si pasó mucho tiempo
+              shakeCount.current = 1;
+            }
+
+            lastShakeTime.current = now;
+            return;
+          }
+
+          // Movimiento hacia adelante (bajar el celular) - Siguiente producto
+          if (y > 0.6 && Math.abs(x) < 0.5) {
+            const nextIndex = Math.min(
+              currentProductIndex + 1,
+              filteredItems.length - 1,
+            );
+            if (nextIndex !== currentProductIndex) {
+              setCurrentProductIndex(nextIndex);
+              flatListRef.current?.scrollToIndex({
+                index: nextIndex,
+                animated: true,
+              });
               lastMovementTime.current = now;
             }
-          } else {
-            // Reset contador si pasó mucho tiempo
-            shakeCount.current = 1;
           }
-          
-          lastShakeTime.current = now;
-          return;
-        }
-        
-        // Movimiento hacia adelante (bajar el celular) - Siguiente producto
-        if (y > 0.6 && Math.abs(x) < 0.5) {
-          const nextIndex = Math.min(currentProductIndex + 1, filteredItems.length - 1);
-          if (nextIndex !== currentProductIndex) {
-            console.log("⬇️ Siguiente producto:", nextIndex);
-            setCurrentProductIndex(nextIndex);
-            flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+
+          // Movimiento hacia atrás (subir el celular) - Producto anterior
+          if (y < -0.6 && Math.abs(x) < 0.5) {
+            const prevIndex = Math.max(currentProductIndex - 1, 0);
+            if (prevIndex !== currentProductIndex) {
+              setCurrentProductIndex(prevIndex);
+              flatListRef.current?.scrollToIndex({
+                index: prevIndex,
+                animated: true,
+              });
+              lastMovementTime.current = now;
+            }
+          }
+        },
+      );
+
+      const gyroscopeSubscription = Gyroscope.addListener(
+        (gyroscopeData: { x: number; y: number; z: number }) => {
+          const { z } = gyroscopeData;
+          const now = Date.now();
+
+          // Cooldown para evitar múltiples disparos
+          if (now - lastMovementTime.current < MOVEMENT_COOLDOWN) return;
+
+          const currentItem = filteredItems[currentProductIndex];
+          if (
+            !currentItem ||
+            !currentItem.menu_item_images ||
+            currentItem.menu_item_images.length <= 1
+          )
+            return;
+
+          const currentImgIndex = currentImageIndex[currentItem.id] || 0;
+          const maxImages = currentItem.menu_item_images.length;
+
+          // Girar a la izquierda (z positivo) - Siguiente foto
+          if (z > 2) {
+            const nextImgIndex = (currentImgIndex + 1) % maxImages;
+            setCurrentImageIndex(prev => ({
+              ...prev,
+              [currentItem.id]: nextImgIndex,
+            }));
             lastMovementTime.current = now;
           }
-        }
-        
-        // Movimiento hacia atrás (subir el celular) - Producto anterior
-        if (y < -0.6 && Math.abs(x) < 0.5) {
-          const prevIndex = Math.max(currentProductIndex - 1, 0);
-          if (prevIndex !== currentProductIndex) {
-            console.log("⬆️ Producto anterior:", prevIndex);
-            setCurrentProductIndex(prevIndex);
-            flatListRef.current?.scrollToIndex({ index: prevIndex, animated: true });
+
+          // Girar a la derecha (z negativo) - Foto anterior
+          if (z < -2) {
+            const prevImgIndex = (currentImgIndex - 1 + maxImages) % maxImages;
+            setCurrentImageIndex(prev => ({
+              ...prev,
+              [currentItem.id]: prevImgIndex,
+            }));
             lastMovementTime.current = now;
           }
-        }
-      });
-      
-      const gyroscopeSubscription = Gyroscope.addListener((gyroscopeData: { x: number; y: number; z: number }) => {
-        const { z } = gyroscopeData;
-        const now = Date.now();
-        
-        // Cooldown para evitar múltiples disparos
-        if (now - lastMovementTime.current < MOVEMENT_COOLDOWN) return;
-        
-        const currentItem = filteredItems[currentProductIndex];
-        if (!currentItem || !currentItem.menu_item_images || currentItem.menu_item_images.length <= 1) return;
-        
-        const currentImgIndex = currentImageIndex[currentItem.id] || 0;
-        const maxImages = currentItem.menu_item_images.length;
-        
-        // Girar a la izquierda (z positivo) - Siguiente foto
-        if (z > 2) {
-          const nextImgIndex = (currentImgIndex + 1) % maxImages;
-          console.log("➡️ Siguiente foto:", nextImgIndex);
-          setCurrentImageIndex(prev => ({
-            ...prev,
-            [currentItem.id]: nextImgIndex
-          }));
-          lastMovementTime.current = now;
-        }
-        
-        // Girar a la derecha (z negativo) - Foto anterior
-        if (z < -2) {
-          const prevImgIndex = (currentImgIndex - 1 + maxImages) % maxImages;
-          console.log("⬅️ Foto anterior:", prevImgIndex);
-          setCurrentImageIndex(prev => ({
-            ...prev,
-            [currentItem.id]: prevImgIndex
-          }));
-          lastMovementTime.current = now;
-        }
-      });
-      
+        },
+      );
+
       return () => {
         // Cleanup cuando se pierde el foco
         accelerometerSubscription.remove();
@@ -652,7 +664,6 @@ export default function MenuScreen() {
       onOpenCart={() => setCartModalVisible(true)}
       onOpenSidebar={() => {
         // Lógica para abrir sidebar si es necesario
-        console.log("Abrir sidebar desde MenuScreen");
       }}
     >
       <LinearGradient
@@ -757,8 +768,10 @@ export default function MenuScreen() {
           decelerationRate="fast"
           snapToAlignment="start"
           showsVerticalScrollIndicator={false}
-          onMomentumScrollEnd={(event) => {
-            const index = Math.round(event.nativeEvent.contentOffset.y / ITEM_VISIBLE_HEIGHT);
+          onMomentumScrollEnd={event => {
+            const index = Math.round(
+              event.nativeEvent.contentOffset.y / ITEM_VISIBLE_HEIGHT,
+            );
             setCurrentProductIndex(index);
           }}
           // Optimizaciones de rendimiento
@@ -787,6 +800,7 @@ export default function MenuScreen() {
             const CategoryIcon = getCategoryIcon(item.category);
             const categoryColor = getCategoryColor(item.category);
             const isRejected = wasItemRejected(item.id);
+            const isAnonymous = user?.profile_code === "cliente_anonimo";
 
             // Calculamos un espacio más optimizado para dispositivos reales
             const RESERVED_BOTTOM = 130; // Optimizado para mejor aprovechamiento
@@ -868,7 +882,8 @@ export default function MenuScreen() {
                       >
                         <FlatList
                           data={item.menu_item_images.sort(
-                            (a: MenuItemImage, b: MenuItemImage) => a.position - b.position,
+                            (a: MenuItemImage, b: MenuItemImage) =>
+                              a.position - b.position,
                           )}
                           keyExtractor={img => img.id}
                           horizontal
@@ -907,21 +922,23 @@ export default function MenuScreen() {
                               alignItems: "center",
                             }}
                           >
-                            {item.menu_item_images.map((_: MenuItemImage, index: number) => (
-                              <View
-                                key={index}
-                                style={{
-                                  width: 8,
-                                  height: 8,
-                                  borderRadius: 4,
-                                  backgroundColor:
-                                    currentImageIdx === index
-                                      ? "#d4af37"
-                                      : "rgba(255,255,255,0.4)",
-                                  marginHorizontal: 4,
-                                }}
-                              />
-                            ))}
+                            {item.menu_item_images.map(
+                              (_: MenuItemImage, index: number) => (
+                                <View
+                                  key={index}
+                                  style={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: 4,
+                                    backgroundColor:
+                                      currentImageIdx === index
+                                        ? "#d4af37"
+                                        : "rgba(255,255,255,0.4)",
+                                    marginHorizontal: 4,
+                                  }}
+                                />
+                              ),
+                            )}
                           </View>
                         )}
                       </View>
@@ -1061,12 +1078,18 @@ export default function MenuScreen() {
                             style={{
                               flexDirection: "row",
                               alignItems: "center",
-                              backgroundColor: isRejected || (isNotSeated && !isModifyMode)
-                                ? "#9ca3af"
-                                : "#d4af37",
+                              backgroundColor:
+                                isRejected || (isNotSeated && !isModifyMode)
+                                  ? "#9ca3af"
+                                  : "#d4af37",
                               borderRadius: 8,
                               paddingHorizontal: 4,
-                              opacity: isRejected || (isNotSeated && !isModifyMode) ? 0.5 : 1,
+                              opacity:
+                                isRejected ||
+                                (isNotSeated && !isModifyMode) ||
+                                isAnonymous
+                                  ? 0.5
+                                  : 1,
                             }}
                           >
                             <TouchableOpacity
@@ -1076,18 +1099,33 @@ export default function MenuScreen() {
                                   getCurrentItemQuantity(item.id) - 1,
                                 )
                               }
-                              disabled={isRejected || (isNotSeated && !isModifyMode)}
+                              disabled={
+                                isRejected ||
+                                (isNotSeated && !isModifyMode) ||
+                                isAnonymous
+                              }
                               style={{ padding: 8 }}
                             >
                               <Minus
                                 size={16}
-                                color={(isRejected || (isNotSeated && !isModifyMode)) ? "#ffffff" : "#1a1a1a"}
+                                color={
+                                  isRejected ||
+                                  (isNotSeated && !isModifyMode) ||
+                                  isAnonymous
+                                    ? "#ffffff"
+                                    : "#1a1a1a"
+                                }
                               />
                             </TouchableOpacity>
 
                             <Text
                               style={{
-                                color: (isRejected || (isNotSeated && !isModifyMode)) ? "#ffffff" : "#1a1a1a",
+                                color:
+                                  isRejected ||
+                                  (isNotSeated && !isModifyMode) ||
+                                  isAnonymous
+                                    ? "#ffffff"
+                                    : "#1a1a1a",
                                 fontWeight: "600",
                                 fontSize: 16,
                                 marginHorizontal: 12,
@@ -1103,23 +1141,40 @@ export default function MenuScreen() {
                                   getCurrentItemQuantity(item.id) + 1,
                                 )
                               }
-                              disabled={isRejected || (isNotSeated && !isModifyMode)}
+                              disabled={
+                                isRejected ||
+                                (isNotSeated && !isModifyMode) ||
+                                isAnonymous
+                              }
                               style={{ padding: 8 }}
                             >
                               <Plus
                                 size={16}
-                                color={(isRejected || (isNotSeated && !isModifyMode)) ? "#ffffff" : "#1a1a1a"}
+                                color={
+                                  isRejected ||
+                                  (isNotSeated && !isModifyMode) ||
+                                  isAnonymous
+                                    ? "#ffffff"
+                                    : "#1a1a1a"
+                                }
                               />
                             </TouchableOpacity>
                           </View>
                         ) : (
                           <TouchableOpacity
                             onPress={() => handleAddToCart(item)}
-                            disabled={isRejected || (isNotSeated && !isModifyMode) || (hasPendingOrder && !isModifyMode)}
+                            disabled={
+                              isRejected ||
+                              (isNotSeated && !isModifyMode) ||
+                              (hasPendingOrder && !isModifyMode) ||
+                              isAnonymous
+                            }
                             style={{
                               backgroundColor: isRejected
                                 ? "#9ca3af"
-                                : (isNotSeated && !isModifyMode) || (hasPendingOrder && !isModifyMode)
+                                : (isNotSeated && !isModifyMode) ||
+                                    (hasPendingOrder && !isModifyMode) ||
+                                    isAnonymous
                                   ? "#6b7280"
                                   : "#d4af37",
                               borderRadius: 8,
@@ -1129,7 +1184,8 @@ export default function MenuScreen() {
                               alignItems: "center",
                               opacity: isRejected
                                 ? 0.5
-                                : (isNotSeated && !isModifyMode) || (hasPendingOrder && !isModifyMode)
+                                : (isNotSeated && !isModifyMode) ||
+                                    (hasPendingOrder && !isModifyMode)
                                   ? 0.8
                                   : 1,
                             }}
@@ -1147,7 +1203,8 @@ export default function MenuScreen() {
                                   No disponible
                                 </Text>
                               </>
-                            ) : (isNotSeated && !isModifyMode) || (hasPendingOrder && !isModifyMode) ? (
+                            ) : (isNotSeated && !isModifyMode) ||
+                              (hasPendingOrder && !isModifyMode) ? (
                               <>
                                 <Lock size={16} color="#ffffff" />
                                 <Text

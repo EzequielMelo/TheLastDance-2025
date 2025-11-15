@@ -1,4 +1,4 @@
-import { sendMail } from '../lib/sendgridMailer';
+import { sendMail } from "../lib/sendgridMailer";
 
 interface InvoiceEmailData {
   clientName: string;
@@ -15,12 +15,15 @@ export class InvoiceEmailService {
   static async sendInvoiceByEmail(
     userEmail: string,
     invoiceHTML: string,
-    invoiceData: InvoiceEmailData
+    invoiceData: InvoiceEmailData,
   ): Promise<{ success: boolean; error?: string }> {
     try {
       // Crear el email con la factura embebida
       const subject = `Factura ${invoiceData.invoiceNumber} - The Last Dance`;
-      const emailHTML = this.createInvoiceEmailTemplate(invoiceData, invoiceHTML);
+      const emailHTML = this.createInvoiceEmailTemplate(
+        invoiceData,
+        invoiceHTML,
+      );
       const emailText = this.createInvoiceEmailText(invoiceData);
 
       // Enviar el email
@@ -28,17 +31,15 @@ export class InvoiceEmailService {
         to: userEmail,
         subject,
         html: emailHTML,
-        text: emailText
+        text: emailText,
       });
 
-      console.log(`✅ Factura enviada por email a: ${userEmail}`);
       return { success: true };
-
     } catch (error) {
-      console.error('❌ Error enviando factura por email:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Error desconocido' 
+      console.error("❌ Error enviando factura por email:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Error desconocido",
       };
     }
   }
@@ -48,7 +49,7 @@ export class InvoiceEmailService {
    */
   private static createInvoiceEmailTemplate(
     invoiceData: InvoiceEmailData,
-    invoiceHTML: string
+    invoiceHTML: string,
   ): string {
     return `
 <!DOCTYPE html>

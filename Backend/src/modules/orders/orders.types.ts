@@ -56,6 +56,9 @@ export interface OrderItem {
   subtotal: number;
   status: OrderItemStatus; // Status individual del item
   created_at: string;
+  // Campos opcionales para items de delivery
+  delivery_order_id?: string | null;
+  is_delivery?: boolean;
   // Datos del producto (join)
   menu_item?: {
     id: string;
@@ -72,13 +75,14 @@ export interface OrderWithItems extends Order {
   table?: {
     id: string;
     number: string;
-  };
+  } | null;
   user?: {
     id: string;
     first_name: string;
     last_name: string;
     profile_image?: string;
   };
+  is_delivery?: boolean; // Indica si es un pedido de delivery
 }
 
 // ============= TIPOS PARA ACCIONES DEL MOZO =============

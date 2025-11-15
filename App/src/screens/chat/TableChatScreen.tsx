@@ -106,7 +106,6 @@ export default function TableChatScreen() {
   // Enviar mensaje automático si se proporciona
   useEffect(() => {
     if (autoMessage && !autoMessageSent && isConnected && !isLoading) {
-      console.log("🤖 Enviando mensaje automático:", autoMessage);
       const success = sendMessage(autoMessage);
       if (success) {
         setAutoMessageSent(true);

@@ -100,10 +100,6 @@ export default function ScanOrderQRScreen() {
         tableId = data.trim();
       }
 
-      console.log("🔍 QR Data:", data);
-      console.log("📋 Extracted tableId:", tableId);
-      console.log("🏠 My tableId:", myTableId);
-
       if (!tableId) {
         ToastAndroid.show(
           "❌ QR Inválido: No contiene información válida de mesa",
@@ -115,24 +111,14 @@ export default function ScanOrderQRScreen() {
 
       // Usar el número de mesa extraído del QR para identificar la mesa
       const targetTableId = tableId; // Número extraído del QR
-      console.log("🎯 Table number from QR:", targetTableId);
-      console.log("� Using my real tableId for API calls:", myTableId);
 
       // Primero verificar el estado actual de la mesa
       const statusResponse = await api.get("/tables/my-status");
       const currentTableStatus = statusResponse.data.table_status;
 
-      console.log("📊 Current table status:", currentTableStatus);
-
       if (currentTableStatus === "bill_requested") {
-        // Si ya se pidió la cuenta, navegar a pantalla de pago
-        console.log("💰 Navegando a pantalla de pago");
-
         // Obtener el tableId real desde el estado del usuario
         const realTableId = statusResponse.data.table?.id || myTableId;
-
-        console.log("💳 Navegando con tableId:", realTableId);
-        console.log("💳 statusResponse.data.table:", statusResponse.data.table);
 
         if (!realTableId) {
           ToastAndroid.show(

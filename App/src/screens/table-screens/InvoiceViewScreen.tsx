@@ -9,7 +9,13 @@ import {
   Linking,
 } from "react-native";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
-import { Download, Share2, ArrowLeft, CheckCircle, ExternalLink } from "lucide-react-native";
+import {
+  Download,
+  Share2,
+  ArrowLeft,
+  CheckCircle,
+  ExternalLink,
+} from "lucide-react-native";
 import type {
   RootStackNavigationProp,
   RootStackParamList,
@@ -28,7 +34,7 @@ interface InvoiceData {
 const InvoiceViewScreen: React.FC = () => {
   const route = useRoute<RouteProp<RootStackParamList, "InvoiceView">>();
   const navigation = useNavigation<RootStackNavigationProp>();
-  
+
   const { invoiceData, paymentAmount } = route.params;
 
   const handleDownload = async () => {
@@ -43,17 +49,15 @@ const InvoiceViewScreen: React.FC = () => {
         "¿Deseas abrir la factura en el navegador?",
         [
           { text: "Cancelar", style: "cancel" },
-          { 
-            text: "Abrir", 
-            style: "default", 
+          {
+            text: "Abrir",
+            style: "default",
             onPress: async () => {
               try {
                 // Construir la URL completa de la factura
-                const baseURL = api.defaults.baseURL || 'http://localhost:3000';
+                const baseURL = api.defaults.baseURL || "http://localhost:3000";
                 const invoiceUrl = `${baseURL}/api/invoices/download/${invoiceData.fileName}`;
-                
-                console.log("📄 Opening invoice URL:", invoiceUrl);
-                
+
                 // Abrir en el navegador del dispositivo
                 const supported = await Linking.canOpenURL(invoiceUrl);
                 if (supported) {
@@ -65,9 +69,9 @@ const InvoiceViewScreen: React.FC = () => {
                 console.error("Error opening invoice:", error);
                 Alert.alert("Error", "No se pudo abrir la factura");
               }
-            }
-          }
-        ]
+            },
+          },
+        ],
       );
     } catch (error) {
       console.error("Error descargando factura:", error);
@@ -129,7 +133,9 @@ const InvoiceViewScreen: React.FC = () => {
           <ArrowLeft size={24} color="#10b981" />
         </TouchableOpacity>
         <View className="flex-1">
-          <Text className="text-white text-lg font-semibold">Factura Generada</Text>
+          <Text className="text-white text-lg font-semibold">
+            Factura Generada
+          </Text>
           <Text className="text-gray-400 text-sm">
             {invoiceData.fileName || "Factura oficial"}
           </Text>
@@ -160,10 +166,12 @@ const InvoiceViewScreen: React.FC = () => {
       {/* Preview Section */}
       <View className="flex-1 m-4 bg-gray-800 rounded-lg overflow-hidden">
         <View className="bg-gray-700 px-4 py-3 border-b border-gray-600">
-          <Text className="text-white font-semibold">Vista Previa de la Factura</Text>
+          <Text className="text-white font-semibold">
+            Vista Previa de la Factura
+          </Text>
           <Text className="text-gray-400 text-sm">Formato oficial AFIP</Text>
         </View>
-        
+
         {/* Placeholder for invoice preview */}
         <ScrollView className="flex-1 p-4">
           <View className="bg-white rounded-lg p-4">
@@ -173,7 +181,7 @@ const InvoiceViewScreen: React.FC = () => {
             <Text className="text-gray-600 text-center mb-4">
               FACTURA OFICIAL - FORMATO AFIP
             </Text>
-            
+
             <View className="border-t border-gray-300 pt-4">
               <Text className="text-gray-800 font-semibold mb-2">
                 Detalles de la Factura:
@@ -193,7 +201,7 @@ const InvoiceViewScreen: React.FC = () => {
               <Text className="text-gray-600 mb-4">
                 • Lista detallada de productos y servicios
               </Text>
-              
+
               {paymentAmount && (
                 <View className="bg-gray-100 p-3 rounded">
                   <Text className="text-gray-800 font-bold text-center">
@@ -216,7 +224,7 @@ const InvoiceViewScreen: React.FC = () => {
             <Download size={16} color="white" />
             <Text className="text-white font-semibold ml-2">Ver Factura</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             onPress={handleShare}
             className="flex-1 bg-purple-600 py-3 rounded-lg flex-row justify-center items-center"
@@ -225,7 +233,7 @@ const InvoiceViewScreen: React.FC = () => {
             <Text className="text-white font-semibold ml-2">Compartir</Text>
           </TouchableOpacity>
         </View>
-        
+
         <TouchableOpacity
           onPress={goToHome}
           className="bg-green-600 py-3 rounded-lg"

@@ -113,7 +113,6 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
         occupiedTable?.id &&
         deliveryConfirmationStatus === "pending"
       ) {
-        console.log("🔍 Verificando delivery status al entrar a la pantalla");
         checkTableDeliveryStatus(occupiedTable.id)
           .then(setDeliveryStatus)
           .catch(console.error);
@@ -131,7 +130,6 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
     // Solo ejecutar si es un nuevo trigger válido
     if (refreshTrigger && refreshTrigger > lastRefreshTrigger) {
       setLastRefreshTrigger(refreshTrigger);
-      console.log("🔄 Pull-to-refresh activado");
 
       // Refrescar estado general
       refresh();
@@ -143,7 +141,6 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
           occupiedTable?.id &&
           deliveryConfirmationStatus === "pending"
         ) {
-          console.log("🔍 Verificando delivery status");
           checkTableDeliveryStatus(occupiedTable.id)
             .then(setDeliveryStatus)
             .catch(console.error);

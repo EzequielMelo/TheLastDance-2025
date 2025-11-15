@@ -18,8 +18,10 @@ import { useAuth } from "../auth/useAuth";
 import { useFocusEffect } from "@react-navigation/native";
 import { useBottomNav } from "../context/BottomNavContext";
 import { useClientState } from "../Hooks/useClientState";
+import { useDeliveryState } from "../Hooks/useDeliveryState";
 import { useCart } from "../context/CartContext";
 import api from "../api/axios";
+import { confirmDeliveryPayment } from "../api/deliveries";
 import {
   Menu,
   User as UserIcon,
@@ -36,10 +38,14 @@ import {
   CalendarCheck,
   Plus,
   ListOrdered,
+  Truck,
+  MapPin,
+  Package,
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { User } from "../types/User";
 import ClientFlowNavigation from "../components/navigation/ClientFlowNavigation";
+import DeliveryFlowNavigation from "../components/navigation/DeliveryFlowNavigation";
 import Sidebar from "../components/navigation/Sidebar";
 import BottomNavbar from "../components/navigation/BottomNavbar";
 import CartModal from "../components/cart/CartModal";
@@ -59,6 +65,11 @@ export default function HomeScreen({ navigation, route }: Props) {
   const { user, token, logout, isLoading } = useAuth();
   const { activeTab, setActiveTab } = useBottomNav();
   const { state: clientState, occupiedTable } = useClientState();
+  const {
+    hasActiveDelivery,
+    state: deliveryState,
+    delivery: activeDelivery,
+  } = useDeliveryState();
   const { cartAmount, cartCount, userOrders } = useCart();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [cartModalVisible, setCartModalVisible] = useState(false);
@@ -537,6 +548,63 @@ export default function HomeScreen({ navigation, route }: Props) {
     });
   };
 
+  // Handler para escanear QR de pago de delivery
+  const handleDeliveryPaymentQRScan = async (qrData: string) => {
+    try {
+      // Parsear el QR
+      const parsedData = JSON.parse(qrData);
+
+      // Validar que sea un QR de pago de delivery
+      if (parsedData.type !== "delivery_payment") {
+        ToastAndroid.show(
+          "❌ QR Inválido - No es un código de pago de delivery",
+          ToastAndroid.LONG,
+        );
+        return;
+      }
+
+      ToastAndroid.show("💰 Confirmando pago...", ToastAndroid.SHORT);
+
+      // Confirmar el pago
+      await confirmDeliveryPayment(parsedData.deliveryId, {
+        payment_method: "qr",
+        tip_amount: parsedData.tipAmount,
+        tip_percentage: parsedData.tipPercentage,
+        satisfaction_level: parsedData.satisfactionLevel,
+      });
+
+      ToastAndroid.show(
+        `✅ Pago confirmado: $${(parsedData.amount + parsedData.tipAmount).toFixed(2)}`,
+        ToastAndroid.LONG,
+      );
+
+      // Cerrar el scanner y volver al home
+      navigation.goBack();
+
+      // Refrescar el estado del delivery
+      setTimeout(() => {
+        handleClientRefresh();
+      }, 500);
+    } catch (error: any) {
+      console.error("Error al confirmar pago de delivery:", error);
+
+      // Si el error es de parsing del JSON
+      if (error instanceof SyntaxError) {
+        ToastAndroid.show(
+          "❌ QR Inválido - Formato incorrecto",
+          ToastAndroid.LONG,
+        );
+      } else {
+        ToastAndroid.show(
+          error.response?.data?.error ||
+            error.message ||
+            "Error al confirmar el pago",
+          ToastAndroid.LONG,
+        );
+      }
+    }
+  };
+
   // Funciones para el BottomNavbar de clientes
   const handleBottomNavHome = () => {
     setActiveTab("home");
@@ -552,7 +620,27 @@ export default function HomeScreen({ navigation, route }: Props) {
     console.log(
       "🔍 HomeScreen - handleBottomNavQR - Estado actual:",
       clientState,
+      "- Delivery activo:",
+      hasActiveDelivery,
+      "- Estado delivery:",
+      deliveryState,
+      "- Método de pago:",
+      activeDelivery?.payment_method,
     );
+
+    // 🚚 Si hay delivery activo en estado "on_the_way" con método de pago QR, usar scanner para pago
+    if (
+      hasActiveDelivery &&
+      deliveryState === "on_the_way" &&
+      activeDelivery?.payment_method === "qr" &&
+      user?.profile_code === "cliente_registrado"
+    ) {
+      navigation.navigate("QRScanner", {
+        mode: "delivery_payment",
+        onScanSuccess: handleDeliveryPaymentQRScan,
+      });
+      return;
+    }
 
     // Si el cliente no está en la lista de espera, escanear QR del maitre para unirse
     if (clientState === "not_in_queue") {
@@ -566,7 +654,9 @@ export default function HomeScreen({ navigation, route }: Props) {
     }
     // Si está en la lista de espera (incluyendo reservas activadas), también debe escanear mesa
     else if (clientState === "in_queue") {
-      console.log("✅ Navegando a ScanTableQR (confirmar llegada - lista de espera)");
+      console.log(
+        "✅ Navegando a ScanTableQR (confirmar llegada - lista de espera)",
+      );
       navigation.navigate("ScanTableQR");
     }
     // Para otros estados (seated, displaced, confirm_pending), usar el escáner general
@@ -855,10 +945,16 @@ export default function HomeScreen({ navigation, route }: Props) {
               {/* Card del usuario */}
               <UserProfileCard user={user!} getProfileLabel={getProfileLabel} />
 
-              <ClientFlowNavigation
-                onRefresh={handleClientRefresh}
-                refreshTrigger={clientRefreshTrigger}
-              />
+              {/* 🚚 Mostrar DeliveryFlowNavigation si hay delivery activo, sino ClientFlowNavigation */}
+              {hasActiveDelivery &&
+              user?.profile_code === "cliente_registrado" ? (
+                <DeliveryFlowNavigation onRefresh={handleClientRefresh} />
+              ) : (
+                <ClientFlowNavigation
+                  onRefresh={handleClientRefresh}
+                  refreshTrigger={clientRefreshTrigger}
+                />
+              )}
 
               {/* Consejo - Dentro del ScrollView para estados sin cart summary */}
               {!(
@@ -1998,6 +2094,93 @@ export default function HomeScreen({ navigation, route }: Props) {
                   Desde aquí puedes gestionar todo el restaurante: aprobar
                   usuarios, crear personal, configurar mesas y supervisar el
                   equipo de trabajo.
+                </Text>
+              </View>
+            </View>
+          ) : user?.profile_code === "empleado" ? (
+            <View>
+              {/* Card del usuario - mismo formato que supervisores */}
+              <UserProfileCard user={user!} getProfileLabel={getProfileLabel} />
+
+              {/* Pantalla de repartidor - Acciones rápidas */}
+              <View
+                style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.05)",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 16,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  <Truck size={20} color="#d4af37" />
+                  <Text
+                    style={{
+                      color: "#d4af37",
+                      fontSize: 16,
+                      fontWeight: "600",
+                      marginLeft: 8,
+                    }}
+                  >
+                    Acciones Rápidas
+                  </Text>
+                </View>
+
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-around",
+                  }}
+                >
+                  <AdminActionButton
+                    icon={Package}
+                    label={"Mis\nEntregas"}
+                    onPress={() => handleNavigate("MyDeliveries")}
+                  />
+
+                  <AdminActionButton
+                    icon={Plus}
+                    label={"Tomar\nPedidos"}
+                    onPress={() => handleNavigate("DriverDeliveries")}
+                  />
+
+                  <AdminActionButton
+                    icon={Plus}
+                    label="Más"
+                    onPress={() => setSidebarVisible(true)}
+                  />
+                </View>
+              </View>
+
+              {/* Info adicional */}
+              <View
+                style={{
+                  backgroundColor: "rgba(34, 197, 94, 0.1)",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginTop: 16,
+                  borderWidth: 1,
+                  borderColor: "rgba(34, 197, 94, 0.3)",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#22c55e",
+                    fontSize: 14,
+                    fontWeight: "600",
+                    marginBottom: 4,
+                  }}
+                >
+                  🚚 Panel de Repartidor
+                </Text>
+                <Text style={{ color: "white", fontSize: 12, lineHeight: 16 }}>
+                  Aquí podrás ver los pedidos listos para entregar. Toma un
+                  pedido y comienza a entregar.
                 </Text>
               </View>
             </View>

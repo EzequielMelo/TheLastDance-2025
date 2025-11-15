@@ -655,7 +655,9 @@ export async function notifyKitchenNewItems(
     }
 
     const totalItems = dishItems.reduce((sum, item) => sum + item.quantity, 0);
-    const itemsText = dishItems.map(item => `${item.quantity}x ${item.name}`).join(", ");
+    const itemsText = dishItems
+      .map(item => `${item.quantity}x ${item.name}`)
+      .join(", ");
 
     const notificationData: PushNotificationData = {
       title: `Nuevo pedido - Mesa #${tableNumber}`,
@@ -672,10 +674,7 @@ export async function notifyKitchenNewItems(
 
     await sendExpoPushNotification(tokens, notificationData);
   } catch (error) {
-    console.error(
-      "❌ Error al enviar notificación a la cocina:",
-      error,
-    );
+    console.error("❌ Error al enviar notificación a la cocina:", error);
   }
 }
 
@@ -693,7 +692,9 @@ export async function notifyBartenderNewItems(
     }
 
     const totalItems = drinkItems.reduce((sum, item) => sum + item.quantity, 0);
-    const itemsText = drinkItems.map(item => `${item.quantity}x ${item.name}`).join(", ");
+    const itemsText = drinkItems
+      .map(item => `${item.quantity}x ${item.name}`)
+      .join(", ");
 
     const notificationData: PushNotificationData = {
       title: `Nuevo pedido - Mesa #${tableNumber}`,
@@ -710,10 +711,7 @@ export async function notifyBartenderNewItems(
 
     await sendExpoPushNotification(tokens, notificationData);
   } catch (error) {
-    console.error(
-      "❌ Error al enviar notificación al bartender:",
-      error,
-    );
+    console.error("❌ Error al enviar notificación al bartender:", error);
   }
 }
 
@@ -731,7 +729,9 @@ export async function notifyWaiterKitchenItemsReady(
     }
 
     const totalItems = dishItems.reduce((sum, item) => sum + item.quantity, 0);
-    const itemsText = dishItems.map(item => `${item.quantity}x ${item.name}`).join(", ");
+    const itemsText = dishItems
+      .map(item => `${item.quantity}x ${item.name}`)
+      .join(", ");
 
     const notificationData: PushNotificationData = {
       title: `🍽️ Platos listos - Mesa #${tableNumber}`,
@@ -768,7 +768,9 @@ export async function notifyWaiterBartenderItemsReady(
     }
 
     const totalItems = drinkItems.reduce((sum, item) => sum + item.quantity, 0);
-    const itemsText = drinkItems.map(item => `${item.quantity}x ${item.name}`).join(", ");
+    const itemsText = drinkItems
+      .map(item => `${item.quantity}x ${item.name}`)
+      .join(", ");
 
     const notificationData: PushNotificationData = {
       title: `🍹 Bebidas listas - Mesa #${tableNumber}`,
@@ -891,10 +893,7 @@ export async function notifyWaiterPaymentCompleted(
 
     await sendExpoPushNotification([token], notificationData);
   } catch (error) {
-    console.error(
-      "❌ Error al enviar notificación de pago completado:",
-      error,
-    );
+    console.error("❌ Error al enviar notificación de pago completado:", error);
   }
 }
 
@@ -910,7 +909,7 @@ export async function notifyClientPaymentConfirmation(
     fileName?: string;
     message?: string;
     error?: string;
-  }
+  },
 ) {
   try {
     const token = await getClientToken(clientId);
@@ -921,7 +920,7 @@ export async function notifyClientPaymentConfirmation(
 
     const notificationData: PushNotificationData = {
       title: `✅ Pago confirmado - Mesa #${tableNumber}`,
-      body: `${waiterName} confirmó tu pago de $${totalAmount.toLocaleString()}. ${invoiceData?.generated ? '¡Tu factura está lista!' : 'Gracias por tu visita!'}`,
+      body: `${waiterName} confirmó tu pago de $${totalAmount.toLocaleString()}. ${invoiceData?.generated ? "¡Tu factura está lista!" : "Gracias por tu visita!"}`,
       data: {
         type: "payment_confirmed",
         tableNumber,
@@ -952,23 +951,21 @@ export async function notifyAnonymousClientInvoiceReady(
     fileName?: string;
     message?: string;
     error?: string;
-  }
+  },
 ) {
   try {
     const token = await getClientToken(clientId);
 
     if (!token) {
-      console.log(`❓ No se encontró token para usuario anónimo: ${clientId}`);
       return;
     }
 
     if (!invoiceData.generated || !invoiceData.fileName) {
-      console.log(`❌ Factura no generada para usuario anónimo: ${clientId}`);
       return;
     }
 
     // Crear URL de descarga para el usuario anónimo
-    const downloadUrl = `${process.env['API_URL'] || 'http://localhost:3000'}/api/invoices/download/${invoiceData.fileName}`;
+    const downloadUrl = `${process.env["API_URL"] || "http://localhost:3000"}/api/invoices/download/${invoiceData.fileName}`;
 
     const notificationData: PushNotificationData = {
       title: `🧾 Tu factura está lista - Mesa #${tableNumber}`,
@@ -985,7 +982,6 @@ export async function notifyAnonymousClientInvoiceReady(
     };
 
     await sendExpoPushNotification([token], notificationData);
-    console.log(`✅ Notificación de factura enviada a usuario anónimo: ${clientId}`);
   } catch (error) {
     console.error(
       "❌ Error al enviar notificación de factura a usuario anónimo:",
@@ -1009,9 +1005,9 @@ export async function notifyClientOrderConfirmed(
       return;
     }
 
-    const timeText = estimatedTime 
+    const timeText = estimatedTime
       ? ` Tiempo estimado: ${estimatedTime} minutos.`
-      : '';
+      : "";
 
     const notificationData: PushNotificationData = {
       title: `✅ Pedido confirmado - Mesa #${tableNumber}`,
@@ -1050,8 +1046,8 @@ export async function notifyManagementPaymentReceived(
       return;
     }
 
-    const paymentInfo = paymentMethod ? ` (${paymentMethod})` : '';
-    
+    const paymentInfo = paymentMethod ? ` (${paymentMethod})` : "";
+
     const notificationData: PushNotificationData = {
       title: `💰 Pago recibido - Mesa #${tableNumber}`,
       body: `${clientName} pagó $${totalAmount.toLocaleString()}${paymentInfo} - Atendido por ${waiterName}`,
@@ -1068,10 +1064,7 @@ export async function notifyManagementPaymentReceived(
 
     await sendExpoPushNotification(tokens, notificationData);
   } catch (error) {
-    console.error(
-      "❌ Error al enviar notificación de pago a gerencia:",
-      error,
-    );
+    console.error("❌ Error al enviar notificación de pago a gerencia:", error);
   }
 }
 
@@ -1102,9 +1095,6 @@ export async function notifyClientAccountApproved(
 
     await sendExpoPushNotification([token], notificationData);
   } catch (error) {
-    console.error(
-      "❌ Error al enviar notificación de cuenta aprobada:",
-      error,
-    );
+    console.error("❌ Error al enviar notificación de cuenta aprobada:", error);
   }
 }

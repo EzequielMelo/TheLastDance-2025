@@ -79,7 +79,10 @@ const BillPaymentScreen: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showPaymentAlert, setShowPaymentAlert] = useState(false);
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
-  const [currentDiscount, setCurrentDiscount] = useState<{ amount: number; received: boolean } | null>(null);
+  const [currentDiscount, setCurrentDiscount] = useState<{
+    amount: number;
+    received: boolean;
+  } | null>(null);
 
   useEffect(() => {
     loadBillData();
@@ -140,7 +143,12 @@ const BillPaymentScreen: React.FC = () => {
   };
 
   const calculateGameDiscountAmount = (): number => {
-    if (!billData || !currentDiscount || user?.profile_code === "cliente_anonimo") return 0;
+    if (
+      !billData ||
+      !currentDiscount ||
+      user?.profile_code === "cliente_anonimo"
+    )
+      return 0;
     return Math.round((billData.subtotal * currentDiscount.amount) / 100);
   };
 
@@ -154,10 +162,9 @@ const BillPaymentScreen: React.FC = () => {
   const handlePayment = async () => {
     try {
       if (!billData) return;
-      
+
       // Mostrar el alert de confirmación con el resumen del pago
       setShowPaymentAlert(true);
-      
     } catch (err) {
       console.error("Error handling payment:", err);
       ToastAndroid.show("❌ Error al procesar el pago", ToastAndroid.SHORT);
@@ -166,31 +173,35 @@ const BillPaymentScreen: React.FC = () => {
 
   const getPaymentSummaryMessage = (): string => {
     if (!billData) return "";
-    
+
     const tipAmount = calculateTipAmount();
     const gameDiscountAmount = calculateGameDiscountAmount();
     const totalAmount = getTotalWithTip();
-    
+
     let message = `Subtotal: $${billData.subtotal.toLocaleString()}\n`;
     message += `Propina (${selectedSatisfaction.tipPercentage}%): $${tipAmount.toLocaleString()}\n`;
-    
-    if (currentDiscount && gameDiscountAmount > 0 && user?.profile_code === "cliente_registrado") {
+
+    if (
+      currentDiscount &&
+      gameDiscountAmount > 0 &&
+      user?.profile_code === "cliente_registrado"
+    ) {
       message += `Descuento por juegos (${currentDiscount.amount}%): -$${gameDiscountAmount.toLocaleString()}\n`;
     }
-    
+
     message += `\nTOTAL A PAGAR: $${totalAmount.toLocaleString()}`;
-    
+
     return message;
   };
 
   const processPay = async () => {
     try {
       if (!billData) return;
-      
+
       const tipAmount = calculateTipAmount();
       const gameDiscountAmount = calculateGameDiscountAmount();
       const totalAmount = getTotalWithTip();
-      
+
       // Preparar datos de pago para enviar al mozo
       const paymentData = {
         totalAmount,
@@ -199,18 +210,16 @@ const BillPaymentScreen: React.FC = () => {
         gameDiscountPercentage: currentDiscount?.amount || 0,
         satisfactionLevel: `${selectedSatisfaction.percentage}% - ${selectedSatisfaction.label}`,
       };
-      
+
       // ⚠️ IMPORTANTE: Esta llamada solo marca el pago como "pendiente de confirmación"
       // NO genera la factura - eso lo hace el mozo cuando confirma la recepción
       await payOrder(billData.tableId, billData.idClient, paymentData);
-      
+
       // ✅ Resetear descuentos de juegos después de solicitar el pago
       const discountCleared = await clearDiscount();
-      console.log("🎮 Game discount reset:", discountCleared ? "✅ Success" : "❌ Failed");
-      
+
       // Mostrar mensaje de que el pago está pendiente de confirmación del mozo
       setShowSuccessAlert(true);
-      
     } catch (err) {
       console.error("Error processing payment:", err);
       ToastAndroid.show("❌ Error al procesar el pago", ToastAndroid.SHORT);
@@ -287,36 +296,37 @@ const BillPaymentScreen: React.FC = () => {
         </View>
 
         {/* Descuentos de Juegos - Solo para usuarios registrados */}
-        {billData.gameDiscounts.length > 0 && user?.profile_code === "cliente_registrado" && (
-          <View className="bg-gray-800 rounded-lg p-4 mb-4">
-            <Text className="text-white text-lg font-semibold mb-3 flex-row items-center">
-              <Gift size={20} color="#10b981" className="mr-2" />
-              Descuentos por Juegos
-            </Text>
-            {billData.gameDiscounts.map(
-              (discount: GameDiscount, index: number) => (
-                <View
-                  key={index}
-                  className="flex-row justify-between items-center py-2"
-                >
-                  <View className="flex-1">
-                    <Text className="text-green-400 font-medium">
-                      {discount.gameType}
-                    </Text>
-                    <Text className="text-gray-400 text-sm">
-                      {discount.wonFirstTry
-                        ? "¡Ganaste en el primer intento!"
-                        : "Descuento aplicado"}
+        {billData.gameDiscounts.length > 0 &&
+          user?.profile_code === "cliente_registrado" && (
+            <View className="bg-gray-800 rounded-lg p-4 mb-4">
+              <Text className="text-white text-lg font-semibold mb-3 flex-row items-center">
+                <Gift size={20} color="#10b981" className="mr-2" />
+                Descuentos por Juegos
+              </Text>
+              {billData.gameDiscounts.map(
+                (discount: GameDiscount, index: number) => (
+                  <View
+                    key={index}
+                    className="flex-row justify-between items-center py-2"
+                  >
+                    <View className="flex-1">
+                      <Text className="text-green-400 font-medium">
+                        {discount.gameType}
+                      </Text>
+                      <Text className="text-gray-400 text-sm">
+                        {discount.wonFirstTry
+                          ? "¡Ganaste en el primer intento!"
+                          : "Descuento aplicado"}
+                      </Text>
+                    </View>
+                    <Text className="text-green-400 font-semibold">
+                      -${discount.discount.toLocaleString()}
                     </Text>
                   </View>
-                  <Text className="text-green-400 font-semibold">
-                    -${discount.discount.toLocaleString()}
-                  </Text>
-                </View>
-              ),
-            )}
-          </View>
-        )}
+                ),
+              )}
+            </View>
+          )}
 
         {/* Total Parcial */}
         <View className="bg-gray-800 rounded-lg p-4 mb-4">
