@@ -856,8 +856,10 @@ export async function confirmPayment(
     message?: string;
     error?: string;
   },
+  updateStatus: boolean = true, // Por defecto actualiza estados (pago en efectivo)
 ): Promise<Delivery> {
-  console.log("💰 Confirmando pago para delivery:", deliveryId);
+  console.log(`💰 Confirmando pago para delivery: ${deliveryId}`);
+  console.log(`🔄 updateStatus=${updateStatus} (${updateStatus ? "actualizar estados inmediatamente" : "solo guardar datos, esperar confirmación"})`);
 
   // Verificar que el delivery existe
   const { data: delivery, error: fetchError } = await supabaseAdmin
@@ -875,31 +877,47 @@ export async function confirmPayment(
     throw new Error("No tienes permiso para confirmar este pago");
   }
 
-  // Para pago con QR, el cliente debe ser quien confirma
-  // Para pago en efectivo, el repartidor confirma
-  if (paymentData.payment_method === "qr" && delivery.user_id !== userId) {
-    throw new Error("Solo el cliente puede confirmar pago con QR");
-  }
-
-  if (paymentData.payment_method === "cash" && delivery.driver_id !== userId) {
-    throw new Error("Solo el repartidor puede confirmar pago en efectivo");
+  // VALIDACIONES SEGÚN EL FLUJO:
+  // - Si updateStatus=false (cliente escaneó QR): el cliente confirma (user_id)
+  // - Si updateStatus=true (repartidor confirma recepción o pago cash): el repartidor confirma (driver_id)
+  
+  if (!updateStatus) {
+    // Cliente escaneando QR - debe ser el cliente (user_id)
+    if (delivery.user_id !== userId) {
+      throw new Error("Solo el cliente puede escanear el QR para iniciar el pago");
+    }
+  } else {
+    // Repartidor confirmando recepción o pago en efectivo - debe ser el repartidor (driver_id)
+    if (delivery.driver_id !== userId) {
+      throw new Error("Solo el repartidor puede confirmar la recepción del pago");
+    }
   }
 
   const now = new Date().toISOString();
 
-  // Actualizar delivery: pago confirmado y estado a delivered
+  // Preparar datos de actualización
+  const updateData: any = {
+    payment_method: paymentData.payment_method,
+    tip_amount: paymentData.tip_amount,
+    tip_percentage: paymentData.tip_percentage,
+    satisfaction_level: paymentData.satisfaction_level,
+  };
+
+  // Solo actualizar estados si updateStatus=true (pago efectivo o confirmación del repartidor)
+  if (updateStatus) {
+    updateData.payment_status = "paid";
+    updateData.paid_at = now;
+    updateData.status = "delivered";
+    updateData.delivered_at = now;
+    console.log("✅ Actualizando estados a 'paid' y 'delivered'");
+  } else {
+    console.log("⏸️ Solo guardando datos de pago, estados quedan en 'pending' y 'on_the_way'");
+  }
+
+  // Actualizar delivery
   const { data: updatedDelivery, error: updateError } = await supabaseAdmin
     .from("deliveries")
-    .update({
-      payment_status: "paid",
-      payment_method: paymentData.payment_method,
-      tip_amount: paymentData.tip_amount,
-      tip_percentage: paymentData.tip_percentage,
-      satisfaction_level: paymentData.satisfaction_level,
-      paid_at: now,
-      status: "delivered",
-      delivered_at: now,
-    })
+    .update(updateData)
     .eq("id", deliveryId)
     .select()
     .single();
@@ -909,58 +927,63 @@ export async function confirmPayment(
     throw new Error("Error al confirmar pago");
   }
 
-  // Actualizar delivery_orders: marcar como pagado (is_paid = true)
-  console.log(
-    "📦 Intentando actualizar delivery_orders con id:",
-    delivery.delivery_order_id,
-  );
-  const { error: orderUpdateError } = await supabaseAdmin
-    .from("delivery_orders")
-    .update({
-      is_paid: true,
-      updated_at: now,
-    })
-    .eq("id", delivery.delivery_order_id);
-
-  if (orderUpdateError) {
-    console.error("❌ Error actualizando delivery_orders:", orderUpdateError);
-    // No lanzar error, pero loguear advertencia
-    console.warn(
-      "⚠️ El delivery se marcó como entregado pero hubo error actualizando el pedido",
-    );
-  } else {
+  // Solo actualizar delivery_orders y delivery_order_items si updateStatus=true
+  if (updateStatus) {
+    // Actualizar delivery_orders: marcar como pagado (is_paid = true)
     console.log(
-      "✅ delivery_orders actualizado: is_paid = true para id:",
+      "📦 Intentando actualizar delivery_orders con id:",
       delivery.delivery_order_id,
     );
-  }
+    const { error: orderUpdateError } = await supabaseAdmin
+      .from("delivery_orders")
+      .update({
+        is_paid: true,
+        updated_at: now,
+      })
+      .eq("id", delivery.delivery_order_id);
 
-  // Actualizar delivery_order_items: marcar todos los items como entregados
-  console.log(
-    "📦 Intentando actualizar delivery_order_items con delivery_order_id:",
-    delivery.delivery_order_id,
-  );
-  const { error: itemsUpdateError } = await supabaseAdmin
-    .from("delivery_order_items")
-    .update({
-      status: "delivered",
-      updated_at: now,
-    })
-    .eq("delivery_order_id", delivery.delivery_order_id);
+    if (orderUpdateError) {
+      console.error("❌ Error actualizando delivery_orders:", orderUpdateError);
+      // No lanzar error, pero loguear advertencia
+      console.warn(
+        "⚠️ El delivery se marcó como entregado pero hubo error actualizando el pedido",
+      );
+    } else {
+      console.log(
+        "✅ delivery_orders actualizado: is_paid = true para id:",
+        delivery.delivery_order_id,
+      );
+    }
 
-  if (itemsUpdateError) {
-    console.error(
-      "❌ Error actualizando delivery_order_items:",
-      itemsUpdateError,
-    );
-    console.warn(
-      "⚠️ El delivery se marcó como entregado pero hubo error actualizando los items",
-    );
-  } else {
+    // Actualizar delivery_order_items: marcar todos los items como entregados
     console.log(
-      "✅ delivery_order_items actualizados: status = 'delivered' para delivery_order_id:",
+      "📦 Intentando actualizar delivery_order_items con delivery_order_id:",
       delivery.delivery_order_id,
     );
+    const { error: itemsUpdateError } = await supabaseAdmin
+      .from("delivery_order_items")
+      .update({
+        status: "delivered",
+        updated_at: now,
+      })
+      .eq("delivery_order_id", delivery.delivery_order_id);
+
+    if (itemsUpdateError) {
+      console.error(
+        "❌ Error actualizando delivery_order_items:",
+        itemsUpdateError,
+      );
+      console.warn(
+        "⚠️ El delivery se marcó como entregado pero hubo error actualizando los items",
+      );
+    } else {
+      console.log(
+        "✅ delivery_order_items actualizados: status = 'delivered' para delivery_order_id:",
+        delivery.delivery_order_id,
+      );
+    }
+  } else {
+    console.log("⏸️ Saltando actualización de delivery_orders y delivery_order_items (esperando confirmación del repartidor)");
   }
 
   // ENTREGA DIFERENCIADA DE FACTURA (igual que en mesas)
@@ -1053,7 +1076,11 @@ export async function confirmPayment(
     }
   }
 
-  console.log("✅ Pago confirmado y delivery marcado como entregado");
+  if (updateStatus) {
+    console.log("✅ Pago confirmado y delivery marcado como entregado");
+  } else {
+    console.log("✅ Datos de pago guardados, esperando confirmación del repartidor");
+  }
   return updatedDelivery;
 }
 

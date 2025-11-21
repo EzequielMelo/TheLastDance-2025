@@ -12,7 +12,6 @@ import {
   AlertCircle,
 } from "lucide-react-native";
 import { useDeliveryState } from "../../Hooks/useDeliveryState";
-import { useDeliveryStateSocket } from "../../Hooks/useDeliveryStateSocket";
 import type { RootStackNavigationProp } from "../../navigation/RootStackParamList";
 import { cancelDelivery } from "../../api/deliveries";
 import CustomAlert from "../common/CustomAlert";
@@ -54,9 +53,6 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
     setAlertConfig({ title, message, type, buttons: buttons || [] });
     setAlertVisible(true);
   };
-
-  // 🔌 Socket para actualizaciones en tiempo real (reemplaza el auto-refresh)
-  useDeliveryStateSocket(refresh);
 
   const handleRefresh = async () => {
     await refresh();

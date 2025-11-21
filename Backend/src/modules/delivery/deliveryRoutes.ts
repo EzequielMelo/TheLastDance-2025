@@ -108,6 +108,13 @@ router.put("/:id/payment-method", deliveryController.setPaymentMethod);
 router.put("/:id/confirm-payment", deliveryController.confirmPayment);
 
 /**
+ * @route   PUT /api/deliveries/:id/confirm-payment-received
+ * @desc    Repartidor confirma que recibió el pago (actualiza estados)
+ * @access  Private (solo repartidor asignado)
+ */
+router.put("/:id/confirm-payment-received", deliveryController.confirmPaymentReceived);
+
+/**
  * @route   PUT /api/deliveries/:id/location
  * @desc    Actualizar ubicación en tiempo real del repartidor
  * @access  Private (solo repartidor asignado)

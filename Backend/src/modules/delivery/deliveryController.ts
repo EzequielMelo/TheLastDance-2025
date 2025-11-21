@@ -739,6 +739,7 @@ export async function confirmPayment(
     }
 
     // PASO 1: Validar que el delivery existe y pertenece al cliente
+    console.log(`🔍 Buscando delivery con id: ${id}`);
     const { data: deliveryData, error: deliveryFetchError } =
       await supabaseAdmin
         .from("deliveries")
@@ -747,6 +748,7 @@ export async function confirmPayment(
         .single();
 
     if (deliveryFetchError || !deliveryData) {
+      console.error(`❌ Delivery no encontrado:`, deliveryFetchError);
       res.status(404).json({
         success: false,
         error: "Delivery no encontrado",
@@ -754,11 +756,22 @@ export async function confirmPayment(
       return;
     }
 
+    console.log(`✅ Delivery encontrado:`, {
+      user_id: deliveryData.user_id,
+      driver_id: deliveryData.driver_id,
+      payment_method: deliveryData.payment_method,
+      payment_status: deliveryData.payment_status,
+      status: deliveryData.status,
+    });
+
     // Validar que el usuario tiene permiso para confirmar este pago
     const isClient = deliveryData.user_id === req.user.appUserId;
     const isDriver = deliveryData.driver_id === req.user.appUserId;
 
+    console.log(`🔐 Validando permisos: isClient=${isClient}, isDriver=${isDriver}, requestUserId=${req.user.appUserId}`);
+
     if (!isClient && !isDriver) {
+      console.error(`❌ Usuario no autorizado para confirmar este pago`);
       res.status(403).json({
         success: false,
         error: "No tienes permiso para confirmar este pago",
@@ -768,6 +781,7 @@ export async function confirmPayment(
 
     // Para pago QR: solo el CLIENTE puede confirmar
     if (payment_method === "qr" && !isClient) {
+      console.error(`❌ Intento de confirmar QR sin ser cliente`);
       res.status(403).json({
         success: false,
         error: "Solo el cliente puede confirmar pago con QR",
@@ -777,6 +791,7 @@ export async function confirmPayment(
 
     // Para pago en efectivo: solo el REPARTIDOR puede confirmar
     if (payment_method === "cash" && !isDriver) {
+      console.error(`❌ Intento de confirmar efectivo sin ser repartidor`);
       res.status(403).json({
         success: false,
         error: "Solo el repartidor puede confirmar pago en efectivo",
@@ -786,6 +801,7 @@ export async function confirmPayment(
 
     // Validar que el delivery tiene el método de pago correcto configurado
     if (deliveryData.payment_method !== payment_method) {
+      console.error(`❌ Método de pago no coincide: esperado=${deliveryData.payment_method}, recibido=${payment_method}`);
       res.status(400).json({
         success: false,
         error: `El método de pago no coincide. El delivery tiene configurado: ${deliveryData.payment_method}`,
@@ -795,6 +811,7 @@ export async function confirmPayment(
 
     // Validar que el pago está pendiente
     if (deliveryData.payment_status !== "pending") {
+      console.error(`❌ Pago ya procesado: ${deliveryData.payment_status}`);
       res.status(400).json({
         success: false,
         error: `El pago ya fue procesado. Estado actual: ${deliveryData.payment_status}`,
@@ -804,6 +821,7 @@ export async function confirmPayment(
 
     // Validar que el delivery está en camino
     if (deliveryData.status !== "on_the_way") {
+      console.error(`❌ Delivery no está en camino: ${deliveryData.status}`);
       res.status(400).json({
         success: false,
         error: `El delivery no está listo para pago. Estado actual: ${deliveryData.status}`,
@@ -811,7 +829,13 @@ export async function confirmPayment(
       return;
     }
 
+    console.log(`✅ Todas las validaciones pasaron correctamente`);
+
     const clientId = deliveryData.user_id;
+
+    // IMPORTANTE: Para pago QR, solo generamos factura y notificamos al repartidor
+    // El repartidor debe confirmar manualmente que recibió el pago
+    const isQRPayment = payment_method === "qr";
 
     // PASO 2: Generar factura ANTES de confirmar el pago
     const { InvoiceService } = await import("../invoices/invoiceService");
@@ -904,30 +928,141 @@ export async function confirmPayment(
         satisfaction_level,
       },
       invoiceInfo, // Pasar la info de la factura
+      !isQRPayment, // updateStatus: false para QR (esperar confirmación del repartidor), true para cash
     );
 
-    // 🔔 Emitir evento Socket.IO
-    const io = getIOInstance();
-    if (io && delivery.user_id) {
-      const userRoom = `user_${delivery.user_id}`;
-      io.to(userRoom).emit("delivery_payment_confirmed", {
-        deliveryId: delivery.id,
-        paymentMethod: payment_method,
-        tipAmount: tip_amount,
-      });
+    // 🔔 Si es pago QR, emitir evento al REPARTIDOR para que confirme
+    if (isQRPayment) {
+      const io = getIOInstance();
+      if (io && delivery.driver_id) {
+        const driverRoom = `user_${delivery.driver_id}`;
+        io.to(driverRoom).emit("delivery_payment_confirmed", {
+          deliveryId: delivery.id,
+          paymentMethod: payment_method,
+          tipAmount: tip_amount,
+        });
+        console.log(`🔔 Evento 'delivery_payment_confirmed' enviado al repartidor: ${delivery.driver_id}`);
+      }
     }
 
     res.json({
       success: true,
       delivery,
       invoice: invoiceInfo,
-      message: "Pago confirmado exitosamente",
+      message: isQRPayment
+        ? "Esperando confirmación del repartidor"
+        : "Pago confirmado exitosamente",
     });
   } catch (error: any) {
     console.error("❌ Error en confirmPayment:", error);
     res.status(400).json({
       success: false,
       error: error.message || "Error al confirmar pago",
+    });
+  }
+}
+
+/**
+ * PUT /api/deliveries/:id/confirm-payment-received
+ * Repartidor confirma que recibió el pago (actualiza estados a delivered y paid)
+ */
+export async function confirmPaymentReceived(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: "Usuario no autenticado",
+      });
+      return;
+    }
+
+    const { id } = req.params;
+
+    if (!id) {
+      res.status(400).json({
+        success: false,
+        error: "ID del delivery es requerido",
+      });
+      return;
+    }
+
+    console.log(`👍 Repartidor confirmando recepción de pago para delivery: ${id}`);
+
+    // Obtener el delivery completo con todos los datos de pago
+    const { data: deliveryData, error: deliveryFetchError } =
+      await supabaseAdmin
+        .from("deliveries")
+        .select("driver_id, payment_method, payment_status, tip_amount, tip_percentage, satisfaction_level")
+        .eq("id", id)
+        .single();
+
+    if (deliveryFetchError || !deliveryData) {
+      res.status(404).json({
+        success: false,
+        error: "Delivery no encontrado",
+      });
+      return;
+    }
+
+    // Validar que es el repartidor
+    if (deliveryData.driver_id !== req.user.appUserId) {
+      res.status(403).json({
+        success: false,
+        error: "Solo el repartidor asignado puede confirmar la recepción",
+      });
+      return;
+    }
+
+    // Validar que el pago está pendiente
+    if (deliveryData.payment_status !== "pending") {
+      res.status(400).json({
+        success: false,
+        error: `El pago ya fue procesado. Estado actual: ${deliveryData.payment_status}`,
+      });
+      return;
+    }
+
+    console.log(`📋 Datos de pago guardados: tip=${deliveryData.tip_amount}, tip%=${deliveryData.tip_percentage}, satisfaction=${deliveryData.satisfaction_level}`);
+
+    // Llamar al service para actualizar los estados
+    const delivery = await deliveryService.confirmPayment(
+      id,
+      req.user.appUserId,
+      {
+        payment_method: deliveryData.payment_method as "qr" | "cash",
+        tip_amount: deliveryData.tip_amount || 0,
+        tip_percentage: deliveryData.tip_percentage || 0,
+        satisfaction_level: deliveryData.satisfaction_level,
+      },
+      undefined, // No hay invoiceInfo (ya se envió)
+      true, // updateStatus = true (actualizar estados ahora)
+    );
+
+    // 🔔 Emitir evento Socket.IO al CLIENTE para notificar que el delivery fue completado
+    const io = getIOInstance();
+    if (io && delivery.user_id) {
+      const userRoom = `user_${delivery.user_id}`;
+      io.to(userRoom).emit("delivery_updated", delivery);
+      io.to(userRoom).emit("delivery_status_changed", {
+        deliveryId: delivery.id,
+        newStatus: "delivered",
+      });
+      console.log(`🔔 Socket.IO: Emitido delivery_updated (delivered) a cliente ${userRoom}`);
+    }
+
+    res.json({
+      success: true,
+      delivery,
+      message: "Pago recibido y delivery completado",
+    });
+  } catch (error: any) {
+    console.error("❌ Error en confirmPaymentReceived:", error);
+    res.status(400).json({
+      success: false,
+      error: error.message || "Error al confirmar recepción del pago",
     });
   }
 }

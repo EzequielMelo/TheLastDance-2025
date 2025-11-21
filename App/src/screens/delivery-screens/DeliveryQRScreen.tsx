@@ -3,9 +3,9 @@
  */
 
 import React, { useEffect, useState, useRef } from "react";
-import { View, Text, ActivityIndicator, TouchableOpacity } from "react-native";
+import { View, Text, ActivityIndicator, TouchableOpacity, BackHandler } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import QRCode from "react-native-qrcode-svg";
 import { CheckCircle, ArrowLeft } from "lucide-react-native";
@@ -13,6 +13,8 @@ import { io, Socket } from "socket.io-client";
 import { RootStackParamList } from "../../navigation/RootStackParamList";
 import { useAuth } from "../../auth/useAuth";
 import { SERVER_BASE_URL } from "../../api/config";
+import CustomAlert from "../../components/common/CustomAlert";
+import { confirmDeliveryPaymentReceived } from "../../api/deliveries";
 
 type DeliveryQRScreenRouteProp = RouteProp<
   RootStackParamList,
@@ -31,6 +33,11 @@ const DeliveryQRScreen: React.FC = () => {
   const socketRef = useRef<Socket | null>(null);
 
   const [isPaid, setIsPaid] = useState(false);
+  const [showConfirmAlert, setShowConfirmAlert] = useState(false);
+  const [paymentConfirmData, setPaymentConfirmData] = useState<{
+    deliveryId: string;
+    totalAmount: number;
+  } | null>(null);
 
   // Generar JSON para el QR
   const qrData = JSON.stringify({
@@ -59,35 +66,77 @@ const DeliveryQRScreen: React.FC = () => {
     });
 
     // Escuchar confirmación de pago
-    socket.on("delivery_payment_confirmed", (data: { deliveryId: string }) => {
-      console.log("💰 Pago confirmado:", data);
-      if (data.deliveryId === deliveryId) {
-        setIsPaid(true);
-        // Navegar al Home después de 2 segundos, reseteando el stack
-        setTimeout(() => {
-          navigation.reset({
-            index: 0,
-            routes: [{ name: "Home" }],
+    socket.on(
+      "delivery_payment_confirmed",
+      (data: { deliveryId: string }) => {
+        if (data.deliveryId === deliveryId) {
+          // Mostrar CustomAlert para que el repartidor confirme que recibió el pago
+          setPaymentConfirmData({
+            deliveryId: data.deliveryId,
+            totalAmount: paymentData.totalAmount,
           });
-        }, 2000);
-      }
-    });
+          setShowConfirmAlert(true);
+        }
+      },
+    );
 
     return () => {
       socket.off("delivery_payment_confirmed");
       socket.disconnect();
     };
-  }, [user?.id, token, deliveryId, navigation]);
+  }, [user?.id, token, deliveryId, navigation, paymentData.totalAmount]);
+
+  const handleConfirmPaymentReceived = async () => {
+    setShowConfirmAlert(false);
+    try {
+      // Llamar al endpoint para confirmar recepción del pago
+      await confirmDeliveryPaymentReceived(deliveryId);
+      setIsPaid(true);
+      // Volver al Home después de mostrar confirmación
+      setTimeout(() => {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Home" }],
+        });
+      }, 2000);
+    } catch (error: any) {
+      console.error("Error confirmando recepción del pago:", error);
+      // Mostrar error pero permitir cerrar el alert
+      setIsPaid(true);
+    }
+  };
+
+  // Interceptar botón de atrás cuando el pago ha sido confirmado
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (isPaid) {
+          // Si el pago fue confirmado, ir al Home en lugar de volver atrás
+          navigation.reset({
+            index: 0,
+            routes: [{ name: "Home" }],
+          });
+          return true; // Prevenir comportamiento por defecto
+        }
+        return false; // Permitir comportamiento por defecto
+      };
+
+      const backHandler = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+
+      return () => backHandler.remove();
+    }, [isPaid, navigation])
+  );
 
   if (isPaid) {
     return (
       <SafeAreaView className="flex-1 bg-[#1a1a1a] items-center justify-center">
         <CheckCircle size={80} color="#10b981" />
         <Text className="text-[#10b981] text-3xl font-bold mt-6 mb-3">
-          ¡Pago Confirmado!
+          ¡Pago Recibido!
         </Text>
         <Text className="text-gray-400 text-base text-center px-5">
-          El delivery ha sido completado exitosamente
+          El delivery ha sido completado exitosamente.
+          {"\n"}La factura fue enviada al cliente.
         </Text>
       </SafeAreaView>
     );
@@ -178,6 +227,26 @@ const DeliveryQRScreen: React.FC = () => {
           </Text>
         </View>
       </View>
+
+      {/* CustomAlert para confirmar recepción del pago */}
+      <CustomAlert
+        visible={showConfirmAlert}
+        title="Pago Confirmado"
+        message={`El cliente ha confirmado el pago de $${paymentConfirmData ? (paymentConfirmData.totalAmount + paymentData.tipAmount).toFixed(2) : paymentData.totalAmount.toFixed(2)}.\n\n¿Confirmas que recibiste el pago?`}
+        type="success"
+        onClose={() => setShowConfirmAlert(false)}
+        buttons={[
+          {
+            text: "No recibí el pago",
+            onPress: () => setShowConfirmAlert(false),
+            style: "cancel",
+          },
+          {
+            text: "Sí, recibí el pago",
+            onPress: handleConfirmPaymentReceived,
+          },
+        ]}
+      />
     </SafeAreaView>
   );
 };

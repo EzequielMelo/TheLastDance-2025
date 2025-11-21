@@ -169,6 +169,19 @@ export const confirmDeliveryPayment = async (
 };
 
 /**
+ * Repartidor confirma que recibió el pago (actualiza estados a paid y delivered)
+ * @param deliveryId ID del delivery
+ */
+export const confirmDeliveryPaymentReceived = async (
+  deliveryId: string,
+): Promise<Delivery> => {
+  const response = await api.put(
+    `/deliveries/${deliveryId}/confirm-payment-received`,
+  );
+  return response.data.delivery;
+};
+
+/**
  * Actualizar ubicación en tiempo real del repartidor
  * @param deliveryId ID del delivery
  * @param location Coordenadas de ubicación

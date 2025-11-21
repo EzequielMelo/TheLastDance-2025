@@ -72,6 +72,7 @@ export default function HomeScreen({ navigation, route }: Props) {
     hasActiveDelivery,
     state: deliveryState,
     delivery: activeDelivery,
+    refresh: refreshDeliveryState,
   } = useDeliveryState();
   const { cartAmount, cartCount, userOrders } = useCart();
   const [sidebarVisible, setSidebarVisible] = useState(false);
@@ -581,9 +582,9 @@ export default function HomeScreen({ navigation, route }: Props) {
         return;
       }
 
-      ToastAndroid.show("💰 Confirmando pago...", ToastAndroid.SHORT);
+      ToastAndroid.show("💰 Procesando pago...", ToastAndroid.SHORT);
 
-      // Confirmar el pago
+      // Confirmar el pago (el repartidor debe confirmar la recepción)
       await confirmDeliveryPayment(parsedData.deliveryId, {
         payment_method: "qr",
         tip_amount: parsedData.tipAmount,
@@ -592,7 +593,7 @@ export default function HomeScreen({ navigation, route }: Props) {
       });
 
       ToastAndroid.show(
-        `✅ Pago confirmado: $${(parsedData.amount + parsedData.tipAmount).toFixed(2)}`,
+        `✅ Pago enviado. Esperando confirmación del repartidor...`,
         ToastAndroid.LONG,
       );
 

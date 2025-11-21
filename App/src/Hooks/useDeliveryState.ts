@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { io, Socket } from "socket.io-client";
 import api from "../api/axios";
 import { useAuth } from "../auth/useAuth";
+import { SERVER_BASE_URL } from "../api/config";
 import type { DeliveryWithOrder } from "../types/Delivery";
 
 export type DeliveryState =
@@ -27,8 +29,9 @@ export const useDeliveryState = (): DeliveryStateData => {
   const [state, setState] = useState<DeliveryState>("loading");
   const [delivery, setDelivery] = useState<DeliveryWithOrder | null>(null);
   const [hasActiveDelivery, setHasActiveDelivery] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+  const socketRef = useRef<Socket | null>(null);
+  const isRefreshingRef = useRef(false);
 
   const checkDeliveryState = useCallback(async () => {
     // Solo usuarios cliente_registrado pueden tener deliveries
@@ -39,10 +42,10 @@ export const useDeliveryState = (): DeliveryStateData => {
       return;
     }
 
-    if (isRefreshing) return;
+    if (isRefreshingRef.current) return;
 
     try {
-      setIsRefreshing(true);
+      isRefreshingRef.current = true;
       setState("loading");
 
       const response = await api.get("/deliveries/active");
@@ -89,25 +92,82 @@ export const useDeliveryState = (): DeliveryStateData => {
       setDelivery(null);
       setHasActiveDelivery(false);
     } finally {
-      setIsRefreshing(false);
-    }
-  }, [user?.id, user?.profile_code, isRefreshing]);
-
-  useEffect(() => {
-    if (user?.id && user.profile_code === "cliente_registrado") {
-      checkDeliveryState();
-    } else {
-      setState("no_delivery");
-      setDelivery(null);
-      setHasActiveDelivery(false);
+      isRefreshingRef.current = false;
     }
   }, [user?.id, user?.profile_code]);
+
+  // Solo ejecutar UNA VEZ al montar el componente
+  useEffect(() => {
+    let isMounted = true;
+
+    const initializeDeliveryState = async () => {
+      if (!isMounted) return;
+      
+      if (user?.id && user.profile_code === "cliente_registrado") {
+        await checkDeliveryState();
+      } else {
+        setState("no_delivery");
+        setDelivery(null);
+        setHasActiveDelivery(false);
+      }
+    };
+
+    initializeDeliveryState();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Sin dependencias - solo se ejecuta al montar
+
+  // Socket.IO para actualizaciones en tiempo real
+  useEffect(() => {
+    // Solo conectar si es cliente registrado
+    if (!user?.id || !token || user.profile_code !== "cliente_registrado") {
+      return;
+    }
+
+    // Crear conexión Socket.IO
+    const socket = io(SERVER_BASE_URL, {
+      auth: { token },
+      transports: ["websocket", "polling"],
+    });
+
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      socket.emit("join_user_room", user.id);
+      console.log("🔌 Socket.IO conectado para delivery state");
+    });
+
+    // Escuchar actualizaciones de delivery
+    socket.on("delivery_updated", () => {
+      console.log("📦 Recibido evento delivery_updated - refrescando estado");
+      checkDeliveryState();
+    });
+
+    socket.on("delivery_status_changed", () => {
+      console.log("📦 Recibido evento delivery_status_changed - refrescando estado");
+      checkDeliveryState();
+    });
+
+    socket.on("disconnect", () => {
+      console.log("🔌 Socket.IO desconectado de delivery state");
+    });
+
+    // Cleanup
+    return () => {
+      socket.off("delivery_updated");
+      socket.off("delivery_status_changed");
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [user?.id, token, user?.profile_code]); // Solo reconectar si cambia el usuario
 
   return {
     state,
     delivery,
     hasActiveDelivery,
     refresh: checkDeliveryState,
-    isLoading: state === "loading" || isRefreshing,
+    isLoading: state === "loading" || isRefreshingRef.current,
   };
 };
