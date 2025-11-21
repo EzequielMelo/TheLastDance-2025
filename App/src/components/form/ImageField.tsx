@@ -46,9 +46,10 @@ export default function ImageField({
       <View>
         <TouchableOpacity
           onPress={handlePress}
-          className={`h-32 rounded-xl overflow-hidden bg-white/10 border items-center justify-center ${
+          className={`w-32 h-32 rounded-xl overflow-hidden bg-white/10 border items-center justify-center ${
             showError ? "border-red-500" : "border-white/20"
           } ${focused ? "border-[#d4af37]" : ""}`}
+          style={{ aspectRatio: 1 }}
         >
           {image ? (
             <Image
@@ -67,7 +68,7 @@ export default function ImageField({
         {!!image && (
           <TouchableOpacity
             onPress={onClear}
-            className="px-3 py-2 mt-2 rounded-lg bg-black/40 border border-white/10 self-center"
+            className="px-3 py-2 mt-2 rounded-lg bg-black/40 border border-white/10"
           >
             <Text className="text-white text-xs">Quitar</Text>
           </TouchableOpacity>

@@ -847,6 +847,15 @@ export async function confirmPayment(
     tip_percentage: number;
     satisfaction_level?: string;
   },
+  invoiceInfo?: {
+    generated: boolean;
+    filePath?: string;
+    fileName?: string;
+    htmlContent?: string;
+    isRegistered?: boolean;
+    message?: string;
+    error?: string;
+  },
 ): Promise<Delivery> {
   console.log("💰 Confirmando pago para delivery:", deliveryId);
 
@@ -952,6 +961,96 @@ export async function confirmPayment(
       "✅ delivery_order_items actualizados: status = 'delivered' para delivery_order_id:",
       delivery.delivery_order_id,
     );
+  }
+
+  // ENTREGA DIFERENCIADA DE FACTURA (igual que en mesas)
+  if (invoiceInfo?.generated) {
+    try {
+      // Obtener datos del cliente
+      const { data: clientData, error: clientError } = await supabaseAdmin
+        .from("users")
+        .select("first_name, last_name")
+        .eq("id", delivery.user_id)
+        .single();
+
+      const clientName = clientData && !clientError
+        ? `${clientData.first_name} ${clientData.last_name}`.trim()
+        : "Cliente";
+
+      if (invoiceInfo.isRegistered && invoiceInfo.htmlContent) {
+        // USUARIO REGISTRADO: Enviar factura por email (HTML embebido)
+        console.log(`📧 Enviando factura por email a usuario registrado del delivery`);
+
+        // Obtener email del cliente desde Firebase Auth
+        const { getAuthEmailById } = await import("../admin/adminServices");
+        const clientEmail = await getAuthEmailById(delivery.user_id);
+
+        if (!clientEmail) {
+          throw new Error("No se pudo obtener email del cliente registrado");
+        }
+
+        const { InvoiceEmailService } = await import(
+          "../../services/invoiceEmailService"
+        );
+        const totalAmount = (updatedDelivery as any).delivery_order?.total_amount || 0;
+        const emailResult = await InvoiceEmailService.sendInvoiceByEmail(
+          clientEmail,
+          invoiceInfo.htmlContent,
+          {
+            clientName,
+            tableNumber: "DELIVERY",
+            invoiceNumber: `INV-DEL-${Date.now()}`,
+            totalAmount,
+            invoiceDate: new Date().toLocaleDateString("es-AR"),
+          },
+        );
+
+        if (emailResult.success) {
+          console.log(
+            `✅ Factura de delivery enviada por email exitosamente a: ${clientEmail}`,
+          );
+        } else {
+          console.error(
+            `❌ Error enviando factura de delivery por email: ${emailResult.error}`,
+          );
+        }
+      } else if (
+        !invoiceInfo.isRegistered &&
+        invoiceInfo.filePath &&
+        invoiceInfo.fileName
+      ) {
+        // USUARIO ANÓNIMO: Enviar notificación push con enlace de descarga
+        console.log(
+          `📱 Enviando notificación push con enlace de descarga a usuario anónimo del delivery`,
+        );
+
+        const { notifyAnonymousClientInvoiceReady } = await import(
+          "../../services/pushNotificationService"
+        );
+        const totalAmount = (updatedDelivery as any).delivery_order?.total_amount || 0;
+        await notifyAnonymousClientInvoiceReady(
+          delivery.user_id,
+          "DELIVERY",
+          totalAmount,
+          {
+            generated: true,
+            filePath: invoiceInfo.filePath,
+            fileName: invoiceInfo.fileName,
+            message: invoiceInfo.message || "Factura generada exitosamente",
+          },
+        );
+      } else {
+        console.warn(
+          `⚠️ Factura generada pero faltan datos para entrega en delivery: isRegistered=${invoiceInfo.isRegistered}, hasHTML=${!!invoiceInfo.htmlContent}, hasFile=${!!invoiceInfo.filePath}`,
+        );
+      }
+    } catch (deliveryError) {
+      console.error(
+        `❌ Error en entrega diferenciada de factura de delivery:`,
+        deliveryError,
+      );
+      // Continúa sin fallar
+    }
   }
 
   console.log("✅ Pago confirmado y delivery marcado como entregado");

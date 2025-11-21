@@ -552,35 +552,6 @@ export const RegisterScreen = ({ navigation }: Props) => {
           onFocus={() => setFocused("confirmPassword")}
           error={errors.confirmPassword}
         />
-
-        {/* Separador */}
-        <View className="flex-row items-center my-6">
-          <View className="flex-1 h-px bg-gray-600" />
-          <Text className="mx-4 text-gray-400">O continúa con</Text>
-          <View className="flex-1 h-px bg-gray-600" />
-        </View>
-
-        {/* Botones de redes sociales */}
-        <View className="flex-row justify-center gap-4 mb-4">
-          {/* Google */}
-          <TouchableOpacity
-            onPress={() => handleSocialSignIn("google")}
-            disabled={socialLoading || actionLoading}
-            className="bg-white p-4 rounded-full flex-row items-center gap-2"
-            style={{
-              opacity: socialLoading || actionLoading ? 0.5 : 1,
-              elevation: 4,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.25,
-              shadowRadius: 4,
-            }}
-          >
-            <Text className="text-2xl font-bold" style={{ color: "#4285F4" }}>
-              G
-            </Text>
-          </TouchableOpacity>
-        </View>
       </FormLayout>
 
       <Modal visible={showCamera} animationType="slide">

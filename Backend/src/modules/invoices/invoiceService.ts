@@ -104,6 +104,68 @@ export class InvoiceService {
     return this.generateInvoiceWithFile(tableId, clientId);
   }
 
+  // ============= MÉTODOS PARA DELIVERY =============
+
+  // Para clientes REGISTRADOS de delivery: Solo generar HTML
+  static async generateDeliveryInvoiceHTMLOnly(
+    deliveryId: string,
+    clientId: string,
+  ): Promise<{ success: boolean; htmlContent?: string; error?: string }> {
+    try {
+      // Obtener datos de la factura desde delivery
+      const invoiceData = await this.getDeliveryInvoiceData(deliveryId, clientId);
+
+      if (!invoiceData) {
+        return {
+          success: false,
+          error: "No se encontraron datos para la factura de delivery",
+        };
+      }
+
+      // Generar solo el HTML sin guardarlo
+      const htmlContent = this.createHTMLInvoice(invoiceData);
+      return { success: true, htmlContent };
+    } catch (error) {
+      console.error("Error generando factura HTML de delivery:", error);
+      return { success: false, error: "Error interno generando factura" };
+    }
+  }
+
+  // Para clientes ANÓNIMOS de delivery: Generar HTML Y guardar archivo
+  static async generateDeliveryInvoiceWithFile(
+    deliveryId: string,
+    clientId: string,
+  ): Promise<{
+    success: boolean;
+    filePath?: string;
+    fileName?: string;
+    htmlContent?: string;
+    error?: string;
+  }> {
+    try {
+      // Obtener datos de la factura desde delivery
+      const invoiceData = await this.getDeliveryInvoiceData(deliveryId, clientId);
+
+      if (!invoiceData) {
+        return {
+          success: false,
+          error: "No se encontraron datos para la factura de delivery",
+        };
+      }
+
+      // Generar el HTML
+      const htmlContent = this.createHTMLInvoice(invoiceData);
+
+      // Guardar el archivo HTML para usuarios anónimos
+      const filePath = await this.saveHTMLFile(invoiceData, htmlContent);
+      const fileName = path.basename(filePath);
+      return { success: true, filePath, fileName, htmlContent };
+    } catch (error) {
+      console.error("Error generando factura con archivo de delivery:", error);
+      return { success: false, error: "Error interno generando factura" };
+    }
+  }
+
   private static async getInvoiceData(
     tableId: string,
     clientId: string,
@@ -540,6 +602,125 @@ export class InvoiceService {
 </html>`;
   }
 
+  private static async getDeliveryInvoiceData(
+    deliveryId: string,
+    clientId: string,
+  ): Promise<InvoiceData | null> {
+    try {
+      // Obtener datos del delivery con orden y repartidor
+      const { data: deliveryData, error: deliveryError } = await supabaseAdmin
+        .from("deliveries")
+        .select(`
+          id,
+          delivery_address,
+          driver_id,
+          delivery_order_id,
+          tip_amount,
+          delivery_order:delivery_orders (
+            id,
+            total_amount,
+            delivery_order_items (
+              id,
+              quantity,
+              unit_price,
+              subtotal,
+              menu_item:menu_items (
+                id,
+                name,
+                category
+              )
+            )
+          )
+        `)
+        .eq("id", deliveryId)
+        .eq("user_id", clientId)
+        .single();
+
+      if (deliveryError || !deliveryData) {
+        console.error("Error obteniendo datos de delivery:", deliveryError);
+        throw new Error("Error obteniendo datos de delivery");
+      }
+
+      // Obtener datos del cliente
+      const { data: clientData, error: clientError } = await supabaseAdmin
+        .from("users")
+        .select("first_name, last_name")
+        .eq("id", clientId)
+        .single();
+
+      if (clientError || !clientData) {
+        console.error("Error obteniendo datos del cliente:", clientError);
+        throw new Error("Error obteniendo datos del cliente");
+      }
+
+      // Obtener datos del repartidor
+      const { data: driverData, error: driverError } = await supabaseAdmin
+        .from("users")
+        .select("first_name, last_name")
+        .eq("id", deliveryData.driver_id)
+        .single();
+
+      if (driverError || !driverData) {
+        console.error("Error obteniendo datos del repartidor:", driverError);
+        throw new Error("Error obteniendo datos del repartidor");
+      }
+
+      const clientName = `${clientData.first_name} ${clientData.last_name}`.trim();
+      const driverName = `${driverData.first_name} ${driverData.last_name}`.trim();
+
+      // Procesar items del delivery_order
+      let billItems: any[] = [];
+      let subtotal = 0;
+
+      const deliveryOrder = deliveryData.delivery_order as any;
+      if (deliveryOrder?.delivery_order_items) {
+        deliveryOrder.delivery_order_items.forEach((item: any) => {
+          const menuItem = item.menu_item;
+          billItems.push({
+            id: item.id,
+            name: menuItem?.name || "Item desconocido",
+            category: menuItem?.category || "Sin categoría",
+            quantity: item.quantity,
+            price: item.unit_price,
+            total: item.subtotal,
+          });
+          subtotal += item.subtotal;
+        });
+      }
+
+      const formattedOrders = [
+        {
+          id: "delivery-consolidated",
+          items: billItems,
+          total_amount: subtotal,
+          created_at: new Date().toISOString(),
+        },
+      ];
+
+      const tipAmount = deliveryData.tip_amount || 0;
+      const totalAmount = subtotal;
+
+      // Generar número y fecha de factura
+      const invoiceNumber = `INV-DEL-${Date.now()}`;
+      const invoiceDate = new Date().toLocaleDateString("es-AR");
+
+      return {
+        tableNumber: "DELIVERY", // Para delivery usamos "DELIVERY" en lugar de número de mesa
+        clientName,
+        waiterName: driverName, // El repartidor toma el rol del mozo
+        orders: formattedOrders,
+        discounts: [], // Por ahora sin descuentos en delivery
+        tip: tipAmount,
+        totalAmount,
+        invoiceNumber,
+        invoiceDate,
+      };
+    } catch (error) {
+      console.error("Error obteniendo datos de factura de delivery:", error);
+      return null;
+    }
+  }
+
   private static async saveHTMLFile(
     data: InvoiceData,
     htmlContent: string,
@@ -552,7 +733,9 @@ export class InvoiceService {
 
     // Generar nombre único para el archivo
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const fileName = `factura-mesa-${data.tableNumber}-${timestamp}.html`;
+    const fileName = data.tableNumber === "DELIVERY" 
+      ? `factura-delivery-${timestamp}.html`
+      : `factura-mesa-${data.tableNumber}-${timestamp}.html`;
     const filePath = path.join(invoicesDir, fileName);
 
     // Guardar el archivo

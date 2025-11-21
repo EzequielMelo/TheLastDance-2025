@@ -30,7 +30,7 @@ export default function SplashScreen() {
 
       <Text style={styles.bottomText}>Integrantes</Text>
       <Text style={styles.bottomText}>
-        JuanPablo cortez - Maximo Pasqui - Ezequiel Melo
+        Juan Pablo Cortez - Ezequiel Melo
       </Text>
     </View>
   );

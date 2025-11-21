@@ -134,19 +134,14 @@ export const LoginScreen = ({ navigation }: Props) => {
       submitLabel="Iniciar Sesión"
       onSubmit={handleLogin}
       loading={actionLoading}
-      bottomText="¿No tienes cuenta?"
-      bottomLinkText="Regístrate"
-      onBottomLinkPress={() => navigation.push("Registro")}
-      footerContent={
-        <TouchableOpacity
-          onPress={() => navigation.push("RegistroAnonimo")}
-          className="px-4 py-2 rounded-full bg-white/10 border border-white/20"
-        >
-          <Text className="text-white">Continuar sin cuenta</Text>
-        </TouchableOpacity>
-      }
+      showDivider={false}
+      bottomText=""
+      bottomLinkText=""
+      renderSubmitInside={true}
     >
-      {/* Email */}
+      {(renderSubmit) => (
+        <>
+          {/* Email */}
       <View className="mb-5">
         <View
           className={`flex-row items-center rounded-xl border px-4 h-14 bg-white/10 border-white/20 ${emailFocused ? "border-[#d4af37] bg-[#d4af371a]" : ""}`}
@@ -201,18 +196,15 @@ export const LoginScreen = ({ navigation }: Props) => {
         )}
       </View>
 
-      <TouchableOpacity className="self-end mb-2">
+      {/* Olvidaste tu contraseña */}
+      <TouchableOpacity className="self-end mb-5">
         <Text className="text-[#d4af37] text-sm">
           ¿Olvidaste tu contraseña?
         </Text>
       </TouchableOpacity>
 
-      {/* Separador */}
-      <View className="flex-row items-center my-6">
-        <View className="flex-1 h-px bg-white/20" />
-        <Text className="mx-4 text-white/60 text-sm">O continúa con</Text>
-        <View className="flex-1 h-px bg-white/20" />
-      </View>
+      {/* Botón Iniciar Sesión */}
+      {renderSubmit()}
 
       {/* Botón de Google */}
       <TouchableOpacity
@@ -222,7 +214,7 @@ export const LoginScreen = ({ navigation }: Props) => {
         style={{ opacity: socialLoading || actionLoading ? 0.6 : 1 }}
       >
         <View className="mr-3">
-          <Text style={{ fontSize: 20 }}>G</Text>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#4285F4' }}>G</Text>
         </View>
         <Text className="text-gray-700 font-semibold">
           {socialLoading ? "Conectando..." : "Continuar con Google"}
@@ -342,6 +334,34 @@ export const LoginScreen = ({ navigation }: Props) => {
         </ScrollView>
       </View>
 
+      {/* Separador antes de registro */}
+      <View className="flex-row items-center my-6">
+        <View className="flex-1 h-px bg-white/20" />
+        <Text className="mx-4 text-white/60 text-sm">o</Text>
+        <View className="flex-1 h-px bg-white/20" />
+      </View>
+
+      {/* ¿No tienes cuenta? Regístrate */}
+      <TouchableOpacity
+        className="items-center mb-4"
+        onPress={() => navigation.push("Registro")}
+      >
+        <Text className="text-gray-300 text-base">
+          ¿No tienes cuenta?{" "}
+          <Text className="text-[#d4af37] font-semibold">
+            Regístrate
+          </Text>
+        </Text>
+      </TouchableOpacity>
+
+      {/* Continuar sin cuenta */}
+      <TouchableOpacity
+        onPress={() => navigation.push("RegistroAnonimo")}
+        className="px-4 py-2 rounded-full bg-white/10 border border-white/20 self-center"
+      >
+        <Text className="text-white">Continuar sin cuenta</Text>
+      </TouchableOpacity>
+
       {/* CustomAlert Component */}
       <CustomAlert
         visible={alertVisible}
@@ -351,6 +371,8 @@ export const LoginScreen = ({ navigation }: Props) => {
         buttons={alertConfig.buttons}
         onClose={closeAlert}
       />
+        </>
+      )}
     </FormLayout>
   );
 };

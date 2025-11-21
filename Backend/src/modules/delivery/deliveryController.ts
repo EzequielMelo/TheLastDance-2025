@@ -7,6 +7,7 @@ import type {
 import { getIOInstance } from "../../socket/chatSocket";
 import { DeliveryChatServices } from "./deliveryChatServices";
 import { notifyDeliveryChatClosed } from "../../socket/deliveryChatSocket";
+import { supabaseAdmin } from "../../config/supabase";
 
 /**
  * POST /api/deliveries
@@ -737,6 +738,105 @@ export async function confirmPayment(
       return;
     }
 
+    // PASO 1: Obtener el delivery para saber el cliente
+    const { data: deliveryData, error: deliveryFetchError } =
+      await supabaseAdmin
+        .from("deliveries")
+        .select("user_id")
+        .eq("id", id)
+        .single();
+
+    if (deliveryFetchError || !deliveryData) {
+      res.status(404).json({
+        success: false,
+        error: "Delivery no encontrado",
+      });
+      return;
+    }
+
+    const clientId = deliveryData.user_id;
+
+    // PASO 2: Generar factura ANTES de confirmar el pago
+    const { InvoiceService } = await import("../invoices/invoiceService");
+    let invoiceInfo: {
+      generated: boolean;
+      filePath?: string;
+      fileName?: string;
+      htmlContent?: string;
+      isRegistered?: boolean;
+      message?: string;
+      error?: string;
+    } = {
+      generated: false,
+      error: "No se generó factura",
+    };
+
+    try {
+      // Determinar si el cliente es registrado o anónimo
+      const { getAuthEmailById } = await import("../admin/adminServices");
+      const clientEmail = await getAuthEmailById(clientId);
+      const isRegisteredUser = !!clientEmail;
+      let invoiceResult;
+
+      if (isRegisteredUser) {
+        // CLIENTE REGISTRADO: Solo generar HTML (no guardar archivo)
+        invoiceResult = await InvoiceService.generateDeliveryInvoiceHTMLOnly(
+          id,
+          clientId,
+        );
+
+        if (invoiceResult.success && invoiceResult.htmlContent) {
+          invoiceInfo = {
+            generated: true,
+            htmlContent: invoiceResult.htmlContent,
+            isRegistered: true,
+            message: "Factura generada exitosamente para envío por email",
+          };
+        } else {
+          console.error(
+            `❌ Error generando factura HTML delivery: ${invoiceResult.error}`,
+          );
+          invoiceInfo = {
+            generated: false,
+            error: invoiceResult.error || "Error generando factura HTML",
+          };
+        }
+      } else {
+        // CLIENTE ANÓNIMO: Generar HTML y guardar archivo
+        invoiceResult = await InvoiceService.generateDeliveryInvoiceWithFile(
+          id,
+          clientId,
+        );
+
+        if (invoiceResult.success && invoiceResult.filePath) {
+          const fileName = require("path").basename(invoiceResult.filePath);
+          invoiceInfo = {
+            generated: true,
+            filePath: invoiceResult.filePath,
+            fileName: fileName,
+            isRegistered: false,
+            message: "Factura generada exitosamente para descarga",
+          };
+        } else {
+          console.error(
+            `❌ Error generando factura con archivo delivery: ${invoiceResult.error}`,
+          );
+          invoiceInfo = {
+            generated: false,
+            error:
+              invoiceResult.error || "Error generando factura con archivo",
+          };
+        }
+      }
+    } catch (invoiceError) {
+      console.error("❌ Error en generación de factura delivery:", invoiceError);
+      invoiceInfo = {
+        generated: false,
+        error: "Error interno generando factura",
+      };
+    }
+
+    // PASO 3: Confirmar el pago
     const delivery = await deliveryService.confirmPayment(
       id,
       req.user.appUserId,
@@ -746,6 +846,7 @@ export async function confirmPayment(
         tip_percentage: tip_percentage || 0,
         satisfaction_level,
       },
+      invoiceInfo, // Pasar la info de la factura
     );
 
     // 🔔 Emitir evento Socket.IO
@@ -762,6 +863,7 @@ export async function confirmPayment(
     res.json({
       success: true,
       delivery,
+      invoice: invoiceInfo,
       message: "Pago confirmado exitosamente",
     });
   } catch (error: any) {

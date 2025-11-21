@@ -49,48 +49,54 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       return;
     }
 
-    // Si el campo es muy similar al anterior (menos de 80px de diferencia), no hacer scroll
-    if (lastFieldY.current !== null && Math.abs(y - lastFieldY.current) < 80) {
+    // Obtener la altura de la pantalla
+    const screenHeight = Dimensions.get("window").height;
+
+    // Si el teclado aún no se ha mostrado, usar una estimación
+    const effectiveKeyboardHeight = keyboardHeight > 0 ? keyboardHeight : screenHeight * 0.4;
+
+    // Calcular cuánto espacio visible hay cuando el teclado está abierto
+    const visibleHeight = screenHeight - effectiveKeyboardHeight;
+
+    // Posicionar el campo en el 20% superior del área visible
+    const targetPositionFromTop = visibleHeight * 0.2;
+
+    // Calcular el scroll necesario
+    const targetScrollY = y - targetPositionFromTop;
+
+    // Si el campo está muy cerca del anterior (menos de 50px), no hacer scroll
+    if (lastFieldY.current !== null && Math.abs(y - lastFieldY.current) < 50) {
       lastFieldY.current = y;
       return;
     }
 
-    if (keyboardHeight === 0) {
-      // Si el teclado no está visible aún, esperar un poco más
-      setTimeout(() => {
-        if (keyboardHeight > 0) {
-          scrollToPosition(y, fieldHeight);
-        }
-      }, 100);
-      return;
+    // Solo hacer scroll si es necesario para mejorar la visibilidad
+    // Si el nuevo campo está más arriba que el anterior, y ya está visible, no hacer scroll hacia arriba
+    if (lastFieldY.current !== null && y < lastFieldY.current) {
+      // El campo está más arriba, verificar si ya está visible
+      if (y > targetPositionFromTop) {
+        // Ya está en una posición visible, no hacer scroll
+        lastFieldY.current = y;
+        return;
+      }
     }
-
-    // Obtener la altura de la pantalla
-    const screenHeight = Dimensions.get("window").height;
-
-    // Calcular cuánto espacio visible hay cuando el teclado está abierto
-    const visibleHeight = screenHeight - keyboardHeight;
-
-    // Margen superior para el header y elementos superiores
-    const topMargin = 100;
-
-    // Calcular cuánto necesitamos hacer scroll
-    const targetScrollY = y - topMargin;
 
     // Guardar la posición del campo actual
     lastFieldY.current = y;
     isScrolling.current = true;
 
-    // Hacer scroll suave
-    scrollViewRef.current?.scrollTo({
-      y: Math.max(0, targetScrollY),
-      animated: true,
-    });
+    // Hacer scroll con un pequeño delay para que funcione en APK
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({
+        y: Math.max(0, targetScrollY),
+        animated: true,
+      });
+    }, 100);
 
     // Resetear el flag después de que termine la animación
     setTimeout(() => {
       isScrolling.current = false;
-    }, 300);
+    }, 400);
   };
 
   return (

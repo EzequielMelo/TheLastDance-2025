@@ -13,11 +13,13 @@ import { ChefHat } from "lucide-react-native";
 import ChefLoading from "../components/common/ChefLoading";
 import { ScrollProvider, useScroll } from "../context/ScrollContext";
 
+type ChildrenFunc = (renderSubmit: () => ReactNode) => ReactNode;
+
 type Props = {
   title: string;
   subtitle?: string;
   icon?: ReactNode;
-  children: ReactNode;
+  children: ReactNode | ChildrenFunc;
   submitLabel: string;
   onSubmit: () => void;
   loading?: boolean;
@@ -26,6 +28,7 @@ type Props = {
   onBottomLinkPress?: () => void;
   showDivider?: boolean;
   footerContent?: ReactNode;
+  renderSubmitInside?: boolean; // Si es true, el botón submit se pasa como parámetro a children
 };
 
 function FormLayoutContent({
@@ -41,6 +44,7 @@ function FormLayoutContent({
   onBottomLinkPress,
   showDivider = true,
   footerContent,
+  renderSubmitInside = false,
 }: Props) {
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const { scrollViewRef } = useScroll();
@@ -72,20 +76,20 @@ function FormLayoutContent({
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1"
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
           ref={scrollViewRef}
           contentContainerStyle={{
             flexGrow: 1,
-            paddingBottom: isKeyboardVisible ? 150 : 50,
+            paddingBottom: isKeyboardVisible ? 300 : 50,
             paddingTop: isKeyboardVisible ? 20 : 0,
             justifyContent: isKeyboardVisible ? "flex-start" : "center",
           }}
           className="px-8 py-12"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          automaticallyAdjustKeyboardInsets={true}
+          automaticallyAdjustKeyboardInsets={false}
           scrollEventThrottle={16}
           nestedScrollEnabled={true}
         >
@@ -103,30 +107,62 @@ function FormLayoutContent({
           </View>
 
           {/* Form content */}
-          <View className="w-full">{children}</View>
+          <View className="w-full">
+            {(() => {
+              if (renderSubmitInside && typeof children === 'function') {
+                const renderSubmitButton = () => (
+                  <TouchableOpacity
+                    className="overflow-hidden rounded-xl mt-2"
+                    onPress={onSubmit}
+                    disabled={!!loading}
+                    style={{ opacity: loading ? 0.7 : 1 }}
+                  >
+                    <LinearGradient
+                      colors={["#d4af37", "#b8941f", "#d4af37"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      className="h-14 justify-center items-center shadow-lg mb-4"
+                    >
+                      {loading ? (
+                        <ChefLoading size="small" />
+                      ) : (
+                        <Text className="text-[#1a1a1a] text-lg font-semibold tracking-wide">
+                          {submitLabel}
+                        </Text>
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+                );
+                return (children as ChildrenFunc)(renderSubmitButton);
+              }
+              return children as ReactNode;
+            })()}
+          </View>
 
-          {/* Submit */}
-          <TouchableOpacity
-            className="overflow-hidden rounded-xl mt-2"
-            onPress={onSubmit}
-            disabled={!!loading}
-            style={{ opacity: loading ? 0.7 : 1 }}
-          >
-            <LinearGradient
-              colors={["#d4af37", "#b8941f", "#d4af37"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              className="h-14 justify-center items-center shadow-lg"
+          {/* Submit - Solo se renderiza si NO es renderSubmitInside */}
+          {!renderSubmitInside && (
+            <TouchableOpacity
+              className="overflow-hidden rounded-xl mt-2"
+              onPress={onSubmit}
+              disabled={!!loading}
+              style={{ opacity: loading ? 0.7 : 1 }}
             >
-              {loading ? (
-                <ChefLoading size="small" />
-              ) : (
-                <Text className="text-[#1a1a1a] text-lg font-semibold tracking-wide">
-                  {submitLabel}
-                </Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={["#d4af37", "#b8941f", "#d4af37"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                className="h-14 justify-center items-center shadow-lg"
+              >
+                {loading ? (
+                  <ChefLoading size="small" />
+                ) : (
+                  <Text className="text-[#1a1a1a] text-lg font-semibold tracking-wide">
+                    {submitLabel}
+                  </Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
 
           {/* Divider */}
           {showDivider ? (
@@ -140,7 +176,7 @@ function FormLayoutContent({
           {/* Bottom link */}
           {bottomText && bottomLinkText && onBottomLinkPress ? (
             <TouchableOpacity
-              className="items-center"
+              className="items-center mb-4"
               onPress={onBottomLinkPress}
             >
               <Text className="text-gray-300 text-base">

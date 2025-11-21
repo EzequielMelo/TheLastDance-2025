@@ -91,10 +91,6 @@ export const RegisterAnonymousScreen = ({ navigation }: Props) => {
         error={errors.file}
         focused={focused === "file"}
       />
-
-      <Text className="text-gray-400 text-xs">
-        Este sistema de cuenta todavía está en desarrollo.
-      </Text>
     </FormLayout>
   );
 };
