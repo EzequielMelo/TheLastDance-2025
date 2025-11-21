@@ -607,6 +607,8 @@ export class InvoiceService {
     clientId: string,
   ): Promise<InvoiceData | null> {
     try {
+      console.log(`📋 Obteniendo datos de factura para delivery: ${deliveryId}, cliente: ${clientId}`);
+      
       // Obtener datos del delivery con orden y repartidor
       const { data: deliveryData, error: deliveryError } = await supabaseAdmin
         .from("deliveries")
@@ -637,9 +639,12 @@ export class InvoiceService {
         .single();
 
       if (deliveryError || !deliveryData) {
-        console.error("Error obteniendo datos de delivery:", deliveryError);
-        throw new Error("Error obteniendo datos de delivery");
+        console.error(`❌ Error obteniendo datos de delivery ${deliveryId}:`, deliveryError);
+        console.error(`❌ Parámetros: deliveryId=${deliveryId}, clientId=${clientId}`);
+        throw new Error(`Delivery no encontrado o no pertenece al cliente`);
       }
+      
+      console.log(`✅ Delivery obtenido correctamente, order_id: ${deliveryData.delivery_order_id}`);
 
       // Obtener datos del cliente
       const { data: clientData, error: clientError } = await supabaseAdmin

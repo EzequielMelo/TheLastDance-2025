@@ -738,11 +738,11 @@ export async function confirmPayment(
       return;
     }
 
-    // PASO 1: Obtener el delivery para saber el cliente
+    // PASO 1: Validar que el delivery existe y pertenece al cliente
     const { data: deliveryData, error: deliveryFetchError } =
       await supabaseAdmin
         .from("deliveries")
-        .select("user_id")
+        .select("user_id, driver_id, payment_method, payment_status, status")
         .eq("id", id)
         .single();
 
@@ -750,6 +750,63 @@ export async function confirmPayment(
       res.status(404).json({
         success: false,
         error: "Delivery no encontrado",
+      });
+      return;
+    }
+
+    // Validar que el usuario tiene permiso para confirmar este pago
+    const isClient = deliveryData.user_id === req.user.appUserId;
+    const isDriver = deliveryData.driver_id === req.user.appUserId;
+
+    if (!isClient && !isDriver) {
+      res.status(403).json({
+        success: false,
+        error: "No tienes permiso para confirmar este pago",
+      });
+      return;
+    }
+
+    // Para pago QR: solo el CLIENTE puede confirmar
+    if (payment_method === "qr" && !isClient) {
+      res.status(403).json({
+        success: false,
+        error: "Solo el cliente puede confirmar pago con QR",
+      });
+      return;
+    }
+
+    // Para pago en efectivo: solo el REPARTIDOR puede confirmar
+    if (payment_method === "cash" && !isDriver) {
+      res.status(403).json({
+        success: false,
+        error: "Solo el repartidor puede confirmar pago en efectivo",
+      });
+      return;
+    }
+
+    // Validar que el delivery tiene el método de pago correcto configurado
+    if (deliveryData.payment_method !== payment_method) {
+      res.status(400).json({
+        success: false,
+        error: `El método de pago no coincide. El delivery tiene configurado: ${deliveryData.payment_method}`,
+      });
+      return;
+    }
+
+    // Validar que el pago está pendiente
+    if (deliveryData.payment_status !== "pending") {
+      res.status(400).json({
+        success: false,
+        error: `El pago ya fue procesado. Estado actual: ${deliveryData.payment_status}`,
+      });
+      return;
+    }
+
+    // Validar que el delivery está en camino
+    if (deliveryData.status !== "on_the_way") {
+      res.status(400).json({
+        success: false,
+        error: `El delivery no está listo para pago. Estado actual: ${deliveryData.status}`,
       });
       return;
     }
