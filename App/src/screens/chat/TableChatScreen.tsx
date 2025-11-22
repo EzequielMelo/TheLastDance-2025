@@ -32,9 +32,6 @@ export default function TableChatScreen() {
   const { tableId, autoMessage } = route.params;
 
   const [inputMessage, setInputMessage] = useState("");
-  const [userJoinedMessage, setUserJoinedMessage] = useState<string | null>(
-    null,
-  );
   const [autoMessageSent, setAutoMessageSent] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
@@ -54,13 +51,6 @@ export default function TableChatScreen() {
     tableId,
     onError: (error: string) => {
       ToastAndroid.show(`💬 Error de Chat: ${error}`, ToastAndroid.SHORT);
-    },
-    onUserJoined: (userData: {
-      userName: string;
-      userType: "client" | "waiter";
-    }) => {
-      setUserJoinedMessage(`${userData.userName} se unió al chat`);
-      setTimeout(() => setUserJoinedMessage(null), 3000);
     },
   });
 
@@ -272,13 +262,6 @@ export default function TableChatScreen() {
           </View>
         </View>
 
-        {/* Mensaje de usuario que se unió */}
-        {userJoinedMessage && (
-          <View style={styles.joinedMessageContainer}>
-            <Text style={styles.joinedMessageText}>{userJoinedMessage}</Text>
-          </View>
-        )}
-
         {/* Lista de mensajes */}
         <FlatList
           ref={flatListRef}
@@ -420,18 +403,6 @@ const styles = StyleSheet.create({
     color: "#d4af37",
     fontSize: 12,
     marginLeft: 4,
-  },
-  joinedMessageContainer: {
-    backgroundColor: "#d4af37",
-    margin: 16,
-    padding: 8,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  joinedMessageText: {
-    color: "#1a1a1a",
-    fontSize: 14,
-    fontWeight: "bold",
   },
   messagesList: {
     flex: 1,

@@ -719,54 +719,65 @@ export default function Sidebar({
                 {isClient ? "Acciones disponibles" : "Acciones disponibles"}
               </Text>
 
-              {filteredActions.map(action => (
-                <TouchableOpacity
-                  key={action.id}
-                  onPress={() => {
-                    action.onPress();
-                    onClose();
-                  }}
-                  style={{
-                    backgroundColor: "rgba(255,255,255,0.05)",
-                    borderRadius: 12,
-                    padding: 16,
-                    marginBottom: 12,
-                    borderWidth: 1,
-                    borderColor: "rgba(255,255,255,0.1)",
-                  }}
-                >
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  justifyContent: "space-between",
+                }}
+              >
+                {filteredActions.map(action => (
+                  <TouchableOpacity
+                    key={action.id}
+                    onPress={() => {
+                      action.onPress();
+                      onClose();
+                    }}
+                    style={{
+                      width: "48%",
+                      marginBottom: 16,
+                      alignItems: "center",
+                    }}
+                  >
+                    {/* Botón redondo con ícono */}
                     <View
                       style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 8,
-                        backgroundColor: "#d4af37",
+                        width: 60,
+                        height: 60,
+                        borderRadius: 30,
+                        backgroundColor: "rgba(212, 175, 55, 0.5)",
                         alignItems: "center",
                         justifyContent: "center",
+                        marginBottom: 8,
+                        borderWidth: 1.5,
+                        borderColor: "rgba(212, 175, 55, 0.5)",
                       }}
                     >
-                      {action.icon}
+                      {React.isValidElement(action.icon) &&
+                      typeof action.icon.type !== "string"
+                        ? React.cloneElement(
+                            action.icon as React.ReactElement<any>,
+                            { color: "#30302f", size: 24 },
+                          )
+                        : action.icon}
                     </View>
-                    <View style={{ marginLeft: 12, flex: 1 }}>
-                      <Text
-                        style={{
-                          color: "white",
-                          fontSize: 16,
-                          fontWeight: "600",
-                        }}
-                      >
-                        {action.title}
-                      </Text>
-                      <Text
-                        style={{ color: "#9ca3af", fontSize: 14, marginTop: 2 }}
-                      >
-                        {action.subtitle}
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
+
+                    {/* Texto debajo del botón */}
+                    <Text
+                      style={{
+                        color: "#e8e9eb",
+                        fontSize: 12,
+                        fontWeight: "500",
+                        textAlign: "center",
+                        lineHeight: 15,
+                      }}
+                      numberOfLines={2}
+                    >
+                      {action.title}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
               {/* Espaciado adicional */}
               <View style={{ height: 20 }} />

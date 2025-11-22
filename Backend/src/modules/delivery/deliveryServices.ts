@@ -1,5 +1,9 @@
 import { supabaseAdmin } from "../../config/supabase";
 import { RESTAURANT_CONFIG } from "../../config/restaurantConfig";
+import { 
+  notifyNewDeliveryOrder,
+  notifyDeliveryReadyForDrivers 
+} from "../../services/pushNotificationService";
 import type {
   Delivery,
   CreateDeliveryDTO,
@@ -72,6 +76,38 @@ export async function createDelivery(
   }
 
   console.log("✅ Delivery creado exitosamente:", delivery.id);
+
+  // Obtener datos del usuario para la notificación
+  const { data: user } = await supabaseAdmin
+    .from("users")
+    .select("name")
+    .eq("id", userId)
+    .single();
+
+  // Contar items del pedido
+  const { data: orderItems } = await supabaseAdmin
+    .from("delivery_order_items")
+    .select("quantity")
+    .eq("delivery_order_id", data.delivery_order_id);
+
+  const itemsCount = orderItems?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+
+  // Enviar notificación a dueños y supervisores
+  if (user) {
+    try {
+      await notifyNewDeliveryOrder(
+        user.name || "Cliente",
+        delivery.id,
+        data.delivery_address,
+        order.total_amount,
+        itemsCount,
+      );
+    } catch (notificationError) {
+      console.error("❌ Error enviando notificación de nuevo delivery:", notificationError);
+      // No lanzar error, el delivery ya se creó exitosamente
+    }
+  }
+
   return delivery;
 }
 
@@ -483,6 +519,29 @@ export async function updateDeliveryStatus(
   if (status === "confirmed" && delivery.delivery_order_id) {
     console.log("🍳🍷 Enviando items automáticamente a cocina y bar...");
     await autoDistributeItemsToStations(delivery.delivery_order_id);
+  }
+
+  // 🚀 Si el estado es "ready", notificar a todos los repartidores
+  if (status === "ready") {
+    console.log("🚀 Delivery listo, notificando a repartidores...");
+    try {
+      // Obtener el total_amount de delivery_orders
+      const { data: deliveryOrder } = await supabaseAdmin
+        .from("delivery_orders")
+        .select("total_amount")
+        .eq("id", delivery.delivery_order_id)
+        .single();
+
+      await notifyDeliveryReadyForDrivers(
+        delivery.id,
+        delivery.delivery_address,
+        deliveryOrder?.total_amount || 0,
+        delivery.estimated_distance_km,
+      );
+    } catch (notificationError) {
+      console.error("❌ Error enviando notificación a repartidores:", notificationError);
+      // No lanzar error, el delivery ya se actualizó exitosamente
+    }
   }
 
   // 📦 Si el estado es "delivered", actualizar delivery_orders y delivery_order_items
