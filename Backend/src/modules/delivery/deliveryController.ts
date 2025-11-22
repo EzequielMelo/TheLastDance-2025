@@ -572,6 +572,130 @@ export async function getDeliveryHistory(
 }
 
 /**
+ * GET /api/deliveries/places-autocomplete
+ * Autocompletar direcciones con Google Places API
+ */
+export async function getPlacesAutocomplete(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const { input, location } = req.query;
+
+    if (!input) {
+      res.status(400).json({
+        success: false,
+        error: "Se requiere el parámetro 'input'",
+      });
+      return;
+    }
+
+    const GOOGLE_MAPS_API_KEY = process.env["GOOGLE_MAPS_API_KEY"];
+
+    if (!GOOGLE_MAPS_API_KEY) {
+      res.status(503).json({
+        success: false,
+        error: "Servicio de búsqueda no disponible",
+      });
+      return;
+    }
+
+    // Construir URL con parámetros
+    let url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input as string)}&key=${GOOGLE_MAPS_API_KEY}&language=es`;
+
+    // Agregar bias de ubicación si está disponible
+    if (location) {
+      url += `&location=${location}&radius=50000`;
+    }
+
+    const response = await fetch(url);
+    const data = (await response.json()) as any;
+
+    console.log("📍 Google Places Autocomplete response:", {
+      status: data.status,
+      error_message: data.error_message,
+      predictions_count: data.predictions?.length || 0,
+    });
+
+    if (data.status === "OK") {
+      res.json({
+        success: true,
+        predictions: data.predictions,
+      });
+    } else {
+      console.error("❌ Error de Google Places Autocomplete:", data.status);
+      console.error("❌ Error message:", data.error_message);
+      res.status(400).json({
+        success: false,
+        error: data.error_message || data.status,
+      });
+    }
+  } catch (error: any) {
+    console.error("❌ Error en getPlacesAutocomplete:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Error al buscar direcciones",
+    });
+  }
+}
+
+/**
+ * GET /api/deliveries/place-details
+ * Obtener detalles y coordenadas de un lugar por place_id
+ */
+export async function getPlaceDetails(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const { placeId } = req.query;
+
+    if (!placeId) {
+      res.status(400).json({
+        success: false,
+        error: "Se requiere el parámetro 'placeId'",
+      });
+      return;
+    }
+
+    const GOOGLE_MAPS_API_KEY = process.env["GOOGLE_MAPS_API_KEY"];
+
+    if (!GOOGLE_MAPS_API_KEY) {
+      res.status(503).json({
+        success: false,
+        error: "Servicio no disponible",
+      });
+      return;
+    }
+
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=geometry,formatted_address&key=${GOOGLE_MAPS_API_KEY}`;
+
+    const response = await fetch(url);
+    const data = (await response.json()) as any;
+
+    if (data.status === "OK" && data.result) {
+      res.json({
+        success: true,
+        location: data.result.geometry.location,
+        address: data.result.formatted_address,
+      });
+    } else {
+      console.error("❌ Error de Google Place Details:", data.status);
+      res.status(400).json({
+        success: false,
+        error: data.error_message || data.status,
+      });
+    }
+  } catch (error: any) {
+    console.error("❌ Error en getPlaceDetails:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Error al obtener detalles del lugar",
+    });
+  }
+}
+
+/**
  * GET /api/deliveries/route
  * Obtener ruta entre dos puntos usando Google Directions API
  */
@@ -768,7 +892,9 @@ export async function confirmPayment(
     const isClient = deliveryData.user_id === req.user.appUserId;
     const isDriver = deliveryData.driver_id === req.user.appUserId;
 
-    console.log(`🔐 Validando permisos: isClient=${isClient}, isDriver=${isDriver}, requestUserId=${req.user.appUserId}`);
+    console.log(
+      `🔐 Validando permisos: isClient=${isClient}, isDriver=${isDriver}, requestUserId=${req.user.appUserId}`,
+    );
 
     if (!isClient && !isDriver) {
       console.error(`❌ Usuario no autorizado para confirmar este pago`);
@@ -801,7 +927,9 @@ export async function confirmPayment(
 
     // Validar que el delivery tiene el método de pago correcto configurado
     if (deliveryData.payment_method !== payment_method) {
-      console.error(`❌ Método de pago no coincide: esperado=${deliveryData.payment_method}, recibido=${payment_method}`);
+      console.error(
+        `❌ Método de pago no coincide: esperado=${deliveryData.payment_method}, recibido=${payment_method}`,
+      );
       res.status(400).json({
         success: false,
         error: `El método de pago no coincide. El delivery tiene configurado: ${deliveryData.payment_method}`,
@@ -904,13 +1032,15 @@ export async function confirmPayment(
           );
           invoiceInfo = {
             generated: false,
-            error:
-              invoiceResult.error || "Error generando factura con archivo",
+            error: invoiceResult.error || "Error generando factura con archivo",
           };
         }
       }
     } catch (invoiceError) {
-      console.error("❌ Error en generación de factura delivery:", invoiceError);
+      console.error(
+        "❌ Error en generación de factura delivery:",
+        invoiceError,
+      );
       invoiceInfo = {
         generated: false,
         error: "Error interno generando factura",
@@ -941,7 +1071,9 @@ export async function confirmPayment(
           paymentMethod: payment_method,
           tipAmount: tip_amount,
         });
-        console.log(`🔔 Evento 'delivery_payment_confirmed' enviado al repartidor: ${delivery.driver_id}`);
+        console.log(
+          `🔔 Evento 'delivery_payment_confirmed' enviado al repartidor: ${delivery.driver_id}`,
+        );
       }
     }
 
@@ -989,13 +1121,17 @@ export async function confirmPaymentReceived(
       return;
     }
 
-    console.log(`👍 Repartidor confirmando recepción de pago para delivery: ${id}`);
+    console.log(
+      `👍 Repartidor confirmando recepción de pago para delivery: ${id}`,
+    );
 
     // Obtener el delivery completo con todos los datos de pago
     const { data: deliveryData, error: deliveryFetchError } =
       await supabaseAdmin
         .from("deliveries")
-        .select("driver_id, payment_method, payment_status, tip_amount, tip_percentage, satisfaction_level")
+        .select(
+          "driver_id, payment_method, payment_status, tip_amount, tip_percentage, satisfaction_level",
+        )
         .eq("id", id)
         .single();
 
@@ -1025,7 +1161,9 @@ export async function confirmPaymentReceived(
       return;
     }
 
-    console.log(`📋 Datos de pago guardados: tip=${deliveryData.tip_amount}, tip%=${deliveryData.tip_percentage}, satisfaction=${deliveryData.satisfaction_level}`);
+    console.log(
+      `📋 Datos de pago guardados: tip=${deliveryData.tip_amount}, tip%=${deliveryData.tip_percentage}, satisfaction=${deliveryData.satisfaction_level}`,
+    );
 
     // Llamar al service para actualizar los estados
     const delivery = await deliveryService.confirmPayment(
@@ -1050,7 +1188,9 @@ export async function confirmPaymentReceived(
         deliveryId: delivery.id,
         newStatus: "delivered",
       });
-      console.log(`🔔 Socket.IO: Emitido delivery_updated (delivered) a cliente ${userRoom}`);
+      console.log(
+        `🔔 Socket.IO: Emitido delivery_updated (delivered) a cliente ${userRoom}`,
+      );
     }
 
     res.json({

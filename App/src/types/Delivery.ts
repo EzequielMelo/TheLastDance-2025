@@ -46,6 +46,7 @@ export interface Delivery {
   tip_percentage: number;
   satisfaction_level: string | null;
   paid_at: string | null;
+  survey_completed: boolean; // 📋 Indica si el cliente completó la encuesta
   created_at: string;
   confirmed_at: string | null;
   preparing_at: string | null;

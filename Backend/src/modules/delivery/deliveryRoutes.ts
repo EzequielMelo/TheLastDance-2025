@@ -66,6 +66,20 @@ router.get("/history", deliveryController.getDeliveryHistory);
 router.get("/route", deliveryController.getRoute);
 
 /**
+ * @route   GET /api/deliveries/places-autocomplete
+ * @desc    Autocompletar direcciones con Google Places API
+ * @access  Private (cliente_registrado)
+ */
+router.get("/places-autocomplete", deliveryController.getPlacesAutocomplete);
+
+/**
+ * @route   GET /api/deliveries/place-details
+ * @desc    Obtener detalles y coordenadas de un lugar por place_id
+ * @access  Private (cliente_registrado)
+ */
+router.get("/place-details", deliveryController.getPlaceDetails);
+
+/**
  * @route   PUT /api/deliveries/:id/status
  * @desc    Actualizar estado de un delivery
  * @access  Private (dueño/supervisor)
@@ -112,7 +126,10 @@ router.put("/:id/confirm-payment", deliveryController.confirmPayment);
  * @desc    Repartidor confirma que recibió el pago (actualiza estados)
  * @access  Private (solo repartidor asignado)
  */
-router.put("/:id/confirm-payment-received", deliveryController.confirmPaymentReceived);
+router.put(
+  "/:id/confirm-payment-received",
+  deliveryController.confirmPaymentReceived,
+);
 
 /**
  * @route   PUT /api/deliveries/:id/location

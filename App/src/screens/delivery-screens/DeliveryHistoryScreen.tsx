@@ -7,8 +7,14 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { ChevronLeft, Package, MapPin, Clock } from "lucide-react-native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import {
+  ChevronLeft,
+  Package,
+  MapPin,
+  Clock,
+  FileText,
+} from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { RootStackNavigationProp } from "../../navigation/RootStackParamList";
 import api from "../../api/axios";
@@ -40,6 +46,13 @@ const DeliveryHistoryScreen: React.FC = () => {
   useEffect(() => {
     fetchHistory();
   }, []);
+
+  // Recargar historial cuando la pantalla recibe el foco
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchHistory();
+    }, []),
+  );
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -181,6 +194,34 @@ const DeliveryHistoryScreen: React.FC = () => {
                     </View>
                   )}
                 </View>
+
+                {/* Botón de encuesta - solo para deliveries entregados */}
+                {delivery.status === "delivered" && (
+                  <View className="mt-3 pt-3 border-t border-gray-100">
+                    {delivery.survey_completed ? (
+                      <View className="bg-green-50 rounded-lg p-3 flex-row items-center justify-center">
+                        <FileText size={16} color="#16a34a" />
+                        <Text className="text-green-600 font-semibold ml-2 text-sm">
+                          Encuesta completada
+                        </Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={() =>
+                          navigation.navigate("DeliverySurvey", {
+                            deliveryId: delivery.id,
+                          })
+                        }
+                        className="bg-[#d4af37] rounded-lg p-3 flex-row items-center justify-center"
+                      >
+                        <FileText size={18} color="#1a1a1a" />
+                        <Text className="text-[#1a1a1a] font-bold ml-2">
+                          Responder encuesta
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
               </View>
             ))
           )}

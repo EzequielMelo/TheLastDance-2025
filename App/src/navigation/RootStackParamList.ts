@@ -82,6 +82,7 @@ export type RootStackParamList = {
   DeliveryLocation: undefined; // Seleccionar ubicación en mapa para delivery
   DeliveryTracking: { deliveryId: string }; // Seguimiento en tiempo real del delivery
   DeliveryHistory: undefined; // Historial de deliveries del usuario
+  DeliverySurvey: { deliveryId: string }; // Encuesta de delivery
   DriverDeliveries: undefined; // Pantalla de pedidos disponibles para repartidor (empleado)
   MyDeliveries: undefined; // Pantalla de entregas activas del repartidor
 

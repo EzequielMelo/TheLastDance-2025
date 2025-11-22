@@ -49,6 +49,7 @@ import MyReservationsScreen from "../screens/MyReservationsScreen";
 import DeliveryLocationScreen from "../screens/delivery-screens/DeliveryLocationScreen";
 import DeliveryTrackingScreen from "../screens/delivery-screens/DeliveryTrackingScreen";
 import DeliveryHistoryScreen from "../screens/delivery-screens/DeliveryHistoryScreen";
+import DeliverySurveyScreen from "../screens/delivery-screens/DeliverySurveyScreen";
 import DriverDeliveriesScreen from "../screens/delivery-screens/DriverDeliveriesScreen";
 import MyDeliveriesScreen from "../screens/delivery-screens/MyDeliveriesScreen";
 import DeliveryOrdersManagementScreen from "../screens/admin-screens/DeliveryOrdersManagementScreen";
@@ -278,6 +279,11 @@ function NavigatorContent() {
             <Stack.Screen
               name="DeliveryHistory"
               component={DeliveryHistoryScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="DeliverySurvey"
+              component={DeliverySurveyScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen

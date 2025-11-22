@@ -15,6 +15,8 @@ import {
   Navigation,
   ChevronLeft,
   Crosshair,
+  Search,
+  X,
 } from "lucide-react-native";
 import type { RootStackNavigationProp } from "../../navigation/RootStackParamList";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -24,10 +26,20 @@ import { useCart } from "../../context/CartContext";
 import { createDeliveryOrder } from "../../api/deliveries";
 import { createDelivery } from "../../api/deliveries";
 import { RESTAURANT_LOCATION, MAP_CONFIG } from "../../config/restaurantConfig";
+import api from "../../api/axios";
 
 interface Coordinates {
   latitude: number;
   longitude: number;
+}
+
+interface PlacePrediction {
+  place_id: string;
+  description: string;
+  structured_formatting: {
+    main_text: string;
+    secondary_text: string;
+  };
 }
 
 /**
@@ -45,6 +57,10 @@ const DeliveryLocationScreen: React.FC = () => {
   const [notes, setNotes] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [predictions, setPredictions] = useState<PlacePrediction[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Estados para CustomAlert
   const [alertVisible, setAlertVisible] = useState(false);
@@ -86,6 +102,90 @@ const DeliveryLocationScreen: React.FC = () => {
     longitude: restaurantLocation.longitude,
     ...MAP_CONFIG.defaultZoom,
   });
+
+  // Buscar direcciones con Google Places Autocomplete
+  const searchAddresses = async (input: string) => {
+    if (input.length < 3) {
+      setPredictions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const response = await api.get("/deliveries/places-autocomplete", {
+        params: {
+          input,
+          location: `${selectedLocation.latitude},${selectedLocation.longitude}`,
+        },
+      });
+
+      if (response.data.success && response.data.predictions) {
+        setPredictions(response.data.predictions);
+        setShowSuggestions(true);
+      }
+    } catch (error: any) {
+      console.error("Error buscando direcciones:", error);
+      console.error("Error response:", error.response?.data);
+
+      // Mostrar mensaje de error específico
+      if (error.response?.data?.error) {
+        console.warn("⚠️ Google Places Error:", error.response.data.error);
+      }
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Debounce para búsqueda
+  const handleAddressChange = (text: string) => {
+    setAddress(text);
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      searchAddresses(text);
+    }, 500);
+  };
+
+  // Seleccionar una dirección de las sugerencias
+  const selectAddress = async (prediction: PlacePrediction) => {
+    try {
+      setAddress(prediction.description);
+      setShowSuggestions(false);
+      setPredictions([]);
+
+      // Obtener detalles del lugar y coordenadas
+      const response = await api.get("/deliveries/place-details", {
+        params: { placeId: prediction.place_id },
+      });
+
+      if (response.data.success && response.data.location) {
+        const { lat, lng } = response.data.location;
+        const newLocation = { latitude: lat, longitude: lng };
+
+        setSelectedLocation(newLocation);
+        setRegion({
+          latitude: lat,
+          longitude: lng,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+
+        // Animar el mapa a la nueva ubicación
+        mapRef.current?.animateToRegion({
+          latitude: lat,
+          longitude: lng,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+      }
+    } catch (error) {
+      console.error("Error obteniendo detalles del lugar:", error);
+    }
+  };
 
   // Obtener ubicación actual del usuario
   const getCurrentLocation = async () => {
@@ -179,6 +279,11 @@ const DeliveryLocationScreen: React.FC = () => {
   };
 
   const handleConfirmLocation = async () => {
+    // Limpiar timeout si existe
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
     if (!address.trim()) {
       showCustomAlert(
         "Error",
@@ -358,16 +463,83 @@ const DeliveryLocationScreen: React.FC = () => {
             <Text className="text-sm font-semibold text-gray-300 mb-2">
               Dirección completa *
             </Text>
-            <TextInput
-              value={address}
-              onChangeText={setAddress}
-              placeholder="Ej: Av. Siempre Viva 742, Springfield"
-              placeholderTextColor="#6b7280"
-              className="rounded-xl px-4 py-3 text-white border border-gray-700"
-              style={{ backgroundColor: "rgba(255, 255, 255, 0.05)" }}
-              multiline
-              numberOfLines={2}
-            />
+            <View className="relative">
+              <View
+                className="flex-row items-center rounded-xl px-4 py-3 border border-gray-700"
+                style={{ backgroundColor: "rgba(255, 255, 255, 0.05)" }}
+              >
+                <Search size={20} color="#6b7280" />
+                <TextInput
+                  value={address}
+                  onChangeText={handleAddressChange}
+                  placeholder="Busca tu dirección..."
+                  placeholderTextColor="#6b7280"
+                  className="flex-1 text-white ml-2"
+                  multiline={!showSuggestions}
+                  numberOfLines={showSuggestions ? 1 : 2}
+                  onFocus={() => {
+                    if (predictions.length > 0) setShowSuggestions(true);
+                  }}
+                />
+                {address.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setAddress("");
+                      setPredictions([]);
+                      setShowSuggestions(false);
+                    }}
+                  >
+                    <X size={20} color="#6b7280" />
+                  </TouchableOpacity>
+                )}
+                {isSearching && (
+                  <ActivityIndicator
+                    size="small"
+                    color="#d4af37"
+                    className="ml-2"
+                  />
+                )}
+              </View>
+
+              {/* Dropdown de sugerencias */}
+              {showSuggestions && predictions.length > 0 && (
+                <View
+                  className="absolute top-full left-0 right-0 mt-2 rounded-xl border border-gray-700 overflow-hidden"
+                  style={{
+                    backgroundColor: "rgba(26, 26, 26, 0.98)",
+                    maxHeight: 250,
+                    zIndex: 1000,
+                    elevation: 5,
+                  }}
+                >
+                  <ScrollView
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator={false}
+                  >
+                    {predictions.map(item => (
+                      <TouchableOpacity
+                        key={item.place_id}
+                        onPress={() => selectAddress(item)}
+                        className="p-4 border-b border-gray-800"
+                        style={{ backgroundColor: "rgba(255, 255, 255, 0.03)" }}
+                      >
+                        <View className="flex-row items-start">
+                          <MapPin size={16} color="#d4af37" className="mt-1" />
+                          <View className="flex-1 ml-3">
+                            <Text className="text-white font-semibold text-sm">
+                              {item.structured_formatting.main_text}
+                            </Text>
+                            <Text className="text-gray-400 text-xs mt-1">
+                              {item.structured_formatting.secondary_text}
+                            </Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
 
             <Text className="text-sm font-semibold text-gray-300 mt-4 mb-2">
               Indicaciones adicionales (opcional)
