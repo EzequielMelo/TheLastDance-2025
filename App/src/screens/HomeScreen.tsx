@@ -638,13 +638,12 @@ export default function HomeScreen({ navigation, route }: Props) {
   const handleBottomNavQR = () => {
     console.log(
       "🔍 HomeScreen - handleBottomNavQR - Estado actual:",
-      clientState,
-      "- Delivery activo:",
-      hasActiveDelivery,
-      "- Estado delivery:",
-      deliveryState,
-      "- Método de pago:",
-      activeDelivery?.payment_method,
+      "\n  clientState:", clientState,
+      "\n  hasActiveDelivery:", hasActiveDelivery,
+      "\n  deliveryState:", deliveryState,
+      "\n  payment_method:", activeDelivery?.payment_method,
+      "\n  user_profile:", user?.profile_code,
+      "\n  delivery_id:", activeDelivery?.id,
     );
 
     // 🚚 Si hay delivery activo en estado "on_the_way" con método de pago QR, usar scanner para pago
@@ -654,6 +653,7 @@ export default function HomeScreen({ navigation, route }: Props) {
       activeDelivery?.payment_method === "qr" &&
       user?.profile_code === "cliente_registrado"
     ) {
+      console.log("✅ Navegando a QRScanner para pago de delivery");
       navigation.navigate("QRScanner", {
         mode: "delivery_payment",
         onScanSuccess: handleDeliveryPaymentQRScan,

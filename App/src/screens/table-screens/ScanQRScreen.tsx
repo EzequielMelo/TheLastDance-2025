@@ -112,6 +112,23 @@ export default function ScanQRScreen() {
         return;
       }
       // Caso 2: QR de mesa (table QR)
+      // 🚚 Validar si es un QR de delivery payment (JSON)
+      try {
+        const parsedData = JSON.parse(data);
+        if (parsedData.type === "delivery_payment") {
+          showCustomAlert(
+            "QR Incorrecto",
+            "Este es un QR de pago de delivery. Úsalo desde el botón QR cuando tengas un delivery activo.",
+            "warning",
+          );
+          setScanned(false);
+          setProcessing(false);
+          return;
+        }
+      } catch (e) {
+        // No es JSON, continuar con flujo normal de mesa
+      }
+
       let tableId: string;
 
       if (data.includes("thelastdance://table/")) {

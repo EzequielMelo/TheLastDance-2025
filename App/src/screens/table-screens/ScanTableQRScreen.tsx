@@ -73,6 +73,22 @@ export default function ScanTableQRScreen() {
     setProcessing(true);
 
     try {
+      // 🚚 Validar si es un QR de delivery payment (JSON)
+      try {
+        const parsedData = JSON.parse(data);
+        if (parsedData.type === "delivery_payment") {
+          ToastAndroid.show(
+            "❌ Este es un QR de pago de delivery, no de mesa",
+            ToastAndroid.LONG,
+          );
+          setScanned(false);
+          setProcessing(false);
+          return;
+        }
+      } catch (e) {
+        // No es JSON, continuar con flujo normal de mesa
+      }
+
       // Por ahora, vamos a simular que el QR contiene el ID de la mesa
       // En el futuro, esto será un deeplink como: thelastdance://table/{tableId}
       let tableId: string;
