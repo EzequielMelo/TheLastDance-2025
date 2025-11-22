@@ -140,7 +140,12 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
     <li>[x] Deploy del backend en Render</li>
     <li>[x] Sistema de Mesas y listas de espera</li>
     <li>[x] Chat cliente - mesero</li>
-    <li>[x] Sistema de meseros - </li>
+    <li>[x] Sistema de meseros</li>
+    <li>[x] Sistema de meseros</li>
+    <li>[x] Correcciones: Cambios en el sistema de QR</li>
+    <li>[x] Correcciones: Menu que muestra un producto a la vez</li>
+    <li>[x] Sistema de login con redes sociales</li>
+    <li>[x] Sistema pedidos a domicilio</li>
   </ul>
 </details>
 
@@ -156,7 +161,6 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
     <li>[x] Registro de usuario completo</li>
     <li>[x] Version preliminar del SplashScreen</li>
     <li>[x] Creacion de juegos</li>
-    <li>[x] Sistema de descuentos asociado a los juegos</li>
   </ul>
 </details>
 
@@ -177,6 +181,11 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
     <li>[x] Visualizacion del menu en los clientes</li>
     <li>[x] Push notifications</li>
     <li>[x] Creacion de pedidos</li>
+    <li>[x] Sistema de descuentos asociado a los juegos</li>
+    <li>[x] Correcciones: Tamaños de fuentes</li>
+    <li>[x] Correcciones: Ingresos rapidos</li>
+    <li>[x] Sistema de encuestas</li>
+    <li>[x] Sistema de reserva de mesas</li>
   </ul>
 </details>
 

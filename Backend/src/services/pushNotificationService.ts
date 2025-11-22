@@ -271,6 +271,30 @@ async function getWaiterTokens(): Promise<string[]> {
   }
 }
 
+// Función para obtener tokens de repartidores
+async function getDriverTokens(): Promise<string[]> {
+  try {
+    const { data: users, error } = await supabaseAdmin
+      .from("users")
+      .select("push_token")
+      .eq("profile_code", "repartidor")
+      .eq("state", "aprobado")
+      .not("push_token", "is", null);
+
+    if (error) {
+      console.error("Error fetching driver tokens:", error);
+      return [];
+    }
+
+    return users
+      .map(user => user.push_token)
+      .filter(token => token && token.trim() !== "");
+  } catch (error) {
+    console.error("Error in getDriverTokens:", error);
+    return [];
+  }
+}
+
 // Función para obtener token de un cliente específico
 async function getClientToken(clientId: string): Promise<string | null> {
   try {
@@ -278,8 +302,6 @@ async function getClientToken(clientId: string): Promise<string | null> {
       .from("users")
       .select("push_token")
       .eq("id", clientId)
-      .eq("state", "aprobado")
-      .not("push_token", "is", null)
       .single();
 
     if (error || !user) {
@@ -290,7 +312,6 @@ async function getClientToken(clientId: string): Promise<string | null> {
       ? user.push_token
       : null;
   } catch (error) {
-    console.error("Error in getClientToken:", error);
     return null;
   }
 }
@@ -323,23 +344,47 @@ async function getRoleTokens(positionCode: string): Promise<string[]> {
 // Función para obtener token de un mozo específico
 async function getWaiterToken(waiterId: string): Promise<string | null> {
   try {
+    console.log(`🔍 Buscando token para mozo: ${waiterId}`);
     const { data: user, error } = await supabaseAdmin
       .from("users")
-      .select("push_token")
+      .select("push_token, name, state, profile_code, position_code")
       .eq("id", waiterId)
-      .eq("profile_code", "empleado")
-      .eq("position_code", "mozo")
-      .eq("state", "aprobado")
-      .not("push_token", "is", null)
       .single();
 
-    if (error || !user) {
+    if (error) {
+      console.error(`❌ Error buscando mozo ${waiterId}:`, error.message);
       return null;
     }
 
-    return user.push_token && user.push_token.trim() !== ""
-      ? user.push_token
-      : null;
+    if (!user) {
+      console.warn(`⚠️ Mozo ${waiterId} no encontrado en BD`);
+      return null;
+    }
+
+    console.log(`👤 Mozo encontrado: ${user.name}, profile: ${user.profile_code}, position: ${user.position_code}, state: ${user.state}`);
+
+    if (user.profile_code !== "empleado") {
+      console.warn(`⚠️ Usuario ${waiterId} no es empleado (es ${user.profile_code})`);
+      return null;
+    }
+
+    if (user.position_code !== "mozo") {
+      console.warn(`⚠️ Empleado ${waiterId} no es mozo (es ${user.position_code})`);
+      return null;
+    }
+
+    if (user.state !== "aprobado") {
+      console.warn(`⚠️ Mozo ${waiterId} no está aprobado (estado: ${user.state})`);
+      return null;
+    }
+
+    if (!user.push_token || user.push_token.trim() === "") {
+      console.warn(`⚠️ Mozo ${waiterId} (${user.name}) no tiene push token registrado`);
+      return null;
+    }
+
+    console.log(`✅ Push token encontrado para mozo ${user.name}`);
+    return user.push_token;
   } catch (error) {
     console.error("Error in getWaiterToken:", error);
     return null;
@@ -569,16 +614,16 @@ export async function notifyClientWaiterMessage(
 
 // Función para notificar al mozo cuando un cliente realiza un nuevo pedido
 export async function notifyWaiterNewOrder(
-  waiterId: string,
+  _waiterId: string, // Mantenido por compatibilidad, pero se notifica a todos los mozos
   clientName: string,
   tableNumber: string,
   itemsCount: number,
   totalAmount: number,
 ) {
   try {
-    const token = await getWaiterToken(waiterId);
+    const tokens = await getWaiterTokens();
 
-    if (!token) {
+    if (tokens.length === 0) {
       return;
     }
 
@@ -595,10 +640,10 @@ export async function notifyWaiterNewOrder(
       },
     };
 
-    await sendExpoPushNotification([token], notificationData);
+    await sendExpoPushNotification(tokens, notificationData);
   } catch (error) {
     console.error(
-      "❌ Error al enviar notificación de nuevo pedido al mozo:",
+      "❌ Error al enviar notificación de nuevo pedido a mozos:",
       error,
     );
   }
@@ -801,9 +846,16 @@ export async function notifyWaiterOrderFullyReady(
   totalItems: number,
 ) {
   try {
-    const token = await getWaiterToken(waiterId);
+    const specificToken = await getWaiterToken(waiterId);
+    let tokens: string[] = [];
+    
+    if (specificToken) {
+      tokens = [specificToken];
+    } else {
+      tokens = await getWaiterTokens();
+    }
 
-    if (!token) {
+    if (tokens.length === 0) {
       return;
     }
 
@@ -819,10 +871,10 @@ export async function notifyWaiterOrderFullyReady(
       },
     };
 
-    await sendExpoPushNotification([token], notificationData);
+    await sendExpoPushNotification(tokens, notificationData);
   } catch (error) {
     console.error(
-      "❌ Error al enviar notificación de pedido completo al mozo:",
+      "❌ Error al enviar notificación de pedido completo:",
       error,
     );
   }
@@ -1096,5 +1148,199 @@ export async function notifyClientAccountApproved(
     await sendExpoPushNotification([token], notificationData);
   } catch (error) {
     console.error("❌ Error al enviar notificación de cuenta aprobada:", error);
+  }
+}
+
+// Función para notificar a dueños y supervisores cuando se crea una nueva reserva
+export async function notifyNewReservation(
+  clientName: string,
+  reservationId: string,
+  date: string,
+  time: string,
+  partySize: number,
+  tableNumber: string,
+  tableType: string,
+) {
+  try {
+    const tokens = await getSupervisorAndOwnerTokens();
+
+    if (tokens.length === 0) {
+      return;
+    }
+
+    // Formatear la fecha para mostrar de forma más legible
+    const dateObj = new Date(date + 'T00:00:00');
+    const formattedDate = dateObj.toLocaleDateString('es-AR', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short'
+    });
+
+    // Formatear hora (remover segundos si los tiene)
+    const timeFormatted = time.substring(0, 5);
+
+    const notificationData: PushNotificationData = {
+      title: "📅 Nueva reserva recibida",
+      body: `${clientName} - Mesa #${tableNumber} (${tableType}) - ${formattedDate} ${timeFormatted} - ${partySize} personas`,
+      data: {
+        type: "new_reservation",
+        reservationId,
+        clientName,
+        date,
+        time: timeFormatted,
+        partySize,
+        tableNumber,
+        tableType,
+        screen: "ManageReservations",
+      },
+    };
+
+    await sendExpoPushNotification(tokens, notificationData);
+  } catch (error) {
+    console.error("❌ Error al enviar notificación de nueva reserva:", error);
+  }
+}
+
+// Función para notificar a dueños y supervisores cuando se crea un pedido de delivery
+export async function notifyNewDeliveryOrder(
+  clientName: string,
+  deliveryId: string,
+  deliveryAddress: string,
+  totalAmount: number,
+  itemsCount: number,
+) {
+  try {
+    const tokens = await getSupervisorAndOwnerTokens();
+
+    if (tokens.length === 0) {
+      return;
+    }
+
+    const notificationData: PushNotificationData = {
+      title: "🛵 Nuevo pedido de delivery",
+      body: `${clientName} - $${totalAmount.toLocaleString()} (${itemsCount} items) - ${deliveryAddress}`,
+      data: {
+        type: "new_delivery_order",
+        deliveryId,
+        clientName,
+        deliveryAddress,
+        totalAmount,
+        itemsCount,
+        screen: "ManageDeliveries",
+      },
+    };
+
+    await sendExpoPushNotification(tokens, notificationData);
+  } catch (error) {
+    console.error("❌ Error al enviar notificación de nuevo delivery:", error);
+  }
+}
+
+// Función para notificar a todos los repartidores cuando un delivery está listo para ser tomado
+export async function notifyDeliveryReadyForDrivers(
+  deliveryId: string,
+  deliveryAddress: string,
+  totalAmount: number,
+  estimatedDistanceKm?: number | null,
+) {
+  try {
+    const tokens = await getDriverTokens();
+
+    if (tokens.length === 0) {
+      return;
+    }
+
+    const distanceText = estimatedDistanceKm 
+      ? ` - ${estimatedDistanceKm.toFixed(1)} km`
+      : "";
+
+    const notificationData: PushNotificationData = {
+      title: "🚀 Nuevo viaje disponible",
+      body: `$${totalAmount.toLocaleString()}${distanceText} - ${deliveryAddress}`,
+      data: {
+        type: "delivery_ready",
+        deliveryId,
+        deliveryAddress,
+        totalAmount,
+        estimatedDistanceKm,
+        screen: "AvailableDeliveries",
+      },
+    };
+
+    await sendExpoPushNotification(tokens, notificationData);
+  } catch (error) {
+    console.error("❌ Error al enviar notificación de delivery listo a repartidores:", error);
+  }
+}
+
+// Función para notificar al repartidor cuando el cliente le envía un mensaje
+export async function notifyDriverNewMessage(
+  driverId: string,
+  clientName: string,
+  message: string,
+  deliveryId: string,
+) {
+  try {
+    const token = await getClientToken(driverId); // Reutilizamos esta función genérica
+
+    if (!token) {
+      return;
+    }
+
+    // Truncar mensaje si es muy largo
+    const truncatedMessage =
+      message.length > 50 ? message.substring(0, 47) + "..." : message;
+
+    const notificationData: PushNotificationData = {
+      title: `📦 ${clientName}`,
+      body: truncatedMessage,
+      data: {
+        type: "delivery_chat_message",
+        deliveryId,
+        clientName,
+        message,
+        screen: "DeliveryChat",
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+  } catch (error) {
+    console.error("❌ Error al enviar notificación de mensaje al repartidor:", error);
+  }
+}
+
+// Función para notificar al cliente cuando el repartidor le envía un mensaje
+export async function notifyClientDriverMessage(
+  clientId: string,
+  driverName: string,
+  message: string,
+  deliveryId: string,
+) {
+  try {
+    const token = await getClientToken(clientId);
+
+    if (!token) {
+      return;
+    }
+
+    // Truncar mensaje si es muy largo
+    const truncatedMessage =
+      message.length > 50 ? message.substring(0, 47) + "..." : message;
+
+    const notificationData: PushNotificationData = {
+      title: `🚗 ${driverName}`,
+      body: truncatedMessage,
+      data: {
+        type: "delivery_chat_message",
+        deliveryId,
+        driverName,
+        message,
+        screen: "DeliveryChat",
+      },
+    };
+
+    await sendExpoPushNotification([token], notificationData);
+  } catch (error) {
+    console.error("❌ Error al enviar notificación de mensaje al cliente:", error);
   }
 }

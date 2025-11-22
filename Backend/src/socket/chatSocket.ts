@@ -3,7 +3,6 @@ import { Server as HttpServer } from "http";
 import { supabaseAdmin } from "../config/supabase";
 import { ChatServices } from "../modules/chat/chatServices";
 import {
-  notifyWaitersNewClientMessage,
   notifyWaiterClientMessage,
   notifyClientWaiterMessage,
 } from "../services/pushNotificationService";
@@ -135,17 +134,6 @@ export const setupSocketIO = (httpServer: HttpServer) => {
 
         socket.join(roomName);
 
-        // Notificar a otros en la sala que se unió
-        socket.to(roomName).emit("user_joined", {
-          userId: user.appUserId,
-          userName: `${user.first_name} ${user.last_name}`,
-          userType:
-            user.profile_code === "cliente_anonimo" ||
-            user.profile_code === "cliente_registrado"
-              ? "client"
-              : "waiter",
-        });
-
         // Debug: mostrar cuántos usuarios hay en la sala
         const roomClients = io.sockets.adapter.rooms.get(roomName);
         const userCount = roomClients?.size || 0;
@@ -232,6 +220,7 @@ export const setupSocketIO = (httpServer: HttpServer) => {
           });
 
           // ENVIAR NOTIFICACIONES PUSH TIPO WHATSAPP
+          // Solo enviar si el receptor NO está activamente conectado al chat
           try {
             // Obtener información de la mesa y usuarios
             const { data: tableData, error: tableError } = await supabaseAdmin
@@ -248,50 +237,53 @@ export const setupSocketIO = (httpServer: HttpServer) => {
               .single();
 
             if (!tableError && tableData) {
+              // Verificar quién está en la sala del chat
+              const roomClients = io.sockets.adapter.rooms.get(roomName);
+              const socketsInRoom = roomClients
+                ? Array.from(roomClients)
+                : [];
+
+              // Obtener los IDs de usuarios conectados en la sala
+              const connectedUserIds = new Set<string>();
+              for (const socketId of socketsInRoom) {
+                const socketInstance = io.sockets.sockets.get(socketId);
+                if (socketInstance?.data.user) {
+                  connectedUserIds.add(socketInstance.data.user.appUserId);
+                }
+              }
+
               if (senderType === "client") {
-                // Cliente envía mensaje al mozo específico
+                // Cliente envía mensaje al mozo
                 const clientData = (tableData as any).users;
                 const clientName = clientData?.name || "Cliente";
+                const waiterId = tableData.id_waiter;
 
-                // Enviar notificación al mozo específico de la mesa
-                await notifyWaiterClientMessage(
-                  tableData.id_waiter,
-                  clientName,
-                  tableData.number.toString(),
-                  message.trim(),
-                  chatId,
-                );
-
-                // Si es el primer mensaje del cliente, también notificar a todos los mozos
-                const { data: previousMessages } = await supabaseAdmin
-                  .from("messages")
-                  .select("id")
-                  .eq("chat_id", chatId)
-                  .eq("sender_type", "client")
-                  .limit(2); // Buscar 2 porque el actual ya está guardado
-
-                const isFirstMessage =
-                  !previousMessages || previousMessages.length <= 1;
-
-                if (isFirstMessage) {
-                  await notifyWaitersNewClientMessage(
+                // Solo enviar notificación si el mozo NO está en la sala
+                if (!connectedUserIds.has(waiterId)) {
+                  await notifyWaiterClientMessage(
+                    waiterId,
                     clientName,
                     tableData.number.toString(),
                     message.trim(),
+                    chatId,
                   );
                 }
               } else if (senderType === "waiter") {
                 // Mozo envía mensaje al cliente
                 const waiterName =
                   `${user.first_name} ${user.last_name}`.trim();
+                const clientId = tableData.id_client;
 
-                await notifyClientWaiterMessage(
-                  tableData.id_client,
-                  waiterName,
-                  tableData.number.toString(),
-                  message.trim(),
-                  chatId,
-                );
+                // Solo enviar notificación si el cliente NO está en la sala
+                if (!connectedUserIds.has(clientId)) {
+                  await notifyClientWaiterMessage(
+                    clientId,
+                    waiterName,
+                    tableData.number.toString(),
+                    message.trim(),
+                    chatId,
+                  );
+                }
               }
             }
           } catch (notifyError) {

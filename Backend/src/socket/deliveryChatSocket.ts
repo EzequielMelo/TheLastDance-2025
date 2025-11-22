@@ -41,13 +41,6 @@ export const setupDeliveryChatSocket = (io: Server) => {
 
         socket.join(roomName);
 
-        // Notificar a otros en la sala que se unió
-        socket.to(roomName).emit("user_joined_delivery", {
-          userId: user.appUserId,
-          userName: `${user.first_name} ${user.last_name}`,
-          userType: isClient ? "client" : "driver",
-        });
-
         // Debug: mostrar cuántos usuarios hay en la sala
         const roomClients = io.sockets.adapter.rooms.get(roomName);
         const userCount = roomClients?.size || 0;
@@ -145,8 +138,69 @@ export const setupDeliveryChatSocket = (io: Server) => {
             success: true,
           });
 
-          // TODO: Implementar notificaciones push para delivery chat
-          // Similar a las notificaciones de chat mesero-cliente
+          // ENVIAR NOTIFICACIONES PUSH para delivery chat
+          // Solo enviar si el receptor NO está activamente conectado al chat
+          try {
+            // Verificar quién está en la sala del chat
+            const roomClients = io.sockets.adapter.rooms.get(roomName);
+            const socketsInRoom = roomClients
+              ? Array.from(roomClients)
+              : [];
+
+            // Obtener los IDs de usuarios conectados en la sala
+            const connectedUserIds = new Set<string>();
+            for (const socketId of socketsInRoom) {
+              const socketInstance = io.sockets.sockets.get(socketId);
+              if (socketInstance?.data.user) {
+                connectedUserIds.add(socketInstance.data.user.appUserId);
+              }
+            }
+
+            const senderIsClient = chat.client_id === user.appUserId;
+            const senderIsDriver = chat.driver_id === user.appUserId;
+
+            if (senderIsClient) {
+              // Cliente envía mensaje al repartidor
+              const driverId = chat.driver_id;
+              
+              // Solo enviar notificación si el repartidor NO está en la sala
+              if (driverId && !connectedUserIds.has(driverId)) {
+                const clientName = `${chat.client_first_name} ${chat.client_last_name}`.trim() || "Cliente";
+                
+                // Importar dinámicamente la función de notificación
+                const { notifyDriverNewMessage } = await import("../services/pushNotificationService");
+                await notifyDriverNewMessage(
+                  driverId,
+                  clientName,
+                  message.trim(),
+                  chat.delivery_id,
+                );
+              }
+            } else if (senderIsDriver) {
+              // Repartidor envía mensaje al cliente
+              const clientId = chat.client_id;
+              
+              // Solo enviar notificación si el cliente NO está en la sala
+              if (clientId && !connectedUserIds.has(clientId)) {
+                const driverName = `${user.first_name} ${user.last_name}`.trim();
+                
+                // Importar dinámicamente la función de notificación
+                const { notifyClientDriverMessage } = await import("../services/pushNotificationService");
+                await notifyClientDriverMessage(
+                  clientId,
+                  driverName,
+                  message.trim(),
+                  chat.delivery_id,
+                );
+              }
+            }
+          } catch (notifyError) {
+            console.error(
+              "❌ Error enviando notificaciones push de delivery:",
+              notifyError,
+            );
+            // No bloqueamos el mensaje por error de notificación
+          }
         } catch (error) {
           console.error("💥 Error al enviar mensaje de delivery:", error);
           console.error(

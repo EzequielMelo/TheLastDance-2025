@@ -1,4 +1,5 @@
 import { supabaseAdmin as supabase } from '../../config/supabase';
+import { notifyNewReservation } from '../../services/pushNotificationService';
 import type {
   Reservation,
   CreateReservationRequest,
@@ -104,6 +105,37 @@ export class ReservationsService {
     if (error) {
       console.error('Error creating reservation:', error);
       throw new Error('Error al crear la reserva');
+    }
+
+    // Obtener datos del usuario y la mesa para la notificación
+    const { data: user } = await supabase
+      .from('users')
+      .select('name')
+      .eq('id', userId)
+      .single();
+
+    const { data: tableData } = await supabase
+      .from('tables')
+      .select('number, type')
+      .eq('id', data.table_id)
+      .single();
+
+    // Enviar notificación a dueños y supervisores
+    if (user && tableData) {
+      try {
+        await notifyNewReservation(
+          user.name || 'Cliente',
+          reservation.id,
+          data.date,
+          data.time,
+          data.party_size,
+          tableData.number,
+          tableData.type
+        );
+      } catch (notificationError) {
+        console.error('❌ Error enviando notificación de nueva reserva:', notificationError);
+        // No lanzar error, la reserva ya se creó exitosamente
+      }
     }
 
     return reservation;
