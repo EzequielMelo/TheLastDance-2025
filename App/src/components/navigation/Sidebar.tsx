@@ -27,6 +27,7 @@ import {
   Gamepad2,
   Truck,
   History,
+  Award,
 } from "lucide-react-native";
 import { User } from "../../types/User";
 import { useClientState } from "../../Hooks/useClientState";
@@ -169,7 +170,7 @@ export default function Sidebar({
       id: "manage-waiting-list",
       title: "Gestionar Lista de Espera",
       subtitle: "Administrá las reservas y asignación de mesas",
-      icon: <Users size={20} color="#374151" />,
+      icon: <Users size={20} color="#111828" />,
       onPress: () => onNavigate("ManageWaitingList"),
       roles: ["empleado"],
       positions: ["maitre"],
@@ -178,7 +179,7 @@ export default function Sidebar({
       id: "generate-qr",
       title: "Generar Código QR",
       subtitle: "Crear QR para que clientes se unan a la lista",
-      icon: <QrCode size={20} color="#374151" />,
+      icon: <QrCode size={20} color="#111828" />,
       onPress: () => onNavigate("GenerateWaitingListQR"),
       roles: ["empleado"],
       positions: ["maitre"],
@@ -200,7 +201,7 @@ export default function Sidebar({
       id: "delivery-management",
       title: "Gestión de Deliveries",
       subtitle: "Administrá pedidos de delivery",
-      icon: <Truck size={20} color="#374151" />,
+      icon: <Truck size={20} color="#111828" />,
       onPress: () => onNavigate("DeliveryOrdersManagement"),
       roles: ["dueno", "supervisor"],
     },
@@ -246,7 +247,7 @@ export default function Sidebar({
                 title: "Reservar Mesa",
                 subtitle:
                   "Reservá una mesa para una fecha y horario específico",
-                icon: <Users size={20} color="#374151" />,
+                icon: <Users size={20} color="#111828" />,
                 onPress: () => onNavigate("MakeReservation"),
                 roles: ["cliente_registrado"],
               },
@@ -254,7 +255,7 @@ export default function Sidebar({
                 id: "my-reservations",
                 title: "Mis Reservas",
                 subtitle: "Ver y gestionar tus reservas",
-                icon: <Clock size={20} color="#374151" />,
+                icon: <Clock size={20} color="#111828" />,
                 onPress: () => onNavigate("MyReservations"),
                 roles: ["cliente_registrado"],
               },
@@ -266,7 +267,7 @@ export default function Sidebar({
               id: "delivery-order",
               title: "Pedir Delivery",
               subtitle: "Realizá tu pedido a domicilio",
-              icon: <Truck size={20} color="#374151" />,
+              icon: <Truck size={20} color="#111828" />,
               onPress: () => {
                 setIsDeliveryOrder(true); // Activar modo delivery
                 onNavigate("Menu"); // Navegar al menú para seleccionar productos
@@ -277,25 +278,43 @@ export default function Sidebar({
               id: "delivery-history",
               title: "Historial de Deliveries",
               subtitle: "Ver tus pedidos anteriores",
-              icon: <History size={20} color="#374151" />,
+              icon: <History size={20} color="#111828" />,
               onPress: () => onNavigate("DeliveryHistory"),
+              roles: ["cliente_registrado"],
+            },
+            {
+              id: "view-surveys",
+              title: "Ver Encuestas",
+              subtitle: "Estadísticas y opiniones del restaurante",
+              icon: <Award size={20} color="#111828" />,
+              onPress: () => onNavigate("SurveyStats"),
               roles: ["cliente_registrado"],
             },
           );
         }
-        // Para clientes anónimos (sin pedido pagado): mantener "Unirse a Lista de Espera"
+        // Para clientes anónimos (sin pedido pagado): mantener "Unirse a Lista de Espera" y Ver Encuestas
         else if (
           user?.profile_code === "cliente_anonimo" &&
           !hasAnonymousPaidOrder
         ) {
-          clientActions.push({
-            id: "join-queue",
-            title: "Unirse a Lista de Espera",
-            subtitle: "Escanea el QR para reservar una mesa",
-            icon: <Users size={20} color="#374151" />,
-            onPress: () => onNavigate("ScanQR"),
-            roles: ["cliente_anonimo"],
-          });
+          clientActions.push(
+            {
+              id: "join-queue",
+              title: "Unirse a Lista de Espera",
+              subtitle: "Escanea el QR para reservar una mesa",
+              icon: <Users size={20} color="#111828" />,
+              onPress: () => onNavigate("ScanQR"),
+              roles: ["cliente_anonimo"],
+            },
+            {
+              id: "view-surveys",
+              title: "Ver Encuestas",
+              subtitle: "Estadísticas y opiniones del restaurante",
+              icon: <Award size={20} color="#111828" />,
+              onPress: () => onNavigate("SurveyStats"),
+              roles: ["cliente_anonimo"],
+            },
+          );
         }
         break;
 
@@ -305,7 +324,7 @@ export default function Sidebar({
             id: "view-position",
             title: "Ver Mi Posición",
             subtitle: `Posición actual: #${waitingPosition || "..."}`,
-            icon: <Clock size={20} color="#374151" />,
+            icon: <Clock size={20} color="#111828" />,
             onPress: () => onNavigate("MyWaitingPosition"),
             roles: ["cliente_registrado", "cliente_anonimo"],
           },
@@ -313,7 +332,7 @@ export default function Sidebar({
             id: "refresh-queue",
             title: "Actualizar Estado",
             subtitle: "Verificar cambios en la lista",
-            icon: <RefreshCcw size={20} color="#374151" />,
+            icon: <RefreshCcw size={20} color="#111828" />,
             onPress: () => {
               refresh();
               onClose();
@@ -327,8 +346,8 @@ export default function Sidebar({
         clientActions.push({
           id: "confirm-table",
           title: "Confirmar Llegada",
-          subtitle: `Mesa #${assignedTable?.number || "..."} asignada`,
-          icon: <QrCode size={20} color="#374151" />,
+          subtitle: `Mesa #${assignedTable?.number || "..."}  asignada`,
+          icon: <QrCode size={20} color="#111828" />,
           onPress: () => onNavigate("ScanTableQR"),
           roles: ["cliente_registrado", "cliente_anonimo"],
         });
@@ -341,7 +360,7 @@ export default function Sidebar({
             id: "table-chat",
             title: "Chat con Mesero",
             subtitle: `Mesa #${occupiedTable.number} - Comunícate con tu mesero`,
-            icon: <MessageCircle size={20} color="#374151" />,
+            icon: <MessageCircle size={20} color="#111828" />,
             onPress: () =>
               onNavigate("TableChat", { tableId: occupiedTable.id }),
             roles: ["cliente_registrado", "cliente_anonimo"],
@@ -353,7 +372,7 @@ export default function Sidebar({
           id: "games",
           title: "Juegos",
           subtitle: "Disfruta mientras esperas tu pedido y gana descuentos",
-          icon: <Gamepad2 size={20} color="#374151" />,
+          icon: <Gamepad2 size={20} color="#111828" />,
           onPress: () => onNavigate("Games"),
           roles: ["cliente_registrado", "cliente_anonimo"],
         });
@@ -365,7 +384,7 @@ export default function Sidebar({
             id: "new-reservation",
             title: "Nueva Reserva",
             subtitle: "Tu mesa fue liberada, únete nuevamente",
-            icon: <Users size={20} color="#374151" />,
+            icon: <Users size={20} color="#111828" />,
             onPress: () => onNavigate("ScanQR"),
             roles: ["cliente_registrado", "cliente_anonimo"],
           },
@@ -373,7 +392,7 @@ export default function Sidebar({
             id: "refresh-displaced",
             title: "Actualizar Estado",
             subtitle: "Verificar tu situación actual",
-            icon: <RefreshCcw size={20} color="#374151" />,
+            icon: <RefreshCcw size={20} color="#111828" />,
             onPress: () => {
               refresh();
               onClose();
@@ -408,7 +427,7 @@ export default function Sidebar({
       switch (state) {
         case "loading":
           return {
-            icon: <RefreshCcw size={20} color="#374151" />,
+            icon: <RefreshCcw size={20} color="#111828" />,
             title: "Verificando estado...",
             subtitle: "Conectando con el servidor",
             color: "#d4af37",
@@ -426,7 +445,7 @@ export default function Sidebar({
           };
         case "in_queue":
           return {
-            icon: <Clock size={20} color="#374151" />,
+            icon: <Clock size={20} color="#111828" />,
             title: `Posición #${waitingPosition || "..."}`,
             subtitle: "En lista de espera",
             color: "#d4af37",
