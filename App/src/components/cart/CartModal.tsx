@@ -33,6 +33,8 @@ import {
   checkTableDeliveryStatus,
   confirmTableDelivery,
 } from "../../api/orders";
+import { createDeliveryOrder, createDelivery } from "../../api/deliveries";
+import { RESTAURANT_LOCATION } from "../../config/restaurantConfig";
 import type { CreateOrderRequest, OrderItem } from "../../types/Order";
 import OrderStatusView from "../orders/OrderStatusView";
 import CustomAlert from "../common/CustomAlert";
@@ -72,6 +74,9 @@ export default function CartModal({
     submitToAcceptedOrder,
     refreshOrders,
     isDeliveryOrder, // 🚚 Flag para detectar modo delivery
+    deliveryAddress, // 🚚 Dirección de delivery guardada
+    setIsDeliveryOrder, // 🚚 Para resetear modo delivery
+    setDeliveryAddress, // 🚚 Para limpiar dirección
   } = useCart();
 
   const {
@@ -198,19 +203,12 @@ export default function CartModal({
       );
 
       if (!orderWithRejectedItems) {
-        if (showCustomAlert) {
-          showCustomAlert(
-            "Error",
-            "No se encontró la orden con productos rechazados",
-            undefined,
-            "error",
-          );
-        } else {
-          Alert.alert(
-            "Error",
-            "No se encontró la orden con productos rechazados",
-          );
-        }
+        showAlert(
+          "Error",
+          "No se encontró la orden con productos rechazados",
+          undefined,
+          "error",
+        );
         return;
       }
 
@@ -222,26 +220,19 @@ export default function CartModal({
         orderId: orderWithRejectedItems.id,
       });
     } catch (error) {
-      if (showCustomAlert) {
-        showCustomAlert(
-          "Error",
-          "No se pudo abrir el menú para modificar los productos",
-          undefined,
-          "error",
-        );
-      } else {
-        Alert.alert(
-          "Error",
-          "No se pudo abrir el menú para modificar los productos",
-        );
-      }
+      showAlert(
+        "Error",
+        "No se pudo abrir el menú para modificar los productos",
+        undefined,
+        "error",
+      );
     }
   };
 
   const handleAddMoreItems = () => {
     // Cerrar el modal de carrito
     onClose();
-    
+
     // Navegar al menú para que el usuario pueda agregar más items
     if (navigation) {
       navigation.navigate("Menu");
@@ -267,7 +258,7 @@ export default function CartModal({
       if (result.success) {
         // Obtener el id_waiter de la mesa para la encuesta
         const waiterId = occupiedTable.id_waiter || "";
-        
+
         showAlert(
           "✅ Recepción Confirmada",
           "¡Perfecto! Has confirmado la recepción de tu pedido. ¿Te gustaría responder una breve encuesta sobre tu experiencia?",
@@ -280,9 +271,9 @@ export default function CartModal({
                 await refreshClientState();
                 refreshOrders();
                 // Navegar a encuesta
-                navigation.navigate("Survey", { 
+                navigation.navigate("Survey", {
                   tableId: occupiedTable.id,
-                  waiterId: waiterId
+                  waiterId: waiterId,
                 });
               },
             },
@@ -320,42 +311,107 @@ export default function CartModal({
   };
 
   const handleConfirmOrder = async () => {
-    if (cartItems.length === 0) {
-      if (showCustomAlert) {
-        showCustomAlert(
+    // 🚚 Si es un pedido de delivery, validar dirección y crear el pedido
+    if (isDeliveryOrder) {
+      // Validar que haya productos en el carrito
+      if (cartItems.length === 0) {
+        showAlert(
           "Error",
-          "No hay productos en el carrito para enviar",
+          "No hay productos en el carrito para realizar el pedido",
           undefined,
           "error",
         );
-      } else {
-        Alert.alert("Error", "No hay productos en el carrito para enviar");
+        return;
+      }
+
+      // Validar que exista una dirección guardada
+      if (!deliveryAddress) {
+        showAlert(
+          "Error",
+          "No se ha seleccionado una dirección de entrega",
+          undefined,
+          "error",
+        );
+        return;
+      }
+
+      try {
+        // Crear el pedido de delivery con los items del carrito
+        const deliveryOrderData = {
+          items: cartItems.map(item => ({
+            id: item.id,
+            name: item.name,
+            category: item.category,
+            price: item.price,
+            prepMinutes: item.prepMinutes,
+            quantity: item.quantity,
+            image_url: item.image_url,
+          })),
+          totalAmount: cartAmount,
+          estimatedTime: cartTime,
+          notes: "",
+        };
+
+        const deliveryOrderResponse =
+          await createDeliveryOrder(deliveryOrderData);
+        const deliveryOrderId = deliveryOrderResponse.id;
+
+        // Crear el registro de delivery con la dirección
+        const deliveryData = {
+          delivery_order_id: deliveryOrderId,
+          delivery_address: deliveryAddress.address,
+          delivery_latitude: deliveryAddress.latitude,
+          delivery_longitude: deliveryAddress.longitude,
+          delivery_notes: deliveryAddress.notes || "",
+          origin_latitude: RESTAURANT_LOCATION.latitude,
+          origin_longitude: RESTAURANT_LOCATION.longitude,
+        };
+
+        await createDelivery(deliveryData);
+
+        // Limpiar el carrito y resetear estados
+        await submitOrder();
+        setIsDeliveryOrder(false);
+        setDeliveryAddress(null);
+
+        // Mostrar mensaje de éxito
+        showAlert(
+          "Pedido Enviado",
+          "Tu pedido de delivery ha sido enviado exitosamente",
+          [{ text: "OK", onPress: onClose }],
+          "success",
+        );
+      } catch (error: any) {
+        console.error("Error al crear pedido de delivery:", error);
+        showAlert(
+          "Error",
+          error.message || "No se pudo crear el pedido de delivery",
+          undefined,
+          "error",
+        );
       }
       return;
     }
 
-    // 🚚 Si es un pedido de delivery, navegar a la pantalla de ubicación
-    if (isDeliveryOrder) {
-      onClose(); // Cerrar el modal del carrito
-      navigation.navigate("DeliveryLocation" as never);
+    // === Flujo normal para pedidos en mesa ===
+    if (cartItems.length === 0) {
+      showAlert(
+        "Error",
+        "No hay productos en el carrito para enviar",
+        undefined,
+        "error",
+      );
       return;
     }
 
     // Verificar si hay items pendientes
     if (hasPendingItems) {
-      if (showCustomAlert) {
-        showCustomAlert(
-          "Error",
-          "Ya tienes productos pendientes de aprobación. No puedes enviar más hasta que sean procesados.",
-          undefined,
-          "error",
-        );
-      } else {
-        Alert.alert(
-          "Error",
-          "Ya tienes productos pendientes de aprobación. No puedes enviar más hasta que sean procesados.",
-        );
-      }
+      showAlert(
+        "Error",
+        "Ya tienes productos pendientes de aprobación. No puedes enviar más hasta que sean procesados.",
+        undefined,
+        "error",
+      );
       return;
     }
 
@@ -364,70 +420,38 @@ export default function CartModal({
       try {
         await submitToAcceptedOrder();
 
-        if (showCustomAlert) {
-          showCustomAlert(
-            "Nueva Tanda Agregada",
-            `Se agregaron ${cartCount} ${cartCount === 1 ? "producto" : "productos"} como nueva tanda. Los productos están pendientes de aprobación del mozo.`,
-            [{ text: "OK", onPress: onClose }],
-            "success",
-          );
-        } else {
-          Alert.alert(
-            "Nueva Tanda Agregada",
-            `Se agregaron ${cartCount} ${cartCount === 1 ? "producto" : "productos"} como nueva tanda. Los productos están pendientes de aprobación del mozo.`,
-            [{ text: "OK", onPress: onClose }],
-          );
-        }
+        showAlert(
+          "Nueva Tanda Agregada",
+          `Se agregaron ${cartCount} ${cartCount === 1 ? "producto" : "productos"} como nueva tanda. Los productos están pendientes de aprobación del mozo.`,
+          [{ text: "OK", onPress: onClose }],
+          "success",
+        );
         return;
       } catch (error: any) {
         console.error("Error al agregar nueva tanda:", error);
-        if (showCustomAlert) {
-          showCustomAlert(
-            "Error",
-            error.message || "No se pudo agregar la nueva tanda.",
-            undefined,
-            "error",
-          );
-        } else {
-          Alert.alert(
-            "Error",
-            error.message || "No se pudo agregar la nueva tanda.",
-          );
-        }
+        showAlert(
+          "Error",
+          error.message || "No se pudo agregar la nueva tanda.",
+          undefined,
+          "error",
+        );
         return;
       }
     }
 
     // Verificar mesa
     if (loadingTable) {
-      if (showCustomAlert) {
-        showCustomAlert(
-          "Espera",
-          "Verificando tu mesa asignada...",
-          undefined,
-          "info",
-        );
-      } else {
-        Alert.alert("Espera", "Verificando tu mesa asignada...");
-      }
+      showAlert("Espera", "Verificando tu mesa asignada...", undefined, "info");
       return;
     }
 
     if (!tableId) {
-      if (showCustomAlert) {
-        showCustomAlert(
-          "Error",
-          "No tienes una mesa asignada. Asegúrate de haber escaneado el código QR de tu mesa.",
-          [{ text: "OK", onPress: onClose }],
-          "error",
-        );
-      } else {
-        Alert.alert(
-          "Error",
-          "No tienes una mesa asignada. Asegúrate de haber escaneado el código QR de tu mesa.",
-          [{ text: "OK", onPress: onClose }],
-        );
-      }
+      showAlert(
+        "Error",
+        "No tienes una mesa asignada. Asegúrate de haber escaneado el código QR de tu mesa.",
+        [{ text: "OK", onPress: onClose }],
+        "error",
+      );
       return;
     }
 
@@ -450,35 +474,20 @@ export default function CartModal({
       await createOrder(orderData);
       await submitOrder();
 
-      if (showCustomAlert) {
-        showCustomAlert(
-          "Pedido Enviado",
-          `Tu pedido por ${formatPrice(cartAmount)} ha sido enviado. Espera a que sea confirmado por el personal.`,
-          [{ text: "OK", onPress: onClose }],
-          "success",
-        );
-      } else {
-        Alert.alert(
-          "Pedido Enviado",
-          `Tu pedido por ${formatPrice(cartAmount)} ha sido enviado. Espera a que sea confirmado por el personal.`,
-          [{ text: "OK", onPress: onClose }],
-        );
-      }
+      showAlert(
+        "Pedido Enviado",
+        `Tu pedido por ${formatPrice(cartAmount)} ha sido enviado. Espera a que sea confirmado por el personal.`,
+        [{ text: "OK", onPress: onClose }],
+        "success",
+      );
     } catch (error: any) {
       console.error("Error al enviar pedido:", error);
-      if (showCustomAlert) {
-        showCustomAlert(
-          "Error",
-          error.message || "No se pudo enviar el pedido. Intenta de nuevo.",
-          undefined,
-          "error",
-        );
-      } else {
-        Alert.alert(
-          "Error",
-          error.message || "No se pudo enviar el pedido. Intenta de nuevo.",
-        );
-      }
+      showAlert(
+        "Error",
+        error.message || "No se pudo enviar el pedido. Intenta de nuevo.",
+        undefined,
+        "error",
+      );
     }
   };
 
@@ -993,7 +1002,7 @@ export default function CartModal({
                 {loadingTable
                   ? "Verificando mesa..."
                   : isDeliveryOrder
-                    ? `Continuar a Ubicación • ${formatPrice(cartAmount)}`
+                    ? `Confirmar Pedido • ${formatPrice(cartAmount)}`
                     : canAddMoreItems
                       ? `Agregar Nueva Tanda • ${formatPrice(cartAmount)}`
                       : `Enviar Pedido • ${formatPrice(cartAmount)}`}

@@ -50,8 +50,7 @@ const DeliveryLocationScreen: React.FC = () => {
   const mapRef = useRef<MapView>(null);
 
   // 🚚 Obtener items del carrito para crear la orden
-  const { cartItems, cartAmount, cartTime, submitOrder, setIsDeliveryOrder } =
-    useCart();
+  const { setDeliveryAddress, setIsDeliveryOrder } = useCart();
 
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
@@ -294,82 +293,16 @@ const DeliveryLocationScreen: React.FC = () => {
       return;
     }
 
-    if (cartItems.length === 0) {
-      showCustomAlert(
-        "Error",
-        "No hay productos en el carrito para realizar el pedido",
-        "error",
-        [{ text: "OK" }],
-      );
-      return;
-    }
+    // Guardar la dirección de delivery en el contexto
+    setDeliveryAddress({
+      address: address,
+      latitude: selectedLocation.latitude,
+      longitude: selectedLocation.longitude,
+      notes: notes || undefined,
+    });
 
-    setIsLoading(true);
-
-    try {
-      // 1️⃣ Crear la orden de delivery primero
-      const orderData = {
-        items: cartItems.map(item => ({
-          id: item.id,
-          name: item.name,
-          category: item.category,
-          price: item.price,
-          prepMinutes: item.prepMinutes,
-          quantity: item.quantity,
-          image_url: item.image_url,
-        })),
-        totalAmount: cartAmount,
-        estimatedTime: cartTime,
-      };
-
-      console.log("📦 Creando orden de delivery...", orderData);
-      const deliveryOrder = await createDeliveryOrder(orderData);
-      console.log("✅ Orden de delivery creada:", deliveryOrder);
-
-      // 2️⃣ Crear el delivery con la orden recién creada
-      const deliveryData = {
-        delivery_order_id: deliveryOrder.id, // 🔄 Cambiado de order_id
-        delivery_address: address,
-        delivery_latitude: selectedLocation.latitude,
-        delivery_longitude: selectedLocation.longitude,
-        delivery_notes: notes || undefined,
-        origin_latitude: restaurantLocation.latitude,
-        origin_longitude: restaurantLocation.longitude,
-      };
-
-      console.log("🚚 Creando delivery...", deliveryData);
-      const delivery = await createDelivery(deliveryData);
-      console.log("✅ Delivery creado:", delivery);
-
-      // 3️⃣ Limpiar carrito y resetear modo delivery
-      await submitOrder();
-      setIsDeliveryOrder(false);
-
-      // 4️⃣ Navegar a Home para ver el tracking
-      showCustomAlert(
-        "¡Pedido Realizado!",
-        `Tu pedido de delivery ha sido creado exitosamente.\n\nDirección: ${address}\n\nTu pedido está siendo procesado y pronto estará en camino.`,
-        "success",
-        [
-          {
-            text: "Ver Estado",
-            onPress: () => navigation.navigate("Home"),
-          },
-        ],
-      );
-    } catch (error: any) {
-      console.error("Error creando delivery:", error);
-      showCustomAlert(
-        "Error",
-        error.response?.data?.error ||
-          error.message ||
-          "No se pudo crear el pedido de delivery. Intenta nuevamente.",
-        "error",
-        [{ text: "OK" }],
-      );
-    } finally {
-      setIsLoading(false);
-    }
+    // Navegar al menú para que el cliente seleccione productos
+    navigation.navigate("Menu");
   };
 
   return (

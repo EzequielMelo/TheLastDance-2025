@@ -21,6 +21,7 @@ import {
   User,
   Navigation2,
   MessageCircle,
+  DollarSign,
 } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
@@ -36,6 +37,7 @@ import DeliveryPaymentModal from "./DeliveryPaymentModal";
 import {
   setDeliveryPaymentMethod,
   updateDriverLocation,
+  markDeliveryAsArrived,
 } from "../../api/deliveries";
 import { io, Socket } from "socket.io-client";
 import { SERVER_BASE_URL } from "../../api/config";
@@ -172,8 +174,27 @@ const DeliveryTrackingScreen: React.FC = () => {
       return;
     }
 
-    // En lugar de completar directamente, abrir modal de pago
-    setShowPaymentModal(true);
+    try {
+      setIsDelivering(true);
+
+      // Marcar como "arrived" en el backend
+      await markDeliveryAsArrived(deliveryId);
+
+      console.log("✅ Delivery marcado como arrived exitosamente");
+
+      // Actualizar estado local inmediatamente para cambiar el botón
+      setDelivery({ ...currentDelivery, status: "arrived" });
+      deliveryRef.current = { ...currentDelivery, status: "arrived" };
+    } catch (error: any) {
+      console.error("Error al marcar llegada:", error);
+      Alert.alert(
+        "Error",
+        error.response?.data?.error ||
+          "No se pudo marcar la llegada. Intenta de nuevo.",
+      );
+    } finally {
+      setIsDelivering(false);
+    }
 
     // Resetear el slider
     Animated.spring(slideAnim, {
@@ -816,7 +837,7 @@ const DeliveryTrackingScreen: React.FC = () => {
                 </TouchableOpacity>
               )}
 
-              {/* Botón deslizable para completar entrega (solo para repartidores) */}
+              {/* Botón deslizable para marcar llegada (solo para repartidores en camino) */}
               {user?.profile_code === "empleado" &&
                 delivery.status === "on_the_way" && (
                   <View className="mb-2">
@@ -830,7 +851,7 @@ const DeliveryTrackingScreen: React.FC = () => {
                       {/* Fondo que se revela al deslizar */}
                       <View className="absolute left-0 right-0 top-0 bottom-0 bg-green-500 items-center justify-center">
                         <Text className="text-white font-bold text-lg">
-                          ✓ Confirmar Entrega
+                          ✓ Confirmar Llegada
                         </Text>
                       </View>
 
@@ -872,6 +893,30 @@ const DeliveryTrackingScreen: React.FC = () => {
                       ></View>
                     </View>
                   </View>
+                )}
+
+              {/* Botón para procesar pago (cuando ya llegó) */}
+              {user?.profile_code === "empleado" &&
+                delivery.status === "arrived" && (
+                  <TouchableOpacity
+                    onPress={() => setShowPaymentModal(true)}
+                    className="mb-2 rounded-2xl h-16 justify-center items-center"
+                    style={{
+                      backgroundColor: "#22c55e",
+                      shadowColor: "#22c55e",
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.3,
+                      shadowRadius: 6,
+                      elevation: 8,
+                    }}
+                  >
+                    <View className="flex-row items-center">
+                      <DollarSign size={24} color="white" />
+                      <Text className="text-white font-bold text-lg ml-2">
+                        Procesar Pago
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
                 )}
             </View>
           </View>

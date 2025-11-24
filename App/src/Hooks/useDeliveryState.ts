@@ -12,6 +12,7 @@ export type DeliveryState =
   | "preparing" // En preparación
   | "ready" // Listo para recoger
   | "on_the_way" // En camino
+  | "arrived" // Repartidor llegó al lugar
   | "delivered" // Entregado
   | "cancelled" // Cancelado
   | "loading" // Cargando estado
@@ -72,6 +73,9 @@ export const useDeliveryState = (): DeliveryStateData => {
           case "on_the_way":
             setState("on_the_way");
             break;
+          case "arrived":
+            setState("arrived");
+            break;
           case "delivered":
             setState("delivered");
             break;
@@ -102,7 +106,7 @@ export const useDeliveryState = (): DeliveryStateData => {
 
     const initializeDeliveryState = async () => {
       if (!isMounted) return;
-      
+
       if (user?.id && user.profile_code === "cliente_registrado") {
         await checkDeliveryState();
       } else {
@@ -146,7 +150,9 @@ export const useDeliveryState = (): DeliveryStateData => {
     });
 
     socket.on("delivery_status_changed", () => {
-      console.log("📦 Recibido evento delivery_status_changed - refrescando estado");
+      console.log(
+        "📦 Recibido evento delivery_status_changed - refrescando estado",
+      );
       checkDeliveryState();
     });
 

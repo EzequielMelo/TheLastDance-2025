@@ -94,6 +94,13 @@ router.put("/:id/status", deliveryController.updateDeliveryStatus);
 router.post("/:id/take", deliveryController.takeDelivery);
 
 /**
+ * @route   PUT /api/deliveries/:id/mark-arrived
+ * @desc    Repartidor marca que llegó al lugar de entrega (on_the_way → arrived)
+ * @access  Private (empleado/repartidor asignado)
+ */
+router.put("/:id/mark-arrived", deliveryController.markDeliveryAsArrived);
+
+/**
  * @route   PUT /api/deliveries/:id/assign
  * @desc    Asignar repartidor a un delivery
  * @access  Private (dueño/supervisor)

@@ -404,7 +404,7 @@ export default function MenuScreen() {
       // Enviar modificaciones de tanda
       const response = await submitTandaModifications(orderId, payload);
 
-      Alert.alert(
+      showCustomAlert(
         "Cambios Enviados",
         `Se han enviado ${keepItems.length} producto(s) original(es) y ${formattedNewItems.length} producto(s) nuevo(s) para aprobación`,
         [
@@ -417,11 +417,14 @@ export default function MenuScreen() {
             },
           },
         ],
+        "success",
       );
     } catch (error: any) {
-      Alert.alert(
+      showCustomAlert(
         "Error",
         error.message || "No se pudieron enviar los cambios",
+        [{ text: "OK" }],
+        "error",
       );
     } finally {
       setIsSubmittingChanges(false);

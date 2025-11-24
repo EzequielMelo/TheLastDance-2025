@@ -286,19 +286,60 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
             </View>
 
             <Text className="text-gray-300 text-center mb-6">
-              Te notificaremos cuando tu mesa esté lista. Puedes ver tu posición
-              o cancelar tu reserva.
+              Te notificaremos cuando tu mesa esté lista. Mientras esperas,
+              puedes ver tu posición o consultar las encuestas del restaurante.
             </Text>
-            <View className="flex-row gap-4 justify-center">
-              <TouchableOpacity
-                onPress={() => navigation.navigate("MyWaitingPosition")}
-                className="bg-blue-600 px-6 py-3 rounded-lg flex-row items-center"
+
+            {/* Botones circulares */}
+            <View className="w-full mb-6">
+              <View
+                className="flex-row justify-around items-center"
+                style={{ paddingHorizontal: 60 }}
               >
-                <Clock size={16} color="white" className="mr-2" />
-                <Text className="text-white font-semibold ml-2">
-                  Ver Posición
-                </Text>
-              </TouchableOpacity>
+                {/* Ver Posición */}
+                <View className="items-center">
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate("MyWaitingPosition")}
+                    className="bg-blue-600 w-16 h-16 rounded-full items-center justify-center mb-2"
+                    style={{
+                      elevation: 4,
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.25,
+                      shadowRadius: 4,
+                    }}
+                  >
+                    <Clock size={24} color="white" />
+                  </TouchableOpacity>
+                  <View style={{ height: 32, justifyContent: "center" }}>
+                    <Text className="text-white text-center text-xs font-medium">
+                      Ver{"\n"}Posición
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Ver Encuestas */}
+                <View className="items-center">
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate("SurveyStats")}
+                    className="bg-green-600 w-16 h-16 rounded-full items-center justify-center mb-2"
+                    style={{
+                      elevation: 4,
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.25,
+                      shadowRadius: 4,
+                    }}
+                  >
+                    <FileText size={24} color="white" />
+                  </TouchableOpacity>
+                  <View style={{ height: 32, justifyContent: "center" }}>
+                    <Text className="text-white text-center text-xs font-medium">
+                      Ver{"\n"}Encuestas
+                    </Text>
+                  </View>
+                </View>
+              </View>
             </View>
           </View>
         );
@@ -404,7 +445,7 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                           if (occupiedTable) {
                             navigation.navigate("Survey", {
                               tableId: occupiedTable.id,
-                              waiterId: occupiedTable.id_waiter || ""
+                              waiterId: occupiedTable.id_waiter || "",
                             });
                           }
                         }}
@@ -531,7 +572,7 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
                           if (occupiedTable) {
                             navigation.navigate("Survey", {
                               tableId: occupiedTable.id,
-                              waiterId: occupiedTable.id_waiter || ""
+                              waiterId: occupiedTable.id_waiter || "",
                             });
                           }
                         }}

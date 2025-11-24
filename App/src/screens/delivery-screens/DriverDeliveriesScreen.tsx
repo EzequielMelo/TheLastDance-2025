@@ -219,9 +219,9 @@ export default function DriverDeliveriesScreen() {
                 key={delivery.id}
                 style={{
                   backgroundColor: "rgba(255, 255, 255, 0.05)",
-                  borderRadius: 12,
-                  padding: 16,
-                  borderWidth: 1,
+                  borderRadius: 16,
+                  padding: 20,
+                  borderWidth: 1.5,
                   borderColor: "#22c55e",
                 }}
               >
@@ -230,40 +230,40 @@ export default function DriverDeliveriesScreen() {
                   <View
                     style={{
                       backgroundColor: "#22c55e",
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      borderRadius: 6,
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 8,
                       flexDirection: "row",
                       alignItems: "center",
                     }}
                   >
-                    <CheckCircle size={14} color="#ffffff" />
-                    <Text className="text-white text-xs font-semibold ml-2">
+                    <CheckCircle size={16} color="#ffffff" />
+                    <Text className="text-white text-sm font-semibold ml-2">
                       LISTO PARA ENTREGAR
                     </Text>
                   </View>
                 </View>
 
                 {/* Info del cliente */}
-                <View className="flex-row items-center mb-3 pb-3 border-b border-gray-700">
-                  <User size={18} color="#d4af37" />
-                  <Text className="text-white text-base font-semibold ml-2">
+                <View className="flex-row items-center mb-4 pb-4 border-b border-gray-700">
+                  <User size={22} color="#d4af37" />
+                  <Text className="text-white text-lg font-semibold ml-3">
                     {delivery.user?.first_name} {delivery.user?.last_name}
                   </Text>
                 </View>
 
                 {/* Dirección */}
-                <View className="flex-row items-start mb-3">
-                  <MapPin size={18} color="#d4af37" className="mt-1" />
-                  <View className="flex-1 ml-2">
-                    <Text className="text-gray-400 text-xs mb-1">
+                <View className="flex-row items-start mb-4">
+                  <MapPin size={22} color="#d4af37" className="mt-1" />
+                  <View className="flex-1 ml-3">
+                    <Text className="text-gray-400 text-sm mb-2">
                       Dirección de entrega
                     </Text>
-                    <Text className="text-white text-sm">
+                    <Text className="text-white text-base leading-6">
                       {delivery.delivery_address}
                     </Text>
                     {delivery.delivery_notes && (
-                      <Text className="text-gray-500 text-xs mt-1 italic">
+                      <Text className="text-gray-400 text-sm mt-2 italic">
                         Nota: {delivery.delivery_notes}
                       </Text>
                     )}
@@ -271,17 +271,17 @@ export default function DriverDeliveriesScreen() {
                 </View>
 
                 {/* Items y monto */}
-                <View className="flex-row justify-between mb-3 pb-3 border-b border-gray-700">
+                <View className="flex-row justify-between mb-4 pb-4 border-b border-gray-700">
                   <View className="flex-row items-center">
-                    <Package size={16} color="#d4af37" />
-                    <Text className="text-gray-400 text-sm ml-2">
+                    <Package size={20} color="#d4af37" />
+                    <Text className="text-gray-400 text-base ml-2">
                       {getTotalItems(delivery)} items ({getItemsCount(delivery)}{" "}
                       productos)
                     </Text>
                   </View>
                   <View className="flex-row items-center">
-                    <DollarSign size={16} color="#22c55e" />
-                    <Text className="text-white text-base font-bold ml-1">
+                    <DollarSign size={20} color="#22c55e" />
+                    <Text className="text-white text-lg font-bold ml-1">
                       {formatCurrency(
                         delivery.delivery_order?.total_amount || 0,
                       )}
@@ -292,8 +292,8 @@ export default function DriverDeliveriesScreen() {
                 {/* Tiempo estimado */}
                 {delivery.estimated_time_minutes && (
                   <View className="flex-row items-center mb-4">
-                    <Clock size={16} color="#d4af37" />
-                    <Text className="text-gray-400 text-sm ml-2">
+                    <Clock size={20} color="#d4af37" />
+                    <Text className="text-gray-400 text-base ml-2">
                       Tiempo estimado: {delivery.estimated_time_minutes} min
                     </Text>
                   </View>
@@ -306,17 +306,17 @@ export default function DriverDeliveriesScreen() {
                   style={{
                     backgroundColor:
                       takingDeliveryId === delivery.id ? "#6b7280" : "#22c55e",
-                    paddingVertical: 14,
-                    borderRadius: 8,
+                    paddingVertical: 16,
+                    borderRadius: 10,
                     alignItems: "center",
                   }}
                 >
                   {takingDeliveryId === delivery.id ? (
-                    <Text className="text-white text-base font-bold">
+                    <Text className="text-white text-lg font-bold">
                       Tomando pedido...
                     </Text>
                   ) : (
-                    <Text className="text-white text-base font-bold">
+                    <Text className="text-white text-lg font-bold">
                       Tomar Pedido
                     </Text>
                   )}
