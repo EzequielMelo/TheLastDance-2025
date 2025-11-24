@@ -310,7 +310,7 @@ export default function MyReservationsScreen({}: MyReservationsScreenProps) {
             borderBottomColor: 'rgba(255, 255, 255, 0.1)',
           }}
         >
-          <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 16 }}>
+          <TouchableOpacity onPress={() => navigation.navigate('Home' as never)} style={{ marginRight: 16 }}>
             <ArrowLeft size={24} color="white" />
           </TouchableOpacity>
           <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold', flex: 1 }}>

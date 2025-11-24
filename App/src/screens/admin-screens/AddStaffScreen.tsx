@@ -4,13 +4,13 @@ import {
   Modal,
   TouchableOpacity,
   ToastAndroid,
-  Alert,
   ScrollView,
+  Keyboard,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import FormLayout from "../../Layouts/formLayout";
 import TextField from "../../components/form/TextField";
 import ImageField from "../../components/form/ImageField";
@@ -18,6 +18,7 @@ import CUILField from "../../components/form/CUILField";
 import { Picker } from "@react-native-picker/picker";
 import api from "../../api/axios";
 import { RootStackParamList } from "../../navigation/RootStackParamList";
+import CustomAlert from "../../components/common/CustomAlert";
 
 type Props = NativeStackScreenProps<RootStackParamList, "AddStaff">;
 
@@ -51,7 +52,22 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
   const [facing, setFacing] = useState<CameraType>("back");
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState<string>("");
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const cameraRef = useRef<CameraView>(null);
+
+  // CustomAlert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    title: "",
+    message: "",
+    type: "info" as "success" | "error" | "warning" | "info",
+    buttons: [] as Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "cancel" | "destructive";
+    }>,
+  });
 
   const [formData, setFormData] = useState<FormData>({
     first_name: "",
@@ -67,6 +83,53 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
+
+  // Helper function to show custom alerts
+  const showAlert = (
+    title: string,
+    message: string,
+    type: "success" | "error" | "warning" | "info" = "info",
+    buttons?: Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "cancel" | "destructive";
+    }>,
+  ) => {
+    setAlertConfig({
+      title,
+      message,
+      type,
+      buttons: buttons || [
+        { text: "OK", onPress: () => setAlertVisible(false) },
+      ],
+    });
+    setAlertVisible(true);
+  };
+
+  const closeAlert = () => {
+    setAlertVisible(false);
+  };
+
+  // Keyboard listeners
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      "keyboardDidShow",
+      () => {
+        setKeyboardVisible(true);
+      },
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      "keyboardDidHide",
+      () => {
+        setKeyboardVisible(false);
+      },
+    );
+
+    return () => {
+      keyboardDidHideListener?.remove();
+      keyboardDidShowListener?.remove();
+    };
+  }, []);
 
   // Determinar qué perfiles están disponibles según el rol del usuario
   const userRole = route.params.userRole;
@@ -360,31 +423,42 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
   };
 
   const showDNIOptions = () => {
-    Alert.alert("Completar DNI", "¿Cómo deseas completar el DNI?", [
+    showAlert("Completar DNI", "¿Cómo deseas completar el DNI?", "info", [
       {
         text: "Escanear DNI",
-        onPress: () => openCamera("dni"),
+        onPress: () => {
+          closeAlert();
+          openCamera("dni");
+        },
       },
       {
         text: "Completar manualmente",
         style: "cancel",
+        onPress: closeAlert,
       },
     ]);
   };
 
   const selectPhotoOption = () => {
-    Alert.alert("Seleccionar foto", "¿Cómo deseas agregar la foto?", [
+    showAlert("Seleccionar foto", "¿Cómo deseas agregar la foto?", "info", [
       {
         text: "Tomar foto",
-        onPress: () => openCamera("photo"),
+        onPress: () => {
+          closeAlert();
+          openCamera("photo");
+        },
       },
       {
         text: "Galería",
-        onPress: pickImageFromGallery,
+        onPress: () => {
+          closeAlert();
+          pickImageFromGallery();
+        },
       },
       {
         text: "Cancelar",
         style: "cancel",
+        onPress: closeAlert,
       },
     ]);
   };
@@ -427,6 +501,30 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
     } catch (error) {
       console.error("Error seleccionando imagen:", error);
       ToastAndroid.show("Error al seleccionar la imagen", ToastAndroid.SHORT);
+    }
+  };
+
+  const validateStep1 = (): boolean => {
+    const step1Errors: string[] = [];
+    
+    if (!formData.first_name.trim()) step1Errors.push("nombre");
+    if (!formData.last_name.trim()) step1Errors.push("apellido");
+    if (!formData.dni.trim()) step1Errors.push("DNI");
+    if (!formData.cuil.trim() || formData.cuil.length < 13) step1Errors.push("CUIL");
+    
+    if (step1Errors.length > 0) {
+      ToastAndroid.show(
+        `Por favor completa: ${step1Errors.join(", ")}`,
+        ToastAndroid.LONG
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const handleNextStep = () => {
+    if (validateStep1()) {
+      setCurrentStep(2);
     }
   };
 
@@ -485,33 +583,33 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
   return (
     <>
       <FormLayout
-        title={screenTitle}
-        subtitle={screenSubtitle}
-        submitLabel="Crear Personal"
-        onSubmit={handleSubmit}
+        title={currentStep === 1 ? screenTitle : "Completa el Perfil"}
+        subtitle={currentStep === 1 ? "Paso 1 de 2" : "Paso 2 de 2"}
+        submitLabel={currentStep === 1 ? "Siguiente" : "Crear Personal"}
+        onSubmit={currentStep === 1 ? handleNextStep : handleSubmit}
         loading={loading}
         bottomText=""
         bottomLinkText=""
         onBottomLinkPress={() => {}}
       >
-        {/* Botón de Escanear DNI - Opción más pequeña */}
-        <View className="mb-4">
-          <TouchableOpacity
-            onPress={showDNIOptions}
-            className="bg-blue-600/20 px-4 py-2 rounded-lg border border-blue-500/30 self-start"
-          >
-            <View className="flex-row items-center">
-              <Text className="text-blue-300 text-lg font-medium">
-                Escanear DNI
+        {currentStep === 1 ? (
+          <>
+            {/* PASO 1: Información Personal */}
+            {/* Botón de Escanear DNI */}
+            <View className="mb-6">
+              <Text className="text-gray-300 text-center text-base mb-4">
+                Cargá los datos de forma manual o escaneá tu DNI
               </Text>
+              <TouchableOpacity
+                onPress={showDNIOptions}
+                className="bg-blue-600/20 px-6 py-3 rounded-xl border border-blue-500/30"
+              >
+                <Text className="text-blue-300 text-center text-base font-semibold">
+                  Escanear DNI
+                </Text>
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-        </View>
 
-        {/* Layout con Nombre/Apellido y Foto */}
-        <View className="flex-row mb-4 gap-3" style={{ minHeight: 140 }}>
-          {/* Columna izquierda: Nombre y Apellido */}
-          <View className="flex-1">
             <Text className="text-white text-sm font-medium mb-1">Nombre</Text>
             <TextField
               placeholder="Nombre"
@@ -521,9 +619,8 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
               onFocus={() => setFocused("first_name")}
               error={errors.first_name}
             />
-            <Text className="text-white text-sm font-medium mb-1">
-              Apellido
-            </Text>
+
+            <Text className="text-white text-sm font-medium mb-1">Apellido</Text>
             <TextField
               placeholder="Apellido"
               value={formData.last_name}
@@ -532,129 +629,140 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
               onFocus={() => setFocused("last_name")}
               error={errors.last_name}
             />
-          </View>
 
-          {/* Columna derecha: Foto (ocupa altura de ambos campos) */}
-          <View className="flex-1">
-            <ImageField
-              label="Foto"
-              image={formData.file}
-              onPick={selectPhotoOption}
-              onClear={() => {
-                handleInputChange("file", null);
-              }}
-              error={errors.file}
-              focused={focused === "file"}
+            <Text className="text-white text-sm font-medium mb-1">DNI</Text>
+            <TextField
+              placeholder="DNI"
+              value={formData.dni}
+              onChangeText={v => handleInputChange("dni", v)}
+              keyboardType="phone-pad"
+              focused={focused === "dni"}
+              onFocus={() => setFocused("dni")}
+              error={errors.dni}
             />
-          </View>
-        </View>
 
-        <Text className="text-white text-sm font-medium mb-1">DNI</Text>
-        <TextField
-          placeholder="DNI"
-          value={formData.dni}
-          onChangeText={v => handleInputChange("dni", v)}
-          keyboardType="phone-pad"
-          focused={focused === "dni"}
-          onFocus={() => setFocused("dni")}
-          error={errors.dni}
-        />
-
-        <CUILField
-          value={formData.cuil}
-          onChangeText={v => handleInputChange("cuil", v)}
-          focused={focused === "cuil"}
-          onFocus={() => setFocused("cuil")}
-          error={errors.cuil}
-        />
-
-        <TextField
-          placeholder="Correo electrónico"
-          value={formData.email}
-          onChangeText={v => handleInputChange("email", v)}
-          keyboardType="email-address"
-          focused={focused === "email"}
-          onFocus={() => setFocused("email")}
-          error={errors.email}
-        />
-
-        <TextField
-          placeholder="Contraseña"
-          value={formData.password}
-          onChangeText={v => handleInputChange("password", v)}
-          secureTextEntry
-          focused={focused === "password"}
-          onFocus={() => setFocused("password")}
-          error={errors.password}
-        />
-
-        <TextField
-          placeholder="Confirmar contraseña"
-          value={formData.confirmPassword}
-          onChangeText={v => handleInputChange("confirmPassword", v)}
-          secureTextEntry
-          focused={focused === "confirmPassword"}
-          onFocus={() => setFocused("confirmPassword")}
-          error={errors.confirmPassword}
-        />
-
-        <View className="mb-4">
-          <Text className="text-white text-sm font-medium mb-2">Perfil</Text>
-          <View
-            className={`rounded-lg border ${userRole === "supervisor" ? "bg-gray-700 border-gray-500" : "bg-gray-800 border-gray-600"}`}
-          >
-            <Picker
-              selectedValue={formData.profile_code}
-              onValueChange={value => handleInputChange("profile_code", value)}
-              style={{ color: userRole === "supervisor" ? "#9ca3af" : "white" }}
-              dropdownIconColor={
-                userRole === "supervisor" ? "#9ca3af" : "white"
-              }
-              enabled={userRole === "dueno"}
-            >
-              {availableProfiles.map(profile => (
-                <Picker.Item
-                  key={profile.value}
-                  label={profile.label}
-                  value={profile.value}
-                />
-              ))}
-            </Picker>
-          </View>
-          {errors.profile_code && (
-            <Text className="text-red-400 text-xs mt-1">
-              {errors.profile_code}
-            </Text>
-          )}
-        </View>
-
-        {formData.profile_code === "empleado" && (
-          <View className="mb-4">
-            <Text className="text-white text-sm font-medium mb-2">
-              Posición
-            </Text>
-            <View className="bg-gray-800 rounded-lg border border-gray-600">
-              <Picker
-                selectedValue={formData.position_code}
-                onValueChange={value =>
-                  handleInputChange("position_code", value)
-                }
-                style={{ color: "white" }}
-                dropdownIconColor="white"
-              >
-                <Picker.Item label="Cocinero" value="cocinero" />
-                <Picker.Item label="Bartender" value="bartender" />
-                <Picker.Item label="Maitre" value="maitre" />
-                <Picker.Item label="Mozo" value="mozo" />
-                <Picker.Item label="Repartidor" value="repartidor" />
-              </Picker>
+            <CUILField
+              value={formData.cuil}
+              onChangeText={v => handleInputChange("cuil", v)}
+              focused={focused === "cuil"}
+              onFocus={() => setFocused("cuil")}
+              error={errors.cuil}
+            />
+          </>
+        ) : (
+          <>
+            {/* PASO 2: Foto y Credenciales */}
+            <View className="items-center mb-6">
+              <ImageField
+                label="Foto"
+                image={formData.file}
+                onPick={selectPhotoOption}
+                onClear={() => {
+                  handleInputChange("file", null);
+                }}
+                error={errors.file}
+                focused={focused === "file"}
+              />
             </View>
-            {errors.position_code && (
-              <Text className="text-red-400 text-xs mt-1">
-                {errors.position_code}
-              </Text>
+
+            <TextField
+              placeholder="Correo electrónico"
+              value={formData.email}
+              onChangeText={v => handleInputChange("email", v)}
+              keyboardType="email-address"
+              focused={focused === "email"}
+              onFocus={() => setFocused("email")}
+              error={errors.email}
+            />
+
+            <TextField
+              placeholder="Contraseña"
+              value={formData.password}
+              onChangeText={v => handleInputChange("password", v)}
+              secureTextEntry
+              focused={focused === "password"}
+              onFocus={() => setFocused("password")}
+              error={errors.password}
+            />
+
+            <TextField
+              placeholder="Confirmar contraseña"
+              value={formData.confirmPassword}
+              onChangeText={v => handleInputChange("confirmPassword", v)}
+              secureTextEntry
+              focused={focused === "confirmPassword"}
+              onFocus={() => setFocused("confirmPassword")}
+              error={errors.confirmPassword}
+            />
+
+            <View className="mb-4">
+              <Text className="text-white text-sm font-medium mb-2">Perfil</Text>
+              <View
+                className={`rounded-lg border ${userRole === "supervisor" ? "bg-gray-700 border-gray-500" : "bg-gray-800 border-gray-600"}`}
+              >
+                <Picker
+                  selectedValue={formData.profile_code}
+                  onValueChange={value => handleInputChange("profile_code", value)}
+                  style={{ color: userRole === "supervisor" ? "#9ca3af" : "white" }}
+                  dropdownIconColor={
+                    userRole === "supervisor" ? "#9ca3af" : "white"
+                  }
+                  enabled={userRole === "dueno"}
+                >
+                  {availableProfiles.map(profile => (
+                    <Picker.Item
+                      key={profile.value}
+                      label={profile.label}
+                      value={profile.value}
+                    />
+                  ))}
+                </Picker>
+              </View>
+              {errors.profile_code && (
+                <Text className="text-red-400 text-xs mt-1">
+                  {errors.profile_code}
+                </Text>
+              )}
+            </View>
+
+            {formData.profile_code === "empleado" && (
+              <View className="mb-4">
+                <Text className="text-white text-sm font-medium mb-2">
+                  Posición
+                </Text>
+                <View className="bg-gray-800 rounded-lg border border-gray-600">
+                  <Picker
+                    selectedValue={formData.position_code}
+                    onValueChange={value =>
+                      handleInputChange("position_code", value)
+                    }
+                    style={{ color: "white" }}
+                    dropdownIconColor="white"
+                  >
+                    <Picker.Item label="Cocinero" value="cocinero" />
+                    <Picker.Item label="Bartender" value="bartender" />
+                    <Picker.Item label="Maitre" value="maitre" />
+                    <Picker.Item label="Mozo" value="mozo" />
+                    <Picker.Item label="Repartidor" value="repartidor" />
+                  </Picker>
+                </View>
+                {errors.position_code && (
+                  <Text className="text-red-400 text-xs mt-1">
+                    {errors.position_code}
+                  </Text>
+                )}
+              </View>
             )}
-          </View>
+
+            <TouchableOpacity
+              onPress={() => setCurrentStep(1)}
+              className="mt-2"
+            >
+              <Text className="text-gray-400 text-center text-sm">
+                ← Volver al paso anterior
+              </Text>
+            </TouchableOpacity>
+          </>
         )}
       </FormLayout>
 
@@ -732,6 +840,15 @@ export const AddStaffScreen = ({ navigation, route }: Props) => {
           )}
         </View>
       </Modal>
+
+      <CustomAlert
+        visible={alertVisible}
+        onClose={closeAlert}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+      />
     </>
   );
 };

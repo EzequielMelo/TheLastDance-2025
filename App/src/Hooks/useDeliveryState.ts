@@ -161,7 +161,7 @@ export const useDeliveryState = (): DeliveryStateData => {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [user?.id, token, user?.profile_code]); // Solo reconectar si cambia el usuario
+  }, [user?.id, token, user?.profile_code, checkDeliveryState]); // Incluir checkDeliveryState en dependencias
 
   return {
     state,

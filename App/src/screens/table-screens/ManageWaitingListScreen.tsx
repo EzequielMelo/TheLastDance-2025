@@ -1171,24 +1171,24 @@ function TableCard({
 
   return (
     <View
-      className={`rounded-xl p-3 min-w-[120px] ${stateConfig[tableState].bg}`}
+      className={`rounded-xl p-4 min-w-[140px] ${stateConfig[tableState].bg}`}
     >
       <View className="items-center">
-        <Text className={`font-bold text-lg ${stateConfig[tableState].text}`}>
+        <Text className={`font-bold text-2xl ${stateConfig[tableState].text}`}>
           {table.number}
         </Text>
-        <Text className="text-gray-400 text-xs">{table.capacity} personas</Text>
-        <Text className="text-gray-400 text-xs">{table.type}</Text>
+        <Text className="text-gray-400 text-sm mt-1">{table.capacity} personas</Text>
+        <Text className="text-gray-400 text-sm">{table.type}</Text>
 
         {tableState === "occupied" ? (
           <>
             {table.client && (
               <>
-                <Text className="text-gray-300 text-xs mt-1 text-center">
+                <Text className="text-gray-300 text-sm mt-1 text-center font-medium">
                   {table.client.first_name} {table.client.last_name}
                 </Text>
                 {table.client.profile_code === "cliente_anonimo" && (
-                  <Text className="text-orange-400 text-xs text-center font-medium">
+                  <Text className="text-orange-400 text-sm text-center font-medium">
                     ANÓNIMO
                   </Text>
                 )}
@@ -1197,13 +1197,13 @@ function TableCard({
             <TouchableOpacity
               onPress={onFree}
               disabled={isFreeing}
-              className={`rounded px-3 py-2 mt-2 border ${
+              className={`rounded px-4 py-2 mt-2 border ${
                 isFreeing
                   ? "bg-gray-600 border-gray-500"
                   : "bg-red-600 hover:bg-red-700 border-red-500"
               }`}
             >
-              <Text className="text-white text-xs font-semibold">
+              <Text className="text-white text-sm font-semibold">
                 {isFreeing ? "🔄 Liberando..." : "⚠️ Liberar"}
               </Text>
             </TouchableOpacity>
@@ -1212,30 +1212,30 @@ function TableCard({
           <>
             {table.client && (
               <>
-                <Text className="text-gray-300 text-xs mt-1 text-center">
+                <Text className="text-gray-300 text-sm mt-1 text-center font-medium">
                   {table.client.first_name} {table.client.last_name}
                 </Text>
                 {table.client.profile_code === "cliente_anonimo" && (
-                  <Text className="text-orange-400 text-xs text-center font-medium">
+                  <Text className="text-orange-400 text-sm text-center font-medium">
                     ANÓNIMO
                   </Text>
                 )}
               </>
             )}
-            <Text className="text-yellow-400 text-xs mt-1">Asignada</Text>
-            <Text className="text-gray-400 text-xs">
+            <Text className="text-yellow-400 text-sm mt-1 font-medium">Asignada</Text>
+            <Text className="text-gray-400 text-sm">
               Esperando confirmación
             </Text>
             <TouchableOpacity
               onPress={onFree}
               disabled={isFreeing}
-              className={`rounded px-3 py-2 mt-2 border ${
+              className={`rounded px-4 py-2 mt-2 border ${
                 isFreeing
                   ? "bg-gray-600 border-gray-500"
                   : "bg-yellow-600 hover:bg-yellow-700 border-yellow-500"
               }`}
             >
-              <Text className="text-white text-xs font-semibold">
+              <Text className="text-white text-sm font-semibold">
                 {isFreeing ? "🔄 Liberando..." : "↩️ Reasignar"}
               </Text>
             </TouchableOpacity>
@@ -1244,13 +1244,13 @@ function TableCard({
           <>
             {table.reservation && (
               <>
-                <Text className="text-purple-400 text-xs mt-1 font-semibold">
+                <Text className="text-purple-400 text-sm mt-1 font-semibold">
                   🔒 Reservada
                 </Text>
-                <Text className="text-gray-300 text-xs text-center">
+                <Text className="text-gray-300 text-sm text-center">
                   {table.reservation.time}
                 </Text>
-                <Text className="text-gray-400 text-xs">
+                <Text className="text-gray-400 text-sm">
                   {table.reservation.party_size} personas
                 </Text>
               </>
@@ -1258,19 +1258,19 @@ function TableCard({
             <TouchableOpacity
               onPress={onFree}
               disabled={isFreeing}
-              className={`rounded px-3 py-2 mt-2 border ${
+              className={`rounded px-4 py-2 mt-2 border ${
                 isFreeing
                   ? "bg-gray-600 border-gray-500"
                   : "bg-purple-600 hover:bg-purple-700 border-purple-500"
               }`}
             >
-              <Text className="text-white text-xs font-semibold">
+              <Text className="text-white text-sm font-semibold">
                 {isFreeing ? "🔄 Cancelando..." : "❌ Cancelar Reserva"}
               </Text>
             </TouchableOpacity>
           </>
         ) : (
-          <Text className="text-green-400 text-xs mt-1">Disponible</Text>
+          <Text className="text-green-400 text-sm mt-1 font-medium">Disponible</Text>
         )}
       </View>
     </View>

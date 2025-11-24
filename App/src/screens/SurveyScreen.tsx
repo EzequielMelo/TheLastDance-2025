@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   Dimensions,
   ScrollView,
   TextInput,
+  KeyboardAvoidingView,
+  Keyboard,
+  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -33,10 +36,12 @@ export default function SurveyScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<SurveyScreenRouteProp>();
   const { tableId } = route.params || {};
+  const scrollRef = useRef<ScrollView>(null);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [hasAnswered, setHasAnswered] = useState(false);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
   // Calificaciones
   const [foodRating, setFoodRating] = useState(0);
@@ -76,6 +81,29 @@ export default function SurveyScreen() {
   useEffect(() => {
     checkSurveyStatus();
   }, [tableId]);
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      "keyboardDidShow",
+      () => {
+        setKeyboardVisible(true);
+        setTimeout(() => {
+          scrollRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      },
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      "keyboardDidHide",
+      () => {
+        setKeyboardVisible(false);
+      },
+    );
+
+    return () => {
+      keyboardDidHideListener?.remove();
+      keyboardDidShowListener?.remove();
+    };
+  }, []);
 
   const checkSurveyStatus = async () => {
     if (!tableId) {
@@ -225,6 +253,11 @@ export default function SurveyScreen() {
         colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
         style={styles.container}
       >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={0}
+        >
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <FileText size={32} color="#d4af37" />
@@ -248,6 +281,7 @@ export default function SurveyScreen() {
           buttons={alertConfig.buttons}
           onClose={() => setShowAlert(false)}
         />
+        </KeyboardAvoidingView>
       </LinearGradient>
     );
   }
@@ -257,6 +291,11 @@ export default function SurveyScreen() {
       colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
       style={styles.container}
     >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={0}
+      >
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
@@ -267,9 +306,20 @@ export default function SurveyScreen() {
 
       {/* Content */}
       <ScrollView
+        ref={scrollRef}
         style={styles.scrollContent}
-        contentContainerStyle={styles.scrollContentContainer}
+        contentContainerStyle={[
+          styles.scrollContentContainer,
+          { 
+            flexGrow: 1,
+            paddingBottom: isKeyboardVisible ? 150 : 32,
+            paddingTop: isKeyboardVisible ? 20 : 0,
+          },
+        ]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets={false}
+        scrollEventThrottle={16}
       >
         <View style={styles.introCard}>
           <Text style={styles.introTitle}>Tu opinión es importante</Text>
@@ -389,6 +439,7 @@ export default function SurveyScreen() {
         buttons={alertConfig.buttons}
         onClose={() => setShowAlert(false)}
       />
+      </KeyboardAvoidingView>
     </LinearGradient>
   );
 }
@@ -447,7 +498,6 @@ const styles = StyleSheet.create({
   },
   scrollContentContainer: {
     paddingHorizontal: 24,
-    paddingBottom: 32,
   },
   introCard: {
     backgroundColor: "rgba(212, 175, 55, 0.1)",

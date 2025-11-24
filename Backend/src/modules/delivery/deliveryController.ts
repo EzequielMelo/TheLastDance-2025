@@ -1061,9 +1061,10 @@ export async function confirmPayment(
       !isQRPayment, // updateStatus: false para QR (esperar confirmación del repartidor), true para cash
     );
 
+    const io = getIOInstance();
+    
     // 🔔 Si es pago QR, emitir evento al REPARTIDOR para que confirme
     if (isQRPayment) {
-      const io = getIOInstance();
       if (io && delivery.driver_id) {
         const driverRoom = `user_${delivery.driver_id}`;
         io.to(driverRoom).emit("delivery_payment_confirmed", {
@@ -1073,6 +1074,19 @@ export async function confirmPayment(
         });
         console.log(
           `🔔 Evento 'delivery_payment_confirmed' enviado al repartidor: ${delivery.driver_id}`,
+        );
+      }
+    } else {
+      // 🔔 Si es pago en EFECTIVO, emitir evento al CLIENTE para actualizar estado a delivered
+      if (io && delivery.user_id) {
+        const userRoom = `user_${delivery.user_id}`;
+        io.to(userRoom).emit("delivery_updated", delivery);
+        io.to(userRoom).emit("delivery_status_changed", {
+          deliveryId: delivery.id,
+          newStatus: "delivered",
+        });
+        console.log(
+          `🔔 Socket.IO: Emitido delivery_updated (delivered) a cliente ${userRoom} después de pago en efectivo`,
         );
       }
     }

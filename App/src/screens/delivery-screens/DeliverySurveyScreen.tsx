@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ScrollView,
   TextInput,
+  Keyboard,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -13,12 +14,10 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
 import {
-  FileText,
   Star,
   MessageSquare,
   Send,
   CheckCircle,
-  AlertCircle,
   ChevronDown,
   ArrowLeft,
   Truck,
@@ -37,10 +36,12 @@ export default function DeliverySurveyScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<DeliverySurveyScreenRouteProp>();
   const { deliveryId } = route.params || {};
+  const scrollRef = useRef<ScrollView>(null);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [hasAnswered, setHasAnswered] = useState(false);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
   // Calificaciones
   const [foodRating, setFoodRating] = useState(0);
@@ -80,6 +81,29 @@ export default function DeliverySurveyScreen() {
   useEffect(() => {
     checkSurveyStatus();
   }, [deliveryId]);
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      "keyboardDidShow",
+      () => {
+        setKeyboardVisible(true);
+        setTimeout(() => {
+          scrollRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      },
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      "keyboardDidHide",
+      () => {
+        setKeyboardVisible(false);
+      },
+    );
+
+    return () => {
+      keyboardDidHideListener?.remove();
+      keyboardDidShowListener?.remove();
+    };
+  }, []);
 
   const checkSurveyStatus = async () => {
     if (!deliveryId) {
@@ -284,9 +308,16 @@ export default function DeliverySurveyScreen() {
 
       {/* Content */}
       <ScrollView
+        ref={scrollRef}
         style={styles.scrollContent}
-        contentContainerStyle={styles.scrollContentContainer}
+        contentContainerStyle={[
+          styles.scrollContentContainer,
+          {
+            paddingBottom: isKeyboardVisible ? 150 : 32,
+          },
+        ]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.introCard}>
           <Text style={styles.introTitle}>Tu opinión es importante</Text>
@@ -477,8 +508,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContentContainer: {
+    flexGrow: 1,
     paddingHorizontal: 24,
-    paddingBottom: 32,
+    justifyContent: "flex-start",
   },
   introCard: {
     backgroundColor: "rgba(212, 175, 55, 0.1)",

@@ -7,6 +7,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  KeyboardAvoidingView,
+  Keyboard,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import CustomAlert from "../../components/common/CustomAlert";
@@ -48,6 +50,8 @@ interface PlacePrediction {
 const DeliveryLocationScreen: React.FC = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
   const mapRef = useRef<MapView>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
   // 🚚 Obtener items del carrito para crear la orden
   const { cartItems, cartAmount, cartTime, submitOrder, setIsDeliveryOrder } =
@@ -94,6 +98,32 @@ const DeliveryLocationScreen: React.FC = () => {
     latitude: RESTAURANT_LOCATION.latitude,
     longitude: RESTAURANT_LOCATION.longitude,
   };
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      "keyboardDidShow",
+      (e) => {
+        console.log("🎹 Teclado abierto, altura:", e.endCoordinates.height);
+        setKeyboardVisible(true);
+        // Forzar scroll hacia abajo cuando se abre el teclado
+        setTimeout(() => {
+          scrollRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      },
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      "keyboardDidHide",
+      () => {
+        console.log("🎹 Teclado cerrado");
+        setKeyboardVisible(false);
+      },
+    );
+
+    return () => {
+      keyboardDidHideListener?.remove();
+      keyboardDidShowListener?.remove();
+    };
+  }, []);
 
   const [selectedLocation, setSelectedLocation] =
     useState<Coordinates>(restaurantLocation);
@@ -373,29 +403,47 @@ const DeliveryLocationScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#1a1a1a]">
-      {/* Header */}
-      <View className="border-b border-gray-800 px-4 py-3">
-        <View className="flex-row items-center">
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            className="mr-3"
-          >
-            <ChevronLeft size={24} color="#d4af37" />
-          </TouchableOpacity>
-          <View className="flex-1">
-            <Text className="text-xl font-bold text-white">
-              Dirección de Entrega
-            </Text>
-            <Text className="text-sm text-gray-400">
-              Ingresa tu dirección para delivery
-            </Text>
+    <View className="flex-1 bg-[#1a1a1a]">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        className="flex-1"
+        keyboardVerticalOffset={0}
+      >
+        <ScrollView 
+          ref={scrollRef}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingBottom: isKeyboardVisible ? 100 : 50,
+            justifyContent: "flex-start",
+          }}
+          className="px-8 py-12"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets={false}
+          scrollEventThrottle={16}
+          nestedScrollEnabled={true}
+        >
+          {/* Header */}
+          <View className="border-b border-gray-800 px-4 py-3 mb-4">
+            <View className="flex-row items-center">
+              <TouchableOpacity
+                onPress={() => navigation.goBack()}
+                className="mr-3"
+              >
+                <ChevronLeft size={24} color="#d4af37" />
+              </TouchableOpacity>
+              <View className="flex-1">
+                <Text className="text-xl font-bold text-white">
+                  Dirección de Entrega
+                </Text>
+                <Text className="text-sm text-gray-400">
+                  Ingresa tu dirección para delivery
+                </Text>
+              </View>
+            </View>
           </View>
-        </View>
-      </View>
 
-      <ScrollView className="flex-1 bg-[#1a1a1a]">
-        <View className="p-4">
+          <View className="w-full">
           {/* Mapa interactivo */}
           <View className="rounded-2xl overflow-hidden h-64 mb-4 border border-gray-800">
             <MapView
@@ -541,19 +589,21 @@ const DeliveryLocationScreen: React.FC = () => {
               )}
             </View>
 
-            <Text className="text-sm font-semibold text-gray-300 mt-4 mb-2">
-              Indicaciones adicionales (opcional)
-            </Text>
-            <TextInput
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Ej: Casa de esquina, portón azul, 2do piso"
-              placeholderTextColor="#6b7280"
-              className="rounded-xl px-4 py-3 text-white border border-gray-700"
-              style={{ backgroundColor: "rgba(255, 255, 255, 0.05)" }}
-              multiline
-              numberOfLines={3}
-            />
+            <View>
+              <Text className="text-sm font-semibold text-gray-300 mt-4 mb-2">
+                Indicaciones adicionales (opcional)
+              </Text>
+              <TextInput
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="Ej: Casa de esquina, portón azul, 2do piso"
+                placeholderTextColor="#6b7280"
+                className="rounded-xl px-4 py-3 text-white border border-gray-700"
+                style={{ backgroundColor: "rgba(255, 255, 255, 0.05)" }}
+                multiline
+                numberOfLines={3}
+              />
+            </View>
           </View>
 
           {/* Botón para usar ubicación actual */}
@@ -624,7 +674,8 @@ const DeliveryLocationScreen: React.FC = () => {
         type={alertConfig.type}
         buttons={alertConfig.buttons}
       />
-    </SafeAreaView>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
 
