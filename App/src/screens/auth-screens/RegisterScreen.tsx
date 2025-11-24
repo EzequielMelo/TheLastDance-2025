@@ -1,10 +1,11 @@
-import { View, Text, Modal, TouchableOpacity, Platform } from "react-native";
+import { View, Text, Modal, TouchableOpacity, Platform, Image } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootStackParamList";
 import FormLayout from "../../Layouts/formLayout";
 import TextField from "../../components/form/TextField";
 import ImageField from "../../components/form/ImageField";
 import CUILField from "../../components/form/CUILField";
+import { Camera } from "lucide-react-native";
 import {
   useRegisterForm,
   FormDataType,
@@ -29,6 +30,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
   const [cameraMode, setCameraMode] = useState<CameraMode>(null);
   const [facing, setFacing] = useState<CameraType>("back");
   const cameraRef = useRef<CameraView>(null);
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
 
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -388,6 +390,31 @@ export const RegisterScreen = ({ navigation }: Props) => {
     ]);
   };
 
+  const validateStep1 = (): boolean => {
+    const step1Errors: string[] = [];
+    
+    if (!formData.first_name.trim()) step1Errors.push("nombre");
+    if (!formData.last_name.trim()) step1Errors.push("apellido");
+    if (!formData.dni.trim()) step1Errors.push("DNI");
+    if (!formData.cuil.trim() || formData.cuil.length < 13) step1Errors.push("CUIL");
+    
+    if (step1Errors.length > 0) {
+      showAlert(
+        "Campos incompletos",
+        `Por favor completa: ${step1Errors.join(", ")}`,
+        "warning"
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const handleNextStep = () => {
+    if (validateStep1()) {
+      setCurrentStep(2);
+    }
+  };
+
   const onSubmit = async (data: FormDataType) => {
     const fd = new FormData();
     fd.append("first_name", data.first_name.trim());
@@ -433,33 +460,34 @@ export const RegisterScreen = ({ navigation }: Props) => {
   return (
     <>
       <FormLayout
-        title="Únete a Nosotros"
-        subtitle="Crea tu cuenta en Last Dance"
-        submitLabel="Crear Cuenta"
-        onSubmit={handleSubmit}
+        title={currentStep === 1 ? "Información Personal" : "Completa tu Perfil"}
+        subtitle={currentStep === 1 ? "Paso 1 de 2" : "Paso 2 de 2"}
+        submitLabel={currentStep === 1 ? "Siguiente" : "Crear Cuenta"}
+        onSubmit={currentStep === 1 ? handleNextStep : handleSubmit}
         loading={loading || actionLoading}
-        bottomText="¿Ya tienes cuenta?"
-        bottomLinkText="Inicia Sesión"
-        onBottomLinkPress={() => navigation.goBack()}
+        bottomText={currentStep === 1 ? "¿Ya tienes cuenta?" : undefined}
+        bottomLinkText={currentStep === 1 ? "Inicia Sesión" : undefined}
+        onBottomLinkPress={currentStep === 1 ? () => navigation.goBack() : undefined}
+        showDivider={currentStep === 1}
       >
-        {/* Botón de Escanear DNI - Opción más pequeña */}
-        <View className="mb-4">
-          <TouchableOpacity
-            onPress={showDNIOptions}
-            className="bg-blue-600/20 px-4 py-2 rounded-lg border border-blue-500/30 self-start"
-          >
-            <View className="flex-row items-center">
-              <Text className="text-blue-300 text-lg font-medium">
-                Escanear DNI
+        {currentStep === 1 ? (
+          <>
+            {/* PASO 1: Información Personal */}
+            {/* Mensaje de bienvenida y opción de escaneo */}
+            <View className="mb-6">
+              <Text className="text-gray-300 text-center text-base mb-4">
+                Cargá los datos de forma manual o escaneá tu DNI
               </Text>
+              <TouchableOpacity
+                onPress={showDNIOptions}
+                className="bg-blue-600/20 px-6 py-3 rounded-xl border border-blue-500/30"
+              >
+                <Text className="text-blue-300 text-center text-base font-semibold">
+                  Escanear DNI
+                </Text>
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-        </View>
 
-        {/* Layout con Nombre/Apellido y Foto */}
-        <View className="flex-row mb-4 gap-3" style={{ minHeight: 140 }}>
-          {/* Columna izquierda: Nombre y Apellido */}
-          <View className="flex-1">
             <Text className="text-white text-sm font-medium mb-1">Nombre</Text>
             <TextField
               placeholder="Nombre"
@@ -470,9 +498,8 @@ export const RegisterScreen = ({ navigation }: Props) => {
               onFocus={() => setFocused("first_name")}
               error={errors.first_name}
             />
-            <Text className="text-white text-sm font-medium mb-1">
-              Apellido
-            </Text>
+
+            <Text className="text-white text-sm font-medium mb-1">Apellido</Text>
             <TextField
               placeholder="Apellido"
               value={formData.last_name}
@@ -482,76 +509,135 @@ export const RegisterScreen = ({ navigation }: Props) => {
               onFocus={() => setFocused("last_name")}
               error={errors.last_name}
             />
-          </View>
 
-          {/* Columna derecha: Foto (ocupa altura de ambos campos) */}
-          <View className="flex-1">
-            <ImageField
-              label="Foto"
-              image={formData.file}
-              onPick={selectPhotoOption}
-              onClear={() => {
-                handleInputChange("file", null);
-              }}
-              onFocus={() => setFocused("file")}
-              error={errors.file}
-              focused={focused === "file"}
+            <Text className="text-white text-sm font-medium mb-1">DNI</Text>
+            <TextField
+              placeholder="DNI"
+              value={formData.dni}
+              onChangeText={v => handleInputChange("dni", v)}
+              onBlur={() => handleBlur("dni")}
+              keyboardType="phone-pad"
+              focused={focused === "dni"}
+              onFocus={() => setFocused("dni")}
+              error={errors.dni}
             />
-          </View>
-        </View>
-        <Text className="text-white text-sm font-medium mb-1">DNI</Text>
-        <TextField
-          placeholder="DNI"
-          value={formData.dni}
-          onChangeText={v => handleInputChange("dni", v)}
-          onBlur={() => handleBlur("dni")}
-          keyboardType="phone-pad"
-          focused={focused === "dni"}
-          onFocus={() => setFocused("dni")}
-          error={errors.dni}
-        />
 
-        <CUILField
-          value={formData.cuil}
-          onChangeText={v => handleInputChange("cuil", v)}
-          onBlur={() => handleBlur("cuil")}
-          focused={focused === "cuil"}
-          onFocus={() => setFocused("cuil")}
-          error={errors.cuil}
-        />
+            <CUILField
+              value={formData.cuil}
+              onChangeText={v => handleInputChange("cuil", v)}
+              onBlur={() => handleBlur("cuil")}
+              focused={focused === "cuil"}
+              onFocus={() => setFocused("cuil")}
+              error={errors.cuil}
+            />
+          </>
+        ) : (
+          <>
+            {/* PASO 2: Foto y Credenciales */}
+            <View className="items-center mb-6">
+              <TouchableOpacity
+                onPress={selectPhotoOption}
+                className="items-center"
+              >
+                {formData.file ? (
+                  <View style={{ position: "relative" }}>
+                    <Image
+                      source={{ uri: (formData.file as any).uri }}
+                      style={{
+                        width: 140,
+                        height: 140,
+                        borderRadius: 70,
+                        borderWidth: 3,
+                        borderColor: "#d4af37",
+                      }}
+                    />
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleInputChange("file", null);
+                      }}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        right: 0,
+                        backgroundColor: "#ef4444",
+                        borderRadius: 16,
+                        width: 32,
+                        height: 32,
+                        justifyContent: "center",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text className="text-white text-center font-bold">✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View
+                    style={{
+                      width: 140,
+                      height: 140,
+                      borderRadius: 70,
+                      backgroundColor: "rgba(212, 175, 55, 0.2)",
+                      borderWidth: 2,
+                      borderColor: "rgba(212, 175, 55, 0.5)",
+                      borderStyle: "dashed",
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Camera size={48} color="#d4af37" strokeWidth={1.5} />
+                    <Text className="text-white text-sm mt-2">Agregar Foto</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              {errors.file && (
+                <Text className="text-red-400 text-xs mt-2">{errors.file}</Text>
+              )}
+            </View>
 
-        <TextField
-          placeholder="Correo electrónico"
-          value={formData.email}
-          onChangeText={v => handleInputChange("email", v)}
-          onBlur={() => handleBlur("email")}
-          keyboardType="email-address"
-          focused={focused === "email"}
-          onFocus={() => setFocused("email")}
-          error={errors.email}
-        />
+            <TextField
+              placeholder="Correo electrónico"
+              value={formData.email}
+              onChangeText={v => handleInputChange("email", v)}
+              onBlur={() => handleBlur("email")}
+              keyboardType="email-address"
+              focused={focused === "email"}
+              onFocus={() => setFocused("email")}
+              error={errors.email}
+            />
 
-        <TextField
-          placeholder="Contraseña"
-          value={formData.password}
-          onChangeText={v => handleInputChange("password", v)}
-          onBlur={() => handleBlur("password")}
-          secureTextEntry
-          focused={focused === "password"}
-          onFocus={() => setFocused("password")}
-          error={errors.password}
-        />
+            <TextField
+              placeholder="Contraseña"
+              value={formData.password}
+              onChangeText={v => handleInputChange("password", v)}
+              onBlur={() => handleBlur("password")}
+              secureTextEntry
+              focused={focused === "password"}
+              onFocus={() => setFocused("password")}
+              error={errors.password}
+            />
 
-        <TextField
-          placeholder="Confirmar contraseña"
-          value={formData.confirmPassword}
-          onChangeText={v => handleInputChange("confirmPassword", v)}
-          onBlur={() => handleBlur("confirmPassword")}
-          secureTextEntry
-          focused={focused === "confirmPassword"}
-          onFocus={() => setFocused("confirmPassword")}
-          error={errors.confirmPassword}
-        />
+            <TextField
+              placeholder="Confirmar contraseña"
+              value={formData.confirmPassword}
+              onChangeText={v => handleInputChange("confirmPassword", v)}
+              onBlur={() => handleBlur("confirmPassword")}
+              secureTextEntry
+              focused={focused === "confirmPassword"}
+              onFocus={() => setFocused("confirmPassword")}
+              error={errors.confirmPassword}
+            />
+
+            <TouchableOpacity
+              onPress={() => setCurrentStep(1)}
+              className="mt-2"
+            >
+              <Text className="text-gray-400 text-center text-sm">
+                ← Volver al paso anterior
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </FormLayout>
 
       <Modal visible={showCamera} animationType="slide">

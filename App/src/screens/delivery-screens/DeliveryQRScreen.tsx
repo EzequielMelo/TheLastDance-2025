@@ -232,7 +232,7 @@ const DeliveryQRScreen: React.FC = () => {
       <CustomAlert
         visible={showConfirmAlert}
         title="Pago Confirmado"
-        message={`El cliente ha confirmado el pago de $${paymentConfirmData ? (paymentConfirmData.totalAmount + paymentData.tipAmount).toFixed(2) : paymentData.totalAmount.toFixed(2)}.\n\n¿Confirmas que recibiste el pago?`}
+        message={`El cliente ha abonado el pago de $${paymentConfirmData ? (paymentConfirmData.totalAmount + paymentData.tipAmount).toFixed(2) : paymentData.totalAmount.toFixed(2)}.\n\n¿Confirmas que recibiste el pago?`}
         type="success"
         onClose={() => setShowConfirmAlert(false)}
         buttons={[
