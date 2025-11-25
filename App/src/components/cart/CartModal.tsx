@@ -147,11 +147,14 @@ export default function CartModal({
   // Verificar si hay items delivered cuando se abre el modal
   useEffect(() => {
     if (visible) {
-      fetchUserTable();
+      // Solo verificar mesa si NO es un pedido delivery
+      if (!isDeliveryOrder) {
+        fetchUserTable();
+      }
       refreshOrders().catch(console.error);
 
-      // Verificar delivery status
-      if (occupiedTable?.id) {
+      // Verificar delivery status solo para pedidos en mesa
+      if (occupiedTable?.id && !isDeliveryOrder) {
         checkTableDeliveryStatus(occupiedTable.id)
           .then(setDeliveryStatus)
           .catch(console.error);
@@ -445,25 +448,27 @@ export default function CartModal({
       }
     }
 
-    // Verificar mesa
-    if (loadingTable) {
-      showAlert("Espera", "Verificando tu mesa asignada...", undefined, "info");
-      return;
-    }
+    // Verificar mesa solo si NO es delivery
+    if (!isDeliveryOrder) {
+      if (loadingTable) {
+        showAlert("Espera", "Verificando tu mesa asignada...", undefined, "info");
+        return;
+      }
 
-    if (!tableId) {
-      showAlert(
-        "Error",
-        "No tienes una mesa asignada. Asegúrate de haber escaneado el código QR de tu mesa.",
-        [{ text: "OK", onPress: onClose }],
-        "error",
-      );
-      return;
+      if (!tableId) {
+        showAlert(
+          "Error",
+          "No tienes una mesa asignada. Asegúrate de haber escaneado el código QR de tu mesa.",
+          [{ text: "OK", onPress: onClose }],
+          "error",
+        );
+        return;
+      }
     }
 
     try {
       const orderData: CreateOrderRequest = {
-        table_id: tableId,
+        table_id: tableId || undefined, // undefined para delivery, string para mesa
         items: cartItems.map(item => ({
           id: item.id,
           name: item.name,

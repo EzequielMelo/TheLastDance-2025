@@ -55,12 +55,31 @@ export class SurveysService {
         };
       }
 
-      // 4. Verificar que no haya respondido ya una encuesta para esta estadía
-      const { data: existingSurvey, error: checkError } = await supabaseAdmin
-        .from("surveys")
+      // 4. Verificar que haya pedidos activos (no pagados)
+      const { data: unpaidOrders } = await supabaseAdmin
+        .from("orders")
         .select("id")
         .eq("table_id", data.table_id)
+        .eq("user_id", clientId)
+        .eq("is_paid", false);
+
+      if (!unpaidOrders || unpaidOrders.length === 0) {
+        return {
+          success: false,
+          error: "No hay pedidos activos para responder la encuesta"
+        };
+      }
+
+      // 5. Verificar que no haya respondido ya una encuesta para los pedidos activos actuales
+      // Solo buscar encuestas donde TODAVÍA existan pedidos sin pagar
+      // Si todos los pedidos previos están pagados, puede hacer una nueva encuesta
+      const { data: existingSurvey, error: checkError } = await supabaseAdmin
+        .from("surveys")
+        .select("id, created_at")
+        .eq("table_id", data.table_id)
         .eq("client_id", clientId)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (checkError) {
@@ -71,11 +90,29 @@ export class SurveysService {
         };
       }
 
+      // Si hay una encuesta previa, verificar si aún hay pedidos sin pagar de esa sesión
       if (existingSurvey) {
-        return {
-          success: false,
-          error: "Ya has respondido una encuesta para esta estadía"
-        };
+        // Contar cuántos pedidos sin pagar existen desde ANTES de la última encuesta
+        const { data: oldUnpaidOrders, error: oldOrdersError } = await supabaseAdmin
+          .from("orders")
+          .select("id")
+          .eq("table_id", data.table_id)
+          .eq("user_id", clientId)
+          .eq("is_paid", false)
+          .lt("created_at", existingSurvey.created_at);
+
+        if (oldOrdersError) {
+          console.error("❌ Error verificando pedidos anteriores:", oldOrdersError);
+        }
+
+        // Si hay pedidos sin pagar creados ANTES de la última encuesta,
+        // significa que aún está en la misma sesión
+        if (oldUnpaidOrders && oldUnpaidOrders.length > 0) {
+          return {
+            success: false,
+            error: "Ya has respondido una encuesta para este pedido"
+          };
+        }
       }
 
       // 5. Crear la encuesta - INSERT directo
@@ -116,34 +153,14 @@ export class SurveysService {
   }
 
   /**
-   * Verificar si el cliente ya respondió la encuesta para la mesa actual
+   * Verificar si el cliente ya respondió la encuesta para los pedidos activos
    */
   static async checkSurveyStatus(
     clientId: string,
     tableId: string
   ): Promise<{ canAnswer: boolean; hasAnswered: boolean; survey?: Survey }> {
     try {
-      const { data: survey, error } = await supabaseAdmin
-        .from("surveys")
-        .select("*")
-        .eq("table_id", tableId)
-        .eq("client_id", clientId)
-        .maybeSingle();
-
-      if (error) {
-        console.error("❌ Error verificando estado de encuesta:", error);
-        return { canAnswer: false, hasAnswered: false };
-      }
-
-      if (survey) {
-        return {
-          canAnswer: false,
-          hasAnswered: true,
-          survey: survey as Survey
-        };
-      }
-
-      // Verificar si la mesa está en estado confirmed o bill_requested
+      // 1. Verificar si la mesa está en estado confirmed o bill_requested
       const { data: table } = await supabaseAdmin
         .from("tables")
         .select("table_status, id_client")
@@ -153,10 +170,59 @@ export class SurveysService {
 
       const canAnswer = table?.table_status === "confirmed" || table?.table_status === "bill_requested";
 
-      return {
-        canAnswer,
-        hasAnswered: false
-      };
+      // 2. Verificar si hay pedidos activos (no pagados)
+      const { data: unpaidOrders } = await supabaseAdmin
+        .from("orders")
+        .select("id, created_at")
+        .eq("table_id", tableId)
+        .eq("user_id", clientId)
+        .eq("is_paid", false);
+
+      if (!unpaidOrders || unpaidOrders.length === 0) {
+        // No hay pedidos activos, no puede responder
+        return { canAnswer: false, hasAnswered: false };
+      }
+
+      // 3. Buscar la última encuesta
+      const { data: survey, error } = await supabaseAdmin
+        .from("surveys")
+        .select("*")
+        .eq("table_id", tableId)
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error("❌ Error verificando estado de encuesta:", error);
+        return { canAnswer, hasAnswered: false };
+      }
+
+      // 4. Si no hay encuesta previa, puede responder
+      if (!survey) {
+        return { canAnswer, hasAnswered: false };
+      }
+
+      // 5. Si hay encuesta, verificar si hay pedidos sin pagar de ANTES de esa encuesta
+      const { data: oldUnpaidOrders } = await supabaseAdmin
+        .from("orders")
+        .select("id")
+        .eq("table_id", tableId)
+        .eq("user_id", clientId)
+        .eq("is_paid", false)
+        .lt("created_at", survey.created_at);
+
+      // Si hay pedidos sin pagar creados antes de la encuesta, ya respondió para esta sesión
+      if (oldUnpaidOrders && oldUnpaidOrders.length > 0) {
+        return {
+          canAnswer: false,
+          hasAnswered: true,
+          survey: survey as Survey
+        };
+      }
+
+      // Todos los pedidos sin pagar son posteriores a la encuesta = nueva sesión
+      return { canAnswer, hasAnswered: false };
     } catch (error) {
       console.error("💥 Error en checkSurveyStatus:", error);
       return { canAnswer: false, hasAnswered: false };

@@ -58,33 +58,56 @@ export class ChatServices {
     tableId: string,
   ): Promise<ChatWithDetails | null> {
     try {
-      const { data, error } = await supabaseAdmin
+      // 1. Obtener el chat
+      const { data: chatData, error: chatError } = await supabaseAdmin
         .from("chats")
-        .select(
-          `
-          *,
-          client:users!chats_client_id_fkey(first_name, last_name, profile_image),
-          waiter:users!chats_waiter_id_fkey(first_name, last_name, profile_image),
-          table:tables!chats_table_id_fkey(number)
-        `,
-        )
+        .select("*")
         .eq("table_id", tableId)
         .eq("is_active", true)
         .single();
 
-      if (error && error.code !== "PGRST116") {
-        throw error;
+      if (chatError && chatError.code !== "PGRST116") {
+        throw chatError;
       }
 
-      if (!data) return null;
+      if (!chatData) return null;
+
+      // 2. Obtener información ACTUAL de la mesa (id_waiter actualizado)
+      const { data: tableData, error: tableError } = await supabaseAdmin
+        .from("tables")
+        .select("number, id_client, id_waiter")
+        .eq("id", tableId)
+        .single();
+
+      if (tableError) {
+        throw tableError;
+      }
+
+      // 3. Obtener información del cliente usando id_client de la mesa
+      const { data: clientData, error: clientError } = await supabaseAdmin
+        .from("users")
+        .select("first_name, last_name, profile_image")
+        .eq("id", tableData.id_client)
+        .single();
+
+      // 4. Obtener información del mozo usando id_waiter de la mesa (NO del chat)
+      const { data: waiterData, error: waiterError } = await supabaseAdmin
+        .from("users")
+        .select("first_name, last_name, profile_image")
+        .eq("id", tableData.id_waiter)
+        .single();
 
       return {
-        ...data,
-        client_name: `${data.client.first_name} ${data.client.last_name}`,
-        waiter_name: `${data.waiter.first_name} ${data.waiter.last_name}`,
-        client_image: data.client.profile_image,
-        waiter_image: data.waiter.profile_image,
-        table_number: data.table.number,
+        ...chatData,
+        client_name: clientData && !clientError
+          ? `${clientData.first_name} ${clientData.last_name}`
+          : "Cliente",
+        waiter_name: waiterData && !waiterError
+          ? `${waiterData.first_name} ${waiterData.last_name}`
+          : "Mozo",
+        client_image: clientData?.profile_image || null,
+        waiter_image: waiterData?.profile_image || null,
+        table_number: tableData.number,
       };
     } catch (error) {
       console.error("Error en getChatByTableId:", error);

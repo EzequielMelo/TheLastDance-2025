@@ -802,6 +802,127 @@ export async function notifyWaiterBartenderItemsReady(
   }
 }
 
+// Función para notificar al mozo cuando todos los items de un batch están listos
+export async function notifyWaiterBatchReady(
+  waiterId: string,
+  tableNumber: string,
+  clientName: string,
+  totalItems: number,
+  batchId: string,
+) {
+  try {
+    // Obtener push token del mozo usando id directo (NO FK)
+    const { data: waiterData, error: waiterError } = await supabaseAdmin
+      .from("users")
+      .select("push_token")
+      .eq("id", waiterId)
+      .eq("state", "aprobado")
+      .single();
+
+    if (waiterError || !waiterData?.push_token) {
+      console.warn(
+        `⚠️ No se encontró push token para mozo ${waiterId}:`,
+        waiterError,
+      );
+      return;
+    }
+
+    const token = waiterData.push_token;
+
+    await sendExpoPushNotification(
+      [token],
+      {
+        title: `✅ Pedido Completo - Mesa ${tableNumber}`,
+        body: `Todos los productos del pedido de ${clientName} están listos para entregar (${totalItems} items)`,
+        data: {
+          type: "batch_ready",
+          tableNumber,
+          clientName,
+          totalItems,
+          batchId,
+        },
+      },
+    );
+
+    console.log(
+      `✅ Push notification enviada a mozo ${waiterId} - Batch ${batchId} completo en mesa ${tableNumber}`,
+    );
+  } catch (error) {
+    console.error(
+      `❌ Error enviando notificación de batch listo a mozo:`,
+      error,
+    );
+  }
+}
+
+// Función para notificar a TODOS los repartidores cuando un batch de delivery está listo
+export async function notifyDriversDeliveryBatchReady(
+  clientName: string,
+  deliveryAddress: string,
+  totalItems: number,
+  batchId: string,
+  deliveryOrderId: string,
+) {
+  try {
+    // Obtener push tokens de TODOS los repartidores aprobados
+    const { data: drivers, error: driversError } = await supabaseAdmin
+      .from("users")
+      .select("id, push_token, first_name, last_name")
+      .eq("position_code", "repartidor")
+      .eq("state", "aprobado")
+      .not("push_token", "is", null);
+
+    if (driversError) {
+      console.error(
+        `❌ Error obteniendo repartidores:`,
+        driversError,
+      );
+      return;
+    }
+
+    if (!drivers || drivers.length === 0) {
+      console.warn(`⚠️ No hay repartidores disponibles para notificar`);
+      return;
+    }
+
+    // Filtrar tokens válidos
+    const validTokens = drivers
+      .map(driver => driver.push_token)
+      .filter(token => token && token.trim() !== "");
+
+    if (validTokens.length === 0) {
+      console.warn(`⚠️ No hay repartidores con push tokens válidos`);
+      return;
+    }
+
+    // Enviar notificación a todos los repartidores
+    await sendExpoPushNotification(
+      validTokens,
+      {
+        title: `🚚 Pedido Delivery Listo`,
+        body: `Pedido de ${clientName} completo y listo para entregar (${totalItems} items) - ${deliveryAddress}`,
+        data: {
+          type: "delivery_batch_ready",
+          clientName,
+          deliveryAddress,
+          totalItems,
+          batchId,
+          deliveryOrderId,
+        },
+      },
+    );
+
+    console.log(
+      `✅ Push notification enviada a ${validTokens.length} repartidores - Batch ${batchId} de delivery completo`,
+    );
+  } catch (error) {
+    console.error(
+      `❌ Error enviando notificación de delivery batch listo:`,
+      error,
+    );
+  }
+}
+
 // Función para notificar al mozo cuando TODO el pedido está completo (cocina + bar)
 export async function notifyWaiterOrderFullyReady(
   waiterId: string,

@@ -42,9 +42,9 @@ import {
   notifyClientOrderConfirmed,
   notifyKitchenNewItems,
   notifyBartenderNewItems,
-  notifyWaiterKitchenItemsReady,
-  notifyWaiterBartenderItemsReady,
   notifyManagementPaymentReceived,
+  notifyWaiterBatchReady,
+  notifyDriversDeliveryBatchReady,
 } from "../../services/pushNotificationService";
 import { emitClientStateUpdate } from "../../socket/clientStateSocket";
 
@@ -1061,57 +1061,165 @@ export async function updateKitchenItemStatusHandler(
       return;
     }
 
-    // Si el item está listo, notificar al mozo
+    // Si el item está listo, verificar si todo el batch está completo
     if (status === "ready") {
       try {
-        // Consulta más simple para obtener la información necesaria
-        const { data: itemData, error: itemError } = await supabaseAdmin
+        // 1. Intentar buscar en order_items (pedidos de mesa)
+        const { data: tableItemData } = await supabaseAdmin
           .from("order_items")
           .select(
             `
             id,
             quantity,
+            batch_id,
             menu_items!inner(name),
             orders!inner(
+              id,
               table_id,
-              tables!inner(number, id_waiter)
+              user_id
             )
           `,
           )
           .eq("id", itemId)
           .single();
 
-        if (!itemError && itemData) {
-          const order = Array.isArray(itemData.orders)
-            ? itemData.orders[0]
-            : itemData.orders;
-          const tables = order?.tables;
-          const table = Array.isArray(tables) ? tables[0] : tables;
-          const menuItems = itemData.menu_items;
-          const menuItem = Array.isArray(menuItems) ? menuItems[0] : menuItems;
+        // 2. Si no está en mesas, buscar en delivery_order_items (pedidos delivery)
+        const { data: deliveryItemData } = await supabaseAdmin
+          .from("delivery_order_items")
+          .select(
+            `
+            id,
+            quantity,
+            batch_id,
+            menu_items!inner(name),
+            delivery_orders!inner(
+              id,
+              user_id
+            )
+          `,
+          )
+          .eq("id", itemId)
+          .single();
 
-          if (
-            table &&
-            "id_waiter" in table &&
-            "number" in table &&
-            menuItem &&
-            "name" in menuItem
-          ) {
-            await notifyWaiterKitchenItemsReady(
-              table.id_waiter,
-              table.number.toString(),
-              [
-                {
-                  name: menuItem.name,
-                  quantity: itemData.quantity || 1,
-                },
-              ],
-            );
+        const isDelivery = !tableItemData && deliveryItemData;
+        const itemData = isDelivery ? deliveryItemData : tableItemData;
+
+        if (itemData) {
+          const batchId = itemData.batch_id;
+
+          if (batchId) {
+            if (isDelivery && deliveryItemData) {
+              // === FLUJO PARA DELIVERY ===
+              const deliveryOrder = Array.isArray(deliveryItemData.delivery_orders)
+                ? deliveryItemData.delivery_orders[0]
+                : deliveryItemData.delivery_orders;
+
+              if (deliveryOrder) {
+                // Verificar si todos los items del batch están ready
+                const { data: batchItems, error: batchError } = await supabaseAdmin
+                  .from("delivery_order_items")
+                  .select("id, status")
+                  .eq("delivery_order_id", deliveryOrder.id)
+                  .eq("batch_id", batchId);
+
+                if (!batchError && batchItems) {
+                  const allReady = batchItems.every(item => item.status === "ready");
+
+                  if (allReady) {
+                    // Obtener información del delivery
+                    const { data: deliveryData } = await supabaseAdmin
+                      .from("deliveries")
+                      .select("delivery_address")
+                      .eq("delivery_order_id", deliveryOrder.id)
+                      .single();
+
+                    // Obtener nombre del cliente
+                    const { data: clientData } = await supabaseAdmin
+                      .from("users")
+                      .select("first_name, last_name")
+                      .eq("id", deliveryOrder.user_id)
+                      .single();
+
+                    const clientName = clientData
+                      ? `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim() || 'Cliente'
+                      : 'Cliente';
+
+                    const deliveryAddress = deliveryData?.delivery_address || 'Dirección no especificada';
+
+                    // Notificar a TODOS los repartidores
+                    await notifyDriversDeliveryBatchReady(
+                      clientName,
+                      deliveryAddress,
+                      batchItems.length,
+                      batchId,
+                      deliveryOrder.id,
+                    );
+
+                    console.log(
+                      `✅ Delivery Batch ${batchId} completo - Notificación enviada a todos los repartidores`,
+                    );
+                  }
+                }
+              }
+            } else if (tableItemData) {
+              // === FLUJO PARA MESA ===
+              const order = Array.isArray(tableItemData.orders)
+                ? tableItemData.orders[0]
+                : tableItemData.orders;
+
+              if (order) {
+                // Verificar si todos los items del batch están ready
+                const { data: batchItems, error: batchError } = await supabaseAdmin
+                  .from("order_items")
+                  .select("id, status")
+                  .eq("order_id", order.id)
+                  .eq("batch_id", batchId);
+
+                if (!batchError && batchItems) {
+                  const allReady = batchItems.every(item => item.status === "ready");
+
+                  if (allReady) {
+                    // Obtener información de la mesa y mozo
+                    const { data: tableData, error: tableError } = await supabaseAdmin
+                      .from("tables")
+                      .select("number, id_waiter, id_client")
+                      .eq("id", order.table_id)
+                      .single();
+
+                    if (!tableError && tableData?.id_waiter && tableData?.id_client) {
+                      // Obtener nombre del cliente
+                      const { data: clientData } = await supabaseAdmin
+                        .from("users")
+                        .select("first_name, last_name")
+                        .eq("id", tableData.id_client)
+                        .single();
+
+                      const clientName = clientData
+                        ? `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim() || 'Cliente'
+                        : 'Cliente';
+
+                      // Notificar al mozo
+                      await notifyWaiterBatchReady(
+                        tableData.id_waiter,
+                        tableData.number.toString(),
+                        clientName,
+                        batchItems.length,
+                        batchId,
+                      );
+
+                      console.log(
+                        `✅ Batch ${batchId} completo - Notificación enviada al mozo ${tableData.id_waiter}`,
+                      );
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       } catch (notifyError) {
         console.error(
-          "Error enviando notificación de plato listo:",
+          "Error enviando notificación de batch listo:",
           notifyError,
         );
         // No bloqueamos la respuesta por error de notificación
@@ -1253,57 +1361,165 @@ export async function updateBartenderItemStatusHandler(
       return;
     }
 
-    // Si el item está listo, notificar al mozo
+    // Si el item está listo, verificar si todo el batch está completo
     if (status === "ready") {
       try {
-        // Consulta para obtener la información necesaria
-        const { data: itemData, error: itemError } = await supabaseAdmin
+        // 1. Intentar buscar en order_items (pedidos de mesa)
+        const { data: tableItemData } = await supabaseAdmin
           .from("order_items")
           .select(
             `
             id,
             quantity,
+            batch_id,
             menu_items!inner(name),
             orders!inner(
+              id,
               table_id,
-              tables!inner(number, id_waiter)
+              user_id
             )
           `,
           )
           .eq("id", itemId)
           .single();
 
-        if (!itemError && itemData) {
-          const order = Array.isArray(itemData.orders)
-            ? itemData.orders[0]
-            : itemData.orders;
-          const tables = order?.tables;
-          const table = Array.isArray(tables) ? tables[0] : tables;
-          const menuItems = itemData.menu_items;
-          const menuItem = Array.isArray(menuItems) ? menuItems[0] : menuItems;
+        // 2. Si no está en mesas, buscar en delivery_order_items (pedidos delivery)
+        const { data: deliveryItemData } = await supabaseAdmin
+          .from("delivery_order_items")
+          .select(
+            `
+            id,
+            quantity,
+            batch_id,
+            menu_items!inner(name),
+            delivery_orders!inner(
+              id,
+              user_id
+            )
+          `,
+          )
+          .eq("id", itemId)
+          .single();
 
-          if (
-            table &&
-            "id_waiter" in table &&
-            "number" in table &&
-            menuItem &&
-            "name" in menuItem
-          ) {
-            await notifyWaiterBartenderItemsReady(
-              table.id_waiter,
-              table.number.toString(),
-              [
-                {
-                  name: menuItem.name,
-                  quantity: itemData.quantity || 1,
-                },
-              ],
-            );
+        const isDelivery = !tableItemData && deliveryItemData;
+        const itemData = isDelivery ? deliveryItemData : tableItemData;
+
+        if (itemData) {
+          const batchId = itemData.batch_id;
+
+          if (batchId) {
+            if (isDelivery && deliveryItemData) {
+              // === FLUJO PARA DELIVERY ===
+              const deliveryOrder = Array.isArray(deliveryItemData.delivery_orders)
+                ? deliveryItemData.delivery_orders[0]
+                : deliveryItemData.delivery_orders;
+
+              if (deliveryOrder) {
+                // Verificar si todos los items del batch están ready
+                const { data: batchItems, error: batchError } = await supabaseAdmin
+                  .from("delivery_order_items")
+                  .select("id, status")
+                  .eq("delivery_order_id", deliveryOrder.id)
+                  .eq("batch_id", batchId);
+
+                if (!batchError && batchItems) {
+                  const allReady = batchItems.every(item => item.status === "ready");
+
+                  if (allReady) {
+                    // Obtener información del delivery
+                    const { data: deliveryData } = await supabaseAdmin
+                      .from("deliveries")
+                      .select("delivery_address")
+                      .eq("delivery_order_id", deliveryOrder.id)
+                      .single();
+
+                    // Obtener nombre del cliente
+                    const { data: clientData } = await supabaseAdmin
+                      .from("users")
+                      .select("first_name, last_name")
+                      .eq("id", deliveryOrder.user_id)
+                      .single();
+
+                    const clientName = clientData
+                      ? `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim() || 'Cliente'
+                      : 'Cliente';
+
+                    const deliveryAddress = deliveryData?.delivery_address || 'Dirección no especificada';
+
+                    // Notificar a TODOS los repartidores
+                    await notifyDriversDeliveryBatchReady(
+                      clientName,
+                      deliveryAddress,
+                      batchItems.length,
+                      batchId,
+                      deliveryOrder.id,
+                    );
+
+                    console.log(
+                      `✅ Delivery Batch ${batchId} completo - Notificación enviada a todos los repartidores`,
+                    );
+                  }
+                }
+              }
+            } else if (tableItemData) {
+              // === FLUJO PARA MESA ===
+              const order = Array.isArray(tableItemData.orders)
+                ? tableItemData.orders[0]
+                : tableItemData.orders;
+
+              if (order) {
+                // Verificar si todos los items del batch están ready
+                const { data: batchItems, error: batchError } = await supabaseAdmin
+                  .from("order_items")
+                  .select("id, status")
+                  .eq("order_id", order.id)
+                  .eq("batch_id", batchId);
+
+                if (!batchError && batchItems) {
+                  const allReady = batchItems.every(item => item.status === "ready");
+
+                  if (allReady) {
+                    // Obtener información de la mesa y mozo
+                    const { data: tableData, error: tableError } = await supabaseAdmin
+                      .from("tables")
+                      .select("number, id_waiter, id_client")
+                      .eq("id", order.table_id)
+                      .single();
+
+                    if (!tableError && tableData?.id_waiter && tableData?.id_client) {
+                      // Obtener nombre del cliente
+                      const { data: clientData } = await supabaseAdmin
+                        .from("users")
+                        .select("first_name, last_name")
+                        .eq("id", tableData.id_client)
+                        .single();
+
+                      const clientName = clientData
+                        ? `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim() || 'Cliente'
+                        : 'Cliente';
+
+                      // Notificar al mozo
+                      await notifyWaiterBatchReady(
+                        tableData.id_waiter,
+                        tableData.number.toString(),
+                        clientName,
+                        batchItems.length,
+                        batchId,
+                      );
+
+                      console.log(
+                        `✅ Batch ${batchId} completo - Notificación enviada al mozo ${tableData.id_waiter}`,
+                      );
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       } catch (notifyError) {
         console.error(
-          "Error enviando notificación de bebida lista:",
+          "Error enviando notificación de batch listo:",
           notifyError,
         );
         // No bloqueamos la respuesta por error de notificación

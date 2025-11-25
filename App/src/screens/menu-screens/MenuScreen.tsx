@@ -97,12 +97,14 @@ export default function MenuScreen() {
     hasPendingOrder,
     refreshOrders,
     isDeliveryOrder,
+    deliveryAddress,
   } = useCart();
 
-  // El cliente no está sentado en una mesa (excepto si es delivery)
-  const isNotSeated = clientState !== "seated" && !isDeliveryOrder;
+  // El cliente no está sentado en una mesa (excepto si es delivery o tiene dirección de delivery)
+  const isNotSeated = clientState !== "seated" && !isDeliveryOrder && !deliveryAddress;
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [allMenuItems, setAllMenuItems] = useState<MenuItem[]>([]); // Todos los items sin filtrar
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<
@@ -236,6 +238,13 @@ export default function MenuScreen() {
 
       const response = await api.get(endpoint);
       setMenuItems(response.data);
+      
+      // Si es la primera carga o está en "all", guardar todos los items
+      if (selectedCategory === "all" || allMenuItems.length === 0) {
+        // Cargar todos los items sin filtro
+        const allItemsResponse = await api.get("/menu/items");
+        setAllMenuItems(allItemsResponse.data);
+      }
     } catch (error) {
       console.error("Error loading menu items:", error);
       Alert.alert(
@@ -556,7 +565,7 @@ export default function MenuScreen() {
             !needsModificationMenuItemIds.includes(itemId),
         )
         .map(([itemId, quantity]) => {
-          const menuItem = menuItems.find(m => m.id === itemId);
+          const menuItem = allMenuItems.find(m => m.id === itemId);
           return {
             menu_item_id: itemId,
             quantity,
@@ -759,6 +768,7 @@ export default function MenuScreen() {
                     fontSize: 24,
                     fontWeight: "600",
                     marginLeft: 8,
+                    marginRight: 24,
                   }}
                 >
                   {isModifyMode ? "Modificar Productos" : "Nuestro Menú"}
@@ -1383,7 +1393,7 @@ export default function MenuScreen() {
           <FloatingModifyCart
             onPress={() => setCartModalVisible(true)}
             selectedItems={selectedModifyItems}
-            menuItems={menuItems}
+            menuItems={allMenuItems}
           />
         ) : (
           <FloatingCart onPress={() => setCartModalVisible(true)} />
@@ -1428,7 +1438,7 @@ export default function MenuScreen() {
                       fontWeight: "700",
                     }}
                   >
-                    🛒 Productos de reemplazo
+                    Productos de reemplazo
                   </Text>
                   <Text
                     style={{
@@ -1487,7 +1497,7 @@ export default function MenuScreen() {
                           marginBottom: 8,
                         }}
                       >
-                        📋 Productos que necesitas reemplazar:
+                        Productos que necesitas reemplazar:
                       </Text>
                       {actuallyRejectedItems.map((item: any, index: number) => (
                         <Text
@@ -1527,13 +1537,13 @@ export default function MenuScreen() {
                       marginBottom: 16,
                     }}
                   >
-                    ✅ Productos de reemplazo seleccionados:
+                    Productos de reemplazo seleccionados:
                   </Text>
                 )}
 
                 {Object.entries(selectedModifyItems).map(
                   ([itemId, quantity]) => {
-                    const menuItem = menuItems.find(m => m.id === itemId);
+                    const menuItem = allMenuItems.find(m => m.id === itemId);
                     if (!menuItem) return null;
 
                     return (
@@ -1673,7 +1683,7 @@ export default function MenuScreen() {
                     const totalPrice = Object.entries(
                       selectedModifyItems,
                     ).reduce((sum, [itemId, quantity]) => {
-                      const menuItem = menuItems.find(m => m.id === itemId);
+                      const menuItem = allMenuItems.find(m => m.id === itemId);
                       return sum + (menuItem ? menuItem.price * quantity : 0);
                     }, 0);
 
@@ -1747,7 +1757,7 @@ export default function MenuScreen() {
                         flex: 1,
                         backgroundColor: "rgba(239, 68, 68, 0.2)",
                         borderRadius: 12,
-                        padding: 16,
+                        padding: 10,
                         alignItems: "center",
                         borderWidth: 1,
                         borderColor: "rgba(239, 68, 68, 0.4)",
@@ -1760,7 +1770,7 @@ export default function MenuScreen() {
                           fontSize: 16,
                         }}
                       >
-                        🗑️ Eliminar todo
+                        Eliminar todo
                       </Text>
                     </TouchableOpacity>
 
@@ -1771,7 +1781,7 @@ export default function MenuScreen() {
                         flex: 2,
                         backgroundColor: "#d4af37",
                         borderRadius: 12,
-                        padding: 16,
+                        padding: 10,
                         alignItems: "center",
                         opacity: isSubmittingChanges ? 0.7 : 1,
                       }}
@@ -1785,7 +1795,7 @@ export default function MenuScreen() {
                       >
                         {isSubmittingChanges
                           ? "Enviando..."
-                          : "✅ Confirmar cambios"}
+                          : "Confirmar cambios"}
                       </Text>
                     </TouchableOpacity>
                   </View>
