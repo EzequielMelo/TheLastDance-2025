@@ -242,7 +242,7 @@ export async function getTablesStatus(): Promise<TablesStatusResponse> {
     }
   }
 
-  // Obtener reservas approved para el día de hoy que están próximas (< 45 minutos)
+  // Obtener reservas approved para el día de hoy
   const today = new Date().toLocaleDateString("en-CA", {
     timeZone: "America/Argentina/Buenos_Aires",
   });
@@ -257,11 +257,23 @@ export async function getTablesStatus(): Promise<TablesStatusResponse> {
     console.warn("Error obteniendo reservas:", reservationsError.message);
   }
 
-  // Filtrar reservas approved del día
+  // Obtener nombres de usuarios para las reservas
+  const reservationUserIds = reservationsData?.map(r => r.user_id).filter(Boolean) || [];
+  let reservationUsersData: any[] = [];
+  if (reservationUserIds.length > 0) {
+    const { data: users } = await supabaseAdmin
+      .from("users")
+      .select("id, first_name, last_name")
+      .in("id", reservationUserIds);
+    reservationUsersData = users || [];
+  }
+
+  // Calcular tiempo actual y ventana de 45 minutos
   const now = new Date();
   const nowArgentina = new Date(
     now.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" })
   );
+  const in45Minutes = new Date(nowArgentina.getTime() + 45 * 60 * 1000);
   
   const allApprovedReservations = reservationsData || [];
 
@@ -269,33 +281,50 @@ export async function getTablesStatus(): Promise<TablesStatusResponse> {
     total: reservationsData?.length || 0,
     approved_today: allApprovedReservations.length,
     time: nowArgentina.toLocaleTimeString("es-AR"),
+    in45Min: in45Minutes.toLocaleTimeString("es-AR"),
   });
 
-  // OPCIÓN 3: Para cada mesa, encontrar solo la reserva más próxima en el tiempo
-  // y SOLO si la mesa NO está ocupada actualmente
+  // Para cada mesa, encontrar la próxima reserva dentro de los próximos 45 minutos
+  // Esto mostrará al maitre qué mesas NO puede asignar porque tienen reserva próxima
   const tableReservationsMap = new Map<string, any>();
   
   allApprovedReservations.forEach(reservation => {
-    const existing = tableReservationsMap.get(reservation.table_id);
+    const reservationDateTime = new Date(`${reservation.date}T${reservation.time}`);
     
-    // Si no hay reserva para esta mesa, o esta es más temprana, guardarla
-    if (!existing || reservation.time < existing.time) {
-      tableReservationsMap.set(reservation.table_id, reservation);
+    // FILTRO CRÍTICO: Solo mostrar reservas dentro de los próximos 45 minutos
+    // Esto previene que el maitre asigne una mesa que pronto estará reservada
+    if (reservationDateTime > nowArgentina && reservationDateTime <= in45Minutes) {
+      const existing = tableReservationsMap.get(reservation.table_id);
+      
+      // Si no hay reserva para esta mesa, o esta es más temprana, guardarla
+      if (!existing || reservation.time < existing.time) {
+        tableReservationsMap.set(reservation.table_id, reservation);
+      }
     }
   });
 
-  console.log("📋 Mesas con reservas (más próxima por mesa):", tableReservationsMap.size);
+  console.log("📋 Mesas con reservas próximas (<45 min):", {
+    count: tableReservationsMap.size,
+    tables: Array.from(tableReservationsMap.entries()).map(([tableId, res]) => {
+      const user = reservationUsersData.find(u => u.id === res.user_id);
+      return {
+        tableId,
+        time: res.time,
+        userName: user ? `${user.first_name} ${user.last_name}` : 'Usuario desconocido'
+      };
+    })
+  });
 
-  // Mapear los datos para incluir información del cliente y reserva
+  // Mapear los datos para incluir información del cliente y reserva próxima
   const tables: TableWithClient[] = tablesData.map(table => {
     const client = table.id_client
       ? clientsData.find(c => c.id === table.id_client)
       : undefined;
 
-    // SOLO mostrar reserva si la mesa NO está ocupada
-    // Esto previene conflictos: si Cliente A está sentado, no muestra la reserva de Cliente B
+    // Mostrar reserva próxima (<45 min) SOLO si la mesa NO está ocupada ni asignada
+    // Esto permite que el maitre vea qué mesas pronto no estarán disponibles
     let reservation = undefined;
-    if (!table.is_occupied) {
+    if (!table.is_occupied && !table.id_client) {
       reservation = tableReservationsMap.get(table.id);
     }
 
@@ -306,7 +335,7 @@ export async function getTablesStatus(): Promise<TablesStatusResponse> {
     };
   });
   
-  // Calcular contadores considerando también las reservas
+  // Calcular contadores considerando también las reservas próximas
   const occupiedCount = tables.filter(t => t.is_occupied).length;
   const assignedCount = tables.filter(
     t => t.id_client && !t.is_occupied,
@@ -315,7 +344,7 @@ export async function getTablesStatus(): Promise<TablesStatusResponse> {
     t => !t.is_occupied && !t.id_client && t.reservation
   ).length;
   
-  // Mesas NO disponibles = ocupadas + asignadas + reservadas
+  // Mesas NO disponibles = ocupadas + asignadas + con reserva próxima (<45 min)
   const unavailableCount = tables.filter(
     t => t.is_occupied || t.id_client || t.reservation,
   ).length;
@@ -382,6 +411,42 @@ export async function assignClientToTable({
         success: false,
         message: "Mesa no disponible o ya asignada a otro cliente",
       };
+    }
+
+    // 2.5. Verificar si hay una reserva próxima (dentro de 45 minutos) para esta mesa
+    const now = new Date();
+    const in45Minutes = new Date(now.getTime() + 45 * 60 * 1000);
+    
+    const { data: upcomingReservation } = await supabaseAdmin
+      .from("reservations")
+      .select(`
+        id,
+        time,
+        date,
+        users!inner(first_name, last_name)
+      `)
+      .eq("table_id", table_id)
+      .eq("status", "approved")
+      .gte("date", now.toISOString().split("T")[0])
+      .limit(1)
+      .single();
+
+    if (upcomingReservation) {
+      // Combinar fecha y hora de la reserva
+      const reservationDateTime = new Date(`${upcomingReservation.date}T${upcomingReservation.time}`);
+      
+      // Si la reserva es dentro de los próximos 45 minutos
+      if (reservationDateTime <= in45Minutes && reservationDateTime > now) {
+        const userData = upcomingReservation.users as any;
+        const clientName = userData 
+          ? `${userData.first_name} ${userData.last_name}`
+          : "un cliente";
+        
+        return {
+          success: false,
+          message: `Esta mesa tiene una reserva confirmada a las ${upcomingReservation.time} para ${clientName}. No se puede asignar en este momento.`,
+        };
+      }
     }
 
     // 3. Verificar capacidad
@@ -647,74 +712,12 @@ export async function activateTableByClient(
       console.log(`🕐 Activación temprana desde: ${Math.floor(earlyActivationTime/60)}:${(earlyActivationTime%60).toString().padStart(2,'0')}`);
       console.log(`🕐 Ventana confirmación: ${Math.floor(confirmationStartTime/60)}:${(confirmationStartTime%60).toString().padStart(2,'0')} - ${Math.floor(latestValidTime/60)}:${(latestValidTime%60).toString().padStart(2,'0')}`);
 
-      // CASO 1: Llega muy tarde (después de las 20:45 para reserva de 20:00)
-      if (currentTimeInMinutes > latestValidTime) {
-        console.log("❌ Cliente llegó muy tarde, cancelando reserva...");
-        
-        // Cancelar reserva
-        await supabaseAdmin
-          .from('reservations')
-          .update({ status: 'cancelled' })
-          .eq('id', reservation.id);
-        
-        console.log(`✅ Reserva ${reservation.id} cancelada por llegada tardía`);
-        
-        return {
-          success: false,
-          message: `Tu reserva para las ${reservation.time.substring(0, 5)}hs expiró. El tiempo límite era hasta las ${Math.floor(latestValidTime/60)}:${(latestValidTime%60).toString().padStart(2,'0')}hs. Por favor, contacta al personal si aún deseas una mesa.`,
-        };
-      }
-
-      // CASO 2: Llega en ventana temprana (19:15-19:59 para reserva de 20:00)
+      // CASO 1: Llega temprano (19:15-19:59 para reserva de 20:00)
       if (currentTimeInMinutes >= earlyActivationTime && currentTimeInMinutes < confirmationStartTime) {
         console.log("⏰ Cliente llegó en ventana temprana (antes de hora de reserva)");
         
-        // Verificar si ya existe waiting_list
-        // Buscar por client_id solamente (no hay reservation_id en el schema)
-        const { data: existingWaiting } = await supabaseAdmin
-          .from('waiting_list')
-          .select('id, status')
-          .eq('client_id', clientId)
-          .single();
-
-        if (existingWaiting && existingWaiting.status === 'waiting') {
-          // Ya escaneó antes, recordarle que debe esperar hasta la hora
-          console.log("ℹ️  Cliente ya escaneó temprano, recordando que debe esperar");
-          return {
-            success: false,
-            earlyArrival: true,
-            reservationTime: reservation.time.substring(0, 5),
-            userName: reservation.user_name,
-            message: `Tu mesa está reservada para las ${reservation.time.substring(0, 5)}hs. Vuelve a escanear el QR a partir de esa hora para ocupar tu mesa.`,
-          };
-        }
-
-        if (!existingWaiting) {
-          // Crear waiting_list con status 'waiting'
-          const { data: fullReservation } = await supabaseAdmin
-            .from('reservations')
-            .select('party_size')
-            .eq('id', reservation.id)
-            .single();
-
-          console.log("📝 Creando waiting_list en estado 'waiting'...");
-          await supabaseAdmin
-            .from('waiting_list')
-            .insert({
-              client_id: clientId,
-              party_size: fullReservation?.party_size || 2,
-              status: 'waiting',
-              priority: 10,
-              joined_at: new Date().toISOString()
-            });
-
-          console.log("✅ waiting_list creado en 'waiting'");
-        }
-
-        // NO asignar id_client en ventana temprana - solo crear waiting_list
-        // La asignación se hará cuando llegue la hora correcta y la mesa esté libre
-        console.log("✅ Llegada temprana registrada (NO se asigna id_client todavía)");
-
+        // Solo informarle, NO crear waiting_list todavía
+        // La waiting_list se creará cuando llegue en el horario correcto
         return {
           success: false,
           earlyArrival: true,
@@ -724,12 +727,54 @@ export async function activateTableByClient(
         };
       }
 
-      // CASO 3: Llega en la ventana correcta (hora reserva hasta +45min)
+      // CASO 2: Llega en la ventana correcta (hora reserva hasta +45min)
       if (currentTimeInMinutes >= confirmationStartTime && currentTimeInMinutes <= latestValidTime) {
         console.log("✅ Cliente llegó en el horario correcto de su reserva");
+        
+        // Crear waiting_list con status='seated' directamente
+        // Verificar si ya existe una entrada
+        const { data: existingWaiting } = await supabaseAdmin
+          .from('waiting_list')
+          .select('id, status')
+          .eq('client_id', clientId)
+          .single();
+
+        if (!existingWaiting) {
+          // Crear waiting_list con status 'seated'
+          const { data: fullReservation } = await supabaseAdmin
+            .from('reservations')
+            .select('party_size')
+            .eq('id', reservation.id)
+            .single();
+
+          await supabaseAdmin
+            .from('waiting_list')
+            .insert({
+              client_id: clientId,
+              party_size: fullReservation?.party_size || 2,
+              status: 'seated',
+              priority: 10,
+              joined_at: new Date().toISOString(),
+              seated_at: new Date().toISOString()
+            });
+          
+          console.log("✅ Waiting_list creado con status='seated' para cliente con reserva");
+        } else if (existingWaiting.status !== 'seated') {
+          // Si existe pero no está como seated, actualizarlo
+          await supabaseAdmin
+            .from('waiting_list')
+            .update({
+              status: 'seated',
+              seated_at: new Date().toISOString()
+            })
+            .eq('id', existingWaiting.id);
+          
+          console.log("✅ Waiting_list actualizado a status='seated'");
+        }
+        
         // Continuar con la activación normal (se hace más abajo)
       } else if (currentTimeInMinutes < earlyActivationTime) {
-        // CASO 4: Intenta confirmar MUY temprano (antes de -45min)
+        // CASO 3: Intenta confirmar MUY temprano (antes de -45min)
         console.log("❌ Cliente intentó confirmar demasiado temprano");
         return {
           success: false,
@@ -795,35 +840,7 @@ export async function activateTableByClient(
       throw new Error(`Error activando mesa: ${updateError.message}`);
     }
 
-    // 6. Actualizar waiting_list status a 'seated' si existe entrada activa
-    try {
-      const { data: waitingEntry, error: waitingError } = await supabaseAdmin
-        .from("waiting_list")
-        .select("id, status")
-        .eq("client_id", clientId)
-        .eq("status", "waiting")
-        .limit(1)
-        .single();
-
-      if (!waitingError && waitingEntry) {
-        const { error: updateWaitingError } = await supabaseAdmin
-          .from("waiting_list")
-          .update({ 
-            status: "seated", 
-            seated_at: new Date().toISOString() 
-          })
-          .eq("id", waitingEntry.id);
-
-        if (updateWaitingError) {
-          console.error("❌ Error actualizando waiting_list:", updateWaitingError);
-        } else {
-          console.log(`✅ waiting_list actualizado: status=seated para usuario ${clientId}`);
-        }
-      }
-    } catch (waitingUpdateError) {
-      console.error("❌ Error actualizando waiting_list:", waitingUpdateError);
-      // No lanzar error porque la mesa se activó correctamente
-    }
+    console.log("✅ Mesa activada exitosamente");
 
     // 6.5. Si había una reserva, marcarla como 'completed'
     if (reservation) {

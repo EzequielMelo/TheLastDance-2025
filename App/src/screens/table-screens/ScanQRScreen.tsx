@@ -188,6 +188,16 @@ export default function ScanQRScreen() {
         setTimeout(() => {
           navigation.navigate("Home");
         }, 2500);
+      } else if (response.data.earlyArrival) {
+        // Caso especial: llegada temprana con reserva
+        showCustomAlert(
+          "Llegaste Temprano",
+          response.data.message,
+          "info",
+        );
+        setScanned(false);
+        setProcessing(false);
+        return;
       } else {
         throw new Error(response.data.message || "Error al activar la mesa");
       }
@@ -203,7 +213,7 @@ export default function ScanQRScreen() {
       if (error.response?.data?.earlyArrival) {
         alertTitle = "Llegaste Temprano";
         errorMessage = error.response.data.message;
-        alertType = "warning";
+        alertType = "info";
         showCustomAlert(alertTitle, errorMessage, alertType);
         setScanned(false);
         setProcessing(false);

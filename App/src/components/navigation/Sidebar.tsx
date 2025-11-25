@@ -84,6 +84,9 @@ export default function Sidebar({
   const [hasAnonymousPaidOrder, setHasAnonymousPaidOrder] =
     React.useState(false);
 
+  // Ref para trackear si ya se hizo el refresh inicial
+  const hasRefreshedRef = React.useRef(false);
+
   // Extraer datos del cliente si corresponde
   const { state, waitingPosition, assignedTable, occupiedTable, refresh } =
     isClient
@@ -103,6 +106,12 @@ export default function Sidebar({
         duration: 300,
         useNativeDriver: true,
       }).start();
+      
+      // Solo refrescar la primera vez o si el estado es 'loading' o 'error'
+      if (isClient && refresh && (!hasRefreshedRef.current || state === 'loading' || state === 'error')) {
+        refresh();
+        hasRefreshedRef.current = true;
+      }
     } else {
       Animated.timing(slideAnim, {
         toValue: -SIDEBAR_WIDTH,
@@ -110,6 +119,7 @@ export default function Sidebar({
         useNativeDriver: true,
       }).start();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   // Verificar si usuario anónimo tiene pedido pagado cuando se abre el sidebar
@@ -326,21 +336,18 @@ export default function Sidebar({
         clientActions.push(
           {
             id: "view-position",
-            title: "Ver Mi Posición",
+            title: "Ver Posición",
             subtitle: `Posición actual: #${waitingPosition || "..."}`,
             icon: <Clock size={20} color="#111828" />,
             onPress: () => onNavigate("MyWaitingPosition"),
             roles: ["cliente_registrado", "cliente_anonimo"],
           },
           {
-            id: "refresh-queue",
-            title: "Actualizar Estado",
-            subtitle: "Verificar cambios en la lista",
-            icon: <RefreshCcw size={20} color="#111828" />,
-            onPress: () => {
-              refresh();
-              onClose();
-            },
+            id: "view-surveys",
+            title: "Ver Encuestas",
+            subtitle: "Estadísticas y opiniones del restaurante",
+            icon: <Award size={20} color="#111828" />,
+            onPress: () => onNavigate("SurveyStats"),
             roles: ["cliente_registrado", "cliente_anonimo"],
           },
         );

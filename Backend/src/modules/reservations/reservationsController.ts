@@ -108,6 +108,36 @@ export class ReservationsController {
   }
 
   /**
+   * Obtener próxima reserva del usuario (dentro de 45 minutos)
+   * GET /api/reservations/upcoming
+   */
+  static async getUpcomingReservation(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.appUserId;
+      if (!userId) {
+        res.status(401).json({
+          success: false,
+          error: 'Usuario no autenticado'
+        });
+        return;
+      }
+
+      const upcomingReservation = await ReservationsService.getClientUpcomingReservation(userId);
+
+      res.status(200).json({
+        success: true,
+        data: upcomingReservation
+      });
+    } catch (error: any) {
+      console.error('Error fetching upcoming reservation:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Error al obtener la próxima reserva'
+      });
+    }
+  }
+
+  /**
    * Obtener todas las reservas (solo admin)
    * GET /api/reservations/all
    */

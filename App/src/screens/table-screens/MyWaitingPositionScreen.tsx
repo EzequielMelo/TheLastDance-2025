@@ -5,8 +5,6 @@ import {
   TouchableOpacity,
   RefreshControl,
   ScrollView,
-  Alert,
-  ToastAndroid,
   BackHandler,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,7 +17,6 @@ import {
   Clock,
   Users,
   Trophy,
-  XCircle,
   RefreshCw,
   User,
   Crown,
@@ -193,48 +190,6 @@ export default function MyWaitingPositionScreen() {
     setRefreshing(true);
     loadData();
   }, [loadData]);
-
-  const handleCancel = () => {
-    showCustomAlert(
-      "Cancelar Reserva",
-      "¿Estás seguro que quieres salir de la lista de espera?",
-      "warning",
-      [
-        { text: "No", style: "cancel" },
-        {
-          text: "Sí, cancelar",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              if (!myEntry?.id) {
-                ToastAndroid.show(
-                  "Error: No se encontró la reserva",
-                  ToastAndroid.SHORT,
-                );
-                return;
-              }
-
-              // Llamar al endpoint para cancelar la reserva
-              await api.put(`/tables/waiting-list/${myEntry.id}/cancel`, {});
-
-              ToastAndroid.show(
-                "Reserva cancelada exitosamente",
-                ToastAndroid.SHORT,
-              );
-
-              // Navegar de vuelta al home con refresh
-              navigateToHome();
-            } catch (error: any) {
-              console.error("Error al cancelar reserva:", error);
-              const errorMessage =
-                error.response?.data?.error || "Error al cancelar la reserva";
-              ToastAndroid.show(errorMessage, ToastAndroid.SHORT);
-            }
-          },
-        },
-      ],
-    );
-  };
 
   const getWaitingTime = () => {
     if (!myEntry) return "0 min";
@@ -459,19 +414,6 @@ export default function MyWaitingPositionScreen() {
               </View>
             </View>
           )}
-
-          {/* Actions */}
-          <View className="gap-3 mb-8">
-            <TouchableOpacity
-              onPress={handleCancel}
-              className="bg-red-600 rounded-xl py-4 flex-row items-center justify-center"
-            >
-              <XCircle size={20} color="white" />
-              <Text className="text-white font-semibold text-lg ml-2">
-                Cancelar Reserva
-              </Text>
-            </TouchableOpacity>
-          </View>
 
           {/* Info */}
           <View className="bg-blue-500/20 rounded-xl p-4 mb-8">
