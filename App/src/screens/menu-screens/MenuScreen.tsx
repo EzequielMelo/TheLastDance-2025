@@ -808,9 +808,7 @@ export default function MenuScreen() {
                     height: 20,
                     borderRadius: 10,
                     backgroundColor: "white",
-                    transform: [
-                      { translateX: sensorsEnabled ? 20 : 0 },
-                    ],
+                    transform: [{ translateX: sensorsEnabled ? 20 : 0 }],
                     shadowColor: "#000",
                     shadowOffset: {
                       width: 0,
@@ -928,6 +926,9 @@ export default function MenuScreen() {
             const categoryColor = getCategoryColor(item.category);
             const isRejected = wasItemRejected(item.id);
             const isAnonymous = user?.profile_code === "cliente_anonimo";
+            // Los clientes anónimos solo pueden hacer pedidos cuando están seated (en mesa)
+            // NO pueden hacer pedidos de delivery
+            const isAnonymousBlocked = isAnonymous && isDeliveryOrder;
 
             // Calculamos un espacio más optimizado para dispositivos reales
             const RESERVED_BOTTOM = 130; // Optimizado para mejor aprovechamiento
@@ -1223,7 +1224,7 @@ export default function MenuScreen() {
                               opacity:
                                 isRejected ||
                                 (isNotSeated && !isModifyMode) ||
-                                isAnonymous
+                                isAnonymousBlocked
                                   ? 0.5
                                   : 1,
                             }}
@@ -1238,7 +1239,7 @@ export default function MenuScreen() {
                               disabled={
                                 isRejected ||
                                 (isNotSeated && !isModifyMode) ||
-                                isAnonymous
+                                isAnonymousBlocked
                               }
                               style={{ padding: 8 }}
                             >
@@ -1247,7 +1248,7 @@ export default function MenuScreen() {
                                 color={
                                   isRejected ||
                                   (isNotSeated && !isModifyMode) ||
-                                  isAnonymous
+                                  isAnonymousBlocked
                                     ? "#ffffff"
                                     : "#1a1a1a"
                                 }
@@ -1259,7 +1260,7 @@ export default function MenuScreen() {
                                 color:
                                   isRejected ||
                                   (isNotSeated && !isModifyMode) ||
-                                  isAnonymous
+                                  isAnonymousBlocked
                                     ? "#ffffff"
                                     : "#1a1a1a",
                                 fontWeight: "600",
@@ -1280,7 +1281,7 @@ export default function MenuScreen() {
                               disabled={
                                 isRejected ||
                                 (isNotSeated && !isModifyMode) ||
-                                isAnonymous
+                                isAnonymousBlocked
                               }
                               style={{ padding: 8 }}
                             >
@@ -1289,7 +1290,7 @@ export default function MenuScreen() {
                                 color={
                                   isRejected ||
                                   (isNotSeated && !isModifyMode) ||
-                                  isAnonymous
+                                  isAnonymousBlocked
                                     ? "#ffffff"
                                     : "#1a1a1a"
                                 }
@@ -1303,14 +1304,14 @@ export default function MenuScreen() {
                               isRejected ||
                               (isNotSeated && !isModifyMode) ||
                               (hasPendingOrder && !isModifyMode) ||
-                              isAnonymous
+                              isAnonymousBlocked
                             }
                             style={{
                               backgroundColor: isRejected
                                 ? "#9ca3af"
                                 : (isNotSeated && !isModifyMode) ||
                                     (hasPendingOrder && !isModifyMode) ||
-                                    isAnonymous
+                                    isAnonymousBlocked
                                   ? "#6b7280"
                                   : "#d4af37",
                               borderRadius: 8,
