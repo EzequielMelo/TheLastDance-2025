@@ -4,6 +4,7 @@ import {
   notifyNewDeliveryOrder,
   notifyDeliveryReadyForDrivers,
 } from "../../services/pushNotificationService";
+import { calculateDeliveryEstimate } from "../../utils/distanceCalculator";
 import type {
   Delivery,
   CreateDeliveryDTO,
@@ -34,6 +35,57 @@ export async function createDelivery(
     );
   }
 
+  // 📊 Obtener items de la orden con sus tiempos de preparación
+  const { data: orderItems, error: itemsError } = await supabaseAdmin
+    .from("delivery_order_items")
+    .select(
+      `
+      id,
+      quantity,
+      menu_item:menu_items (
+        id,
+        name,
+        prep_minutes
+      )
+    `,
+    )
+    .eq("delivery_order_id", data.delivery_order_id);
+
+  if (itemsError) {
+    console.error("❌ Error obteniendo items de la orden:", itemsError);
+    throw new Error("Error al obtener items de la orden");
+  }
+
+  // 🕐 Calcular el tiempo de preparación máximo (el más grande de todos los items)
+  let maxPrepTime = 0;
+  if (orderItems && orderItems.length > 0) {
+    const prepTimes = orderItems.map((item: any) => {
+      const prepMinutes = item.menu_item?.prep_minutes || 0;
+      console.log(
+        `🍽️ Item: ${item.menu_item?.name} - Tiempo prep: ${prepMinutes} min`,
+      );
+      return prepMinutes;
+    });
+    maxPrepTime = Math.max(...prepTimes);
+    console.log(`⏱️ Tiempo de preparación máximo: ${maxPrepTime} minutos`);
+  } else {
+    console.warn("⚠️ No se encontraron items para la orden");
+    maxPrepTime = 20; // Tiempo por defecto si no hay items
+  }
+
+  // 📍 Calcular distancia y tiempo estimado total
+  const { distanceKm, estimatedTimeMinutes } = calculateDeliveryEstimate(
+    RESTAURANT_CONFIG.location.latitude,
+    RESTAURANT_CONFIG.location.longitude,
+    data.delivery_latitude,
+    data.delivery_longitude,
+    maxPrepTime,
+  );
+
+  console.log(
+    `📏 Distancia calculada: ${distanceKm} km | 🕐 Tiempo total estimado: ${estimatedTimeMinutes} min (${maxPrepTime} prep + ${estimatedTimeMinutes - maxPrepTime} viaje)`,
+  );
+
   // Verificar que el usuario no tenga otro delivery activo
   const { data: activeDelivery } = await supabaseAdmin
     .from("deliveries")
@@ -49,7 +101,7 @@ export async function createDelivery(
     );
   }
 
-  // Crear el delivery
+  // Crear el delivery con distancia y tiempo calculados
   const { data: delivery, error: deliveryError } = await supabaseAdmin
     .from("deliveries")
     .insert({
@@ -60,8 +112,8 @@ export async function createDelivery(
       delivery_latitude: data.delivery_latitude,
       delivery_longitude: data.delivery_longitude,
       delivery_notes: data.delivery_notes || null,
-      estimated_distance_km: data.estimated_distance_km || null,
-      estimated_time_minutes: data.estimated_time_minutes || null,
+      estimated_distance_km: distanceKm, // 📏 Distancia calculada
+      estimated_time_minutes: estimatedTimeMinutes, // 🕐 Tiempo total calculado
       // 📍 Agregar ubicación del restaurante como origen
       origin_address: RESTAURANT_CONFIG.address,
       origin_latitude: RESTAURANT_CONFIG.location.latitude,
@@ -84,12 +136,7 @@ export async function createDelivery(
     .eq("id", userId)
     .single();
 
-  // Contar items del pedido
-  const { data: orderItems } = await supabaseAdmin
-    .from("delivery_order_items")
-    .select("quantity")
-    .eq("delivery_order_id", data.delivery_order_id);
-
+  // Contar items del pedido (ya los tenemos en memoria)
   const itemsCount =
     orderItems?.reduce((sum, item) => sum + item.quantity, 0) || 0;
 

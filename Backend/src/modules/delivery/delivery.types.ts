@@ -51,8 +51,9 @@ export interface CreateDeliveryDTO {
   delivery_latitude: number;
   delivery_longitude: number;
   delivery_notes?: string;
-  estimated_distance_km?: number;
-  estimated_time_minutes?: number;
+  // Los siguientes campos se calculan automáticamente en el backend
+  // estimated_distance_km: se calcula con fórmula de Haversine
+  // estimated_time_minutes: tiempo preparación máximo + tiempo viaje
 }
 
 export interface UpdateDeliveryStatusDTO {
