@@ -45,6 +45,7 @@ import {
   notifyWaiterKitchenItemsReady,
   notifyWaiterBartenderItemsReady,
   notifyManagementPaymentReceived,
+  notifyWaiterTandaResubmitted,
 } from "../../services/pushNotificationService";
 import { emitClientStateUpdate } from "../../socket/clientStateSocket";
 
@@ -142,12 +143,15 @@ export async function createOrderHandler(
           .single();
 
         if (tableError) {
-          console.error('❌ [createOrderHandler] Error obteniendo mesa:', tableError);
+          console.error(
+            "❌ [createOrderHandler] Error obteniendo mesa:",
+            tableError,
+          );
         } else {
-          console.log('✅ [createOrderHandler] Mesa obtenida:', {
+          console.log("✅ [createOrderHandler] Mesa obtenida:", {
             number: tableData?.number,
             id_waiter: tableData?.id_waiter,
-            id_client: tableData?.id_client
+            id_client: tableData?.id_client,
           });
         }
 
@@ -159,10 +163,11 @@ export async function createOrderHandler(
             .eq("id", tableData.id_client)
             .single();
 
-          const clientName = clientData && !clientError
-            ? `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim() || 'Cliente'
-            : 'Cliente';
-
+          const clientName =
+            clientData && !clientError
+              ? `${clientData.first_name || ""} ${clientData.last_name || ""}`.trim() ||
+                "Cliente"
+              : "Cliente";
 
           // Notificar al mozo
           await notifyWaiterNewOrder(
@@ -172,16 +177,20 @@ export async function createOrderHandler(
             parsed.items.length,
             parsed.totalAmount,
           );
-
         } else {
-          console.warn('⚠️ [createOrderHandler] Mesa sin mozo o cliente asignado');
+          console.warn(
+            "⚠️ [createOrderHandler] Mesa sin mozo o cliente asignado",
+          );
         }
       } catch (notifyError) {
-        console.error("❌ [createOrderHandler] Error enviando notificaciones:", notifyError);
+        console.error(
+          "❌ [createOrderHandler] Error enviando notificaciones:",
+          notifyError,
+        );
         // No bloqueamos la creación del pedido por error de notificación
       }
     } else {
-      console.log('🚨 [createOrderHandler] No hay table_id en el pedido');
+      console.log("🚨 [createOrderHandler] No hay table_id en el pedido");
     }
 
     res.status(201).json({
@@ -473,18 +482,20 @@ export async function waiterOrderActionHandler(
 
           if (!orderError && orderData) {
             const tableData = (orderData as any).tables;
-            
+
             // Obtener datos del cliente usando id_client
             const { data: clientData, error: clientError } = await supabaseAdmin
               .from("users")
               .select("first_name, last_name")
               .eq("id", tableData.id_client)
               .single();
-            
-            const clientName = clientData && !clientError
-              ? `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim() || 'Cliente'
-              : 'Cliente';
-            
+
+            const clientName =
+              clientData && !clientError
+                ? `${clientData.first_name || ""} ${clientData.last_name || ""}`.trim() ||
+                  "Cliente"
+                : "Cliente";
+
             // Separar items por categoría (platos vs bebidas)
             const orderItems = (orderData as any).order_items;
             const dishItems: Array<{ name: string; quantity: number }> = [];
@@ -612,18 +623,20 @@ export async function waiterOrderActionHandler(
 
           if (!orderError && orderData?.table_id) {
             const tableData = (orderData as any).tables;
-            
+
             // Obtener datos del mozo usando id_waiter
             const { data: waiterData, error: waiterError } = await supabaseAdmin
               .from("users")
               .select("first_name, last_name")
               .eq("id", tableData.id_waiter)
               .single();
-            
-            const waiterName = waiterData && !waiterError
-              ? `${waiterData.first_name || ''} ${waiterData.last_name || ''}`.trim() || 'Mozo'
-              : 'Mozo';
-            
+
+            const waiterName =
+              waiterData && !waiterError
+                ? `${waiterData.first_name || ""} ${waiterData.last_name || ""}`.trim() ||
+                  "Mozo"
+                : "Mozo";
+
             await notifyClientOrderRejectedForModification(
               orderData.id_client,
               waiterName,
@@ -1465,6 +1478,52 @@ export async function rejectIndividualItemsHandler(
       parsed.reason,
     );
 
+    // Enviar notificación push al cliente
+    try {
+      const { data: orderData, error: orderError } = await supabaseAdmin
+        .from("orders")
+        .select(
+          `
+          id_client,
+          table_id,
+          tables!inner(number, id_waiter)
+        `,
+        )
+        .eq("id", orderId)
+        .single();
+
+      if (!orderError && orderData) {
+        const tableData = (orderData as any).tables;
+
+        // Obtener nombre del mozo
+        const { data: waiterData, error: waiterError } = await supabaseAdmin
+          .from("users")
+          .select("first_name, last_name")
+          .eq("id", waiterId)
+          .single();
+
+        const waiterName =
+          waiterData && !waiterError
+            ? `${waiterData.first_name || ""} ${waiterData.last_name || ""}`.trim() ||
+              "Mozo"
+            : "Mozo";
+
+        await notifyClientOrderRejectedForModification(
+          orderData.id_client,
+          waiterName,
+          tableData.number.toString(),
+          parsed.itemIds.length,
+          updatedOrder.order_items.length,
+        );
+      }
+    } catch (notifyError) {
+      console.error(
+        "❌ Error enviando notificación de rechazo al cliente:",
+        notifyError,
+      );
+      // No bloqueamos la respuesta por error de notificación
+    }
+
     res.json({
       success: true,
       message:
@@ -1991,13 +2050,14 @@ export async function submitTandaModificationsHandler(
 
     // Enviar notificación push al mozo sobre la resubmisión
     try {
-      // Obtener información de la orden y mesa
+      // Obtener información de la orden y mesa con items para calcular total real
       const { data: orderData, error: orderError } = await supabaseAdmin
         .from("orders")
         .select(
           `
           id,
           table_id,
+          total_amount,
           order_items(id),
           tables!inner(
             number,
@@ -2017,16 +2077,14 @@ export async function submitTandaModificationsHandler(
           : "Cliente";
 
         const itemsCount = (orderData as any).order_items.length;
+        const totalAmount = orderData.total_amount || 0;
 
-        // Calcular total aproximado (esto se podría mejorar obteniendo el precio real)
-        const estimatedTotal = itemsCount * 1500; // Estimación básica
-
-        await notifyWaiterNewOrder(
+        await notifyWaiterTandaResubmitted(
           tableData.id_waiter,
           clientName,
           tableData.number.toString(),
           itemsCount,
-          estimatedTotal,
+          totalAmount,
         );
       }
 

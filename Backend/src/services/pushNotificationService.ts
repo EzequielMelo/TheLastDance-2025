@@ -166,7 +166,10 @@ export async function notifyEmployees(title: string, body: string, data?: any) {
 }
 
 // Función para actualizar el push token de un usuario
-export async function updateUserPushToken(userId: string, pushToken: string | null) {
+export async function updateUserPushToken(
+  userId: string,
+  pushToken: string | null,
+) {
   try {
     const { error } = await supabaseAdmin
       .from("users")
@@ -188,24 +191,48 @@ export async function updateUserPushToken(userId: string, pushToken: string | nu
 // Función para obtener tokens de maîtres
 async function getMaitreTokens(): Promise<string[]> {
   try {
+    console.log(
+      `📋 [getMaitreTokens] Buscando tokens para position_code: "maitre"`,
+    );
+
     const { data: users, error } = await supabaseAdmin
       .from("users")
-      .select("push_token")
+      .select("push_token, first_name, last_name")
       .eq("profile_code", "empleado")
       .eq("position_code", "maitre")
       .eq("state", "aprobado")
       .not("push_token", "is", null);
 
     if (error) {
-      console.error("Error fetching maitre tokens:", error);
+      console.error(
+        "❌ [getMaitreTokens] Error fetching maitre tokens:",
+        error,
+      );
       return [];
     }
 
-    return users
+    console.log(
+      `✅ [getMaitreTokens] Usuarios maitre encontrados:`,
+      users?.length || 0,
+    );
+    if (users && users.length > 0) {
+      users.forEach(user => {
+        console.log(
+          `   - ${user.first_name} ${user.last_name}: ${user.push_token ? "Tiene token" : "Sin token"}`,
+        );
+      });
+    }
+
+    const tokens = users
       .map(user => user.push_token)
       .filter(token => token && token.trim() !== "");
+
+    console.log(
+      `📤 [getMaitreTokens] Tokens válidos para maitre: ${tokens.length}`,
+    );
+    return tokens;
   } catch (error) {
-    console.error("Error in getMaitreTokens:", error);
+    console.error("❌ [getMaitreTokens] Error in getMaitreTokens:", error);
     return [];
   }
 }
@@ -222,18 +249,25 @@ async function getWaiterTokens(): Promise<string[]> {
       .not("push_token", "is", null);
 
     if (error) {
-      console.error("❌ [getWaiterTokens] Error fetching waiter tokens:", error);
+      console.error(
+        "❌ [getWaiterTokens] Error fetching waiter tokens:",
+        error,
+      );
       return [];
     }
 
-    console.log(`📋 [getWaiterTokens] ${users?.length || 0} mozos encontrados en BD`);
-    
+    console.log(
+      `📋 [getWaiterTokens] ${users?.length || 0} mozos encontrados en BD`,
+    );
+
     const tokens = users
       .map(user => user.push_token)
       .filter(token => token && token.trim() !== "");
-    
-    console.log(`✅ [getWaiterTokens] ${tokens.length} tokens válidos después de filtrar`);
-        
+
+    console.log(
+      `✅ [getWaiterTokens] ${tokens.length} tokens válidos después de filtrar`,
+    );
+
     return tokens;
   } catch (error) {
     console.error("❌ [getWaiterTokens] Error in getWaiterTokens:", error);
@@ -289,24 +323,51 @@ async function getClientToken(clientId: string): Promise<string | null> {
 // Función genérica para obtener tokens por position_code
 async function getRoleTokens(positionCode: string): Promise<string[]> {
   try {
+    console.log(
+      `📋 [getRoleTokens] Buscando tokens para position_code: "${positionCode}"`,
+    );
+
     const { data: users, error } = await supabaseAdmin
       .from("users")
-      .select("push_token")
+      .select("push_token, first_name, last_name")
       .eq("profile_code", "empleado")
       .eq("position_code", positionCode)
       .eq("state", "aprobado")
       .not("push_token", "is", null);
 
     if (error) {
-      console.error(`Error fetching ${positionCode} tokens:`, error);
+      console.error(
+        `❌ [getRoleTokens] Error fetching ${positionCode} tokens:`,
+        error,
+      );
       return [];
     }
 
-    return users
+    console.log(
+      `✅ [getRoleTokens] Usuarios encontrados para ${positionCode}:`,
+      users?.length || 0,
+    );
+    if (users && users.length > 0) {
+      users.forEach(user => {
+        console.log(
+          `   - ${user.first_name} ${user.last_name}: ${user.push_token ? "Tiene token" : "Sin token"}`,
+        );
+      });
+    }
+
+    const tokens = users
       .map(user => user.push_token)
       .filter(token => token && token.trim() !== "");
+
+    console.log(
+      `📤 [getRoleTokens] Tokens válidos para ${positionCode}: ${tokens.length}`,
+    );
+    return tokens;
   } catch (error) {
-    console.error(`Error in getRoleTokens for ${positionCode}:`, error);
+    console.error(
+      `❌ [getRoleTokens] Error in getRoleTokens for ${positionCode}:`,
+      error,
+    );
     return [];
   }
 }
@@ -357,9 +418,16 @@ export async function notifyMaitreNewWaitingClient(
   tableType?: string,
 ) {
   try {
+    console.log(
+      `👔 [notifyMaitreNewWaitingClient] Nuevo cliente en lista de espera: ${clientName} (${partySize} personas)`,
+    );
+
     const tokens = await getMaitreTokens();
 
     if (tokens.length === 0) {
+      console.log(
+        `⚠️ [notifyMaitreNewWaitingClient] No hay tokens de maitre disponibles`,
+      );
       return;
     }
 
@@ -375,9 +443,18 @@ export async function notifyMaitreNewWaitingClient(
       },
     };
 
+    console.log(
+      `📤 [notifyMaitreNewWaitingClient] Enviando notificación a ${tokens.length} maitres`,
+    );
     await sendExpoPushNotification(tokens, notificationData);
+    console.log(
+      `✅ [notifyMaitreNewWaitingClient] Notificación enviada exitosamente`,
+    );
   } catch (error) {
-    console.error("❌ Error al enviar notificación al maître:", error);
+    console.error(
+      "❌ [notifyMaitreNewWaitingClient] Error al enviar notificación al maître:",
+      error,
+    );
   }
 }
 
@@ -573,25 +650,29 @@ export async function notifyClientWaiterMessage(
 
 // Función para notificar al mozo cuando un cliente realiza un nuevo pedido
 export async function notifyWaiterNewOrder(
-  _waiterId: string, // Mantenido por compatibilidad, pero se notifica a todos los mozos
+  waiterId: string,
   clientName: string,
   tableNumber: string,
   itemsCount: number,
   totalAmount: number,
 ) {
   try {
-    const tokens = await getWaiterTokens();
+    // Obtener token del mozo específico asignado a la mesa
+    const token = await getClientToken(waiterId);
 
-    if (tokens.length === 0) {
-      console.log('⚠️ [notifyWaiterNewOrder] No hay tokens de mozos disponibles');
+    if (!token) {
+      console.log(
+        `⚠️ [notifyWaiterNewOrder] Mozo ${waiterId} no tiene token de push registrado`,
+      );
       return;
     }
 
     const notificationData: PushNotificationData = {
-      title: `Nuevo pedido - Mesa #${tableNumber}`,
-      body: `${clientName} realizó un pedido (${itemsCount} items - $${totalAmount.toFixed(2)})`,
+      title: `🍽️ Nuevo pedido - Mesa #${tableNumber}`,
+      body: `${clientName} - ${itemsCount} items ($${totalAmount.toLocaleString()}) - Requiere aprobación`,
       data: {
         type: "new_order",
+        waiterId,
         tableNumber,
         clientName,
         itemsCount,
@@ -600,12 +681,14 @@ export async function notifyWaiterNewOrder(
       },
     };
 
-    console.log('📤 [notifyWaiterNewOrder] Enviando notificación');
-    await sendExpoPushNotification(tokens, notificationData);
-    console.log('✅ [notifyWaiterNewOrder] Notificación enviada exitosamente');
+    console.log(
+      `📤 [notifyWaiterNewOrder] Enviando notificación al mozo ${waiterId} para mesa #${tableNumber}`,
+    );
+    await sendExpoPushNotification([token], notificationData);
+    console.log("✅ [notifyWaiterNewOrder] Notificación enviada exitosamente");
   } catch (error) {
     console.error(
-      "❌ [notifyWaiterNewOrder] Error al enviar notificación de nuevo pedido a mozos:",
+      "❌ [notifyWaiterNewOrder] Error al enviar notificación de nuevo pedido al mozo:",
       error,
     );
   }
@@ -639,12 +722,64 @@ export async function notifyClientOrderRejectedForModification(
       },
     };
 
-    console.log('📤 [notifyClientOrderRejectedForModification] Enviando notificación');
+    console.log(
+      "📤 [notifyClientOrderRejectedForModification] Enviando notificación",
+    );
     await sendExpoPushNotification([token], notificationData);
-    console.log('✅ [notifyClientOrderRejectedForModification] Notificación enviada');
+    console.log(
+      "✅ [notifyClientOrderRejectedForModification] Notificación enviada",
+    );
   } catch (error) {
     console.error(
       "❌ [notifyClientOrderRejectedForModification] Error al enviar notificación de pedido rechazado:",
+      error,
+    );
+  }
+}
+
+// Función para notificar al mozo cuando el cliente reenvía una tanda modificada
+export async function notifyWaiterTandaResubmitted(
+  waiterId: string,
+  clientName: string,
+  tableNumber: string,
+  itemsCount: number,
+  totalAmount: number,
+) {
+  try {
+    // Obtener token del mozo específico asignado a la mesa
+    const token = await getClientToken(waiterId);
+
+    if (!token) {
+      console.log(
+        `⚠️ [notifyWaiterTandaResubmitted] Mozo ${waiterId} no tiene token de push registrado`,
+      );
+      return;
+    }
+
+    const notificationData: PushNotificationData = {
+      title: `🔄 Tanda modificada - Mesa #${tableNumber}`,
+      body: `${clientName} reenvió su pedido modificado - ${itemsCount} items ($${totalAmount.toLocaleString()}) - Requiere revisión`,
+      data: {
+        type: "tanda_resubmitted",
+        waiterId,
+        tableNumber,
+        clientName,
+        itemsCount,
+        totalAmount,
+        screen: "WaiterPendingOrders",
+      },
+    };
+
+    console.log(
+      `📤 [notifyWaiterTandaResubmitted] Enviando notificación al mozo ${waiterId} para tanda modificada en mesa #${tableNumber}`,
+    );
+    await sendExpoPushNotification([token], notificationData);
+    console.log(
+      "✅ [notifyWaiterTandaResubmitted] Notificación enviada exitosamente",
+    );
+  } catch (error) {
+    console.error(
+      "❌ [notifyWaiterTandaResubmitted] Error al enviar notificación de tanda modificada al mozo:",
       error,
     );
   }
@@ -657,9 +792,17 @@ export async function notifyKitchenNewItems(
   clientName?: string,
 ) {
   try {
+    console.log(
+      `🍳 [notifyKitchenNewItems] Iniciando notificación para cocina - Mesa #${tableNumber}`,
+    );
+    console.log(`   Items:`, dishItems);
+
     const tokens = await getRoleTokens("cocinero");
 
     if (!tokens.length) {
+      console.log(
+        `⚠️ [notifyKitchenNewItems] No hay tokens de cocineros disponibles`,
+      );
       return;
     }
 
@@ -681,9 +824,16 @@ export async function notifyKitchenNewItems(
       },
     };
 
+    console.log(
+      `📤 [notifyKitchenNewItems] Enviando notificación a ${tokens.length} cocineros`,
+    );
     await sendExpoPushNotification(tokens, notificationData);
+    console.log(`✅ [notifyKitchenNewItems] Notificación enviada exitosamente`);
   } catch (error) {
-    console.error("❌ Error al enviar notificación a la cocina:", error);
+    console.error(
+      "❌ [notifyKitchenNewItems] Error al enviar notificación a la cocina:",
+      error,
+    );
   }
 }
 
@@ -694,9 +844,17 @@ export async function notifyBartenderNewItems(
   clientName?: string,
 ) {
   try {
+    console.log(
+      `🍹 [notifyBartenderNewItems] Iniciando notificación para bar - Mesa #${tableNumber}`,
+    );
+    console.log(`   Items:`, drinkItems);
+
     const tokens = await getRoleTokens("bartender");
 
     if (!tokens.length) {
+      console.log(
+        `⚠️ [notifyBartenderNewItems] No hay tokens de bartenders disponibles`,
+      );
       return;
     }
 
@@ -718,9 +876,18 @@ export async function notifyBartenderNewItems(
       },
     };
 
+    console.log(
+      `📤 [notifyBartenderNewItems] Enviando notificación a ${tokens.length} bartenders`,
+    );
     await sendExpoPushNotification(tokens, notificationData);
+    console.log(
+      `✅ [notifyBartenderNewItems] Notificación enviada exitosamente`,
+    );
   } catch (error) {
-    console.error("❌ Error al enviar notificación al bartender:", error);
+    console.error(
+      "❌ [notifyBartenderNewItems] Error al enviar notificación al bartender:",
+      error,
+    );
   }
 }
 
@@ -812,7 +979,7 @@ export async function notifyWaiterOrderFullyReady(
   try {
     const specificToken = await getWaiterToken(waiterId);
     let tokens: string[] = [];
-    
+
     if (specificToken) {
       tokens = [specificToken];
     } else {
@@ -837,10 +1004,7 @@ export async function notifyWaiterOrderFullyReady(
 
     await sendExpoPushNotification(tokens, notificationData);
   } catch (error) {
-    console.error(
-      "❌ Error al enviar notificación de pedido completo:",
-      error,
-    );
+    console.error("❌ Error al enviar notificación de pedido completo:", error);
   }
 }
 
@@ -1015,15 +1179,22 @@ export async function notifyClientOrderConfirmed(
   estimatedTime?: number,
 ) {
   try {
-    console.log('🔔 [notifyClientOrderConfirmed] Iniciando...', { clientId, waiterName, tableNumber });
+    console.log("🔔 [notifyClientOrderConfirmed] Iniciando...", {
+      clientId,
+      waiterName,
+      tableNumber,
+    });
     const token = await getClientToken(clientId);
 
     if (!token) {
-      console.log('⚠️ [notifyClientOrderConfirmed] Cliente sin token:', clientId);
+      console.log(
+        "⚠️ [notifyClientOrderConfirmed] Cliente sin token:",
+        clientId,
+      );
       return;
     }
 
-    console.log('✅ [notifyClientOrderConfirmed] Token de cliente encontrado');
+    console.log("✅ [notifyClientOrderConfirmed] Token de cliente encontrado");
 
     const timeText = estimatedTime
       ? ` Tiempo estimado: ${estimatedTime} minutos.`
@@ -1042,9 +1213,11 @@ export async function notifyClientOrderConfirmed(
       },
     };
 
-    console.log('📤 [notifyClientOrderConfirmed] Enviando notificación');
+    console.log("📤 [notifyClientOrderConfirmed] Enviando notificación");
     await sendExpoPushNotification([token], notificationData);
-    console.log('✅ [notifyClientOrderConfirmed] Notificación enviada exitosamente');
+    console.log(
+      "✅ [notifyClientOrderConfirmed] Notificación enviada exitosamente",
+    );
   } catch (error) {
     console.error(
       "❌ [notifyClientOrderConfirmed] Error al enviar notificación de pedido confirmado:",
@@ -1108,11 +1281,11 @@ export async function notifyNewReservation(
     }
 
     // Formatear la fecha para mostrar de forma más legible
-    const dateObj = new Date(date + 'T00:00:00');
-    const formattedDate = dateObj.toLocaleDateString('es-AR', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short'
+    const dateObj = new Date(date + "T00:00:00");
+    const formattedDate = dateObj.toLocaleDateString("es-AR", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
     });
 
     // Formatear hora (remover segundos si los tiene)
@@ -1135,8 +1308,7 @@ export async function notifyNewReservation(
     };
 
     await sendExpoPushNotification(tokens, notificationData);
-  } catch (error) {
-  }
+  } catch (error) {}
 }
 
 // Función para notificar a dueños y supervisores cuando se crea un pedido de delivery
@@ -1170,7 +1342,10 @@ export async function notifyNewDeliveryOrder(
 
     await sendExpoPushNotification(tokens, notificationData);
   } catch (error) {
-    console.error("❌ [notifyNewDeliveryOrder] Error al enviar notificación de nuevo delivery:", error);
+    console.error(
+      "❌ [notifyNewDeliveryOrder] Error al enviar notificación de nuevo delivery:",
+      error,
+    );
   }
 }
 
@@ -1188,7 +1363,7 @@ export async function notifyDeliveryReadyForDrivers(
       return;
     }
 
-    const distanceText = estimatedDistanceKm 
+    const distanceText = estimatedDistanceKm
       ? ` - ${estimatedDistanceKm.toFixed(1)} km`
       : "";
 
@@ -1207,7 +1382,10 @@ export async function notifyDeliveryReadyForDrivers(
 
     await sendExpoPushNotification(tokens, notificationData);
   } catch (error) {
-    console.error("❌ Error al enviar notificación de delivery listo a repartidores:", error);
+    console.error(
+      "❌ Error al enviar notificación de delivery listo a repartidores:",
+      error,
+    );
   }
 }
 
@@ -1243,7 +1421,10 @@ export async function notifyDriverNewMessage(
 
     await sendExpoPushNotification([token], notificationData);
   } catch (error) {
-    console.error("❌ Error al enviar notificación de mensaje al repartidor:", error);
+    console.error(
+      "❌ Error al enviar notificación de mensaje al repartidor:",
+      error,
+    );
   }
 }
 
@@ -1279,6 +1460,9 @@ export async function notifyClientDriverMessage(
 
     await sendExpoPushNotification([token], notificationData);
   } catch (error) {
-    console.error("❌ Error al enviar notificación de mensaje al cliente:", error);
+    console.error(
+      "❌ Error al enviar notificación de mensaje al cliente:",
+      error,
+    );
   }
 }
