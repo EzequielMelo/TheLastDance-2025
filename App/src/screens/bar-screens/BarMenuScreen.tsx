@@ -4,7 +4,6 @@ import {
   Text,
   FlatList,
   ScrollView,
-  TouchableOpacity,
   Image,
   Alert,
   RefreshControl,
@@ -13,11 +12,9 @@ import {
   NativeSyntheticEvent,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import ChefLoading from "../../components/common/ChefLoading";
 import {
-  ArrowLeft,
-  RefreshCw,
   Coffee,
   Clock,
   Martini,
@@ -204,6 +201,7 @@ export default function BarMenuScreen() {
                 justifyContent: "flex-start",
                 paddingHorizontal: 24,
                 paddingBottom: 20,
+                paddingTop: 20,
               }}
             >
               <View

@@ -130,24 +130,13 @@ export default function KitchenMenuScreen() {
             marginBottom: 16,
           }}
         >
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={{
-              backgroundColor: "rgba(255,255,255,0.1)",
-              borderRadius: 12,
-              padding: 8,
-              marginRight: 16,
-            }}
-          >
-            <ArrowLeft size={24} color="white" />
-          </TouchableOpacity>
-
           <View style={{ flex: 1, alignItems: "center" }}>
             <View
               style={{
                 flexDirection: "row",
                 alignItems: "center",
                 marginBottom: 4,
+                marginTop: 30,
               }}
             >
               <ChefHat size={24} color="#d4af37" />
@@ -162,21 +151,10 @@ export default function KitchenMenuScreen() {
                 Menú de Platos
               </Text>
             </View>
-            <Text style={{ color: "#d1d5db", fontSize: 14 }}>
+            <Text style={{ color: "#d1d5db", fontSize: 14, marginBottom: -10 }}>
               Visualiza todos los platos disponibles
             </Text>
           </View>
-
-          <TouchableOpacity
-            onPress={onRefresh}
-            style={{
-              backgroundColor: "rgba(255,255,255,0.1)",
-              borderRadius: 12,
-              padding: 8,
-            }}
-          >
-            <RefreshCw size={20} color="#d4af37" />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -230,6 +208,7 @@ export default function KitchenMenuScreen() {
                 justifyContent: "flex-start",
                 paddingHorizontal: 24,
                 paddingBottom: 20,
+                paddingTop: 40,
               }}
             >
               <View

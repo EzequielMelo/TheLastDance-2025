@@ -247,9 +247,9 @@ export const LoginScreen = ({ navigation }: Props) => {
 
           <TouchableOpacity
             onPress={() => {
-              setEmail("franco@gmail.com");
+              setEmail("lucas@gmail.com");
               setPassword("123456");
-              login({ email: "franco@gmail.com", password: "123456" });
+              login({ email: "lucas@gmail.com", password: "123456" });
             }}
             className="px-3 py-2 mx-1 rounded-lg bg-cyan-600/20 border border-cyan-500/30 min-w-[120px]"
           >
@@ -297,9 +297,9 @@ export const LoginScreen = ({ navigation }: Props) => {
 
           <TouchableOpacity
             onPress={() => {
-              setEmail("coscu@gmail.com");
+              setEmail("mclovin@gmail.com");
               setPassword("123456");
-              login({ email: "coscu@gmail.com", password: "123456" });
+              login({ email: "mclovin@gmail.com", password: "123456" });
             }}
             className="px-3 py-2 mx-1 rounded-lg bg-green-600/20 border border-green-500/30 min-w-[120px]"
           >
