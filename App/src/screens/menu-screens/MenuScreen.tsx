@@ -12,6 +12,8 @@ import {
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  ToastAndroid,
+  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -125,6 +127,11 @@ export default function MenuScreen() {
   const lastAccelAction = useRef(0);
   const gyroSubscription = useRef<any>(null);
   const accelSubscription = useRef<any>(null);
+
+  // Estados para detectar sacudidas (shake gesture)
+  const shakeCount = useRef(0);
+  const lastShakeTime = useRef(0);
+  const shakeDirection = useRef<"left" | "right" | null>(null);
 
   // Modo de modificación de productos rechazados
   const isModifyMode = route.params?.mode === "modify-rejected";
@@ -265,6 +272,59 @@ export default function MenuScreen() {
 
       const GYRO_THRESHOLD = 1.5; // Umbral para detectar inclinación (más alto = menos sensible)
       const COOLDOWN = 800; // ms entre acciones (más tiempo = menos sensible)
+      const SHAKE_THRESHOLD = 2.5; // Umbral para detectar sacudida fuerte
+      const SHAKE_WINDOW = 2000; // Ventana de tiempo para completar las sacudidas (2 segundos)
+      const REQUIRED_SHAKES = 3; // Número de sacudidas necesarias
+
+      // Detectar sacudidas para volver al inicio
+      if (Math.abs(y) > SHAKE_THRESHOLD) {
+        const currentDirection: "left" | "right" = y > 0 ? "right" : "left";
+
+        // Reiniciar contador si pasó mucho tiempo o si cambió de dirección consecutiva
+        if (
+          now - lastShakeTime.current > SHAKE_WINDOW ||
+          (shakeDirection.current !== null &&
+            shakeDirection.current === currentDirection)
+        ) {
+          shakeCount.current = 1;
+          shakeDirection.current = currentDirection;
+        } else {
+          // Incrementar contador si alterna direcciones
+          if (shakeDirection.current !== currentDirection) {
+            shakeCount.current++;
+            shakeDirection.current = currentDirection;
+          }
+        }
+
+        lastShakeTime.current = now;
+
+        // Si completó las sacudidas requeridas, volver al inicio
+        if (shakeCount.current >= REQUIRED_SHAKES) {
+          shakeCount.current = 0;
+          shakeDirection.current = null;
+
+          // Scroll al primer producto
+          if (filteredItems.length > 0) {
+            flatListRef.current?.scrollToOffset({
+              offset: 0,
+              animated: true,
+            });
+
+            // Mostrar toast
+            if (Platform.OS === "android") {
+              ToastAndroid.show(
+                "📋 Volviste al inicio del menú",
+                ToastAndroid.SHORT,
+              );
+            } else {
+              // Para iOS, usar Alert como alternativa
+              Alert.alert("📋 Volviste al inicio del menú");
+            }
+          }
+
+          return; // Salir para no ejecutar el cambio de imagen
+        }
+      }
 
       if (now - lastGyroAction.current < COOLDOWN) return;
 

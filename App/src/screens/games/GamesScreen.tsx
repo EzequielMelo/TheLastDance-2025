@@ -19,7 +19,7 @@ import { useAuth } from "../../auth/useAuth";
 const simonImg = require("../../../assets/simon.png");
 const mathImg = require("../../../assets/math-quiz.png");
 const puzzleImg = require("../../../assets/sliding-puzzle.png");
-const mozoImg = require("../../../assets/mozo.png");
+const mozoImg = require("../../../assets/mozoenapuros.jpg");
 
 const GAMES = [
   {
