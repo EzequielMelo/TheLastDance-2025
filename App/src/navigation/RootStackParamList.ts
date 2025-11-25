@@ -38,8 +38,9 @@ export type RootStackParamList = {
 
   Games: undefined; // Pantalla de juegos
   Memory: undefined; // Juego de la memoria
-  FastMath: undefined; // Juego de
+  FastMath: undefined; // Juego de matemáticas
   Puzzle: undefined; // Juego de puzzle
+  WaiterMaze: undefined; // Juego del mozo con giroscopio
 
   Survey: { tableId: string; waiterId: string }; // Pantalla de encuesta (después de confirmar pedido)
   SurveyStats: undefined; // Estadísticas históricas de encuestas
@@ -87,6 +88,10 @@ export type RootStackParamList = {
   MyDeliveries: undefined; // Pantalla de entregas activas del repartidor
 
   // Sistema de Pago para Deliveries
+  DeliveryPaymentConfirm: {
+    deliveryId: string;
+    totalAmount: number;
+  }; // Pantalla de confirmación de pago con propina
   DeliveryPaymentQR: {
     deliveryId: string;
     paymentData: {

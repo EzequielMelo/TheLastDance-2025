@@ -257,24 +257,30 @@ export default function MakeReservationScreen({
     }
 
     // Mostrar alert de confirmación con los detalles
-    const tableTypeLabel = tableType === "estandar" ? "Estándar" : tableType === "vip" ? "VIP" : "Accesible";
-    
+    const tableTypeLabel =
+      tableType === "estandar"
+        ? "Estándar"
+        : tableType === "vip"
+          ? "VIP"
+          : "Accesible";
+
     showCustomAlert(
       "Confirmar Reserva",
       `Por favor confirma los detalles de tu reserva:\n\n` +
-      `📅 Fecha: ${formatDateForDisplay(selectedDate)}\n` +
-      `🕐 Hora: ${selectedTime}\n` +
-      `🪑 Tipo de mesa: ${tableTypeLabel}\n` +
-      `👥 Cantidad de personas: ${partySize}\n` +
-      `🏷️ Mesa: ${selectedTable.number}`,
+        `📅 Fecha: ${formatDateForDisplay(selectedDate)}\n` +
+        `🕐 Hora: ${selectedTime}\n` +
+        `🪑 Tipo de mesa: ${tableTypeLabel}\n` +
+        `👥 Cantidad de personas: ${partySize}\n` +
+        `🏷️ Mesa: ${selectedTable.number}`,
       "warning",
-      undefined
+      undefined,
     );
 
     // Cambiar el alert para tener botones personalizados
     setAlertConfig({
       title: "Confirmar Reserva",
-      message: `Por favor confirma los detalles de tu reserva:\n\n` +
+      message:
+        `Por favor confirma los detalles de tu reserva:\n\n` +
         `📅 Fecha: ${formatDateForDisplay(selectedDate)}\n` +
         `🕐 Hora: ${selectedTime}\n` +
         `🪑 Tipo de mesa: ${tableTypeLabel}\n` +
@@ -347,21 +353,28 @@ export default function MakeReservationScreen({
       <ScrollView className="flex-1 px-6">
         <View className="py-6">
           <View className="flex-row items-center mb-2">
-            {currentStep === 2 && (
-              <TouchableOpacity
-                onPress={() => navigation.goBack()}
-                className="mr-3"
-              >
-                <ChevronLeft size={24} color="#d4af37" />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              onPress={() => {
+                if (currentStep === 2) {
+                  // Si estamos en paso 2, volver al paso 1
+                  setCurrentStep(1);
+                  setSelectedTable(null);
+                } else {
+                  // Si estamos en paso 1, volver al home
+                  navigation.goBack();
+                }
+              }}
+              className="mr-3"
+            >
+              <ChevronLeft size={24} color="#d4af37" />
+            </TouchableOpacity>
             <Text className="text-3xl font-semibold text-white">
               Reservá tu mesa
             </Text>
           </View>
           <Text className="text-sm text-gray-400 mb-6">
-            {currentStep === 1 
-              ? "Paso 1 de 2: Selecciona fecha, hora y preferencias" 
+            {currentStep === 1
+              ? "Paso 1 de 2: Selecciona fecha, hora y preferencias"
               : "Paso 2 de 2: Elige tu mesa y confirma"}
           </Text>
 
@@ -370,80 +383,80 @@ export default function MakeReservationScreen({
               {/* PASO 1: Fecha, Hora, Tipo y Capacidad */}
               {/* Fecha de la reserva */}
               <View className="mb-6">
-            <View className="flex-row items-center mb-3">
-              <Text className="text-base font-semibold text-gray-200">
-                Fecha de la reserva
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => setShowDatePicker(!showDatePicker)}
-              className="flex-row items-center p-4 border border-golden/30 rounded-lg bg-neutral-800"
-            >
-              <Calendar size={20} color="#D4AF37" />
-              <Text
-                className="ml-3 text-gray-200 flex-1"
-                numberOfLines={2}
-                style={{ flexShrink: 1 }}
-              >
-                {formatDateForDisplay(selectedDate)}
-              </Text>
-              <ChevronDown size={20} color="#D4AF37" />
-            </TouchableOpacity>
-
-            {/* Date Picker Dropdown */}
-            {showDatePicker && (
-              <View
-                className="mt-2 border border-golden/30 rounded-lg bg-neutral-800"
-                style={{ maxHeight: 200 }}
-              >
-                <ScrollView
-                  style={{ maxHeight: 200 }}
-                  showsVerticalScrollIndicator={true}
-                  nestedScrollEnabled={true}
+                <View className="flex-row items-center mb-3">
+                  <Text className="text-base font-semibold text-gray-200">
+                    Fecha de la reserva
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowDatePicker(!showDatePicker)}
+                  className="flex-row items-center p-4 border border-golden/30 rounded-lg bg-neutral-800"
                 >
-                  {getAvailableDates().map((date, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      onPress={() => {
-                        setSelectedDate(date);
-                        setShowDatePicker(false);
-                        setAvailableTables([]);
-                        setSelectedTable(null);
-                      }}
-                      style={{
-                        padding: 12,
-                        borderBottomWidth:
-                          index < getAvailableDates().length - 1 ? 1 : 0,
-                        borderBottomColor: "rgba(212, 175, 55, 0.2)",
-                        backgroundColor:
-                          formatDateForAPI(date) ===
-                          formatDateForAPI(selectedDate)
-                            ? "rgba(212, 175, 55, 0.2)"
-                            : "transparent",
-                      }}
+                  <Calendar size={20} color="#D4AF37" />
+                  <Text
+                    className="ml-3 text-gray-200 flex-1"
+                    numberOfLines={2}
+                    style={{ flexShrink: 1 }}
+                  >
+                    {formatDateForDisplay(selectedDate)}
+                  </Text>
+                  <ChevronDown size={20} color="#D4AF37" />
+                </TouchableOpacity>
+
+                {/* Date Picker Dropdown */}
+                {showDatePicker && (
+                  <View
+                    className="mt-2 border border-golden/30 rounded-lg bg-neutral-800"
+                    style={{ maxHeight: 200 }}
+                  >
+                    <ScrollView
+                      style={{ maxHeight: 200 }}
+                      showsVerticalScrollIndicator={true}
+                      nestedScrollEnabled={true}
                     >
-                      <Text
-                        style={{
-                          color:
-                            formatDateForAPI(date) ===
-                            formatDateForAPI(selectedDate)
-                              ? "#D4AF37"
-                              : "#E5E7EB",
-                          fontWeight:
-                            formatDateForAPI(date) ===
-                            formatDateForAPI(selectedDate)
-                              ? "600"
-                              : "normal",
-                        }}
-                      >
-                        {formatDateForDisplay(date)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                      {getAvailableDates().map((date, index) => (
+                        <TouchableOpacity
+                          key={index}
+                          onPress={() => {
+                            setSelectedDate(date);
+                            setShowDatePicker(false);
+                            setAvailableTables([]);
+                            setSelectedTable(null);
+                          }}
+                          style={{
+                            padding: 12,
+                            borderBottomWidth:
+                              index < getAvailableDates().length - 1 ? 1 : 0,
+                            borderBottomColor: "rgba(212, 175, 55, 0.2)",
+                            backgroundColor:
+                              formatDateForAPI(date) ===
+                              formatDateForAPI(selectedDate)
+                                ? "rgba(212, 175, 55, 0.2)"
+                                : "transparent",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color:
+                                formatDateForAPI(date) ===
+                                formatDateForAPI(selectedDate)
+                                  ? "#D4AF37"
+                                  : "#E5E7EB",
+                              fontWeight:
+                                formatDateForAPI(date) ===
+                                formatDateForAPI(selectedDate)
+                                  ? "600"
+                                  : "normal",
+                            }}
+                          >
+                            {formatDateForDisplay(date)}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
               </View>
-            )}
-          </View>
 
               {/* Hora de la reserva */}
               <View className="mb-6">
@@ -632,7 +645,9 @@ export default function MakeReservationScreen({
                           }}
                           className="bg-blue-500/20 border border-blue-500/40 rounded-lg px-4 py-2"
                         >
-                          <Text className="text-blue-300 font-medium text-base">{time}</Text>
+                          <Text className="text-blue-300 font-medium text-base">
+                            {time}
+                          </Text>
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -705,10 +720,10 @@ export default function MakeReservationScreen({
                     💡 Información importante:
                   </Text>
                   <Text className="text-base text-gray-300 leading-6">
-                    • Las reservas deben ser aprobadas por el restaurante{"\n"}• Te
-                    notificaremos por email cuando sea confirmada{"\n"}• Horario:
-                    19:00 a 03:00 (última reserva 02:30){"\n"}• Las mesas se bloquean
-                    45 min antes y después de tu horario
+                    • Las reservas deben ser aprobadas por el restaurante{"\n"}•
+                    Te notificaremos por email cuando sea confirmada{"\n"}•
+                    Horario: 19:00 a 03:00 (última reserva 02:30){"\n"}• Las
+                    mesas se bloquean 45 min antes y después de tu horario
                   </Text>
                 </View>
               )}
@@ -723,7 +738,9 @@ export default function MakeReservationScreen({
         title={alertConfig.title || alertTitle}
         message={alertConfig.message || alertMessage}
         type={alertConfig.type || alertType}
-        buttons={alertConfig.buttons.length > 0 ? alertConfig.buttons : undefined}
+        buttons={
+          alertConfig.buttons.length > 0 ? alertConfig.buttons : undefined
+        }
         onClose={() => {
           setShowAlert(false);
           if (alertOnClose) {

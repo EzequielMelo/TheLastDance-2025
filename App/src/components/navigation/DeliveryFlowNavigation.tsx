@@ -11,11 +11,13 @@ import {
   XCircle,
   AlertCircle,
   CheckCircle2,
+  Gamepad2,
 } from "lucide-react-native";
 import { useDeliveryState } from "../../Hooks/useDeliveryState";
 import type { RootStackNavigationProp } from "../../navigation/RootStackParamList";
 import { cancelDelivery } from "../../api/deliveries";
 import CustomAlert from "../common/CustomAlert";
+import { useAuth } from "../../auth/useAuth";
 
 interface DeliveryFlowNavigationProps {
   onRefresh?: () => void;
@@ -27,6 +29,7 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
   const { state, delivery, hasActiveDelivery, refresh, isLoading } =
     useDeliveryState();
   const navigation = useNavigation<RootStackNavigationProp>();
+  const { user } = useAuth();
 
   const [isCancelling, setIsCancelling] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
@@ -269,6 +272,11 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
   const canViewTracking =
     (state === "on_the_way" || state === "arrived") && delivery?.driver;
   const canCancel = state === "pending"; // Solo se puede cancelar antes de ser aceptado
+  const canPlayGames =
+    state !== "pending" &&
+    state !== "delivered" &&
+    state !== "cancelled" &&
+    user?.profile_code === "cliente_registrado"; // Solo clientes registrados pueden jugar
 
   return (
     <View
@@ -585,6 +593,25 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
               <MapPin size={20} color="white" />
               <Text className="text-white font-bold ml-2 text-base">
                 Ver en Mapa
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {canPlayGames && (
+            <TouchableOpacity
+              onPress={() => navigation.navigate("Games")}
+              className="flex-1 rounded-lg py-4 flex-row items-center justify-center border-2"
+              style={{
+                backgroundColor: "rgba(139, 92, 246, 0.15)",
+                borderColor: "#8b5cf6",
+              }}
+            >
+              <Gamepad2 size={20} color="#8b5cf6" />
+              <Text
+                className="font-bold ml-2 text-base"
+                style={{ color: "#8b5cf6" }}
+              >
+                Juegos
               </Text>
             </TouchableOpacity>
           )}

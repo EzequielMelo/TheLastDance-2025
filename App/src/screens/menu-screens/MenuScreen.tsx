@@ -19,6 +19,7 @@ import {
   useRoute,
   useFocusEffect,
 } from "@react-navigation/native";
+import { Gyroscope, Accelerometer } from "expo-sensors";
 import ChefLoading from "../../components/common/ChefLoading";
 import CustomAlert from "../../components/common/CustomAlert";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -111,6 +112,19 @@ export default function MenuScreen() {
   const [currentImageIndex, setCurrentImageIndex] = useState<{
     [key: string]: number;
   }>({});
+
+  // Referencias para FlatList y scroll manual
+  const flatListRef = useRef<FlatList>(null);
+  const imageScrollRefs = useRef<{ [key: string]: FlatList | null }>({});
+  const currentVisibleItemId = useRef<string | null>(null);
+  const currentScrollOffset = useRef(0);
+
+  // Estados para sensores
+  const [sensorsEnabled, setSensorsEnabled] = useState(true);
+  const lastGyroAction = useRef(0);
+  const lastAccelAction = useRef(0);
+  const gyroSubscription = useRef<any>(null);
+  const accelSubscription = useRef<any>(null);
 
   // Modo de modificación de productos rechazados
   const isModifyMode = route.params?.mode === "modify-rejected";
@@ -231,6 +245,121 @@ export default function MenuScreen() {
     setRefreshing(true);
     loadMenuItems();
   };
+
+  // Filtrar items antes de usar en sensores
+  const filteredItems = menuItems.filter(item => {
+    if (selectedCategory === "all") return true;
+    return item.category === selectedCategory;
+  });
+
+  // ============ SENSOR CONTROLS ============
+  // Configurar sensores cuando el componente está activo
+  useEffect(() => {
+    if (!sensorsEnabled) return;
+
+    // Configurar Giroscopio para cambiar imágenes (inclinación izq/der)
+    Gyroscope.setUpdateInterval(150);
+    gyroSubscription.current = Gyroscope.addListener(gyroscopeData => {
+      const { y } = gyroscopeData; // y = inclinación izquierda/derecha
+      const now = Date.now();
+
+      const GYRO_THRESHOLD = 1.5; // Umbral para detectar inclinación (más alto = menos sensible)
+      const COOLDOWN = 800; // ms entre acciones (más tiempo = menos sensible)
+
+      if (now - lastGyroAction.current < COOLDOWN) return;
+
+      // Obtener el item visible actual
+      const currentItemId = currentVisibleItemId.current;
+      if (!currentItemId) return;
+
+      const currentItem = filteredItems.find(i => i.id === currentItemId);
+      if (!currentItem || !currentItem.menu_item_images.length) return;
+
+      const currentIdx = currentImageIndex[currentItemId] || 0;
+      const maxImages = currentItem.menu_item_images.length;
+
+      // Inclinación derecha -> siguiente imagen
+      if (y > GYRO_THRESHOLD && currentIdx < maxImages - 1) {
+        const newIndex = currentIdx + 1;
+        setCurrentImageIndex(prev => ({
+          ...prev,
+          [currentItemId]: newIndex,
+        }));
+        // Scroll automático en el FlatList de imágenes
+        imageScrollRefs.current[currentItemId]?.scrollToIndex({
+          index: newIndex,
+          animated: true,
+        });
+        lastGyroAction.current = now;
+      }
+      // Inclinación izquierda -> imagen anterior
+      else if (y < -GYRO_THRESHOLD && currentIdx > 0) {
+        const newIndex = currentIdx - 1;
+        setCurrentImageIndex(prev => ({
+          ...prev,
+          [currentItemId]: newIndex,
+        }));
+        imageScrollRefs.current[currentItemId]?.scrollToIndex({
+          index: newIndex,
+          animated: true,
+        });
+        lastGyroAction.current = now;
+      }
+    });
+
+    // Configurar Acelerómetro para scroll del menú (movimiento arriba/abajo)
+    Accelerometer.setUpdateInterval(200);
+    accelSubscription.current = Accelerometer.addListener(accelerometerData => {
+      const { y } = accelerometerData; // y = aceleración vertical
+      const now = Date.now();
+
+      const ACCEL_THRESHOLD = 0.7; // Umbral para detectar movimiento (más alto = menos sensible)
+      const COOLDOWN = 600; // ms entre acciones (más tiempo = menos sensible)
+
+      if (now - lastAccelAction.current < COOLDOWN) return;
+
+      // Movimiento hacia arriba (teléfono empujado arriba) -> scroll hacia arriba en lista
+      if (y > ACCEL_THRESHOLD) {
+        const newOffset = Math.max(
+          currentScrollOffset.current - ITEM_VISIBLE_HEIGHT,
+          0,
+        );
+        flatListRef.current?.scrollToOffset({
+          offset: newOffset,
+          animated: true,
+        });
+        lastAccelAction.current = now;
+      }
+      // Movimiento hacia abajo (teléfono jalado abajo) -> scroll hacia abajo en lista
+      else if (y < -ACCEL_THRESHOLD) {
+        const maxOffset = ITEM_VISIBLE_HEIGHT * (filteredItems.length - 1);
+        const newOffset = Math.min(
+          currentScrollOffset.current + ITEM_VISIBLE_HEIGHT,
+          maxOffset,
+        );
+        flatListRef.current?.scrollToOffset({
+          offset: newOffset,
+          animated: true,
+        });
+        lastAccelAction.current = now;
+      }
+    });
+
+    return () => {
+      gyroSubscription.current?.remove();
+      accelSubscription.current?.remove();
+    };
+  }, [sensorsEnabled, filteredItems, currentImageIndex]);
+
+  // Cleanup de sensores cuando el componente se desmonta
+  useEffect(() => {
+    return () => {
+      gyroSubscription.current?.remove();
+      accelSubscription.current?.remove();
+    };
+  }, []);
+
+  // ============ END SENSOR CONTROLS ============
 
   const handleAddToCart = (item: MenuItem) => {
     // No permitir agregar items rechazados
@@ -510,13 +639,6 @@ export default function MenuScreen() {
     return category === "plato" ? "#ef4444" : "#3b82f6";
   };
 
-  const filteredItems = menuItems.filter(item => {
-    if (selectedCategory === "all") return true;
-    return item.category === selectedCategory;
-  });
-
-  const flatListRef = useRef<FlatList>(null);
-
   // Efecto para actualizar el tab activo cuando se enfoque la pantalla
   useFocusEffect(
     React.useCallback(() => {
@@ -551,14 +673,14 @@ export default function MenuScreen() {
           style={{
             paddingTop: 48,
             paddingHorizontal: 24,
-            paddingBottom: 26,
+            paddingBottom: 14,
           }}
         >
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
-              marginBottom: 16,
+              marginBottom: 14,
             }}
           >
             <View style={{ flex: 1, alignItems: "center" }}>
@@ -589,9 +711,15 @@ export default function MenuScreen() {
             </View>
           </View>
 
-          {/* Category Filter */}
-          <View
-            style={{ flexDirection: "row", justifyContent: "center", gap: 8 }}
+          {/* Category Filter + Sensor Toggle - Scrollable */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingHorizontal: 24,
+              gap: 8,
+            }}
+            style={{ marginBottom: 0 }}
           >
             {[
               { key: "all", label: "Todo", icon: Filter },
@@ -614,6 +742,7 @@ export default function MenuScreen() {
                     paddingHorizontal: 16,
                     paddingVertical: 8,
                     borderRadius: 20,
+                    marginRight: 8,
                   }}
                 >
                   <IconComponent
@@ -632,7 +761,39 @@ export default function MenuScreen() {
                 </TouchableOpacity>
               );
             })}
-          </View>
+
+            {/* Sensor Toggle Button integrado */}
+            <TouchableOpacity
+              onPress={() => setSensorsEnabled(!sensorsEnabled)}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: sensorsEnabled
+                  ? "#d4af37"
+                  : "rgba(255,255,255,0.1)",
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                borderRadius: 20,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 16,
+                  marginRight: 4,
+                }}
+              >
+                🎮
+              </Text>
+              <Text
+                style={{
+                  color: sensorsEnabled ? "#1a1a1a" : "#d1d5db",
+                  fontWeight: "500",
+                }}
+              >
+                Sensores
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
 
         {/* Menu Items */}
@@ -655,6 +816,20 @@ export default function MenuScreen() {
             offset: ITEM_VISIBLE_HEIGHT * index,
             index,
           })}
+          // Rastrear item visible para sensores
+          onViewableItemsChanged={({ viewableItems }) => {
+            if (viewableItems.length > 0 && viewableItems[0].item) {
+              currentVisibleItemId.current = viewableItems[0].item.id;
+            }
+          }}
+          viewabilityConfig={{
+            itemVisiblePercentThreshold: 50,
+          }}
+          // Rastrear scroll offset para acelerómetro
+          onScroll={event => {
+            currentScrollOffset.current = event.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -751,6 +926,11 @@ export default function MenuScreen() {
                         }}
                       >
                         <FlatList
+                          ref={ref => {
+                            if (ref) {
+                              imageScrollRefs.current[item.id] = ref;
+                            }
+                          }}
                           data={item.menu_item_images.sort(
                             (a: MenuItemImage, b: MenuItemImage) =>
                               a.position - b.position,
@@ -763,6 +943,10 @@ export default function MenuScreen() {
                           showsHorizontalScrollIndicator={false}
                           onScroll={handleImageScroll}
                           scrollEventThrottle={16}
+                          onScrollToIndexFailed={info => {
+                            // Manejar error de scroll silenciosamente
+                            console.log("Scroll to index failed:", info.index);
+                          }}
                           renderItem={({ item: imgItem }) => (
                             <Image
                               source={{ uri: imgItem.image_url }}

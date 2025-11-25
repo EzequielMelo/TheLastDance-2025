@@ -42,6 +42,7 @@ import BarMenuScreen from "../screens/bar-screens/BarMenuScreen";
 import MemoryGame from "../screens/games/MemoryGame";
 import FastMathGame from "../screens/games/FastMathGame";
 import PuzzleGame from "../screens/games/PuzzleGame";
+import WaiterMazeGame from "../screens/games/WaiterMazeGame";
 import MakeReservationScreen from "../screens/reservation-screens/MakeReservationScreen";
 import ManageReservationsScreen from "../screens/reservation-screens/ManageReservationsScreen";
 import MyReservationsScreen from "../screens/MyReservationsScreen";
@@ -53,6 +54,7 @@ import DeliverySurveyScreen from "../screens/delivery-screens/DeliverySurveyScre
 import DriverDeliveriesScreen from "../screens/delivery-screens/DriverDeliveriesScreen";
 import MyDeliveriesScreen from "../screens/delivery-screens/MyDeliveriesScreen";
 import DeliveryOrdersManagementScreen from "../screens/admin-screens/DeliveryOrdersManagementScreen";
+import DeliveryPaymentConfirmScreen from "../screens/delivery-screens/DeliveryPaymentConfirmScreen";
 import DeliveryQRScreen from "../screens/delivery-screens/DeliveryQRScreen";
 import DeliveryCashConfirmScreen from "../screens/delivery-screens/DeliveryCashConfirmScreen";
 import PaymentQRScanner from "../screens/delivery-screens/PaymentQRScanner";
@@ -168,6 +170,11 @@ function NavigatorContent() {
             <Stack.Screen
               name="Puzzle"
               component={PuzzleGame}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="WaiterMaze"
+              component={WaiterMazeGame}
               options={{ headerShown: false }}
             />
             <Stack.Screen
@@ -299,6 +306,11 @@ function NavigatorContent() {
             <Stack.Screen
               name="DeliveryOrdersManagement"
               component={DeliveryOrdersManagementScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="DeliveryPaymentConfirm"
+              component={DeliveryPaymentConfirmScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen

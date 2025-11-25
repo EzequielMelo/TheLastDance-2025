@@ -1002,9 +1002,14 @@ export async function confirmPayment(
       return;
     }
 
-    // Validar que el delivery está en camino
-    if (deliveryData.status !== "on_the_way") {
-      console.error(`❌ Delivery no está en camino: ${deliveryData.status}`);
+    // Validar que el delivery está en camino o llegó
+    if (
+      deliveryData.status !== "on_the_way" &&
+      deliveryData.status !== "arrived"
+    ) {
+      console.error(
+        `❌ Delivery no está listo para pago: ${deliveryData.status}`,
+      );
       res.status(400).json({
         success: false,
         error: `El delivery no está listo para pago. Estado actual: ${deliveryData.status}`,
@@ -1117,7 +1122,7 @@ export async function confirmPayment(
     );
 
     const io = getIOInstance();
-    
+
     // 🔔 Si es pago QR, emitir evento al REPARTIDOR para que confirme
     if (isQRPayment) {
       if (io && delivery.driver_id) {

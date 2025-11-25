@@ -111,10 +111,38 @@ export const setupSocketIO = (httpServer: HttpServer) => {
   io.on("connection", socket => {
     const user = socket.data.user as SocketUser;
 
+    console.log(
+      `🟢 NUEVA CONEXIÓN Socket.IO - Usuario: ${user.first_name} ${user.last_name} (${user.appUserId}), Profile: ${user.profile_code}, SocketId: ${socket.id}`,
+    );
+
     // Usuario se une a su sala personal para recibir notificaciones
     socket.on("join_user_room", (userId: string) => {
       const userRoom = `user_${userId}`;
       socket.join(userRoom);
+      console.log(
+        `👤 Usuario ${user.appUserId} unido a sala personal ${userRoom}`,
+      );
+    });
+
+    // Cliente se une a la sala de su mesa para recibir actualizaciones en tiempo real
+    socket.on("join_table_room", (tableId: string) => {
+      const tableRoom = `table_${tableId}`;
+
+      console.log(
+        `📥 SOLICITUD join_table_room recibida - TableId: ${tableId}, Room: ${tableRoom}`,
+      );
+
+      socket.join(tableRoom);
+
+      const roomClients = io.sockets.adapter.rooms.get(tableRoom);
+      const clientCount = roomClients?.size || 0;
+
+      console.log(
+        `✅ Usuario ${user.first_name} ${user.last_name} (${user.appUserId}) se unió a la sala ${tableRoom}`,
+      );
+      console.log(`   - Clientes totales en sala ${tableRoom}: ${clientCount}`);
+
+      socket.emit("joined_table_room", { tableId, tableRoom });
     });
 
     // Cliente o mesero se une al chat de una mesa
@@ -239,9 +267,7 @@ export const setupSocketIO = (httpServer: HttpServer) => {
             if (!tableError && tableData) {
               // Verificar quién está en la sala del chat
               const roomClients = io.sockets.adapter.rooms.get(roomName);
-              const socketsInRoom = roomClients
-                ? Array.from(roomClients)
-                : [];
+              const socketsInRoom = roomClients ? Array.from(roomClients) : [];
 
               // Obtener los IDs de usuarios conectados en la sala
               const connectedUserIds = new Set<string>();

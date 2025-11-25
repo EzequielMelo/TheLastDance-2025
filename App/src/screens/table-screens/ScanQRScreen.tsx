@@ -33,7 +33,11 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 export default function ScanQRScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<NavigationProp>();
-  const { hasActiveDelivery, delivery: activeDelivery, state: deliveryState } = useDeliveryState();
+  const {
+    hasActiveDelivery,
+    delivery: activeDelivery,
+    state: deliveryState,
+  } = useDeliveryState();
 
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
@@ -123,42 +127,15 @@ export default function ScanQRScreen() {
           // Verificar si el cliente tiene un delivery activo con pago pendiente
           if (
             hasActiveDelivery &&
-            deliveryState === "on_the_way" &&
+            (deliveryState === "on_the_way" || deliveryState === "arrived") &&
             activeDelivery?.payment_method === "qr" &&
             activeDelivery?.payment_status === "pending"
           ) {
-            // Confirmar el pago
-            try {
-              ToastAndroid.show("Procesando pago...", ToastAndroid.SHORT);
-
-              await confirmDeliveryPayment(parsedData.deliveryId, {
-                payment_method: "qr",
-                tip_amount: parsedData.tipAmount || 0,
-                tip_percentage: parsedData.tipPercentage || 0,
-                satisfaction_level: parsedData.satisfactionLevel || 5,
-              });
-
-              showCustomAlert(
-                "¡Pago Confirmado!",
-                `Has confirmado el pago del delivery.\nGracias por tu compra.`,
-                "success",
-              );
-
-              // Volver al home después de un delay
-              setTimeout(() => {
-                navigation.navigate("Home");
-              }, 2000);
-            } catch (error: any) {
-              console.error("Error al confirmar pago:", error);
-              showCustomAlert(
-                "Error",
-                error.response?.data?.error ||
-                  error.message ||
-                  "No se pudo confirmar el pago",
-                "error",
-              );
-              setScanned(false);
-            }
+            // Navegar a pantalla de confirmación con propina
+            navigation.navigate("DeliveryPaymentConfirm", {
+              deliveryId: parsedData.deliveryId,
+              totalAmount: activeDelivery?.delivery_order?.total_amount || 0,
+            });
           } else {
             showCustomAlert(
               "QR Incorrecto",

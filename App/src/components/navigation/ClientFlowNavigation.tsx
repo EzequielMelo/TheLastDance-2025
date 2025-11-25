@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, Text, TouchableOpacity, Alert } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import {
@@ -27,6 +27,8 @@ import {
 import { PDFService } from "../../services/pdfService";
 import { useAuth } from "../../auth/useAuth";
 import type { RootStackNavigationProp } from "../../navigation/RootStackParamList";
+import { io, Socket } from "socket.io-client";
+import { SERVER_BASE_URL } from "../../api/config";
 
 interface ClientFlowNavigationProps {
   onRefresh?: () => void;
@@ -50,7 +52,8 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
   useClientStateSocket(refresh);
 
   const navigation = useNavigation<RootStackNavigationProp>();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+  const socketRef = useRef<Socket | null>(null);
   const [deliveryStatus, setDeliveryStatus] = useState<{
     allDelivered: boolean;
     totalItems: number;
@@ -148,6 +151,110 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
       }, 500);
     }
   }, [refreshTrigger]); // SOLO refreshTrigger como dependencia
+
+  // Socket.IO para escuchar actualizaciones de items entregados en tiempo real
+  useEffect(() => {
+    if (!user || !token || !occupiedTable?.id || state !== "seated") {
+      console.log("⏸️ Socket.IO no iniciado - Condiciones no cumplidas:", {
+        hasUser: !!user,
+        hasToken: !!token,
+        hasTable: !!occupiedTable?.id,
+        state,
+      });
+      return;
+    }
+
+    console.log("🚀 Iniciando Socket.IO para items entregados...", {
+      userId: user.id,
+      tableId: occupiedTable.id,
+      profileCode: user.profile_code,
+      tokenLength: token.length,
+    });
+
+    // Usar el token de sesión real (JWT de Supabase)
+    const authToken = token;
+
+    console.log("🔑 Token JWT presente - longitud:", token.length);
+
+    // Crear conexión Socket.IO
+    const socket = io(SERVER_BASE_URL, {
+      auth: { token: authToken },
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      console.log(
+        `🔌 Socket.IO CONECTADO - SocketId: ${socket.id}, Mesa: ${occupiedTable.id}`,
+      );
+      socket.emit("join_table_room", occupiedTable.id);
+    });
+
+    socket.on(
+      "joined_table_room",
+      (data: { tableId: string; tableRoom: string }) => {
+        console.log(
+          `✅ CONFIRMACIÓN: Unido exitosamente a sala ${data.tableRoom}`,
+        );
+      },
+    );
+
+    // Escuchar actualizaciones de items marcados como entregados
+    socket.on("order_items_delivered", (data: { tableId: string }) => {
+      console.log(
+        `📦 EVENTO RECIBIDO - Items entregados en mesa ${data.tableId}`,
+      );
+      if (data.tableId === occupiedTable.id) {
+        console.log(
+          "✅ TableId coincide - Recargando TODO el estado del cliente...",
+        );
+
+        // Recargar TODO el estado del cliente (más robusto que solo actualizar números)
+        refresh()
+          .then(() => {
+            console.log("✅ Estado del cliente recargado completamente");
+            // También actualizar el delivery status específicamente
+            return checkTableDeliveryStatus(occupiedTable.id);
+          })
+          .then(newStatus => {
+            console.log("📊 Nuevo delivery status:", newStatus);
+            setDeliveryStatus(newStatus);
+          })
+          .catch(error => {
+            console.error("❌ Error recargando estado:", error);
+          });
+      } else {
+        console.log(
+          `⚠️ TableId no coincide: recibido ${data.tableId}, esperado ${occupiedTable.id}`,
+        );
+      }
+    });
+
+    socket.on("disconnect", reason => {
+      console.log("🔌 Socket.IO DESCONECTADO:", reason);
+    });
+
+    socket.on("connect_error", error => {
+      console.error("❌ ERROR de conexión Socket.IO:", error.message);
+    });
+
+    socket.on("error", (error: { message: string }) => {
+      console.error("❌ ERROR Socket.IO del servidor:", error.message);
+    });
+
+    return () => {
+      console.log("🧹 Limpiando Socket.IO...");
+      socket.off("order_items_delivered");
+      socket.off("joined_table_room");
+      socket.off("connect_error");
+      socket.off("error");
+      socket.disconnect();
+    };
+  }, [user?.id, token, occupiedTable?.id, state]);
 
   const renderStateContent = () => {
     // Verificar si es usuario anónimo con pedido listo para facturar, independientemente del estado

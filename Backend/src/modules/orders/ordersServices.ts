@@ -3282,6 +3282,38 @@ export async function markItemAsDelivered(
     }
 
     console.log(`✅ Item ${itemId} marcado como entregado`);
+
+    // Emitir evento Socket.IO a la mesa para notificar actualización de items entregados
+    try {
+      const { getIOInstance } = await import("../../socket/chatSocket");
+      const io = getIOInstance();
+
+      if (io) {
+        const tableId = (item.orders as any).table_id;
+        const tableRoom = `table_${tableId}`;
+
+        console.log(`📡 Intentando emitir evento Socket.IO...`);
+        console.log(`   - TableId: ${tableId}`);
+        console.log(`   - Room: ${tableRoom}`);
+        console.log(`   - ItemId: ${itemId}`);
+
+        io.to(tableRoom).emit("order_items_delivered", { tableId });
+
+        // Verificar cuántos clientes hay en la sala
+        const room = io.sockets.adapter.rooms.get(tableRoom);
+        const clientCount = room?.size || 0;
+        console.log(`   - Clientes en sala ${tableRoom}: ${clientCount}`);
+
+        console.log(
+          `✅ Evento Socket.IO emitido a room ${tableRoom}: item ${itemId} entregado`,
+        );
+      } else {
+        console.error("⚠️ Socket.IO instance no disponible");
+      }
+    } catch (socketError) {
+      console.error("❌ Error emitiendo evento Socket.IO:", socketError);
+      // No lanzar error, el item ya se actualizó correctamente
+    }
   } catch (error) {
     console.error("❌ Error en markItemAsDelivered:", error);
     throw error;

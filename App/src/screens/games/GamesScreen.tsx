@@ -19,6 +19,7 @@ import { useAuth } from "../../auth/useAuth";
 const simonImg = require("../../../assets/simon.png");
 const mathImg = require("../../../assets/math-quiz.png");
 const puzzleImg = require("../../../assets/sliding-puzzle.png");
+const mozoImg = require("../../../assets/mozo.png");
 
 const GAMES = [
   {
@@ -41,6 +42,13 @@ const GAMES = [
     subtitle: "Ordená las piezas del 1 al 8",
     discount: 20,
     image: puzzleImg,
+  },
+  {
+    key: "WaiterMaze",
+    title: "Mozo en Apuros",
+    subtitle: "Esquivá obstáculos y llegá a la mesa usando el giroscopio!",
+    discount: 20,
+    image: mozoImg,
   },
 ];
 
@@ -90,8 +98,8 @@ export default function GamesScreen() {
           {discount
             ? `Descuento aplicado: ${discount}%`
             : user?.profile_code === "cliente_anonimo"
-            ? "Juega y divertite - Los descuentos están disponibles solo para usuarios registrados"
-            : "Ganá un descuento si ganás en tu primera victoria"}
+              ? "Juega y divertite - Los descuentos están disponibles solo para usuarios registrados"
+              : "Ganá un descuento si ganás en tu primera victoria"}
         </Text>
       </View>
 
@@ -102,7 +110,7 @@ export default function GamesScreen() {
         <Text style={styles.title}>Nuestros juegos disponibles</Text>
 
         <Text style={styles.info}>
-          {user?.profile_code === "cliente_anonimo" 
+          {user?.profile_code === "cliente_anonimo"
             ? "Seleccioná un juego y divertite. Los descuentos están disponibles solo para usuarios registrados."
             : "Seleccioná un juego. La primera victoria que consigas en cualquiera de los juegos desbloquea un descuento para la cuenta!"}
         </Text>
