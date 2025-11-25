@@ -261,19 +261,23 @@ export default function Sidebar({
               },
             );
           }
-          // Opciones de Delivery siempre disponibles
-          clientActions.push(
-            {
+          // Opciones de Delivery
+          // Solo mostrar "Pedir Delivery" si NO hay un delivery activo
+          if (!hasActiveDelivery) {
+            clientActions.push({
               id: "delivery-order",
               title: "Pedir Delivery",
               subtitle: "Realizá tu pedido a domicilio",
               icon: <Truck size={20} color="#111828" />,
               onPress: () => {
                 setIsDeliveryOrder(true); // Activar modo delivery
-                onNavigate("Menu"); // Navegar al menú para seleccionar productos
+                onNavigate("DeliveryLocation"); // Primero seleccionar dirección, luego el menú
               },
               roles: ["cliente_registrado"],
-            },
+            });
+          }
+          // Historial y encuestas siempre disponibles
+          clientActions.push(
             {
               id: "delivery-history",
               title: "Historial de Deliveries",

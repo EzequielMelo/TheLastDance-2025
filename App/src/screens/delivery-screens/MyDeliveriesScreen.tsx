@@ -211,46 +211,46 @@ export default function MyDeliveriesScreen() {
                 key={delivery.id}
                 style={{
                   backgroundColor: "rgba(255, 255, 255, 0.05)",
-                  borderRadius: 12,
-                  padding: 16,
-                  borderWidth: 1,
+                  borderRadius: 16,
+                  padding: 20,
+                  borderWidth: 1.5,
                   borderColor: "#8b5cf6",
                 }}
               >
                 {/* Badge de estado y tiempo */}
-                <View className="flex-row items-center justify-between mb-3">
+                <View className="flex-row items-center justify-between mb-4">
                   <View
                     style={{
                       backgroundColor: "#8b5cf6",
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      borderRadius: 6,
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 8,
                       flexDirection: "row",
                       alignItems: "center",
                     }}
                   >
-                    <Navigation size={14} color="#ffffff" />
-                    <Text className="text-white text-xs font-semibold ml-2">
+                    <Navigation size={16} color="#ffffff" />
+                    <Text className="text-white text-sm font-semibold ml-2">
                       EN CAMINO
                     </Text>
                   </View>
-                  <Text className="text-gray-400 text-xs">
+                  <Text className="text-gray-400 text-sm">
                     {formatTimeAgo(delivery.on_the_way_at)}
                   </Text>
                 </View>
 
                 {/* Info del cliente */}
-                <View className="flex-row items-center justify-between mb-3 pb-3 border-b border-gray-700">
+                <View className="flex-row items-center justify-between mb-4 pb-4 border-b border-gray-700">
                   <View className="flex-row items-center flex-1">
-                    <User size={18} color="#d4af37" />
-                    <Text className="text-white text-base font-semibold ml-2">
+                    <User size={22} color="#d4af37" />
+                    <Text className="text-white text-lg font-semibold ml-3">
                       {delivery.user?.first_name} {delivery.user?.last_name}
                     </Text>
                   </View>
                   {delivery.user?.phone && (
                     <View className="flex-row items-center">
-                      <Phone size={14} color="#22c55e" />
-                      <Text className="text-gray-400 text-xs ml-1">
+                      <Phone size={16} color="#22c55e" />
+                      <Text className="text-gray-400 text-sm ml-1">
                         {delivery.user.phone}
                       </Text>
                     </View>
@@ -258,17 +258,17 @@ export default function MyDeliveriesScreen() {
                 </View>
 
                 {/* Dirección */}
-                <View className="flex-row items-start mb-3">
-                  <MapPin size={18} color="#d4af37" className="mt-1" />
-                  <View className="flex-1 ml-2">
-                    <Text className="text-gray-400 text-xs mb-1">
+                <View className="flex-row items-start mb-4">
+                  <MapPin size={22} color="#d4af37" className="mt-1" />
+                  <View className="flex-1 ml-3">
+                    <Text className="text-gray-400 text-sm mb-2">
                       Dirección de entrega
                     </Text>
-                    <Text className="text-white text-sm">
+                    <Text className="text-white text-base leading-6">
                       {delivery.delivery_address}
                     </Text>
                     {delivery.delivery_notes && (
-                      <Text className="text-gray-500 text-xs mt-1 italic">
+                      <Text className="text-gray-400 text-sm mt-2 italic">
                         Nota: {delivery.delivery_notes}
                       </Text>
                     )}
@@ -276,17 +276,17 @@ export default function MyDeliveriesScreen() {
                 </View>
 
                 {/* Items y monto */}
-                <View className="flex-row justify-between mb-4 pb-3 border-b border-gray-700">
+                <View className="flex-row justify-between mb-5 pb-4 border-b border-gray-700">
                   <View className="flex-row items-center">
-                    <Package size={16} color="#d4af37" />
-                    <Text className="text-gray-400 text-sm ml-2">
+                    <Package size={20} color="#d4af37" />
+                    <Text className="text-gray-400 text-base ml-2">
                       {getTotalItems(delivery)} items ({getItemsCount(delivery)}{" "}
                       productos)
                     </Text>
                   </View>
                   <View className="flex-row items-center">
-                    <DollarSign size={16} color="#22c55e" />
-                    <Text className="text-white text-base font-bold ml-1">
+                    <DollarSign size={20} color="#22c55e" />
+                    <Text className="text-white text-lg font-bold ml-1">
                       {formatCurrency(
                         delivery.delivery_order?.total_amount || 0,
                       )}
@@ -305,16 +305,16 @@ export default function MyDeliveriesScreen() {
                     }
                     style={{
                       backgroundColor: "#ef4444",
-                      paddingVertical: 12,
-                      paddingHorizontal: 16,
-                      borderRadius: 8,
+                      paddingVertical: 14,
+                      paddingHorizontal: 18,
+                      borderRadius: 10,
                       flexDirection: "row",
                       alignItems: "center",
                       justifyContent: "center",
                     }}
                   >
-                    <MessageCircle size={18} color="#ffffff" />
-                    <Text className="text-white text-sm font-bold ml-2">
+                    <MessageCircle size={20} color="#ffffff" />
+                    <Text className="text-white text-base font-bold ml-2">
                       Chat
                     </Text>
                   </TouchableOpacity>
@@ -325,15 +325,15 @@ export default function MyDeliveriesScreen() {
                     style={{
                       flex: 1,
                       backgroundColor: "#8b5cf6",
-                      paddingVertical: 12,
-                      borderRadius: 8,
+                      paddingVertical: 14,
+                      borderRadius: 10,
                       flexDirection: "row",
                       alignItems: "center",
                       justifyContent: "center",
                     }}
                   >
-                    <Navigation size={18} color="#ffffff" />
-                    <Text className="text-white text-sm font-bold ml-2">
+                    <Navigation size={20} color="#ffffff" />
+                    <Text className="text-white text-base font-bold ml-2">
                       Ver en Mapa
                     </Text>
                   </TouchableOpacity>

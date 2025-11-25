@@ -10,6 +10,7 @@ import {
   RefreshCcw,
   XCircle,
   AlertCircle,
+  CheckCircle2,
 } from "lucide-react-native";
 import { useDeliveryState } from "../../Hooks/useDeliveryState";
 import type { RootStackNavigationProp } from "../../navigation/RootStackParamList";
@@ -181,6 +182,8 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
         return <CheckCircle size={48} color="#22c55e" />;
       case "on_the_way":
         return <Truck size={48} color="#8b5cf6" />;
+      case "arrived":
+        return <CheckCircle2 size={48} color="#10b981" />;
       case "delivered":
         return <CheckCircle size={48} color="#22c55e" />;
       case "cancelled":
@@ -202,6 +205,8 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
         return "¡Tu Pedido está Listo!";
       case "on_the_way":
         return "En Camino";
+      case "arrived":
+        return "¡El Repartidor Llegó!";
       case "delivered":
         return "Pedido Entregado";
       case "cancelled":
@@ -225,6 +230,10 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
         return delivery?.driver
           ? `${delivery.driver.first_name} está en camino con tu pedido`
           : "Tu pedido está en camino";
+      case "arrived":
+        return delivery?.driver
+          ? `${delivery.driver.first_name} llegó a tu dirección. Prepárate para recibir tu pedido`
+          : "El repartidor llegó a tu dirección";
       case "delivered":
         return "Tu pedido ha sido entregado. ¡Buen provecho!";
       case "cancelled":
@@ -246,6 +255,8 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
         return 66; // 4/6 checkpoints
       case "on_the_way":
         return 83; // 5/6 checkpoints
+      case "arrived":
+        return 92; // 5.5/6 checkpoints
       case "delivered":
         return 100; // 6/6 checkpoints
       case "cancelled":
@@ -255,7 +266,8 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
     }
   };
 
-  const canViewTracking = state === "on_the_way" && delivery?.driver;
+  const canViewTracking =
+    (state === "on_the_way" || state === "arrived") && delivery?.driver;
   const canCancel = state === "pending"; // Solo se puede cancelar antes de ser aceptado
 
   return (
@@ -270,25 +282,29 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
             className="rounded-2xl p-6 border-2"
             style={{
               backgroundColor:
-                state === "on_the_way"
-                  ? "rgba(139, 92, 246, 0.15)"
-                  : state === "ready"
-                    ? "rgba(34, 197, 94, 0.15)"
-                    : state === "preparing"
-                      ? "rgba(59, 130, 246, 0.15)"
-                      : state === "confirmed"
-                        ? "rgba(16, 185, 129, 0.15)"
-                        : "rgba(245, 158, 11, 0.15)",
+                state === "arrived"
+                  ? "rgba(16, 185, 129, 0.15)"
+                  : state === "on_the_way"
+                    ? "rgba(139, 92, 246, 0.15)"
+                    : state === "ready"
+                      ? "rgba(34, 197, 94, 0.15)"
+                      : state === "preparing"
+                        ? "rgba(59, 130, 246, 0.15)"
+                        : state === "confirmed"
+                          ? "rgba(16, 185, 129, 0.15)"
+                          : "rgba(245, 158, 11, 0.15)",
               borderColor:
-                state === "on_the_way"
-                  ? "#8b5cf6"
-                  : state === "ready"
-                    ? "#22c55e"
-                    : state === "preparing"
-                      ? "#3b82f6"
-                      : state === "confirmed"
-                        ? "#10b981"
-                        : "#f59e0b",
+                state === "arrived"
+                  ? "#10b981"
+                  : state === "on_the_way"
+                    ? "#8b5cf6"
+                    : state === "ready"
+                      ? "#22c55e"
+                      : state === "preparing"
+                        ? "#3b82f6"
+                        : state === "confirmed"
+                          ? "#10b981"
+                          : "#f59e0b",
             }}
           >
             {/* Timeline horizontal con checkpoint */}
@@ -312,15 +328,17 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
                 style={{
                   width: `${getProgressPercentage() * 0.8}%`,
                   backgroundColor:
-                    state === "on_the_way"
-                      ? "#8b5cf6"
-                      : state === "ready"
-                        ? "#22c55e"
-                        : state === "preparing"
-                          ? "#3b82f6"
-                          : state === "confirmed"
-                            ? "#10b981"
-                            : "#f59e0b",
+                    state === "arrived"
+                      ? "#10b981"
+                      : state === "on_the_way"
+                        ? "#8b5cf6"
+                        : state === "ready"
+                          ? "#22c55e"
+                          : state === "preparing"
+                            ? "#3b82f6"
+                            : state === "confirmed"
+                              ? "#10b981"
+                              : "#f59e0b",
                   top: 28,
                   left: "10%",
                 }}
@@ -337,26 +355,30 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
                     width: 56,
                     height: 56,
                     backgroundColor:
-                      state === "on_the_way"
-                        ? "#8b5cf6"
-                        : state === "ready"
-                          ? "#22c55e"
-                          : state === "preparing"
-                            ? "#3b82f6"
-                            : state === "confirmed"
-                              ? "#10b981"
-                              : "#f59e0b",
+                      state === "arrived"
+                        ? "#10b981"
+                        : state === "on_the_way"
+                          ? "#8b5cf6"
+                          : state === "ready"
+                            ? "#22c55e"
+                            : state === "preparing"
+                              ? "#3b82f6"
+                              : state === "confirmed"
+                                ? "#10b981"
+                                : "#f59e0b",
                     borderWidth: 4,
                     borderColor:
-                      state === "on_the_way"
-                        ? "#a78bfa"
-                        : state === "ready"
-                          ? "#4ade80"
-                          : state === "preparing"
-                            ? "#60a5fa"
-                            : state === "confirmed"
-                              ? "#22c55e"
-                              : "#fbbf24",
+                      state === "arrived"
+                        ? "#34d399"
+                        : state === "on_the_way"
+                          ? "#a78bfa"
+                          : state === "ready"
+                            ? "#4ade80"
+                            : state === "preparing"
+                              ? "#60a5fa"
+                              : state === "confirmed"
+                                ? "#22c55e"
+                                : "#fbbf24",
                   }}
                 >
                   {state === "pending" && <Clock size={28} color="#ffffff" />}
@@ -372,21 +394,26 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
                   {state === "on_the_way" && (
                     <Truck size={28} color="#ffffff" />
                   )}
+                  {state === "arrived" && (
+                    <CheckCircle2 size={28} color="#ffffff" />
+                  )}
                 </View>
                 <Text
                   className="mt-3 text-center font-bold"
                   style={{
                     fontSize: 15,
                     color:
-                      state === "on_the_way"
-                        ? "#8b5cf6"
-                        : state === "ready"
-                          ? "#22c55e"
-                          : state === "preparing"
-                            ? "#3b82f6"
-                            : state === "confirmed"
-                              ? "#10b981"
-                              : "#f59e0b",
+                      state === "arrived"
+                        ? "#10b981"
+                        : state === "on_the_way"
+                          ? "#8b5cf6"
+                          : state === "ready"
+                            ? "#22c55e"
+                            : state === "preparing"
+                              ? "#3b82f6"
+                              : state === "confirmed"
+                                ? "#10b981"
+                                : "#f59e0b",
                   }}
                 >
                   {state === "pending" && "Recibido"}
@@ -394,6 +421,7 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
                   {state === "preparing" && "Preparando"}
                   {state === "ready" && "Listo"}
                   {state === "on_the_way" && "En Camino"}
+                  {state === "arrived" && "En el Lugar"}
                 </Text>
               </View>
 
@@ -424,7 +452,8 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
                     />
                     {(state === "preparing" ||
                       state === "ready" ||
-                      state === "on_the_way") && (
+                      state === "on_the_way" ||
+                      state === "arrived") && (
                       <View
                         className="rounded-full"
                         style={{
@@ -444,7 +473,7 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
                 className="absolute flex-row items-center"
                 style={{ right: -40, top: 18 }}
               >
-                {state !== "on_the_way" && (
+                {state !== "arrived" && state !== "on_the_way" && (
                   <>
                     {state !== "ready" && (
                       <View
@@ -528,18 +557,19 @@ const DeliveryFlowNavigation: React.FC<DeliveryFlowNavigationProps> = ({
 
       {/* Botones de acción */}
       <View className="w-full px-2" style={{ maxWidth: 350 }}>
-        {/* Info: Usar el botón QR del navbar cuando el delivery está en camino y se seleccionó QR */}
-        {state === "on_the_way" && delivery?.payment_method === "qr" && (
-          <View
-            className="w-full rounded-lg py-3 px-4 mb-3 border border-purple-500"
-            style={{ backgroundColor: "rgba(139, 92, 246, 0.1)" }}
-          >
-            <Text className="text-purple-400 font-semibold text-sm text-center">
-              💡 Usa el botón QR del menú inferior para escanear el código del
-              repartidor
-            </Text>
-          </View>
-        )}
+        {/* Info: Usar el botón QR del navbar cuando el delivery está en camino o llegó y se seleccionó QR */}
+        {(state === "on_the_way" || state === "arrived") &&
+          delivery?.payment_method === "qr" && (
+            <View
+              className="w-full rounded-lg py-3 px-4 mb-3 border border-purple-500"
+              style={{ backgroundColor: "rgba(139, 92, 246, 0.1)" }}
+            >
+              <Text className="text-purple-400 font-semibold text-sm text-center">
+                💡 Usa el botón QR del menú inferior para escanear el código del
+                repartidor
+              </Text>
+            </View>
+          )}
 
         <View className="flex-row gap-3">
           {canViewTracking && (

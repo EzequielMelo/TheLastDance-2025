@@ -224,7 +224,6 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
             marginBottom: 16,
           }}
         >
-          <X size={22} color="#ffc107" />
           <View style={{ flex: 1, marginLeft: 8 }}>
             <Text
               style={{
@@ -233,7 +232,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                 color: "#ffc107",
               }}
             >
-              ⚠️ Se requiere modificación
+              Se requiere modificación
             </Text>
             <Text
               style={{
@@ -258,7 +257,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                 marginBottom: 8,
               }}
             >
-              ❌ No disponibles:
+              No disponibles:
             </Text>
             {rejectedItems.map((item, index) => (
               <View
@@ -325,7 +324,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                 marginBottom: 8,
               }}
             >
-              ✅ Disponibles (en esta tanda):
+              Disponibles (en esta tanda):
             </Text>
             {needsModificationItems.map((item, index) => (
               <View
@@ -471,8 +470,8 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
               lineHeight: 16,
             }}
           >
-            • Los productos marcados ❌ no tienen stock disponible
-            {"\n"}• Los productos marcados ✅ sí tenemos en stock
+            • Los productos marcados en rojo no tienen stock disponible
+            {"\n"}• Los productos marcados verde sí tenemos en stock
             {"\n"}• Puedes reemplazar los no disponibles con otros del menú
             {"\n"}• Los disponibles se mantendrán en tu pedido modificado
           </Text>
@@ -540,7 +539,7 @@ const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                 color: "#ef4444",
               }}
             >
-              ❌ Items Rechazados
+              Items Rechazados
             </Text>
             <Text
               style={{

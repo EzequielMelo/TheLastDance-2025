@@ -1,8 +1,8 @@
 import { supabaseAdmin } from "../../config/supabase";
 import { RESTAURANT_CONFIG } from "../../config/restaurantConfig";
-import { 
+import {
   notifyNewDeliveryOrder,
-  notifyDeliveryReadyForDrivers 
+  notifyDeliveryReadyForDrivers,
 } from "../../services/pushNotificationService";
 import type {
   Delivery,
@@ -90,7 +90,8 @@ export async function createDelivery(
     .select("quantity")
     .eq("delivery_order_id", data.delivery_order_id);
 
-  const itemsCount = orderItems?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+  const itemsCount =
+    orderItems?.reduce((sum, item) => sum + item.quantity, 0) || 0;
 
   // Enviar notificación a dueños y supervisores
   if (user) {
@@ -103,7 +104,10 @@ export async function createDelivery(
         itemsCount,
       );
     } catch (notificationError) {
-      console.error("❌ Error enviando notificación de nuevo delivery:", notificationError);
+      console.error(
+        "❌ Error enviando notificación de nuevo delivery:",
+        notificationError,
+      );
       // No lanzar error, el delivery ya se creó exitosamente
     }
   }
@@ -331,7 +335,7 @@ export async function getConfirmedDeliveries(): Promise<DeliveryWithOrder[]> {
 }
 
 /**
- * Obtener deliveries asignados a un repartidor (en camino)
+ * Obtener deliveries asignados a un repartidor (en camino o arrived)
  */
 export async function getDriverDeliveries(
   driverId: string,
@@ -361,7 +365,7 @@ export async function getDriverDeliveries(
     `,
     )
     .eq("driver_id", driverId)
-    .eq("status", "on_the_way")
+    .in("status", ["on_the_way", "arrived"]) // Incluir ambos estados
     .order("on_the_way_at", { ascending: true });
 
   if (error) {
@@ -495,6 +499,9 @@ export async function updateDeliveryStatus(
     case "on_the_way":
       updateData.on_the_way_at = now;
       break;
+    case "arrived":
+      updateData.arrived_at = now;
+      break;
     case "delivered":
       updateData.delivered_at = now;
       break;
@@ -539,7 +546,10 @@ export async function updateDeliveryStatus(
         delivery.estimated_distance_km,
       );
     } catch (notificationError) {
-      console.error("❌ Error enviando notificación a repartidores:", notificationError);
+      console.error(
+        "❌ Error enviando notificación a repartidores:",
+        notificationError,
+      );
       // No lanzar error, el delivery ya se actualizó exitosamente
     }
   }
@@ -739,6 +749,91 @@ export async function assignDriver(
 }
 
 /**
+ * Marcar delivery como arrived (repartidor llegó al lugar)
+ */
+export async function markAsArrived(
+  deliveryId: string,
+  driverId: string,
+): Promise<Delivery> {
+  console.log(
+    `📍 Repartidor ${driverId} marca llegada al delivery ${deliveryId}`,
+  );
+
+  // Obtener el delivery
+  const { data: existingDelivery, error: fetchError } = await supabaseAdmin
+    .from("deliveries")
+    .select("id, driver_id, status, user_id")
+    .eq("id", deliveryId)
+    .single();
+
+  if (fetchError || !existingDelivery) {
+    throw new Error("Delivery no encontrado");
+  }
+
+  // Verificar que el usuario sea el repartidor asignado
+  if (existingDelivery.driver_id !== driverId) {
+    throw new Error("Solo el repartidor asignado puede marcar llegada");
+  }
+
+  // Verificar que el delivery esté en estado on_the_way
+  if (existingDelivery.status !== "on_the_way") {
+    throw new Error(
+      `No se puede marcar llegada. Estado actual: ${existingDelivery.status}`,
+    );
+  }
+
+  const now = new Date().toISOString();
+
+  // Actualizar a estado arrived
+  const { data: delivery, error } = await supabaseAdmin
+    .from("deliveries")
+    .update({
+      status: "arrived",
+      arrived_at: now,
+    })
+    .eq("id", deliveryId)
+    .eq("status", "on_the_way") // Verificación adicional
+    .select()
+    .single();
+
+  if (error) {
+    console.error("❌ Error marcando llegada:", error);
+    throw new Error("Error al marcar llegada");
+  }
+
+  if (!delivery) {
+    throw new Error("No se pudo actualizar el estado del delivery");
+  }
+
+  console.log("✅ Delivery marcado como arrived exitosamente");
+
+  // Emitir evento Socket.IO al cliente para notificar cambio de estado
+  try {
+    const { getIOInstance } = await import("../../socket/chatSocket");
+    const io = getIOInstance();
+
+    if (io && existingDelivery.user_id) {
+      const userRoom = `user_${existingDelivery.user_id}`;
+      io.to(userRoom).emit("delivery_status_changed", {
+        deliveryId: delivery.id,
+        oldStatus: "on_the_way",
+        newStatus: "arrived",
+        timestamp: now,
+      });
+      io.to(userRoom).emit("delivery_updated", delivery);
+      console.log(
+        `📡 Evento Socket.IO emitido a room ${userRoom}: repartidor llegó`,
+      );
+    }
+  } catch (socketError) {
+    console.error("⚠️ Error emitiendo evento Socket.IO:", socketError);
+    // No lanzar error, el delivery ya se actualizó correctamente
+  }
+
+  return delivery;
+}
+
+/**
  * Cancelar un delivery
  */
 export async function cancelDelivery(
@@ -859,9 +954,9 @@ export async function setPaymentMethod(
     throw new Error("Delivery no encontrado o no eres el repartidor asignado");
   }
 
-  if (delivery.status !== "on_the_way") {
+  if (delivery.status !== "on_the_way" && delivery.status !== "arrived") {
     throw new Error(
-      "El delivery debe estar en camino para establecer el método de pago",
+      "El delivery debe estar en camino o haber llegado para establecer el método de pago",
     );
   }
 
@@ -918,7 +1013,9 @@ export async function confirmPayment(
   updateStatus: boolean = true, // Por defecto actualiza estados (pago en efectivo)
 ): Promise<Delivery> {
   console.log(`💰 Confirmando pago para delivery: ${deliveryId}`);
-  console.log(`🔄 updateStatus=${updateStatus} (${updateStatus ? "actualizar estados inmediatamente" : "solo guardar datos, esperar confirmación"})`);
+  console.log(
+    `🔄 updateStatus=${updateStatus} (${updateStatus ? "actualizar estados inmediatamente" : "solo guardar datos, esperar confirmación"})`,
+  );
 
   // Verificar que el delivery existe
   const { data: delivery, error: fetchError } = await supabaseAdmin
@@ -939,16 +1036,20 @@ export async function confirmPayment(
   // VALIDACIONES SEGÚN EL FLUJO:
   // - Si updateStatus=false (cliente escaneó QR): el cliente confirma (user_id)
   // - Si updateStatus=true (repartidor confirma recepción o pago cash): el repartidor confirma (driver_id)
-  
+
   if (!updateStatus) {
     // Cliente escaneando QR - debe ser el cliente (user_id)
     if (delivery.user_id !== userId) {
-      throw new Error("Solo el cliente puede escanear el QR para iniciar el pago");
+      throw new Error(
+        "Solo el cliente puede escanear el QR para iniciar el pago",
+      );
     }
   } else {
     // Repartidor confirmando recepción o pago en efectivo - debe ser el repartidor (driver_id)
     if (delivery.driver_id !== userId) {
-      throw new Error("Solo el repartidor puede confirmar la recepción del pago");
+      throw new Error(
+        "Solo el repartidor puede confirmar la recepción del pago",
+      );
     }
   }
 
@@ -970,7 +1071,9 @@ export async function confirmPayment(
     updateData.delivered_at = now;
     console.log("✅ Actualizando estados a 'paid' y 'delivered'");
   } else {
-    console.log("⏸️ Solo guardando datos de pago, estados quedan en 'pending' y 'on_the_way'");
+    console.log(
+      "⏸️ Solo guardando datos de pago, estados quedan en 'pending' y 'on_the_way'",
+    );
   }
 
   // Actualizar delivery
@@ -1042,7 +1145,9 @@ export async function confirmPayment(
       );
     }
   } else {
-    console.log("⏸️ Saltando actualización de delivery_orders y delivery_order_items (esperando confirmación del repartidor)");
+    console.log(
+      "⏸️ Saltando actualización de delivery_orders y delivery_order_items (esperando confirmación del repartidor)",
+    );
   }
 
   // ENTREGA DIFERENCIADA DE FACTURA (igual que en mesas)
@@ -1055,13 +1160,16 @@ export async function confirmPayment(
         .eq("id", delivery.user_id)
         .single();
 
-      const clientName = clientData && !clientError
-        ? `${clientData.first_name} ${clientData.last_name}`.trim()
-        : "Cliente";
+      const clientName =
+        clientData && !clientError
+          ? `${clientData.first_name} ${clientData.last_name}`.trim()
+          : "Cliente";
 
       if (invoiceInfo.isRegistered && invoiceInfo.htmlContent) {
         // USUARIO REGISTRADO: Enviar factura por email (HTML embebido)
-        console.log(`📧 Enviando factura por email a usuario registrado del delivery`);
+        console.log(
+          `📧 Enviando factura por email a usuario registrado del delivery`,
+        );
 
         // Obtener email del cliente desde Firebase Auth
         const { getAuthEmailById } = await import("../admin/adminServices");
@@ -1074,7 +1182,8 @@ export async function confirmPayment(
         const { InvoiceEmailService } = await import(
           "../../services/invoiceEmailService"
         );
-        const totalAmount = (updatedDelivery as any).delivery_order?.total_amount || 0;
+        const totalAmount =
+          (updatedDelivery as any).delivery_order?.total_amount || 0;
         const emailResult = await InvoiceEmailService.sendInvoiceByEmail(
           clientEmail,
           invoiceInfo.htmlContent,
@@ -1109,7 +1218,8 @@ export async function confirmPayment(
         const { notifyAnonymousClientInvoiceReady } = await import(
           "../../services/pushNotificationService"
         );
-        const totalAmount = (updatedDelivery as any).delivery_order?.total_amount || 0;
+        const totalAmount =
+          (updatedDelivery as any).delivery_order?.total_amount || 0;
         await notifyAnonymousClientInvoiceReady(
           delivery.user_id,
           "DELIVERY",
@@ -1138,7 +1248,9 @@ export async function confirmPayment(
   if (updateStatus) {
     console.log("✅ Pago confirmado y delivery marcado como entregado");
   } else {
-    console.log("✅ Datos de pago guardados, esperando confirmación del repartidor");
+    console.log(
+      "✅ Datos de pago guardados, esperando confirmación del repartidor",
+    );
   }
   return updatedDelivery;
 }

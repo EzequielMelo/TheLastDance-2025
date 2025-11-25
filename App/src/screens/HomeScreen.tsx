@@ -374,7 +374,10 @@ export default function HomeScreen({ navigation, route }: Props) {
               await api.post(`/admin/clients/${userId}/reject`, {
                 reason: "",
               });
-              ToastAndroid.show(`❌ Usuario ${userName} rechazado`, ToastAndroid.SHORT);
+              ToastAndroid.show(
+                `❌ Usuario ${userName} rechazado`,
+                ToastAndroid.SHORT,
+              );
               await loadPendingUsers();
             } catch (error: any) {
               console.error("❌ [FRONTEND] Error rechazando usuario:", error);
@@ -477,13 +480,18 @@ export default function HomeScreen({ navigation, route }: Props) {
       } else if (tableStatus === "confirmed") {
         // Si el estado es confirmed, verificar si todos los productos están entregados
         console.log("📊 Verificando estado de entrega completo...");
-        
+
         try {
-          const deliveryResponse = await api.get(`/orders/table/${myTableId}/delivery-status`);
-          const { allDelivered, totalItems, deliveredItems } = deliveryResponse.data.data;
-          
-          console.log(`📦 Estado entrega: ${deliveredItems}/${totalItems} items entregados`);
-          
+          const deliveryResponse = await api.get(
+            `/orders/table/${myTableId}/delivery-status`,
+          );
+          const { allDelivered, totalItems, deliveredItems } =
+            deliveryResponse.data.data;
+
+          console.log(
+            `📦 Estado entrega: ${deliveredItems}/${totalItems} items entregados`,
+          );
+
           if (allDelivered && totalItems > 0) {
             // Todos los productos entregados -> Mostrar estadísticas de encuestas
             console.log("📈 Navegando a SurveyStatsScreen...");
@@ -491,10 +499,10 @@ export default function HomeScreen({ navigation, route }: Props) {
               "✅ Ver estadísticas de encuestas del restaurante",
               ToastAndroid.SHORT,
             );
-            
+
             // Cerrar el scanner primero
             navigation.goBack();
-            
+
             // Navegar a SurveyStatsScreen
             setTimeout(() => {
               navigation.navigate("SurveyStats");
@@ -502,22 +510,25 @@ export default function HomeScreen({ navigation, route }: Props) {
           } else {
             // Hay productos pendientes -> Abrir CartModal
             console.log("🛒 Productos pendientes - Abriendo CartModal...");
-            
+
             // Cerrar el scanner primero
             navigation.goBack();
-            
+
             // Abrir el modal después de un pequeño delay
             setTimeout(() => {
               setCartModalVisible(true);
             }, 100);
-            
+
             ToastAndroid.show(
               "✅ Mesa verificada - Consultando tus productos...",
               ToastAndroid.SHORT,
             );
           }
         } catch (deliveryError) {
-          console.error("❌ Error verificando estado de entrega:", deliveryError);
+          console.error(
+            "❌ Error verificando estado de entrega:",
+            deliveryError,
+          );
           // En caso de error, abrir CartModal por defecto
           navigation.goBack();
           setTimeout(() => {
@@ -638,12 +649,18 @@ export default function HomeScreen({ navigation, route }: Props) {
   const handleBottomNavQR = () => {
     console.log(
       "🔍 HomeScreen - handleBottomNavQR - Estado actual:",
-      "\n  clientState:", clientState,
-      "\n  hasActiveDelivery:", hasActiveDelivery,
-      "\n  deliveryState:", deliveryState,
-      "\n  payment_method:", activeDelivery?.payment_method,
-      "\n  user_profile:", user?.profile_code,
-      "\n  delivery_id:", activeDelivery?.id,
+      "\n  clientState:",
+      clientState,
+      "\n  hasActiveDelivery:",
+      hasActiveDelivery,
+      "\n  deliveryState:",
+      deliveryState,
+      "\n  payment_method:",
+      activeDelivery?.payment_method,
+      "\n  user_profile:",
+      user?.profile_code,
+      "\n  delivery_id:",
+      activeDelivery?.id,
     );
 
     // 🚚 Si hay delivery activo en estado "on_the_way" con método de pago QR, usar scanner para pago
@@ -1921,7 +1938,8 @@ export default function HomeScreen({ navigation, route }: Props) {
                                 fontWeight: "700",
                               }}
                             >
-                              {pendingUser.first_name?.charAt(0)}{pendingUser.last_name?.charAt(0)}
+                              {pendingUser.first_name?.charAt(0)}
+                              {pendingUser.last_name?.charAt(0)}
                             </Text>
                           </View>
                         )}
@@ -2256,7 +2274,11 @@ export default function HomeScreen({ navigation, route }: Props) {
                   const totalItems =
                     cartCount +
                     currentTableOrders.reduce(
-                      (sum, order) => sum + order.order_items.length,
+                      (sum, order) =>
+                        sum +
+                        order.order_items.filter(
+                          item => item.status !== "rejected",
+                        ).length,
                       0,
                     );
                   return `${totalItems} ${totalItems === 1 ? "producto" : "productos"}`;
@@ -2276,7 +2298,11 @@ export default function HomeScreen({ navigation, route }: Props) {
               {(() => {
                 const currentTableOrders = getCurrentTableUnpaidOrders();
                 const totalOrders = currentTableOrders.reduce(
-                  (sum, order) => sum + order.total_amount,
+                  (sum, order) =>
+                    sum +
+                    order.order_items
+                      .filter(item => item.status !== "rejected")
+                      .reduce((itemSum, item) => itemSum + item.subtotal, 0),
                   0,
                 );
                 return (cartAmount + totalOrders).toLocaleString();

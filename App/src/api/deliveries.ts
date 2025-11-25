@@ -112,6 +112,16 @@ export const cancelDelivery = async (deliveryId: string): Promise<void> => {
 };
 
 /**
+ * Marcar delivery como arrived (repartidor llegó al lugar)
+ */
+export const markDeliveryAsArrived = async (
+  deliveryId: string,
+): Promise<Delivery> => {
+  const response = await api.put(`/deliveries/${deliveryId}/mark-arrived`);
+  return response.data.delivery;
+};
+
+/**
  * Obtener deliveries pendientes (solo dueño/supervisor)
  */
 export const getPendingDeliveries = async (): Promise<Delivery[]> => {

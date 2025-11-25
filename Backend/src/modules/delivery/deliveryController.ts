@@ -413,6 +413,61 @@ export async function takeDelivery(req: Request, res: Response): Promise<void> {
 }
 
 /**
+ * PUT /api/deliveries/:id/mark-arrived
+ * Repartidor marca que llegó al lugar de entrega
+ */
+export async function markDeliveryAsArrived(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: "Usuario no autenticado",
+      });
+      return;
+    }
+
+    // Verificar que el usuario sea repartidor (empleado)
+    if (req.user.profile_code !== "empleado") {
+      res.status(403).json({
+        success: false,
+        error: "Solo los repartidores pueden marcar llegada",
+      });
+      return;
+    }
+
+    const { id } = req.params;
+
+    if (!id) {
+      res.status(400).json({
+        success: false,
+        error: "ID del delivery es requerido",
+      });
+      return;
+    }
+
+    const delivery = await deliveryService.markAsArrived(
+      id,
+      req.user.appUserId,
+    );
+
+    res.json({
+      success: true,
+      delivery,
+      message: "Llegada marcada exitosamente",
+    });
+  } catch (error: any) {
+    console.error("❌ Error en markDeliveryAsArrived:", error);
+    res.status(400).json({
+      success: false,
+      error: error.message || "Error al marcar llegada",
+    });
+  }
+}
+
+/**
  * PUT /api/deliveries/:id/assign-driver
  * Asignar repartidor a un delivery (solo dueño/supervisor)
  */

@@ -7,6 +7,7 @@ export type DeliveryStatus =
   | "preparing"
   | "ready"
   | "on_the_way"
+  | "arrived"
   | "delivered"
   | "cancelled";
 
@@ -52,6 +53,7 @@ export interface Delivery {
   preparing_at: string | null;
   ready_at: string | null;
   on_the_way_at: string | null;
+  arrived_at: string | null;
   delivered_at: string | null;
   cancelled_at: string | null;
 }

@@ -77,6 +77,20 @@ export interface CartContextType {
   // 🚚 Funciones para modo delivery
   isDeliveryOrder: boolean;
   setIsDeliveryOrder: (value: boolean) => void;
+  deliveryAddress: {
+    address: string;
+    latitude: number;
+    longitude: number;
+    notes?: string;
+  } | null;
+  setDeliveryAddress: (
+    address: {
+      address: string;
+      latitude: number;
+      longitude: number;
+      notes?: string;
+    } | null,
+  ) => void;
 
   // Totales
   cartAmount: number;
@@ -122,6 +136,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   // 🚚 Estado para indicar si el pedido es para delivery
   const [isDeliveryOrder, setIsDeliveryOrder] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState<{
+    address: string;
+    latitude: number;
+    longitude: number;
+    notes?: string;
+  } | null>(null);
   const { user } = useAuth();
 
   // Función para convertir OrderItem a CartItem
@@ -661,7 +681,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     try {
       // Obtener las órdenes del usuario
       const orders = await getUserOrders();
-      
+
       // Buscar cualquier orden activa (no pagada)
       const activeOrder = orders.find(order => !order.is_paid);
 
@@ -701,20 +721,35 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       // Obtener las órdenes del usuario
       const orders = await getUserOrders();
       console.log("🔍 Órdenes obtenidas:", orders.length);
-      console.log("📊 Estados de órdenes:", orders.map(o => `ID: ${o.id.substring(0, 8)}... | is_paid: ${o.is_paid} | items: ${o.order_items.length}`).join(" | "));
-      
+      console.log(
+        "📊 Estados de órdenes:",
+        orders
+          .map(
+            o =>
+              `ID: ${o.id.substring(0, 8)}... | is_paid: ${o.is_paid} | items: ${o.order_items.length}`,
+          )
+          .join(" | "),
+      );
+
       // Buscar cualquier orden activa (no pagada)
       // El cliente puede agregar nuevas tandas a cualquier pedido activo,
       // independientemente del estado de los items existentes
       const activeOrder = orders.find(order => !order.is_paid);
 
       if (!activeOrder) {
-        console.error("❌ No se encontró orden activa. Todas las órdenes están pagadas o no hay órdenes.");
+        console.error(
+          "❌ No se encontró orden activa. Todas las órdenes están pagadas o no hay órdenes.",
+        );
         throw new Error("No se encontró pedido activo para agregar items");
       }
 
       console.log("📦 Agregando nueva tanda a orden:", activeOrder.id);
-      console.log("📋 Items existentes:", activeOrder.order_items.map(i => `${i.menu_item?.name} (${i.status})`).join(", "));
+      console.log(
+        "📋 Items existentes:",
+        activeOrder.order_items
+          .map(i => `${i.menu_item?.name} (${i.status})`)
+          .join(", "),
+      );
 
       // Convertir items del carrito al formato requerido
       const itemsToAdd = cartItems.map(item => ({
@@ -1020,6 +1055,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     // 🚚 Delivery mode
     isDeliveryOrder,
     setIsDeliveryOrder,
+    deliveryAddress,
+    setDeliveryAddress,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

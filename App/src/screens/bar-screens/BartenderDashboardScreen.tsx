@@ -61,6 +61,7 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
   const [orders, setOrders] = useState<BartenderOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [updatingItems, setUpdatingItems] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<
     "accepted" | "preparing" | "ready"
   >("accepted");
@@ -96,15 +97,26 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
     newStatus: "preparing" | "ready",
   ) => {
     try {
+      setUpdatingItems(prev => new Set([...prev, itemId]));
+
       await api.put(`/orders/bar/item/${itemId}/status`, { status: newStatus });
-      ToastAndroid.show("Estado actualizado", ToastAndroid.SHORT);
-      await fetchBartenderOrders();
-    } catch (error) {
-      console.error("Error actualizando estado:", error);
       ToastAndroid.show(
-        "❌ No se pudo actualizar el estado",
+        `Bebida marcada como ${newStatus === "preparing" ? "preparando" : "lista"}`,
         ToastAndroid.SHORT,
       );
+      await fetchBartenderOrders();
+    } catch (error: any) {
+      console.error("Error actualizando estado:", error);
+      ToastAndroid.show(
+        error.response?.data?.message || "❌ No se pudo actualizar el estado",
+        ToastAndroid.SHORT,
+      );
+    } finally {
+      setUpdatingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(itemId);
+        return newSet;
+      });
     }
   };
 
@@ -253,54 +265,74 @@ export default function BartenderDashboardScreen({ navigation }: Props) {
         {orderItem.status === "accepted" && (
           <TouchableOpacity
             onPress={() => updateItemStatus(orderItem.id, "preparing")}
+            disabled={updatingItems.has(orderItem.id)}
             style={{
-              backgroundColor: "#d4af37",
+              backgroundColor: updatingItems.has(orderItem.id)
+                ? "#6b7280"
+                : "#d4af37",
               flex: 1,
               paddingVertical: 12,
               borderRadius: 8,
               alignItems: "center",
               flexDirection: "row",
               justifyContent: "center",
+              opacity: updatingItems.has(orderItem.id) ? 0.6 : 1,
             }}
           >
-            <Wine size={16} color="#000" />
-            <Text
-              style={{
-                color: "#000",
-                fontSize: 16,
-                fontWeight: "600",
-                marginLeft: 8,
-              }}
-            >
-              Empezar preparación
-            </Text>
+            {updatingItems.has(orderItem.id) ? (
+              <ChefLoading size="small" />
+            ) : (
+              <>
+                <Wine size={16} color="#000" />
+                <Text
+                  style={{
+                    color: "#000",
+                    fontSize: 16,
+                    fontWeight: "600",
+                    marginLeft: 8,
+                  }}
+                >
+                  Empezar preparación
+                </Text>
+              </>
+            )}
           </TouchableOpacity>
         )}
 
         {orderItem.status === "preparing" && (
           <TouchableOpacity
             onPress={() => updateItemStatus(orderItem.id, "ready")}
+            disabled={updatingItems.has(orderItem.id)}
             style={{
-              backgroundColor: "#228B22",
+              backgroundColor: updatingItems.has(orderItem.id)
+                ? "#6b7280"
+                : "#228B22",
               flex: 1,
               paddingVertical: 12,
               borderRadius: 8,
               alignItems: "center",
               flexDirection: "row",
               justifyContent: "center",
+              opacity: updatingItems.has(orderItem.id) ? 0.6 : 1,
             }}
           >
-            <CheckCircle size={16} color="#fff" />
-            <Text
-              style={{
-                color: "#fff",
-                fontSize: 16,
-                fontWeight: "600",
-                marginLeft: 8,
-              }}
-            >
-              Marcar como lista
-            </Text>
+            {updatingItems.has(orderItem.id) ? (
+              <ChefLoading size="small" />
+            ) : (
+              <>
+                <CheckCircle size={16} color="#fff" />
+                <Text
+                  style={{
+                    color: "#fff",
+                    fontSize: 16,
+                    fontWeight: "600",
+                    marginLeft: 8,
+                  }}
+                >
+                  Marcar como lista
+                </Text>
+              </>
+            )}
           </TouchableOpacity>
         )}
       </View>
