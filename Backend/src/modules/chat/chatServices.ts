@@ -134,10 +134,11 @@ export class ChatServices {
         .limit(limit);
 
       if (error) {
+        console.error("❌ [CHAT SERVICES] Error obteniendo mensajes:", error);
         throw error;
       }
 
-      return (data || [])
+      const messages = (data || [])
         .map(msg => ({
           ...msg,
           sender_name: `${msg.sender.first_name} ${msg.sender.last_name}`,
@@ -146,8 +147,13 @@ export class ChatServices {
           sender_image: msg.sender.profile_image,
         }))
         .reverse(); // Devolver en orden cronológico
+
+      console.log(
+        `✅ [CHAT SERVICES] ${messages.length} mensajes obtenidos para chat ${chatId}`,
+      );
+      return messages;
     } catch (error) {
-      console.error("Error en getMessages:", error);
+      console.error("💥 [CHAT SERVICES] Error en getMessages:", error);
       throw new Error("Error al obtener mensajes");
     }
   }
@@ -161,6 +167,10 @@ export class ChatServices {
     messageType: "text" | "image" | "notification" = "text",
   ): Promise<Message> {
     try {
+      console.log(
+        `📝 [CHAT SERVICES] Creando mensaje en chat ${chatId} de ${senderType}`,
+      );
+
       const { data, error } = await supabaseAdmin
         .from("messages")
         .insert({
@@ -175,9 +185,14 @@ export class ChatServices {
         .single();
 
       if (error) {
-        console.error("❌ Error al insertar mensaje en BD:", error);
+        console.error(
+          "❌ [CHAT SERVICES] Error al insertar mensaje en BD:",
+          error,
+        );
         throw error;
       }
+
+      console.log(`✅ [CHAT SERVICES] Mensaje creado exitosamente: ${data.id}`);
 
       const { error: updateError } = await supabaseAdmin
         .from("chats")
@@ -185,14 +200,18 @@ export class ChatServices {
         .eq("id", chatId);
 
       if (updateError) {
-        console.warn("⚠️ Error actualizando timestamp del chat:", updateError);
-        // No lanzamos error por esto, solo warning
-      } else {
+        console.warn(
+          "⚠️ [CHAT SERVICES] Error actualizando timestamp del chat:",
+          updateError,
+        );
       }
 
       return data;
     } catch (error) {
-      console.error("💥 Error completo en createMessage:", error);
+      console.error(
+        "💥 [CHAT SERVICES] Error completo en createMessage:",
+        error,
+      );
       console.error(
         "Stack trace:",
         error instanceof Error ? error.stack : "Sin stack",

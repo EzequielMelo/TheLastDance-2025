@@ -8,6 +8,7 @@ import morgan from "morgan";
 import { createServer } from "http";
 import { setupSocketIO } from "./socket/chatSocket";
 import { setupDeliveryChatSocket } from "./socket/deliveryChatSocket";
+import { setupTableChatSocket } from "./socket/tableChatSocket";
 
 // Import routes
 import authRoutes from "./auth/authRoutes";
@@ -223,6 +224,9 @@ const io = setupSocketIO(httpServer);
 
 // Setup delivery chat socket
 setupDeliveryChatSocket(io);
+
+// Setup table chat socket (cliente-mesero)
+setupTableChatSocket(io);
 
 // Hacer io accesible para debugging (solo en desarrollo)
 if (process.env["NODE_ENV"] !== "production") {

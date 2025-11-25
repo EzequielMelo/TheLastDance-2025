@@ -127,42 +127,64 @@ export const useChat = ({ tableId, onError, onUserJoined }: UseChatProps) => {
 
         // Eventos de conexión
         socketInstance.on("connect", () => {
-          Logger.info("Conectado al chat");
+          Logger.info("✅ [TABLE CHAT] Conectado al chat");
           setIsConnected(true);
           setConnectionError(null);
 
           // Unirse al chat de la mesa
-          Logger.info(`🚪 Intentando unirse al chat de mesa: ${tableId}`);
+          Logger.info(
+            `🚪 [TABLE CHAT] Intentando unirse al chat de mesa: ${tableId}`,
+          );
           socketInstance.emit("join_table_chat", tableId);
         });
 
         socketInstance.on("disconnect", () => {
-          Logger.info("Desconectado del chat");
+          Logger.info("🔴 [TABLE CHAT] Desconectado del chat");
           setIsConnected(false);
         });
 
         socketInstance.on("connect_error", error => {
-          Logger.error("Error de conexión:", error);
+          Logger.error("❌ [TABLE CHAT] Error de conexión:", error);
           setConnectionError("Error de conexión al chat");
           setIsConnected(false);
           onError?.("Error de conexión al chat");
         });
 
         // Eventos de chat
-        socketInstance.on("new_message", (message: ChatMessage) => {
+        socketInstance.on("new_table_message", (message: any) => {
+          Logger.info("📨 [TABLE CHAT] Nuevo mensaje recibido:", message.id);
+
+          // Convertir formato del mensaje
+          const formattedMessage: ChatMessage = {
+            id: message.id,
+            message: message.message,
+            senderId: message.senderId,
+            senderName: message.senderName,
+            senderImage: message.senderImage,
+            senderType: message.senderType,
+            timestamp: message.timestamp,
+            isRead: message.isRead,
+          };
 
           // Usar callback para asegurar que se base en el estado más actual
           setMessages(prevMessages => {
             // Verificar si el mensaje ya existe para evitar duplicados
             const messageExists = prevMessages.some(
-              msg => msg.id === message.id,
+              msg => msg.id === formattedMessage.id,
             );
             if (messageExists) {
-              Logger.warn("⚠️ Mensaje duplicado ignorado:", message.id);
+              Logger.warn(
+                "⚠️ [TABLE CHAT] Mensaje duplicado ignorado:",
+                formattedMessage.id,
+              );
               return prevMessages;
             }
 
-            const newMessages = [...prevMessages, message];
+            const newMessages = [...prevMessages, formattedMessage];
+            Logger.info(
+              "✅ [TABLE CHAT] Mensaje agregado, total:",
+              newMessages.length,
+            );
             return newMessages;
           });
         });
@@ -176,9 +198,11 @@ export const useChat = ({ tableId, onError, onUserJoined }: UseChatProps) => {
         );
 
         socketInstance.on(
-          "messages_read",
+          "table_messages_read",
           (data: { readByUserId: string; readByName: string }) => {
-            Logger.debug(`Mensajes leídos por ${data.readByName}`);
+            Logger.debug(
+              `📖 [TABLE CHAT] Mensajes leídos por ${data.readByName}`,
+            );
             if (data.readByUserId !== user.id) {
               setMessages(prev =>
                 prev.map(msg =>
@@ -190,17 +214,26 @@ export const useChat = ({ tableId, onError, onUserJoined }: UseChatProps) => {
         );
 
         socketInstance.on("error", (error: { message: string }) => {
-          Logger.error("❌ Error del socket:", error);
+          Logger.error("❌ [TABLE CHAT] Error del socket:", error);
           onError?.(error.message);
         });
 
         // Evento de confirmación de unión exitosa
         socketInstance.on(
-          "joined_room",
-          (data: { roomName: string; userCount: number }) => {
+          "joined_table_room",
+          (data: { roomName: string; userCount: number; tableId: string }) => {
             Logger.info(
-              `✅ Te uniste exitosamente a la sala: ${data.roomName} con ${data.userCount} usuarios`,
+              `✅ [TABLE CHAT] Te uniste exitosamente a la sala: ${data.roomName} con ${data.userCount} usuarios`,
             );
+          },
+        );
+
+        // Evento cuando el chat se cierra (mesa liberada)
+        socketInstance.on(
+          "table_chat_closed",
+          (data: { tableId: string; message: string }) => {
+            Logger.info(`🔒 [TABLE CHAT] Chat cerrado: ${data.message}`);
+            onError?.(data.message);
           },
         );
 
@@ -221,6 +254,10 @@ export const useChat = ({ tableId, onError, onUserJoined }: UseChatProps) => {
     // Cleanup
     return () => {
       if (socket) {
+        Logger.info(
+          `👋 [TABLE CHAT] Desconectando y saliendo del chat de mesa ${tableId}`,
+        );
+        socket.emit("leave_table_chat", tableId);
         socket.disconnect();
       }
     };
@@ -249,12 +286,15 @@ export const useChat = ({ tableId, onError, onUserJoined }: UseChatProps) => {
     (message: string) => {
       if (!socket || !isConnected || !chatInfo || !message.trim()) {
         Logger.warn(
-          "No se puede enviar mensaje: socket no conectado o mensaje vacío",
+          "⚠️ [TABLE CHAT] No se puede enviar mensaje: socket no conectado o mensaje vacío",
         );
         return false;
       }
 
-      socket.emit("send_message", {
+      Logger.info(
+        `📤 [TABLE CHAT] Enviando mensaje: "${message.substring(0, 30)}..."`,
+      );
+      socket.emit("send_table_message", {
         chatId: chatInfo.id,
         message: message.trim(),
         tableId: tableId,
@@ -269,7 +309,10 @@ export const useChat = ({ tableId, onError, onUserJoined }: UseChatProps) => {
   const markAsRead = useCallback(() => {
     if (!socket || !isConnected || !chatInfo) return;
 
-    socket.emit("mark_as_read", {
+    Logger.info(
+      `📖 [TABLE CHAT] Marcando mensajes como leídos en chat ${chatInfo.id}`,
+    );
+    socket.emit("mark_table_as_read", {
       chatId: chatInfo.id,
       tableId: tableId,
     });
