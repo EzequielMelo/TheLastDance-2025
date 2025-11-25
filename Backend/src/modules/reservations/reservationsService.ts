@@ -176,7 +176,7 @@ export class ReservationsService {
     // Obtener datos del usuario y la mesa para la notificación
     const { data: user } = await supabase
       .from('users')
-      .select('name')
+      .select('first_name, last_name')
       .eq('id', userId)
       .single();
 
@@ -189,8 +189,9 @@ export class ReservationsService {
     // Enviar notificación a dueños y supervisores
     if (user && tableData) {
       try {
+        const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Cliente';
         await notifyNewReservation(
-          user.name || 'Cliente',
+          userName,
           reservation.id,
           data.date,
           data.time,

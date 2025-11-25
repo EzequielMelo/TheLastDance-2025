@@ -80,7 +80,7 @@ export async function createDelivery(
   // Obtener datos del usuario para la notificación
   const { data: user } = await supabaseAdmin
     .from("users")
-    .select("name")
+    .select("first_name, last_name")
     .eq("id", userId)
     .single();
 
@@ -96,8 +96,9 @@ export async function createDelivery(
   // Enviar notificación a dueños y supervisores
   if (user) {
     try {
+      const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Cliente';
       await notifyNewDeliveryOrder(
-        user.name || "Cliente",
+        userName,
         delivery.id,
         data.delivery_address,
         order.total_amount,

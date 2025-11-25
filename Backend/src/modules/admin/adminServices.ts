@@ -11,7 +11,6 @@ import {
   CreateTableBody,
   Table,
 } from "../../types/adminTypes";
-import { notifyClientAccountApproved } from "../../services/pushNotificationService";
 
 // Tipos para los servicios
 export interface Client {
@@ -145,34 +144,14 @@ export async function sendClientRejectionEmail(
 // Servicio completo para aprobar cliente (actualizar estado + enviar email + push notification)
 export async function processClientApproval(
   id: string,
-  approverId: string,
 ): Promise<void> {
   try {
     // Paso 1: Actualizar estado en base de datos
     const clientData = await approveClientById(id);
 
-    // Paso 2: Obtener información del administrador que aprueba
-    const { data: approverData, error: approverError } = await supabaseAdmin
-      .from("users")
-      .select("first_name, last_name, profile_code")
-      .eq("id", approverId)
-      .single();
-
-    const approverName =
-      approverError || !approverData
-        ? "Administrador"
-        : `${approverData.first_name || ""} ${approverData.last_name || ""}`.trim() ||
-          "Administrador";
-
-    // Paso 3: Enviar email de aprobación
+    // Paso 2: Enviar email de aprobación
     await sendClientApprovalEmail(id, clientData.first_name);
 
-    // Paso 4: Enviar notificación push
-    await notifyClientAccountApproved(
-      id,
-      `${clientData.first_name} ${clientData.last_name}`.trim(),
-      approverName,
-    );
   } catch (error) {
     console.error("❌ Error en processClientApproval:", error);
     throw error instanceof Error ? error : new Error("Error aprobando cliente");

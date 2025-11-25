@@ -134,25 +134,37 @@ export async function createOrderHandler(
     // Enviar notificación push al mozo si hay mesa asignada
     if (parsed.table_id) {
       try {
-        // Obtener información de la mesa y el mozo
+        // Obtener información de la mesa (número, mozo, id_client)
         const { data: tableData, error: tableError } = await supabaseAdmin
           .from("tables")
-          .select(
-            `
-            number,
-            id_waiter,
-            users!tables_id_client_fkey(first_name, last_name)
-          `,
-          )
+          .select("number, id_waiter, id_client")
           .eq("id", parsed.table_id)
           .single();
 
-        if (!tableError && tableData?.id_waiter) {
-          const clientData = (tableData as any).users;
-          const clientName = clientData
-            ? `${clientData.first_name} ${clientData.last_name}`.trim()
-            : "Cliente";
+        if (tableError) {
+          console.error('❌ [createOrderHandler] Error obteniendo mesa:', tableError);
+        } else {
+          console.log('✅ [createOrderHandler] Mesa obtenida:', {
+            number: tableData?.number,
+            id_waiter: tableData?.id_waiter,
+            id_client: tableData?.id_client
+          });
+        }
 
+        if (!tableError && tableData?.id_waiter && tableData?.id_client) {
+          // Obtener datos del cliente usando id_client
+          const { data: clientData, error: clientError } = await supabaseAdmin
+            .from("users")
+            .select("first_name, last_name")
+            .eq("id", tableData.id_client)
+            .single();
+
+          const clientName = clientData && !clientError
+            ? `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim() || 'Cliente'
+            : 'Cliente';
+
+
+          // Notificar al mozo
           await notifyWaiterNewOrder(
             tableData.id_waiter,
             clientName,
@@ -160,11 +172,16 @@ export async function createOrderHandler(
             parsed.items.length,
             parsed.totalAmount,
           );
+
+        } else {
+          console.warn('⚠️ [createOrderHandler] Mesa sin mozo o cliente asignado');
         }
       } catch (notifyError) {
-        console.error("Error enviando notificación al mozo:", notifyError);
+        console.error("❌ [createOrderHandler] Error enviando notificaciones:", notifyError);
         // No bloqueamos la creación del pedido por error de notificación
       }
+    } else {
+      console.log('🚨 [createOrderHandler] No hay table_id en el pedido');
     }
 
     res.status(201).json({
@@ -433,21 +450,21 @@ export async function waiterOrderActionHandler(
             .from("orders")
             .select(
               `
-              id_client,
+              user_id,
               table_id,
-              order_items!inner(
+              order_items(
                 menu_item_id,
                 quantity,
                 unit_price,
                 status,
-                menu_items!inner(
+                menu_items(
                   name,
                   category
                 )
               ),
-              tables!inner(
+              tables(
                 number,
-                users!tables_id_client_fkey(first_name, last_name)
+                id_client
               )
             `,
             )
@@ -456,11 +473,18 @@ export async function waiterOrderActionHandler(
 
           if (!orderError && orderData) {
             const tableData = (orderData as any).tables;
-            const clientData = tableData?.users;
-            const clientName = clientData
-              ? `${clientData.first_name} ${clientData.last_name}`.trim()
-              : "Cliente";
-
+            
+            // Obtener datos del cliente usando id_client
+            const { data: clientData, error: clientError } = await supabaseAdmin
+              .from("users")
+              .select("first_name, last_name")
+              .eq("id", tableData.id_client)
+              .single();
+            
+            const clientName = clientData && !clientError
+              ? `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim() || 'Cliente'
+              : 'Cliente';
+            
             // Separar items por categoría (platos vs bebidas)
             const orderItems = (orderData as any).order_items;
             const dishItems: Array<{ name: string; quantity: number }> = [];
@@ -526,7 +550,7 @@ export async function waiterOrderActionHandler(
                   : "Mozo";
 
               await notifyClientOrderConfirmed(
-                orderData.id_client,
+                orderData.user_id,
                 waiterName,
                 tableData.number.toString(),
                 totalItemsCount,
@@ -577,10 +601,9 @@ export async function waiterOrderActionHandler(
               `
               id_client,
               table_id,
-              tables!inner(
+              tables(
                 number,
-                id_waiter,
-                users!tables_id_waiter_fkey(first_name, last_name)
+                id_waiter
               )
             `,
             )
@@ -589,11 +612,18 @@ export async function waiterOrderActionHandler(
 
           if (!orderError && orderData?.table_id) {
             const tableData = (orderData as any).tables;
-            const waiterData = tableData?.users;
-            const waiterName = waiterData
-              ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
-              : "Mozo";
-
+            
+            // Obtener datos del mozo usando id_waiter
+            const { data: waiterData, error: waiterError } = await supabaseAdmin
+              .from("users")
+              .select("first_name, last_name")
+              .eq("id", tableData.id_waiter)
+              .single();
+            
+            const waiterName = waiterData && !waiterError
+              ? `${waiterData.first_name || ''} ${waiterData.last_name || ''}`.trim() || 'Mozo'
+              : 'Mozo';
+            
             await notifyClientOrderRejectedForModification(
               orderData.id_client,
               waiterName,

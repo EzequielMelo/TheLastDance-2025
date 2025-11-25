@@ -37,7 +37,7 @@ export async function approveClient(req: Request, res: Response) {
       return;
     }
 
-    await processClientApproval(id, req.user.appUserId);
+    await processClientApproval(id);
     res.json({ ok: true });
     return;
   } catch (e: any) {

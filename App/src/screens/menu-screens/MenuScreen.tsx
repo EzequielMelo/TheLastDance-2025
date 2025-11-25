@@ -681,6 +681,7 @@ export default function MenuScreen() {
               flexDirection: "row",
               alignItems: "center",
               marginBottom: 14,
+              position: "relative",
             }}
           >
             <View style={{ flex: 1, alignItems: "center" }}>
@@ -709,9 +710,62 @@ export default function MenuScreen() {
                   : "Explora nuestros deliciosos platos y bebidas"}
               </Text>
             </View>
+
+            {/* Toggle Switch estilo iOS - Position Absolute */}
+            <View
+              style={{
+                position: "absolute",
+                right: 0,
+                top: 0,
+              }}
+            >
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  const newState = !sensorsEnabled;
+                  setSensorsEnabled(newState);
+                  showCustomAlert(
+                    newState ? "Sensores Activados" : "Sensores Desactivados",
+                    newState
+                      ? "Sistema de sensores activado. Inclina el dispositivo para navegar."
+                      : "Sistema de sensores desactivado. Usa el scroll manual.",
+                    [{ text: "OK" }],
+                    "info",
+                  );
+                }}
+                style={{
+                  width: 44,
+                  height: 24,
+                  borderRadius: 12,
+                  backgroundColor: sensorsEnabled ? "#d4af37" : "#374151",
+                  justifyContent: "center",
+                  padding: 2,
+                }}
+              >
+                <View
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 10,
+                    backgroundColor: "white",
+                    transform: [
+                      { translateX: sensorsEnabled ? 20 : 0 },
+                    ],
+                    shadowColor: "#000",
+                    shadowOffset: {
+                      width: 0,
+                      height: 2,
+                    },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 3.84,
+                    elevation: 5,
+                  }}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {/* Category Filter + Sensor Toggle - Scrollable */}
+          {/* Category Filter - Scrollable */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -761,38 +815,6 @@ export default function MenuScreen() {
                 </TouchableOpacity>
               );
             })}
-
-            {/* Sensor Toggle Button integrado */}
-            <TouchableOpacity
-              onPress={() => setSensorsEnabled(!sensorsEnabled)}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                backgroundColor: sensorsEnabled
-                  ? "#d4af37"
-                  : "rgba(255,255,255,0.1)",
-                paddingHorizontal: 16,
-                paddingVertical: 8,
-                borderRadius: 20,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 16,
-                  marginRight: 4,
-                }}
-              >
-                🎮
-              </Text>
-              <Text
-                style={{
-                  color: sensorsEnabled ? "#1a1a1a" : "#d1d5db",
-                  fontWeight: "500",
-                }}
-              >
-                Sensores
-              </Text>
-            </TouchableOpacity>
           </ScrollView>
         </View>
 

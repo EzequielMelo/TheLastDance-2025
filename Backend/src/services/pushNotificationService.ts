@@ -165,42 +165,6 @@ export async function notifyEmployees(title: string, body: string, data?: any) {
   }
 }
 
-// Función para notificar al cliente recién registrado sobre el estado de su cuenta
-export async function notifyClientAccountCreated(clientId: string) {
-  try {
-    // Obtener el push token del cliente específico
-    const { data: client, error } = await supabaseAdmin
-      .from("users")
-      .select("push_token, name")
-      .eq("id", clientId)
-      .single();
-
-    if (error) {
-      console.error("Error obteniendo datos del cliente:", error);
-      return;
-    }
-
-    if (!client?.push_token) {
-      return;
-    }
-
-    // Preparar datos de la notificación para el cliente
-    const notificationData: PushNotificationData = {
-      title: "Cuenta creada exitosamente",
-      body: "Para ingresar a la aplicación la cuenta debe ser aprobada",
-      data: {
-        type: "account_created",
-        status: "pending_approval",
-      },
-    };
-
-    // Enviar notificación al cliente específico
-    await sendExpoPushNotification([client.push_token], notificationData);
-  } catch (error) {
-    console.error("Error al enviar notificación de cuenta creada:", error);
-  }
-}
-
 // Función para actualizar el push token de un usuario
 export async function updateUserPushToken(userId: string, pushToken: string | null) {
   try {
@@ -251,22 +215,28 @@ async function getWaiterTokens(): Promise<string[]> {
   try {
     const { data: users, error } = await supabaseAdmin
       .from("users")
-      .select("push_token")
+      .select("push_token, first_name, last_name, id")
       .eq("profile_code", "empleado")
       .eq("position_code", "mozo")
       .eq("state", "aprobado")
       .not("push_token", "is", null);
 
     if (error) {
-      console.error("Error fetching waiter tokens:", error);
+      console.error("❌ [getWaiterTokens] Error fetching waiter tokens:", error);
       return [];
     }
 
-    return users
+    console.log(`📋 [getWaiterTokens] ${users?.length || 0} mozos encontrados en BD`);
+    
+    const tokens = users
       .map(user => user.push_token)
       .filter(token => token && token.trim() !== "");
+    
+    console.log(`✅ [getWaiterTokens] ${tokens.length} tokens válidos después de filtrar`);
+        
+    return tokens;
   } catch (error) {
-    console.error("Error in getWaiterTokens:", error);
+    console.error("❌ [getWaiterTokens] Error in getWaiterTokens:", error);
     return [];
   }
 }
@@ -344,49 +314,38 @@ async function getRoleTokens(positionCode: string): Promise<string[]> {
 // Función para obtener token de un mozo específico
 async function getWaiterToken(waiterId: string): Promise<string | null> {
   try {
-    console.log(`🔍 Buscando token para mozo: ${waiterId}`);
     const { data: user, error } = await supabaseAdmin
       .from("users")
-      .select("push_token, name, state, profile_code, position_code")
+      .select("push_token, first_name, state, profile_code, position_code")
       .eq("id", waiterId)
       .single();
 
     if (error) {
-      console.error(`❌ Error buscando mozo ${waiterId}:`, error.message);
       return null;
     }
 
     if (!user) {
-      console.warn(`⚠️ Mozo ${waiterId} no encontrado en BD`);
       return null;
     }
 
-    console.log(`👤 Mozo encontrado: ${user.name}, profile: ${user.profile_code}, position: ${user.position_code}, state: ${user.state}`);
-
     if (user.profile_code !== "empleado") {
-      console.warn(`⚠️ Usuario ${waiterId} no es empleado (es ${user.profile_code})`);
       return null;
     }
 
     if (user.position_code !== "mozo") {
-      console.warn(`⚠️ Empleado ${waiterId} no es mozo (es ${user.position_code})`);
       return null;
     }
 
     if (user.state !== "aprobado") {
-      console.warn(`⚠️ Mozo ${waiterId} no está aprobado (estado: ${user.state})`);
       return null;
     }
 
     if (!user.push_token || user.push_token.trim() === "") {
-      console.warn(`⚠️ Mozo ${waiterId} (${user.name}) no tiene push token registrado`);
       return null;
     }
 
-    console.log(`✅ Push token encontrado para mozo ${user.name}`);
     return user.push_token;
   } catch (error) {
-    console.error("Error in getWaiterToken:", error);
     return null;
   }
 }
@@ -624,6 +583,7 @@ export async function notifyWaiterNewOrder(
     const tokens = await getWaiterTokens();
 
     if (tokens.length === 0) {
+      console.log('⚠️ [notifyWaiterNewOrder] No hay tokens de mozos disponibles');
       return;
     }
 
@@ -640,10 +600,12 @@ export async function notifyWaiterNewOrder(
       },
     };
 
+    console.log('📤 [notifyWaiterNewOrder] Enviando notificación');
     await sendExpoPushNotification(tokens, notificationData);
+    console.log('✅ [notifyWaiterNewOrder] Notificación enviada exitosamente');
   } catch (error) {
     console.error(
-      "❌ Error al enviar notificación de nuevo pedido a mozos:",
+      "❌ [notifyWaiterNewOrder] Error al enviar notificación de nuevo pedido a mozos:",
       error,
     );
   }
@@ -677,10 +639,12 @@ export async function notifyClientOrderRejectedForModification(
       },
     };
 
+    console.log('📤 [notifyClientOrderRejectedForModification] Enviando notificación');
     await sendExpoPushNotification([token], notificationData);
+    console.log('✅ [notifyClientOrderRejectedForModification] Notificación enviada');
   } catch (error) {
     console.error(
-      "❌ Error al enviar notificación de pedido rechazado:",
+      "❌ [notifyClientOrderRejectedForModification] Error al enviar notificación de pedido rechazado:",
       error,
     );
   }
@@ -1051,11 +1015,15 @@ export async function notifyClientOrderConfirmed(
   estimatedTime?: number,
 ) {
   try {
+    console.log('🔔 [notifyClientOrderConfirmed] Iniciando...', { clientId, waiterName, tableNumber });
     const token = await getClientToken(clientId);
 
     if (!token) {
+      console.log('⚠️ [notifyClientOrderConfirmed] Cliente sin token:', clientId);
       return;
     }
+
+    console.log('✅ [notifyClientOrderConfirmed] Token de cliente encontrado');
 
     const timeText = estimatedTime
       ? ` Tiempo estimado: ${estimatedTime} minutos.`
@@ -1074,10 +1042,12 @@ export async function notifyClientOrderConfirmed(
       },
     };
 
+    console.log('📤 [notifyClientOrderConfirmed] Enviando notificación');
     await sendExpoPushNotification([token], notificationData);
+    console.log('✅ [notifyClientOrderConfirmed] Notificación enviada exitosamente');
   } catch (error) {
     console.error(
-      "❌ Error al enviar notificación de pedido confirmado:",
+      "❌ [notifyClientOrderConfirmed] Error al enviar notificación de pedido confirmado:",
       error,
     );
   }
@@ -1101,7 +1071,7 @@ export async function notifyManagementPaymentReceived(
     const paymentInfo = paymentMethod ? ` (${paymentMethod})` : "";
 
     const notificationData: PushNotificationData = {
-      title: `💰 Pago recibido - Mesa #${tableNumber}`,
+      title: `Pago recibido - Mesa #${tableNumber}`,
       body: `${clientName} pagó $${totalAmount.toLocaleString()}${paymentInfo} - Atendido por ${waiterName}`,
       data: {
         type: "payment_received",
@@ -1117,37 +1087,6 @@ export async function notifyManagementPaymentReceived(
     await sendExpoPushNotification(tokens, notificationData);
   } catch (error) {
     console.error("❌ Error al enviar notificación de pago a gerencia:", error);
-  }
-}
-
-// Función para notificar al cliente cuando su cuenta es aprobada
-export async function notifyClientAccountApproved(
-  clientId: string,
-  clientName: string,
-  approvedBy: string,
-) {
-  try {
-    const token = await getClientToken(clientId);
-
-    if (!token) {
-      return;
-    }
-
-    const notificationData: PushNotificationData = {
-      title: "¡Cuenta aprobada! 🎉",
-      body: `${clientName}, tu cuenta ha sido aprobada. Ya puedes acceder a todas las funciones de la app.`,
-      data: {
-        type: "account_approved",
-        clientId,
-        clientName,
-        approvedBy,
-        screen: "Home",
-      },
-    };
-
-    await sendExpoPushNotification([token], notificationData);
-  } catch (error) {
-    console.error("❌ Error al enviar notificación de cuenta aprobada:", error);
   }
 }
 
@@ -1197,7 +1136,6 @@ export async function notifyNewReservation(
 
     await sendExpoPushNotification(tokens, notificationData);
   } catch (error) {
-    console.error("❌ Error al enviar notificación de nueva reserva:", error);
   }
 }
 
@@ -1232,7 +1170,7 @@ export async function notifyNewDeliveryOrder(
 
     await sendExpoPushNotification(tokens, notificationData);
   } catch (error) {
-    console.error("❌ Error al enviar notificación de nuevo delivery:", error);
+    console.error("❌ [notifyNewDeliveryOrder] Error al enviar notificación de nuevo delivery:", error);
   }
 }
 

@@ -6,7 +6,6 @@ import { extractPathFromUrl, deleteFile } from "../lib/storage/uploadService";
 import { STORAGE_BUCKETS } from "../lib/storage/storageConfig";
 import {
   notifyNewClientRegistration,
-  notifyClientAccountCreated,
 } from "../services/pushNotificationService";
 
 export async function registerUser(
@@ -131,13 +130,6 @@ export async function registerUser(
       ),
     );
 
-    // Notificar al cliente recién registrado
-    notifyClientAccountCreated(userId!).catch(err =>
-      console.error(
-        "No se pudo enviar notificación push al cliente:",
-        err?.message || err,
-      ),
-    );
   }
 
   return {
