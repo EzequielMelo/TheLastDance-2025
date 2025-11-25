@@ -12,6 +12,72 @@ import type {
 
 export class ReservationsService {
   /**
+   * Obtener próxima reserva del cliente (dentro de 45 minutos)
+   */
+  static async getClientUpcomingReservation(userId: string): Promise<{
+    time: string;
+    date: string;
+    tableNumber: string;
+    minutesUntil: number;
+  } | null> {
+    // Usar tiempo de Argentina (UTC-3)
+    const now = new Date();
+    const nowArgentina = new Date(
+      now.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" })
+    );
+    const in45Minutes = new Date(nowArgentina.getTime() + 45 * 60 * 1000);
+
+    // Obtener fecha actual en Argentina
+    const today = nowArgentina.toLocaleDateString("en-CA", {
+      timeZone: "America/Argentina/Buenos_Aires",
+    });
+
+    const { data: reservations, error } = await supabase
+    .from('reservations')
+    .select(`
+      id,
+      date,
+      time,
+      tables:table_id (number)
+    `)
+    .eq('user_id', userId)
+    .eq('status', 'approved')
+    .eq('date', today)
+    .order('time', { ascending: true });
+
+    if (error) {
+      console.error('❌ Error obteniendo reservas del cliente:', error);
+      return null;
+    }
+
+    if (!reservations || reservations.length === 0) {
+      return null;
+    }
+
+    // Verificar si hay alguna reserva dentro de los próximos 45 minutos
+    // O si ya pasó la hora (seguir mostrando hasta que el maitre la cancele)
+    for (const reservation of reservations) {
+      const reservationDateTime = new Date(`${reservation.date}T${reservation.time}`);
+      
+      // Mostrar si la reserva es en los próximos 45 minutos O si ya pasó la hora
+      // (hasta que el maitre la cancele manualmente)
+      if (reservationDateTime <= in45Minutes) {
+        const minutesUntil = Math.floor((reservationDateTime.getTime() - nowArgentina.getTime()) / (60 * 1000));
+        
+        return {
+          time: reservation.time.substring(0, 5), // HH:MM (sin segundos)
+          date: reservation.date,
+          tableNumber: (reservation.tables as any)?.number || '',
+          minutesUntil: Math.max(0, minutesUntil) // No mostrar negativos
+        };
+      }
+    }
+
+    console.log('❌ No hay reservas dentro de los próximos 45 minutos ni pasadas');
+    return null;
+  }
+
+  /**
    * Crear una nueva reserva
    */
   static async createReservation(

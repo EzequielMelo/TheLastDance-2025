@@ -81,6 +81,12 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
       invoiceNumber: string;
     };
   } | null>(null);
+  const [upcomingReservation, setUpcomingReservation] = useState<{
+    time: string;
+    date: string;
+    tableNumber: string;
+    minutesUntil: number;
+  } | null>(null);
 
   const handleRefresh = async () => {
     await refresh();
@@ -98,7 +104,7 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
     onRefresh?.();
   };
 
-  // Verificar delivery status cuando la pantalla está en foco
+  // Verificar delivery status y reservas cuando la pantalla está en foco
   useFocusEffect(
     React.useCallback(() => {
       // Verificar datos de orden para usuarios anónimos
@@ -107,6 +113,26 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
           .then(setAnonymousOrderData)
           .catch(console.error);
       }
+
+      // Verificar próxima reserva para clientes registrados
+      const checkUpcomingReservation = async () => {
+        console.log("🔍 [ClientFlow] Verificando reservas - profile_code:", user?.profile_code);
+        
+        if (user?.profile_code === "cliente_registrado") {
+          try {
+            const { ReservationsService } = await import("../../services/reservations/reservationsService");
+            const upcoming = await ReservationsService.getUpcomingReservation();
+            setUpcomingReservation(upcoming);
+          } catch (error) {
+            console.error("❌ [ClientFlow] Error verificando próxima reserva:", error);
+          }
+        } else {
+          console.log("⚠️ [ClientFlow] Usuario no es cliente registrado, limpiando reserva");
+          setUpcomingReservation(null);
+        }
+      };
+
+      checkUpcomingReservation();
 
       if (
         state === "seated" &&
@@ -150,6 +176,50 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
   }, [refreshTrigger]); // SOLO refreshTrigger como dependencia
 
   const renderStateContent = () => {
+    // Mostrar reserva próxima
+    if (upcomingReservation) {
+      return (
+        <View className="items-center">
+          {/* Header con ícono */}
+          <View className="flex-row items-center mb-3 w-full justify-center px-2">
+            <Clock size={58} color="#f59e0b" />
+            <View className="ml-4" style={{ maxWidth: 220 }}>
+              <Text className="text-white text-2xl font-bold">
+                ¡Reserva Confirmada!
+              </Text>
+              <Text className="text-gray-300 text-lg">
+                Mesa #{upcomingReservation.tableNumber}
+              </Text>
+            </View>
+          </View>
+
+          <Text className="text-amber-400 text-center text-lg font-semibold mb-3">
+            Recordá que tenés una reserva confirmada para hoy a las{" "}
+            {upcomingReservation.time}
+          </Text>
+
+          <View className="items-center">
+            <Text className="text-gray-300 text-center text-lg mb-6">
+              Para confirmar tu llegada, usa el botón QR del menú inferior.
+            </Text>
+              <View
+                className="bg-yellow-600 w-16 h-16 rounded-full items-center justify-center mb-3"
+                style={{
+                  shadowColor: "#d4af37",
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                  elevation: 8,
+                }}
+              >
+                <QrCode size={32} color="#1a1a1a" />
+              </View>
+              <ArrowDown size={32} color="#d4af37" />
+            </View>
+        </View>
+      );
+    }
+
     // Verificar si es usuario anónimo con pedido listo para facturar, independientemente del estado
     if (
       user?.profile_code === "cliente_anonimo" &&

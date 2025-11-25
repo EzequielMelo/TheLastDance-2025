@@ -14,6 +14,7 @@ router.get('/tables', ReservationsController.getTablesByType);
 router.get('/table-availability', ReservationsController.checkTableAvailability);
 router.get('/availability', ReservationsController.checkAvailability);
 router.get('/my-reservations', ReservationsController.getUserReservations);
+router.get('/upcoming', ReservationsController.getUpcomingReservation);
 router.get('/all', roleGuard(['dueno', 'supervisor']), ReservationsController.getAllReservations);
 router.get('/check-table-reserved', roleGuard(['dueno', 'supervisor', 'maitre']), ReservationsController.checkTableReserved);
 

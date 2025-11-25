@@ -55,6 +55,29 @@ export class ReservationsService {
   }
 
   /**
+   * Obtener próxima reserva del usuario (dentro de 45 minutos)
+   */
+  static async getUpcomingReservation(): Promise<{
+    time: string;
+    date: string;
+    tableNumber: string;
+    minutesUntil: number;
+  } | null> {
+    try {
+      const response = await api.get('/reservations/upcoming');
+      
+      if (!response.data.success) {
+        return null;
+      }
+      
+      return response.data.data;
+    } catch (error: any) {
+      console.error('Error fetching upcoming reservation:', error);
+      return null;
+    }
+  }
+
+  /**
    * Obtener mesas disponibles por tipo y capacidad
    */
   static async getTablesByType(

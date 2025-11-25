@@ -319,6 +319,18 @@ export async function activateTableHandler(req: Request, res: Response) {
     const result = await activateTableByClient(tableId, req.user.appUserId);
 
     if (!result.success) {
+      // Caso especial: llegada temprana (no es un error, es informativo)
+      if (result.earlyArrival) {
+        return res.status(200).json({
+          success: false,
+          earlyArrival: true,
+          message: result.message,
+          reservationTime: result.reservationTime,
+          userName: result.userName
+        });
+      }
+      
+      // Otros casos de error
       return res.status(400).json({ error: result.message });
     }
 

@@ -3027,6 +3027,21 @@ export async function confirmPaymentAndReleaseTable(
       // No falla la función por esto
     }
 
+    // 10. Emitir evento de socket para actualizar el estado del cliente en tiempo real
+    try {
+      const { emitClientStateUpdate } = await import(
+        "../../socket/clientStateSocket"
+      );
+      emitClientStateUpdate(payingClientId, "client:state-update", {
+        status: "not_in_queue",
+        message: "Pago confirmado. ¡Gracias por tu visita!",
+      });
+      console.log(`🔌 Evento de socket emitido al cliente ${payingClientId}: estado actualizado a not_in_queue`);
+    } catch (socketError) {
+      console.warn(`⚠️ Error emitiendo evento de socket:`, socketError);
+      // No falla la función por esto
+    }
+
     return {
       success: true,
       message: "Pago confirmado y mesa liberada exitosamente",
