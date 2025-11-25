@@ -156,8 +156,14 @@ export default function CartModal({
           .then(setDeliveryStatus)
           .catch(console.error);
       }
+    } else {
+      // Cuando el modal se cierra y no hay items en el carrito, resetear modo delivery
+      if (cartItems.length === 0 && isDeliveryOrder) {
+        setIsDeliveryOrder(false);
+        setDeliveryAddress(null);
+      }
     }
-  }, [visible, occupiedTable?.id]);
+  }, [visible, occupiedTable?.id, cartItems.length, isDeliveryOrder]);
 
   const fetchUserTable = async () => {
     try {
@@ -531,8 +537,8 @@ export default function CartModal({
                   marginLeft: 8,
                 }}
               >
-                {isDeliveryOrder
-                  ? "🚚 Pedido Delivery"
+                {isDeliveryOrder && cartItems.length > 0
+                  ? "Pedido Delivery"
                   : cartItems.length > 0
                     ? canAddMoreItems
                       ? "Nueva Tanda"
@@ -562,7 +568,7 @@ export default function CartModal({
               marginTop: 4,
             }}
           >
-            {isDeliveryOrder
+            {isDeliveryOrder && cartItems.length > 0
               ? `${cartCount} ${cartCount === 1 ? "producto" : "productos"} • Seleccioná tu ubicación en el siguiente paso`
               : cartItems.length > 0
                 ? canAddMoreItems
@@ -1001,7 +1007,7 @@ export default function CartModal({
               >
                 {loadingTable
                   ? "Verificando mesa..."
-                  : isDeliveryOrder
+                  : isDeliveryOrder && cartItems.length > 0
                     ? `Confirmar Pedido • ${formatPrice(cartAmount)}`
                     : canAddMoreItems
                       ? `Agregar Nueva Tanda • ${formatPrice(cartAmount)}`
