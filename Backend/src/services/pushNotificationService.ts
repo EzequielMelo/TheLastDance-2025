@@ -302,20 +302,35 @@ async function getDriverTokens(): Promise<string[]> {
 // Función para obtener token de un cliente específico
 async function getClientToken(clientId: string): Promise<string | null> {
   try {
+    console.log(`🔍 [getClientToken] Buscando push_token para cliente: ${clientId}`);
+    
     const { data: user, error } = await supabaseAdmin
       .from("users")
       .select("push_token")
       .eq("id", clientId)
       .single();
 
-    if (error || !user) {
+    if (error) {
+      console.error(`❌ [getClientToken] Error en query:`, error);
       return null;
     }
 
-    return user.push_token && user.push_token.trim() !== ""
-      ? user.push_token
-      : null;
+    if (!user) {
+      console.warn(`⚠️ [getClientToken] Usuario no encontrado: ${clientId}`);
+      return null;
+    }
+
+    const hasValidToken = user.push_token && user.push_token.trim() !== "";
+    
+    if (hasValidToken) {
+      console.log(`✅ [getClientToken] Token encontrado: ${user.push_token.substring(0, 20)}...`);
+    } else {
+      console.warn(`⚠️ [getClientToken] Cliente ${clientId} NO tiene push_token registrado`);
+    }
+
+    return hasValidToken ? user.push_token : null;
   } catch (error) {
+    console.error(`❌ [getClientToken] Exception:`, error);
     return null;
   }
 }

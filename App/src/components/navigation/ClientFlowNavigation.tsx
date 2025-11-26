@@ -119,7 +119,6 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
 
       // Verificar próxima reserva para clientes registrados
       const checkUpcomingReservation = async () => {
-        console.log("🔍 [ClientFlow] Verificando reservas - profile_code:", user?.profile_code);
         
         if (user?.profile_code === "cliente_registrado") {
           try {
@@ -190,17 +189,8 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
       return;
     }
 
-    console.log("🚀 Iniciando Socket.IO para items entregados...", {
-      userId: user.id,
-      tableId: occupiedTable.id,
-      profileCode: user.profile_code,
-      tokenLength: token.length,
-    });
-
     // Usar el token de sesión real (JWT de Supabase)
     const authToken = token;
-
-    console.log("🔑 Token JWT presente - longitud:", token.length);
 
     // Crear conexión Socket.IO
     const socket = io(SERVER_BASE_URL, {
@@ -214,18 +204,12 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log(
-        `🔌 Socket.IO CONECTADO - SocketId: ${socket.id}, Mesa: ${occupiedTable.id}`,
-      );
       socket.emit("join_table_room", occupiedTable.id);
     });
 
     socket.on(
       "joined_table_room",
       (data: { tableId: string; tableRoom: string }) => {
-        console.log(
-          `✅ CONFIRMACIÓN: Unido exitosamente a sala ${data.tableRoom}`,
-        );
       },
     );
 
@@ -235,10 +219,6 @@ const ClientFlowNavigation: React.FC<ClientFlowNavigationProps> = ({
         `📦 EVENTO RECIBIDO - Items entregados en mesa ${data.tableId}`,
       );
       if (data.tableId === occupiedTable.id) {
-        console.log(
-          "✅ TableId coincide - Recargando TODO el estado del cliente...",
-        );
-
         // Recargar TODO el estado del cliente (más robusto que solo actualizar números)
         refresh()
           .then(() => {

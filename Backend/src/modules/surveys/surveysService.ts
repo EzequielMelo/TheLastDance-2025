@@ -58,11 +58,10 @@ export class SurveysService {
       // 4. Verificar que haya pedidos activos (no pagados)
       const { data: unpaidOrders } = await supabaseAdmin
         .from("orders")
-        .select("id")
+        .select("id, user_id, is_paid, created_at")
         .eq("table_id", data.table_id)
         .eq("user_id", clientId)
         .eq("is_paid", false);
-
       if (!unpaidOrders || unpaidOrders.length === 0) {
         return {
           success: false,

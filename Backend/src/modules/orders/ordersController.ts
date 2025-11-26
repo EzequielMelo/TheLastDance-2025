@@ -457,8 +457,7 @@ export async function waiterOrderActionHandler(
           // Obtener información de la orden y mesa
           const { data: orderData, error: orderError } = await supabaseAdmin
             .from("orders")
-            .select(
-              `
+            .select(`
               user_id,
               table_id,
               order_items(
@@ -610,7 +609,7 @@ export async function waiterOrderActionHandler(
             .from("orders")
             .select(
               `
-              id_client,
+              user_id,
               table_id,
               tables(
                 number,
@@ -638,7 +637,7 @@ export async function waiterOrderActionHandler(
                 : "Mozo";
 
             await notifyClientOrderRejectedForModification(
-              orderData.id_client,
+              orderData.user_id,
               waiterName,
               tableData.number.toString(),
               rejectedItemIds.length,
@@ -1189,7 +1188,9 @@ export async function updateKitchenItemStatusHandler(
                   .eq("batch_id", batchId);
 
                 if (!batchError && batchItems) {
-                  const allReady = batchItems.every(item => item.status === "ready");
+                  // Filtrar items rechazados antes de verificar
+                  const nonRejectedItems = batchItems.filter(item => item.status !== "rejected");
+                  const allReady = nonRejectedItems.length > 0 && nonRejectedItems.every(item => item.status === "ready");
 
                   if (allReady) {
                     // Obtener información de la mesa y mozo
@@ -1211,17 +1212,17 @@ export async function updateKitchenItemStatusHandler(
                         ? `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim() || 'Cliente'
                         : 'Cliente';
 
-                      // Notificar al mozo
+                      // Notificar al mozo (con count de items no rechazados)
                       await notifyWaiterBatchReady(
                         tableData.id_waiter,
                         tableData.number.toString(),
                         clientName,
-                        batchItems.length,
+                        nonRejectedItems.length,
                         batchId,
                       );
 
                       console.log(
-                        `✅ Batch ${batchId} completo - Notificación enviada al mozo ${tableData.id_waiter}`,
+                        `✅ Batch ${batchId} completo (${nonRejectedItems.length} items no rechazados) - Notificación enviada al mozo ${tableData.id_waiter}`,
                       );
                     }
                   }
@@ -1246,7 +1247,7 @@ export async function updateKitchenItemStatusHandler(
         .select(
           `
           orders!inner(
-            id_client
+            user_id
           )
         `,
         )
@@ -1258,8 +1259,8 @@ export async function updateKitchenItemStatusHandler(
           ? itemData.orders[0]
           : itemData.orders;
 
-        if (order && "id_client" in order) {
-          emitClientStateUpdate(order.id_client, "client:state-update", {
+        if (order && "user_id" in order) {
+          emitClientStateUpdate(order.user_id, "client:state-update", {
             type: "item_status_updated",
             itemId,
             status,
@@ -1275,7 +1276,7 @@ export async function updateKitchenItemStatusHandler(
       message: result.message,
     });
   } catch (error: any) {
-    console.error("❌ Error actualizando status de item:", error);
+    console.error("❌ Error actualizando status de item (Kitchen):", error);
     res.status(500).json({
       success: false,
       message: "Error interno del servidor",
@@ -1489,7 +1490,9 @@ export async function updateBartenderItemStatusHandler(
                   .eq("batch_id", batchId);
 
                 if (!batchError && batchItems) {
-                  const allReady = batchItems.every(item => item.status === "ready");
+                  // Filtrar items rechazados antes de verificar
+                  const nonRejectedItems = batchItems.filter(item => item.status !== "rejected");
+                  const allReady = nonRejectedItems.length > 0 && nonRejectedItems.every(item => item.status === "ready");
 
                   if (allReady) {
                     // Obtener información de la mesa y mozo
@@ -1511,17 +1514,17 @@ export async function updateBartenderItemStatusHandler(
                         ? `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim() || 'Cliente'
                         : 'Cliente';
 
-                      // Notificar al mozo
+                      // Notificar al mozo (con count de items no rechazados)
                       await notifyWaiterBatchReady(
                         tableData.id_waiter,
                         tableData.number.toString(),
                         clientName,
-                        batchItems.length,
+                        nonRejectedItems.length,
                         batchId,
                       );
 
                       console.log(
-                        `✅ Batch ${batchId} completo - Notificación enviada al mozo ${tableData.id_waiter}`,
+                        `✅ Batch ${batchId} completo (${nonRejectedItems.length} items no rechazados) - Notificación enviada al mozo ${tableData.id_waiter}`,
                       );
                     }
                   }
@@ -1546,7 +1549,7 @@ export async function updateBartenderItemStatusHandler(
         .select(
           `
           orders!inner(
-            id_client
+            user_id
           )
         `,
         )
@@ -1558,8 +1561,8 @@ export async function updateBartenderItemStatusHandler(
           ? itemData.orders[0]
           : itemData.orders;
 
-        if (order && "id_client" in order) {
-          emitClientStateUpdate(order.id_client, "client:state-update", {
+        if (order && "user_id" in order) {
+          emitClientStateUpdate(order.user_id, "client:state-update", {
             type: "item_status_updated",
             itemId,
             status,
@@ -1575,7 +1578,7 @@ export async function updateBartenderItemStatusHandler(
       message: result.message,
     });
   } catch (error: any) {
-    console.error("❌ Error actualizando status de item de bar:", error);
+    console.error("❌ Error actualizando status de item de bar (Bartender):", error);
     res.status(500).json({
       success: false,
       message: "Error interno del servidor",
@@ -1698,9 +1701,8 @@ export async function rejectIndividualItemsHandler(
     try {
       const { data: orderData, error: orderError } = await supabaseAdmin
         .from("orders")
-        .select(
-          `
-          id_client,
+        .select(`
+          user_id,
           table_id,
           tables!inner(number, id_waiter)
         `,
@@ -1725,7 +1727,7 @@ export async function rejectIndividualItemsHandler(
             : "Mozo";
 
         await notifyClientOrderRejectedForModification(
-          orderData.id_client,
+          orderData.user_id,
           waiterName,
           tableData.number.toString(),
           parsed.itemIds.length,
