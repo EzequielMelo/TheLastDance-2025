@@ -31,7 +31,10 @@ const TABLE_SIZE = 70;
 const WALL_THICKNESS = 8; // Grosor de las paredes
 
 // Velocidad de movimiento
-const GYRO_SPEED = 15; // Velocidad de movimiento con giroscopio (aumentada)
+const GYRO_SPEED = 25; // Velocidad base de movimiento con giroscopio
+const GYRO_MULTIPLIER_X = 3.0; // Multiplicador para movimiento vertical (adelante/atrás)
+const GYRO_MULTIPLIER_Y = 6.0; // Multiplicador para movimiento lateral (izquierda/derecha)
+const GYRO_THRESHOLD = 0.05; // Umbral más bajo = más sensible (reducido de 0.1)
 const SLIP_SPEED = 80; // Distancia del resbalón (reducida)
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -213,26 +216,24 @@ export default function WaiterMazeGame() {
 
   // Configurar giroscopio para control completo (x e y)
   const startGyroscope = () => {
-    Gyroscope.setUpdateInterval(30);
+    Gyroscope.setUpdateInterval(16); // ~60fps para mayor fluidez
     gyroSubscription.current = Gyroscope.addListener(gyroscopeData => {
       if (gameOver || won || isSlipping) return;
 
       const { x, y } = gyroscopeData; // x = adelante/atrás, y = izquierda/derecha
 
       setWaiterPos(prevPos => {
-        const threshold = 0.1; // Umbral más bajo = más sensible
-
         let newX = prevPos.x;
         let newY = prevPos.y;
 
-        // Movimiento lateral (eje Y del giroscopio) - MUCHO MÁS SENSIBLE
-        if (Math.abs(y) > threshold) {
-          newX = prevPos.x + y * GYRO_SPEED * 4; // 2.5x más sensible en eje Y
+        // Movimiento lateral (eje Y del giroscopio) - MUY SENSIBLE
+        if (Math.abs(y) > GYRO_THRESHOLD) {
+          newX = prevPos.x + y * GYRO_SPEED * GYRO_MULTIPLIER_Y;
         }
 
-        // Movimiento vertical (eje X del giroscopio) - MÁS SENSIBLE
-        if (Math.abs(x) > threshold) {
-          newY = prevPos.y + x * GYRO_SPEED * 1.3; // 1.3x más sensible en eje X
+        // Movimiento vertical (eje X del giroscopio) - SENSIBLE
+        if (Math.abs(x) > GYRO_THRESHOLD) {
+          newY = prevPos.y + x * GYRO_SPEED * GYRO_MULTIPLIER_X;
         }
 
         // Verificar colisión con bordes (solo cuando el sprite realmente toca la pared)

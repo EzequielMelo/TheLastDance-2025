@@ -113,7 +113,10 @@ export class InvoiceService {
   ): Promise<{ success: boolean; htmlContent?: string; error?: string }> {
     try {
       // Obtener datos de la factura desde delivery
-      const invoiceData = await this.getDeliveryInvoiceData(deliveryId, clientId);
+      const invoiceData = await this.getDeliveryInvoiceData(
+        deliveryId,
+        clientId,
+      );
 
       if (!invoiceData) {
         return {
@@ -144,7 +147,10 @@ export class InvoiceService {
   }> {
     try {
       // Obtener datos de la factura desde delivery
-      const invoiceData = await this.getDeliveryInvoiceData(deliveryId, clientId);
+      const invoiceData = await this.getDeliveryInvoiceData(
+        deliveryId,
+        clientId,
+      );
 
       if (!invoiceData) {
         return {
@@ -214,7 +220,7 @@ export class InvoiceService {
           id,
           total_amount,
           created_at,
-          order_items!inner (
+          order_items (
             id,
             quantity,
             unit_price,
@@ -231,7 +237,6 @@ export class InvoiceService {
         .eq("table_id", tableId)
         .eq("user_id", clientId)
         .eq("is_paid", false) // CORREGIDO: Consultar órdenes NO pagadas
-        .eq("order_items.status", "delivered")
         .order("created_at", { ascending: true });
 
       if (ordersError) {
@@ -246,6 +251,51 @@ export class InvoiceService {
         throw new Error("No se encontraron órdenes pendientes de pago");
       }
 
+      console.log(
+        `📦 Órdenes encontradas: ${orders.length}, IDs: ${orders.map((o: any) => o.id).join(", ")}`,
+      );
+
+      // Obtener solo order_items que NO estén rechazados
+      const { data: orderItems, error: itemsError } = await supabaseAdmin
+        .from("order_items")
+        .select(
+          `
+          id,
+          order_id,
+          quantity,
+          unit_price,
+          subtotal,
+          status,
+          menu_items (
+            id,
+            name,
+            category
+          )
+        `,
+        )
+        .in(
+          "order_id",
+          orders.map((o: any) => o.id),
+        )
+        .neq("status", "rejected") // Excluir explícitamente items rechazados
+        .order("order_id", { ascending: true });
+
+      if (itemsError) {
+        console.error("Error obteniendo items:", itemsError);
+        throw new Error("Error obteniendo items");
+      }
+
+      console.log(
+        `📋 Total de items NO rechazados para factura: ${orderItems?.length || 0}`,
+      );
+
+      // Log detallado de cada item
+      orderItems?.forEach((item: any) => {
+        console.log(
+          `  📄 Item ID: ${item.id}, Status: ${item.status}, Producto: ${item.menu_items?.name || "unknown"}`,
+        );
+      });
+
       // Formatear los datos
       const clientName =
         `${clientData.first_name} ${clientData.last_name}`.trim();
@@ -255,26 +305,29 @@ export class InvoiceService {
         ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
         : "N/A";
 
-      // Procesar los datos exactamente como lo hace billController.ts
+      // Procesar los items (ya filtrados desde la BD)
       let billItems: any[] = [];
       let subtotal = 0;
 
-      orders?.forEach(order => {
-        order.order_items?.forEach((item: any) => {
-          const menuItem = Array.isArray(item.menu_items)
-            ? item.menu_items[0]
-            : item.menu_items;
-          billItems.push({
-            id: item.id,
-            name: menuItem?.name || "Item desconocido",
-            category: menuItem?.category || "Sin categoría",
-            quantity: item.quantity,
-            price: item.unit_price,
-            total: item.subtotal,
-          });
-          subtotal += item.subtotal;
+      orderItems?.forEach((item: any) => {
+        const menuItem = Array.isArray(item.menu_items)
+          ? item.menu_items[0]
+          : item.menu_items;
+
+        billItems.push({
+          id: item.id,
+          name: menuItem?.name || "Item desconocido",
+          category: menuItem?.category || "Sin categoría",
+          quantity: item.quantity,
+          price: item.unit_price,
+          total: item.subtotal,
         });
+        subtotal += item.subtotal;
       });
+
+      console.log(
+        `💰 Items procesados para factura: ${billItems.length}, Subtotal: $${subtotal}`,
+      );
 
       const formattedOrders = [
         {
@@ -607,12 +660,15 @@ export class InvoiceService {
     clientId: string,
   ): Promise<InvoiceData | null> {
     try {
-      console.log(`📋 Obteniendo datos de factura para delivery: ${deliveryId}, cliente: ${clientId}`);
-      
+      console.log(
+        `📋 Obteniendo datos de factura para delivery: ${deliveryId}, cliente: ${clientId}`,
+      );
+
       // Obtener datos del delivery con orden y repartidor
       const { data: deliveryData, error: deliveryError } = await supabaseAdmin
         .from("deliveries")
-        .select(`
+        .select(
+          `
           id,
           delivery_address,
           driver_id,
@@ -633,18 +689,26 @@ export class InvoiceService {
               )
             )
           )
-        `)
+        `,
+        )
         .eq("id", deliveryId)
         .eq("user_id", clientId)
         .single();
 
       if (deliveryError || !deliveryData) {
-        console.error(`❌ Error obteniendo datos de delivery ${deliveryId}:`, deliveryError);
-        console.error(`❌ Parámetros: deliveryId=${deliveryId}, clientId=${clientId}`);
+        console.error(
+          `❌ Error obteniendo datos de delivery ${deliveryId}:`,
+          deliveryError,
+        );
+        console.error(
+          `❌ Parámetros: deliveryId=${deliveryId}, clientId=${clientId}`,
+        );
         throw new Error(`Delivery no encontrado o no pertenece al cliente`);
       }
-      
-      console.log(`✅ Delivery obtenido correctamente, order_id: ${deliveryData.delivery_order_id}`);
+
+      console.log(
+        `✅ Delivery obtenido correctamente, order_id: ${deliveryData.delivery_order_id}`,
+      );
 
       // Obtener datos del cliente
       const { data: clientData, error: clientError } = await supabaseAdmin
@@ -670,8 +734,10 @@ export class InvoiceService {
         throw new Error("Error obteniendo datos del repartidor");
       }
 
-      const clientName = `${clientData.first_name} ${clientData.last_name}`.trim();
-      const driverName = `${driverData.first_name} ${driverData.last_name}`.trim();
+      const clientName =
+        `${clientData.first_name} ${clientData.last_name}`.trim();
+      const driverName =
+        `${driverData.first_name} ${driverData.last_name}`.trim();
 
       // Procesar items del delivery_order
       let billItems: any[] = [];
@@ -680,6 +746,14 @@ export class InvoiceService {
       const deliveryOrder = deliveryData.delivery_order as any;
       if (deliveryOrder?.delivery_order_items) {
         deliveryOrder.delivery_order_items.forEach((item: any) => {
+          // Filtro: excluir items rechazados si tienen status
+          if (item.status && item.status === "rejected") {
+            console.log(
+              `⏭️ Omitiendo item rechazado en factura delivery: ${item.id}`,
+            );
+            return;
+          }
+
           const menuItem = item.menu_item;
           billItems.push({
             id: item.id,
@@ -738,9 +812,10 @@ export class InvoiceService {
 
     // Generar nombre único para el archivo
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const fileName = data.tableNumber === "DELIVERY" 
-      ? `factura-delivery-${timestamp}.html`
-      : `factura-mesa-${data.tableNumber}-${timestamp}.html`;
+    const fileName =
+      data.tableNumber === "DELIVERY"
+        ? `factura-delivery-${timestamp}.html`
+        : `factura-mesa-${data.tableNumber}-${timestamp}.html`;
     const filePath = path.join(invoicesDir, fileName);
 
     // Guardar el archivo

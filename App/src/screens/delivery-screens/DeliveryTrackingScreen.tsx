@@ -87,8 +87,14 @@ const DeliveryTrackingScreen: React.FC = () => {
     deliveryRef.current = delivery; // 📌 Actualizar ref
   }, [delivery]);
 
-  // Obtener permisos de ubicación
+  // Obtener permisos de ubicación SOLO si soy el repartidor
   useEffect(() => {
+    if (!user || !delivery) return;
+
+    // Solo obtener ubicación GPS si soy el repartidor
+    const isDriver = delivery.driver_id === user.id;
+    if (!isDriver) return;
+
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -133,7 +139,7 @@ const DeliveryTrackingScreen: React.FC = () => {
         console.error("Error obteniendo ubicación:", error);
       }
     })();
-  }, []);
+  }, [user, delivery]);
 
   // PanResponder para el botón deslizable
   const panResponder = useRef(

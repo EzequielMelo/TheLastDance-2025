@@ -77,7 +77,10 @@ export default function WaiterOrdersScreen() {
       setActiveOrders(active);
     } catch (error: any) {
       console.error("Error obteniendo datos del mozo:", error);
-      ToastAndroid.show("❌ No se pudieron cargar los datos", ToastAndroid.SHORT);
+      ToastAndroid.show(
+        "❌ No se pudieron cargar los datos",
+        ToastAndroid.SHORT,
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -107,14 +110,17 @@ export default function WaiterOrdersScreen() {
 
       ToastAndroid.show(
         `✅ Tanda ${action === "accept" ? "aceptada" : "rechazada"} correctamente`,
-        ToastAndroid.SHORT
+        ToastAndroid.SHORT,
       );
 
       // Refrescar datos
       await fetchOrders();
     } catch (error: any) {
       console.error("Error procesando acción del mozo:", error);
-      ToastAndroid.show(`❌ Error: ${error.message || "Error procesando la acción"}`, ToastAndroid.SHORT);
+      ToastAndroid.show(
+        `❌ Error: ${error.message || "Error procesando la acción"}`,
+        ToastAndroid.SHORT,
+      );
     } finally {
       setActionLoading(null);
     }
@@ -154,7 +160,10 @@ export default function WaiterOrdersScreen() {
     const rejectedItemIds = selectedItems[batchKey] || [];
 
     if (rejectedItemIds.length === 0) {
-      ToastAndroid.show("⚠️ Selecciona al menos un producto que no está disponible", ToastAndroid.SHORT);
+      ToastAndroid.show(
+        "⚠️ Selecciona al menos un producto que no está disponible",
+        ToastAndroid.SHORT,
+      );
       return;
     }
 
@@ -170,7 +179,7 @@ export default function WaiterOrdersScreen() {
 
       ToastAndroid.show(
         `✅ Tanda procesada: ${rejectedItemIds.length} items sin stock, el resto disponible para modificar`,
-        ToastAndroid.LONG
+        ToastAndroid.LONG,
       );
 
       // Limpiar selección y modo
@@ -181,7 +190,10 @@ export default function WaiterOrdersScreen() {
       await fetchOrders();
     } catch (error: any) {
       console.error("Error procesando rechazo con selección:", error);
-      ToastAndroid.show(`❌ Error: ${error.message || "Error procesando la acción"}`, ToastAndroid.SHORT);
+      ToastAndroid.show(
+        `❌ Error: ${error.message || "Error procesando la acción"}`,
+        ToastAndroid.SHORT,
+      );
     } finally {
       setActionLoading(null);
     }
@@ -914,8 +926,12 @@ export default function WaiterOrdersScreen() {
                             fontSize: 12,
                           }}
                         >
-                          {order.order_items.length} producto
-                          {order.order_items.length > 1 ? "s" : ""}
+                          {(() => {
+                            const validItemsCount = order.order_items.filter(
+                              item => item.status !== "rejected",
+                            ).length;
+                            return `${validItemsCount} producto${validItemsCount !== 1 ? "s" : ""}`;
+                          })()}
                         </Text>
                       </View>
                     </View>

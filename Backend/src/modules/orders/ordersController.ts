@@ -1122,20 +1122,25 @@ export async function updateKitchenItemStatusHandler(
           if (batchId) {
             if (isDelivery && deliveryItemData) {
               // === FLUJO PARA DELIVERY ===
-              const deliveryOrder = Array.isArray(deliveryItemData.delivery_orders)
+              const deliveryOrder = Array.isArray(
+                deliveryItemData.delivery_orders,
+              )
                 ? deliveryItemData.delivery_orders[0]
                 : deliveryItemData.delivery_orders;
 
               if (deliveryOrder) {
                 // Verificar si todos los items del batch están ready
-                const { data: batchItems, error: batchError } = await supabaseAdmin
-                  .from("delivery_order_items")
-                  .select("id, status")
-                  .eq("delivery_order_id", deliveryOrder.id)
-                  .eq("batch_id", batchId);
+                const { data: batchItems, error: batchError } =
+                  await supabaseAdmin
+                    .from("delivery_order_items")
+                    .select("id, status")
+                    .eq("delivery_order_id", deliveryOrder.id)
+                    .eq("batch_id", batchId);
 
                 if (!batchError && batchItems) {
-                  const allReady = batchItems.every(item => item.status === "ready");
+                  const allReady = batchItems.every(
+                    item => item.status === "ready",
+                  );
 
                   if (allReady) {
                     // Obtener información del delivery
@@ -1153,10 +1158,13 @@ export async function updateKitchenItemStatusHandler(
                       .single();
 
                     const clientName = clientData
-                      ? `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim() || 'Cliente'
-                      : 'Cliente';
+                      ? `${clientData.first_name || ""} ${clientData.last_name || ""}`.trim() ||
+                        "Cliente"
+                      : "Cliente";
 
-                    const deliveryAddress = deliveryData?.delivery_address || 'Dirección no especificada';
+                    const deliveryAddress =
+                      deliveryData?.delivery_address ||
+                      "Dirección no especificada";
 
                     // Notificar a TODOS los repartidores
                     await notifyDriversDeliveryBatchReady(
@@ -1181,11 +1189,12 @@ export async function updateKitchenItemStatusHandler(
 
               if (order) {
                 // Verificar si todos los items del batch están ready
-                const { data: batchItems, error: batchError } = await supabaseAdmin
-                  .from("order_items")
-                  .select("id, status")
-                  .eq("order_id", order.id)
-                  .eq("batch_id", batchId);
+                const { data: batchItems, error: batchError } =
+                  await supabaseAdmin
+                    .from("order_items")
+                    .select("id, status")
+                    .eq("order_id", order.id)
+                    .eq("batch_id", batchId);
 
                 if (!batchError && batchItems) {
                   // Filtrar items rechazados antes de verificar
@@ -1194,13 +1203,18 @@ export async function updateKitchenItemStatusHandler(
 
                   if (allReady) {
                     // Obtener información de la mesa y mozo
-                    const { data: tableData, error: tableError } = await supabaseAdmin
-                      .from("tables")
-                      .select("number, id_waiter, id_client")
-                      .eq("id", order.table_id)
-                      .single();
+                    const { data: tableData, error: tableError } =
+                      await supabaseAdmin
+                        .from("tables")
+                        .select("number, id_waiter, id_client")
+                        .eq("id", order.table_id)
+                        .single();
 
-                    if (!tableError && tableData?.id_waiter && tableData?.id_client) {
+                    if (
+                      !tableError &&
+                      tableData?.id_waiter &&
+                      tableData?.id_client
+                    ) {
                       // Obtener nombre del cliente
                       const { data: clientData } = await supabaseAdmin
                         .from("users")
@@ -1209,8 +1223,9 @@ export async function updateKitchenItemStatusHandler(
                         .single();
 
                       const clientName = clientData
-                        ? `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim() || 'Cliente'
-                        : 'Cliente';
+                        ? `${clientData.first_name || ""} ${clientData.last_name || ""}`.trim() ||
+                          "Cliente"
+                        : "Cliente";
 
                       // Notificar al mozo (con count de items no rechazados)
                       await notifyWaiterBatchReady(
@@ -1424,20 +1439,25 @@ export async function updateBartenderItemStatusHandler(
           if (batchId) {
             if (isDelivery && deliveryItemData) {
               // === FLUJO PARA DELIVERY ===
-              const deliveryOrder = Array.isArray(deliveryItemData.delivery_orders)
+              const deliveryOrder = Array.isArray(
+                deliveryItemData.delivery_orders,
+              )
                 ? deliveryItemData.delivery_orders[0]
                 : deliveryItemData.delivery_orders;
 
               if (deliveryOrder) {
                 // Verificar si todos los items del batch están ready
-                const { data: batchItems, error: batchError } = await supabaseAdmin
-                  .from("delivery_order_items")
-                  .select("id, status")
-                  .eq("delivery_order_id", deliveryOrder.id)
-                  .eq("batch_id", batchId);
+                const { data: batchItems, error: batchError } =
+                  await supabaseAdmin
+                    .from("delivery_order_items")
+                    .select("id, status")
+                    .eq("delivery_order_id", deliveryOrder.id)
+                    .eq("batch_id", batchId);
 
                 if (!batchError && batchItems) {
-                  const allReady = batchItems.every(item => item.status === "ready");
+                  const allReady = batchItems.every(
+                    item => item.status === "ready",
+                  );
 
                   if (allReady) {
                     // Obtener información del delivery
@@ -1455,10 +1475,13 @@ export async function updateBartenderItemStatusHandler(
                       .single();
 
                     const clientName = clientData
-                      ? `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim() || 'Cliente'
-                      : 'Cliente';
+                      ? `${clientData.first_name || ""} ${clientData.last_name || ""}`.trim() ||
+                        "Cliente"
+                      : "Cliente";
 
-                    const deliveryAddress = deliveryData?.delivery_address || 'Dirección no especificada';
+                    const deliveryAddress =
+                      deliveryData?.delivery_address ||
+                      "Dirección no especificada";
 
                     // Notificar a TODOS los repartidores
                     await notifyDriversDeliveryBatchReady(
@@ -1483,11 +1506,12 @@ export async function updateBartenderItemStatusHandler(
 
               if (order) {
                 // Verificar si todos los items del batch están ready
-                const { data: batchItems, error: batchError } = await supabaseAdmin
-                  .from("order_items")
-                  .select("id, status")
-                  .eq("order_id", order.id)
-                  .eq("batch_id", batchId);
+                const { data: batchItems, error: batchError } =
+                  await supabaseAdmin
+                    .from("order_items")
+                    .select("id, status")
+                    .eq("order_id", order.id)
+                    .eq("batch_id", batchId);
 
                 if (!batchError && batchItems) {
                   // Filtrar items rechazados antes de verificar
@@ -1496,13 +1520,18 @@ export async function updateBartenderItemStatusHandler(
 
                   if (allReady) {
                     // Obtener información de la mesa y mozo
-                    const { data: tableData, error: tableError } = await supabaseAdmin
-                      .from("tables")
-                      .select("number, id_waiter, id_client")
-                      .eq("id", order.table_id)
-                      .single();
+                    const { data: tableData, error: tableError } =
+                      await supabaseAdmin
+                        .from("tables")
+                        .select("number, id_waiter, id_client")
+                        .eq("id", order.table_id)
+                        .single();
 
-                    if (!tableError && tableData?.id_waiter && tableData?.id_client) {
+                    if (
+                      !tableError &&
+                      tableData?.id_waiter &&
+                      tableData?.id_client
+                    ) {
                       // Obtener nombre del cliente
                       const { data: clientData } = await supabaseAdmin
                         .from("users")
@@ -1511,8 +1540,9 @@ export async function updateBartenderItemStatusHandler(
                         .single();
 
                       const clientName = clientData
-                        ? `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim() || 'Cliente'
-                        : 'Cliente';
+                        ? `${clientData.first_name || ""} ${clientData.last_name || ""}`.trim() ||
+                          "Cliente"
+                        : "Cliente";
 
                       // Notificar al mozo (con count de items no rechazados)
                       await notifyWaiterBatchReady(
@@ -2411,23 +2441,29 @@ export async function getAnonymousOrderData(
       console.error("Error obteniendo datos de mesa:", tableError);
     }
 
-    // Obtener items de la orden
+    // Obtener items de la orden (excluir rechazados)
     const { data: orderItems, error: itemsError } = await supabaseAdmin
       .from("order_items")
       .select(
         `
         quantity,
         unit_price,
+        status,
         menu_items(name, description, category)
       `,
       )
-      .eq("order_id", order.id);
+      .eq("order_id", order.id)
+      .neq("status", "rejected"); // Excluir items rechazados
 
     if (itemsError) {
       console.error("Error obteniendo items de la orden:", itemsError);
       res.status(500).json({ error: "Error obteniendo items del pedido" });
       return;
     }
+
+    console.log(
+      `📋 Items obtenidos para factura anónima (sin rejected): ${orderItems?.length || 0}`,
+    );
 
     // Formatear datos básicos para el PDF
     const tableNumber = tableData?.number || "N/A";
