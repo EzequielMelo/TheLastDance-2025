@@ -323,6 +323,9 @@ const DeliveryLocationScreen: React.FC = () => {
       return;
     }
 
+    // 🚚 Activar modo delivery ANTES de guardar la dirección
+    setIsDeliveryOrder(true);
+    
     // Guardar la dirección de delivery en el contexto
     setDeliveryAddress({
       address: address,
@@ -331,8 +334,8 @@ const DeliveryLocationScreen: React.FC = () => {
       notes: notes || undefined,
     });
 
-    // Navegar al menú para que el cliente seleccione productos
-    navigation.navigate("Menu");
+    // Navegar al menú con parámetro para indicar que es delivery
+    navigation.navigate("Menu", { isDeliveryMode: true });
   };
 
   return (

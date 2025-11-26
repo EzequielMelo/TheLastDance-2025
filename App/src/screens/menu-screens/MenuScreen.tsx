@@ -97,11 +97,28 @@ export default function MenuScreen() {
     hasPendingOrder,
     refreshOrders,
     isDeliveryOrder,
-    deliveryAddress,
+    deliveryAddress, // 🚚 Para pasar al CartModal
+    setIsDeliveryOrder,
   } = useCart();
 
-  // El cliente no está sentado en una mesa (excepto si es delivery o tiene dirección de delivery)
-  const isNotSeated = clientState !== "seated" && !isDeliveryOrder && !deliveryAddress;
+  // 🚚 Detectar si venimos de DeliveryLocationScreen via parámetros de navegación
+  const isDeliveryMode = route.params?.isDeliveryMode || false;
+
+  // 🚚 Ref para controlar que solo se active una vez por sesión
+  const deliveryModeActivated = useRef(false);
+
+  // 🚚 Efecto para sincronizar el contexto cuando se detecta el parámetro isDeliveryMode
+  useEffect(() => {
+    if (isDeliveryMode && !deliveryModeActivated.current) {
+      console.log("🚚 MenuScreen: Activando modo delivery desde parámetro de navegación");
+      setIsDeliveryOrder(true);
+      deliveryModeActivated.current = true;
+    }
+  }, [isDeliveryMode, setIsDeliveryOrder]);
+
+  // El cliente está bloqueado si NO está sentado Y NO es un pedido delivery
+  // Si es delivery (parámetro, contexto o dirección), NO está bloqueado
+  const isNotSeated = clientState !== "seated" && !(isDeliveryMode || isDeliveryOrder || deliveryAddress);
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [allMenuItems, setAllMenuItems] = useState<MenuItem[]>([]); // Todos los items sin filtrar
@@ -1403,6 +1420,8 @@ export default function MenuScreen() {
         <CartModal
           visible={cartModalVisible}
           onClose={() => setCartModalVisible(false)}
+          forceDeliveryMode={isDeliveryMode}
+          deliveryAddressProp={deliveryAddress}
         />
       </LinearGradient>
 
@@ -1809,6 +1828,8 @@ export default function MenuScreen() {
         <CartModal
           visible={cartModalVisible}
           onClose={() => setCartModalVisible(false)}
+          forceDeliveryMode={isDeliveryMode}
+          deliveryAddressProp={deliveryAddress}
           showCustomAlert={showCustomAlert}
         />
       )}

@@ -49,6 +49,7 @@ export type RootStackParamList = {
         mode?: "normal" | "modify-rejected";
         rejectedItems?: any[];
         orderId?: string;
+        isDeliveryMode?: boolean;
       }
     | undefined; // Menú para clientes
   WaiterDashboard: undefined; // Panel del mesero

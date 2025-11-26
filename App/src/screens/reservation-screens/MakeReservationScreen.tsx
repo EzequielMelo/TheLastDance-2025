@@ -241,6 +241,29 @@ export default function MakeReservationScreen({
       showCustomAlert("Error", "La hora debe estar entre 19:00 y 02:30");
       return false;
     }
+
+    // Validar que la reserva sea con al menos 15 minutos de anticipación
+    const [hours, minutes] = selectedTime.split(':').map(Number);
+    const reservationDateTime = new Date(selectedDate);
+    reservationDateTime.setHours(hours ?? 0, minutes ?? 0, 0, 0);
+    
+    const now = new Date();
+    const diffInMinutes = (reservationDateTime.getTime() - now.getTime()) / (1000 * 60);
+    
+    if (diffInMinutes < 15) {
+      setAlertConfig({
+        title: "Tiempo de anticipación",
+        message: "La reserva debe ser con al menos 15 minutos de anticipación. Por favor selecciona otro horario.",
+        type: "info",
+        buttons: [{
+          text: "Entendido",
+          onPress: () => setShowAlert(false),
+        }],
+      });
+      setShowAlert(true);
+      return false;
+    }
+
     return true;
   };
 
@@ -264,19 +287,7 @@ export default function MakeReservationScreen({
           ? "VIP"
           : "Accesible";
 
-    showCustomAlert(
-      "Confirmar Reserva",
-      `Por favor confirma los detalles de tu reserva:\n\n` +
-        `📅 Fecha: ${formatDateForDisplay(selectedDate)}\n` +
-        `🕐 Hora: ${selectedTime}\n` +
-        `🪑 Tipo de mesa: ${tableTypeLabel}\n` +
-        `👥 Cantidad de personas: ${partySize}\n` +
-        `🏷️ Mesa: ${selectedTable.number}`,
-      "warning",
-      undefined,
-    );
-
-    // Cambiar el alert para tener botones personalizados
+    // Solo usar setAlertConfig con botones personalizados
     setAlertConfig({
       title: "Confirmar Reserva",
       message:
@@ -297,7 +308,10 @@ export default function MakeReservationScreen({
           text: "Reservar",
           onPress: () => {
             setShowAlert(false);
-            handleSubmit();
+            // Pequeño delay para asegurar que el alert anterior se cierre completamente
+            setTimeout(() => {
+              handleSubmit();
+            }, 300);
           },
         },
       ],
@@ -339,9 +353,20 @@ export default function MakeReservationScreen({
       navigation.navigate("MyReservations");
     } catch (error: any) {
       console.error("Error creating reservation:", error);
+      
+      // Extraer el mensaje de error correcto de Axios
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          "No se pudo crear la reserva. Intenta nuevamente.";
+      
+      // Determinar el tipo de alerta según el mensaje de error
+      const isTimeValidationError = errorMessage.includes("15 minutos de anticipación");
+      
       showCustomAlert(
-        "Error",
-        error.message || "No se pudo crear la reserva. Intenta nuevamente.",
+        isTimeValidationError ? "Tiempo insuficiente" : "Error",
+        errorMessage,
+        isTimeValidationError ? "warning" : "error",
       );
     } finally {
       setLoading(false);
