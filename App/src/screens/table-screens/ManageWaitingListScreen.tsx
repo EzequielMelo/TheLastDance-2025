@@ -1027,7 +1027,7 @@ function ClientCard({
     <View
       className={`rounded-xl p-4 mb-3 ${isVip ? "bg-yellow-500/10 border border-yellow-500/30" : "bg-white/5"}`}
     >
-      <View className="flex-row items-start justify-between">
+      <View className="flex-row items-start">
         <View className="flex-row flex-1">
           {/* Avatar */}
           {client.users.profile_image ? (
@@ -1058,7 +1058,7 @@ function ClientCard({
           )}
 
           <View className="flex-1">
-            <View className="flex-row items-center">
+            <View className="flex-row items-center flex-wrap">
               {isVip && <Crown size={18} color="#d4af37" />}
               <Text
                 className={`font-bold ${isVip ? "text-yellow-400 ml-2 text-lg" : "text-white text-lg ml-2"}`}
@@ -1115,16 +1115,19 @@ function ClientCard({
             )}
           </View>
         </View>
+      </View>
 
-        <View className="ml-3">
-          <TouchableOpacity
-            onPress={onAssign}
-            className="bg-green-600 rounded-lg px-3 py-2 flex-row items-center"
-          >
-            <CheckCircle size={16} color="white" />
-            <Text className="text-white text-sm ml-1 font-medium">Asignar</Text>
-          </TouchableOpacity>
-        </View>
+      {/* Botón Asignar movido al final */}
+      <View className="mt-3">
+        <TouchableOpacity
+          onPress={onAssign}
+          className="bg-green-600 rounded-lg py-3 flex-row items-center justify-center"
+        >
+          <CheckCircle size={18} color="white" />
+          <Text className="text-white text-base ml-2 font-semibold">
+            Asignar Mesa
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -1177,7 +1180,9 @@ function TableCard({
         <Text className={`font-bold text-2xl ${stateConfig[tableState].text}`}>
           {table.number}
         </Text>
-        <Text className="text-gray-400 text-sm mt-1">{table.capacity} personas</Text>
+        <Text className="text-gray-400 text-sm mt-1">
+          {table.capacity} personas
+        </Text>
         <Text className="text-gray-400 text-sm">{table.type}</Text>
 
         {tableState === "occupied" ? (
@@ -1222,7 +1227,9 @@ function TableCard({
                 )}
               </>
             )}
-            <Text className="text-yellow-400 text-sm mt-1 font-medium">Asignada</Text>
+            <Text className="text-yellow-400 text-sm mt-1 font-medium">
+              Asignada
+            </Text>
             <Text className="text-gray-400 text-sm">
               Esperando confirmación
             </Text>
@@ -1270,7 +1277,9 @@ function TableCard({
             </TouchableOpacity>
           </>
         ) : (
-          <Text className="text-green-400 text-sm mt-1 font-medium">Disponible</Text>
+          <Text className="text-green-400 text-sm mt-1 font-medium">
+            Disponible
+          </Text>
         )}
       </View>
     </View>

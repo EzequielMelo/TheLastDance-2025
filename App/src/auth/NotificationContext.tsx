@@ -9,12 +9,42 @@ import Constants from "expo-constants";
 import { NotificationService } from "../services/notificationService";
 import { AuthContext } from "./AuthContext";
 import api from "../api/axios";
+import { useChatNotificationHandler } from "../Hooks/useChatNotificationHandler";
+import CustomAlert from "../components/common/CustomAlert";
+import CustomAlert from "../components/common/CustomAlert";
+
+interface CustomAlertConfig {
+  visible: boolean;
+  title: string;
+  message: string;
+  type: "success" | "error" | "warning" | "info";
+  buttons: Array<{
+    text: string;
+    onPress?: () => void;
+    style?: "default" | "cancel" | "destructive";
+  }>;
+}
 
 interface NotificationContextType {
   expoPushToken: string | null;
   sendTokenToBackend: () => Promise<void>;
   showTestNotification: () => Promise<void>;
   setupPaymentNotificationHandler: (handler: (data: any) => void) => void;
+  showCustomAlert: {
+    // Sobrecarga 1: Formato antiguo (para compatibilidad)
+    (
+      title: string,
+      message: string,
+      type?: "success" | "error" | "warning" | "info",
+      buttons?: Array<{
+        text: string;
+        onPress?: () => void;
+        style?: "default" | "cancel" | "destructive";
+      }>,
+    ): void;
+    // Sobrecarga 2: Formato nuevo (objeto config)
+    (config: Omit<CustomAlertConfig, "visible">): void;
+  };
 }
 
 const NotificationContext = createContext<NotificationContextType>({
@@ -22,6 +52,7 @@ const NotificationContext = createContext<NotificationContextType>({
   sendTokenToBackend: async () => {},
   showTestNotification: async () => {},
   setupPaymentNotificationHandler: () => {},
+  showCustomAlert: () => {},
 });
 
 export const useNotifications = () => useContext(NotificationContext);
@@ -35,12 +66,23 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 }) => {
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const { user, token } = useContext(AuthContext);
+  const [alertConfig, setAlertConfig] = useState<CustomAlertConfig>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+    buttons: [{ text: "OK" }],
+  });
+
+  // Hook para manejar notificaciones de chat (mesa y delivery)
+  useChatNotificationHandler();
 
   useEffect(() => {
     setupNotifications();
   }, []);
 
   useEffect(() => {
+    // Enviar token tanto para usuarios registrados como anónimos
     if (user && token && expoPushToken) {
       sendTokenToBackend();
     }
@@ -125,6 +167,31 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     );
   };
 
+  const showCustomAlert = (
+    titleOrConfig: string | Omit<CustomAlertConfig, "visible">,
+    message?: string,
+    type: "success" | "error" | "warning" | "info" = "info",
+    buttons: Array<{
+      text: string;
+      onPress?: () => void;
+      style?: "default" | "cancel" | "destructive";
+    }> = [{ text: "OK" }],
+  ) => {
+    // Si el primer argumento es un objeto, usar formato nuevo
+    if (typeof titleOrConfig === "object") {
+      setAlertConfig({ visible: true, ...titleOrConfig });
+    } else {
+      // Formato antiguo (compatibilidad)
+      setAlertConfig({
+        visible: true,
+        title: titleOrConfig,
+        message: message || "",
+        type,
+        buttons,
+      });
+    }
+  };
+
   return (
     <NotificationContext.Provider
       value={{
@@ -132,9 +199,18 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         sendTokenToBackend,
         showTestNotification,
         setupPaymentNotificationHandler,
+        showCustomAlert,
       }}
     >
       {children}
+      <CustomAlert
+        visible={alertConfig.visible}
+        onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+      />
     </NotificationContext.Provider>
   );
 };

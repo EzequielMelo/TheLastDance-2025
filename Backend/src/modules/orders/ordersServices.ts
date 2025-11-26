@@ -3036,7 +3036,9 @@ export async function confirmPaymentAndReleaseTable(
         status: "not_in_queue",
         message: "Pago confirmado. ¡Gracias por tu visita!",
       });
-      console.log(`🔌 Evento de socket emitido al cliente ${payingClientId}: estado actualizado a not_in_queue`);
+      console.log(
+        `🔌 Evento de socket emitido al cliente ${payingClientId}: estado actualizado a not_in_queue`,
+      );
     } catch (socketError) {
       console.warn(`⚠️ Error emitiendo evento de socket:`, socketError);
       // No falla la función por esto
@@ -3297,6 +3299,50 @@ export async function markItemAsDelivered(
     }
 
     console.log(`✅ Item ${itemId} marcado como entregado`);
+
+    // Verificar si todos los items de la mesa están entregados
+    const tableId = (item.orders as any).table_id;
+    try {
+      // Obtener la tabla para saber el id_client
+      const { data: tableData } = await supabaseAdmin
+        .from("tables")
+        .select("id_client")
+        .eq("id", tableId)
+        .single();
+
+      if (tableData?.id_client) {
+        const deliveryCheck = await checkAllItemsDelivered(
+          tableId,
+          tableData.id_client,
+        );
+
+        if (deliveryCheck.allDelivered && deliveryCheck.totalItems > 0) {
+          // Todos los items están entregados, actualizar table_status a 'pending'
+          console.log(
+            `✅ Todos los items entregados para mesa ${tableId}, actualizando table_status a 'pending'`,
+          );
+
+          const { error: tableUpdateError } = await supabaseAdmin
+            .from("tables")
+            .update({ table_status: "pending" })
+            .eq("id", tableId);
+
+          if (tableUpdateError) {
+            console.error(
+              "⚠️ Error actualizando table_status:",
+              tableUpdateError,
+            );
+          } else {
+            console.log(
+              `✅ table_status actualizado a 'pending' para mesa ${tableId}`,
+            );
+          }
+        }
+      }
+    } catch (checkError) {
+      console.error("⚠️ Error verificando estado de entrega:", checkError);
+      // No lanzar error, el item ya se marcó como delivered
+    }
 
     // Emitir evento Socket.IO a la mesa para notificar actualización de items entregados
     try {

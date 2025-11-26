@@ -22,6 +22,7 @@ import {
   Crown,
   AlertCircle,
   ArrowLeft,
+  XCircle,
 } from "lucide-react-native";
 import { useAuth } from "../../auth/AuthContext";
 import api from "../../api/axios";
@@ -190,6 +191,50 @@ export default function MyWaitingPositionScreen() {
     setRefreshing(true);
     loadData();
   }, [loadData]);
+
+  const handleCancelReservation = async () => {
+    if (!myEntry?.id) return;
+
+    showCustomAlert(
+      "Cancelar Reserva",
+      "¿Estás seguro que deseas cancelar tu posición en la lista de espera? Esta acción no se puede deshacer.",
+      "warning",
+      [
+        {
+          text: "No, mantener",
+          style: "cancel",
+        },
+        {
+          text: "Sí, cancelar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.put(`/tables/waiting-list/${myEntry.id}/cancel`);
+
+              showCustomAlert(
+                "Reserva Cancelada",
+                "Tu posición en la lista de espera ha sido cancelada exitosamente.",
+                "success",
+                [
+                  {
+                    text: "OK",
+                    onPress: () => {
+                      setAlertVisible(false);
+                      navigateToHome();
+                    },
+                  },
+                ],
+              );
+            } catch (error: any) {
+              const message =
+                error.response?.data?.error || "Error al cancelar la reserva";
+              showCustomAlert("Error", message, "error", [{ text: "OK" }]);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const getWaitingTime = () => {
     if (!myEntry) return "0 min";
@@ -377,6 +422,19 @@ export default function MyWaitingPositionScreen() {
               </View>
             </View>
           </View>
+
+          {/* Cancel Button */}
+          <TouchableOpacity
+            onPress={handleCancelReservation}
+            className="bg-red-500/20 border border-red-500/50 rounded-xl p-4 mb-6 active:opacity-70"
+          >
+            <View className="flex-row items-center justify-center">
+              <XCircle size={20} color="#ef4444" />
+              <Text className="text-red-400 font-semibold ml-2">
+                Cancelar mi Reserva
+              </Text>
+            </View>
+          </TouchableOpacity>
 
           {/* Reservation Details */}
           {myEntry && (

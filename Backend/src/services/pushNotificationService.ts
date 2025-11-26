@@ -4,6 +4,8 @@ interface PushNotificationData {
   title: string;
   body: string;
   data?: any;
+  channelId?: string;
+  priority?: "default" | "normal" | "high";
 }
 
 // Función para enviar notificaciones push usando Expo Push API
@@ -17,6 +19,8 @@ async function sendExpoPushNotification(
     title: notificationData.title,
     body: notificationData.body,
     data: notificationData.data || {},
+    channelId: notificationData.channelId,
+    priority: notificationData.priority || "default",
   }));
 
   try {
@@ -587,6 +591,8 @@ export async function notifyWaiterClientMessage(
     const notificationData: PushNotificationData = {
       title: `${clientName} - Mesa #${tableNumber}`,
       body: truncatedMessage,
+      channelId: "chat_messages",
+      priority: "high",
       data: {
         type: "chat_message_client",
         tableNumber,
@@ -594,7 +600,8 @@ export async function notifyWaiterClientMessage(
         message,
         chatId,
         waiterId,
-        screen: "WaiterChat",
+        screen: "TableChat",
+        tableId: tableNumber,
       },
     };
 
@@ -629,13 +636,16 @@ export async function notifyClientWaiterMessage(
     const notificationData: PushNotificationData = {
       title: `${waiterName} - Mesa #${tableNumber}`,
       body: truncatedMessage,
+      channelId: "chat_messages",
+      priority: "high",
       data: {
         type: "chat_message_waiter",
         tableNumber,
         waiterName,
         message,
         chatId,
-        screen: "ClientChat",
+        screen: "TableChat",
+        tableId: tableNumber,
       },
     };
 
@@ -670,6 +680,8 @@ export async function notifyWaiterNewOrder(
     const notificationData: PushNotificationData = {
       title: `🍽️ Nuevo pedido - Mesa #${tableNumber}`,
       body: `${clientName} - ${itemsCount} items ($${totalAmount.toLocaleString()}) - Requiere aprobación`,
+      channelId: "waiter_orders",
+      priority: "high",
       data: {
         type: "new_order",
         waiterId,
@@ -677,7 +689,7 @@ export async function notifyWaiterNewOrder(
         clientName,
         itemsCount,
         totalAmount,
-        screen: "WaiterPendingOrders",
+        screen: "WaiterOrders",
       },
     };
 
@@ -712,13 +724,16 @@ export async function notifyClientOrderRejectedForModification(
     const notificationData: PushNotificationData = {
       title: `Pedido devuelto - Mesa #${tableNumber}`,
       body: `${waiterName} devolvió ${rejectedItemsCount} de ${totalItemsCount} items para modificación`,
+      channelId: "order_updates",
+      priority: "high",
       data: {
         type: "order_rejected_for_modification",
         tableNumber,
         waiterName,
         rejectedItemsCount,
         totalItemsCount,
-        screen: "ModifyOrder",
+        screen: "Menu",
+        mode: "modify-rejected",
       },
     };
 
@@ -759,6 +774,8 @@ export async function notifyWaiterTandaResubmitted(
     const notificationData: PushNotificationData = {
       title: `🔄 Tanda modificada - Mesa #${tableNumber}`,
       body: `${clientName} reenvió su pedido modificado - ${itemsCount} items ($${totalAmount.toLocaleString()}) - Requiere revisión`,
+      channelId: "waiter_orders",
+      priority: "high",
       data: {
         type: "tanda_resubmitted",
         waiterId,
@@ -766,7 +783,7 @@ export async function notifyWaiterTandaResubmitted(
         clientName,
         itemsCount,
         totalAmount,
-        screen: "WaiterPendingOrders",
+        screen: "WaiterOrders",
       },
     };
 
@@ -814,13 +831,15 @@ export async function notifyKitchenNewItems(
     const notificationData: PushNotificationData = {
       title: `Nuevo pedido - Mesa #${tableNumber}`,
       body: `${totalItems} platos: ${itemsText}`,
+      channelId: "kitchen_orders",
+      priority: "high",
       data: {
         type: "kitchen_new_items",
         tableNumber,
         clientName,
         itemsCount: totalItems,
         items: dishItems,
-        screen: "KitchenOrders",
+        screen: "KitchenDashboard",
       },
     };
 
@@ -866,13 +885,15 @@ export async function notifyBartenderNewItems(
     const notificationData: PushNotificationData = {
       title: `Nuevo pedido - Mesa #${tableNumber}`,
       body: `${totalItems} bebidas: ${itemsText}`,
+      channelId: "bar_orders",
+      priority: "high",
       data: {
         type: "bartender_new_items",
         tableNumber,
         clientName,
         itemsCount: totalItems,
         items: drinkItems,
-        screen: "BartenderOrders",
+        screen: "BartenderDashboard",
       },
     };
 
@@ -912,12 +933,14 @@ export async function notifyWaiterKitchenItemsReady(
     const notificationData: PushNotificationData = {
       title: `🍽️ Platos listos - Mesa #${tableNumber}`,
       body: `${totalItems} platos terminados: ${itemsText}`,
+      channelId: "order_updates",
+      priority: "high",
       data: {
         type: "kitchen_items_ready",
         tableNumber,
         itemsCount: totalItems,
         items: dishItems,
-        screen: "WaiterPendingOrders",
+        screen: "WaiterOrders",
       },
     };
 
@@ -951,12 +974,14 @@ export async function notifyWaiterBartenderItemsReady(
     const notificationData: PushNotificationData = {
       title: `🍹 Bebidas listas - Mesa #${tableNumber}`,
       body: `${totalItems} bebidas terminadas: ${itemsText}`,
+      channelId: "order_updates",
+      priority: "high",
       data: {
         type: "bartender_items_ready",
         tableNumber,
         itemsCount: totalItems,
         items: drinkItems,
-        screen: "WaiterPendingOrders",
+        screen: "WaiterOrders",
       },
     };
 
@@ -996,20 +1021,20 @@ export async function notifyWaiterBatchReady(
 
     const token = waiterData.push_token;
 
-    await sendExpoPushNotification(
-      [token],
-      {
-        title: `✅ Pedido Completo - Mesa ${tableNumber}`,
-        body: `Todos los productos del pedido de ${clientName} están listos para entregar (${totalItems} items)`,
-        data: {
-          type: "batch_ready",
-          tableNumber,
-          clientName,
-          totalItems,
-          batchId,
-        },
+    await sendExpoPushNotification([token], {
+      title: `✅ Pedido Completo - Mesa ${tableNumber}`,
+      body: `Todos los productos del pedido de ${clientName} están listos para entregar (${totalItems} items)`,
+      channelId: "order_updates",
+      priority: "high",
+      data: {
+        type: "batch_ready",
+        tableNumber,
+        clientName,
+        totalItems,
+        batchId,
+        screen: "WaiterOrders",
       },
-    );
+    });
 
     console.log(
       `✅ Push notification enviada a mozo ${waiterId} - Batch ${batchId} completo en mesa ${tableNumber}`,
@@ -1040,10 +1065,7 @@ export async function notifyDriversDeliveryBatchReady(
       .not("push_token", "is", null);
 
     if (driversError) {
-      console.error(
-        `❌ Error obteniendo repartidores:`,
-        driversError,
-      );
+      console.error(`❌ Error obteniendo repartidores:`, driversError);
       return;
     }
 
@@ -1063,21 +1085,18 @@ export async function notifyDriversDeliveryBatchReady(
     }
 
     // Enviar notificación a todos los repartidores
-    await sendExpoPushNotification(
-      validTokens,
-      {
-        title: `🚚 Pedido Delivery Listo`,
-        body: `Pedido de ${clientName} completo y listo para entregar (${totalItems} items) - ${deliveryAddress}`,
-        data: {
-          type: "delivery_batch_ready",
-          clientName,
-          deliveryAddress,
-          totalItems,
-          batchId,
-          deliveryOrderId,
-        },
+    await sendExpoPushNotification(validTokens, {
+      title: `🚚 Pedido Delivery Listo`,
+      body: `Pedido de ${clientName} completo y listo para entregar (${totalItems} items) - ${deliveryAddress}`,
+      data: {
+        type: "delivery_batch_ready",
+        clientName,
+        deliveryAddress,
+        totalItems,
+        batchId,
+        deliveryOrderId,
       },
-    );
+    });
 
     console.log(
       `✅ Push notification enviada a ${validTokens.length} repartidores - Batch ${batchId} de delivery completo`,
@@ -1531,6 +1550,8 @@ export async function notifyDriverNewMessage(
     const notificationData: PushNotificationData = {
       title: `📦 ${clientName}`,
       body: truncatedMessage,
+      channelId: "chat_messages",
+      priority: "high",
       data: {
         type: "delivery_chat_message",
         deliveryId,
@@ -1570,6 +1591,8 @@ export async function notifyClientDriverMessage(
     const notificationData: PushNotificationData = {
       title: `🚗 ${driverName}`,
       body: truncatedMessage,
+      channelId: "chat_messages",
+      priority: "high",
       data: {
         type: "delivery_chat_message",
         deliveryId,
