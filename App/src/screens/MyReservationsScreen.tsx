@@ -6,6 +6,7 @@ import {
   ScrollView,
   RefreshControl,
   Dimensions,
+  BackHandler,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -51,6 +52,14 @@ export default function MyReservationsScreen({}: MyReservationsScreenProps) {
 
   useEffect(() => {
     loadReservations();
+
+    // Interceptar el botón físico de back para ir siempre al Home
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      navigation.navigate('Home' as never);
+      return true; // Prevenir comportamiento por defecto
+    });
+
+    return () => backHandler.remove();
   }, []);
 
   const loadReservations = async () => {

@@ -44,6 +44,13 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 interface CartModalProps {
   visible: boolean;
   onClose: () => void;
+  forceDeliveryMode?: boolean; // 🚚 Prop para forzar modo delivery (evita race conditions)
+  deliveryAddressProp?: {
+    address: string;
+    latitude: number;
+    longitude: number;
+    notes?: string;
+  } | null; // 🚚 Prop para pasar la dirección directamente
   showCustomAlert?: (
     title: string,
     message: string,
@@ -59,6 +66,8 @@ interface CartModalProps {
 export default function CartModal({
   visible,
   onClose,
+  forceDeliveryMode = false,
+  deliveryAddressProp = null,
   showCustomAlert,
 }: CartModalProps) {
   const navigation = useNavigation<NavigationProp>();
@@ -93,6 +102,13 @@ export default function CartModal({
     totalItems: number;
     deliveredItems: number;
   } | null>(null);
+
+  // 🚚 Estado local para capturar el modo delivery al abrir el modal
+  // Priorizar el prop forceDeliveryMode sobre el contexto (evita race conditions)
+  const [isDeliveryMode, setIsDeliveryMode] = useState(() => {
+    const mode = forceDeliveryMode || isDeliveryOrder || deliveryAddress !== null;
+    return mode;
+  });
 
   // Estado para CustomAlert
   const [alertConfig, setAlertConfig] = useState<{
@@ -147,26 +163,29 @@ export default function CartModal({
   // Verificar si hay items delivered cuando se abre el modal
   useEffect(() => {
     if (visible) {
+      // 🚚 Capturar el modo delivery al abrir el modal
+      // Priorizar forceDeliveryMode prop sobre el contexto
+      const deliveryMode = forceDeliveryMode || isDeliveryOrder || deliveryAddress !== null;     
+      setIsDeliveryMode(deliveryMode);
+
       // Solo verificar mesa si NO es un pedido delivery
-      if (!isDeliveryOrder) {
+      if (!deliveryMode) {
         fetchUserTable();
       }
       refreshOrders().catch(console.error);
 
       // Verificar delivery status solo para pedidos en mesa
-      if (occupiedTable?.id && !isDeliveryOrder) {
+      if (occupiedTable?.id && !deliveryMode) {
         checkTableDeliveryStatus(occupiedTable.id)
           .then(setDeliveryStatus)
           .catch(console.error);
       }
     } else {
-      // Cuando el modal se cierra y no hay items en el carrito, resetear modo delivery
-      if (cartItems.length === 0 && isDeliveryOrder) {
-        setIsDeliveryOrder(false);
-        setDeliveryAddress(null);
-      }
+      // NO limpiar deliveryAddress aquí - solo limpiar cuando el pedido se confirme exitosamente
+      // Resetear estado local del modal
+      setIsDeliveryMode(false);
     }
-  }, [visible, occupiedTable?.id, cartItems.length, isDeliveryOrder]);
+  }, [visible, occupiedTable?.id, cartItems.length, forceDeliveryMode, isDeliveryOrder, deliveryAddress]);
 
   const fetchUserTable = async () => {
     try {
@@ -320,8 +339,12 @@ export default function CartModal({
   };
 
   const handleConfirmOrder = async () => {
-    // 🚚 Si es un pedido de delivery, validar dirección y crear el pedido
-    if (isDeliveryOrder) {
+    // 🚚 Usar el estado local capturado al abrir el modal
+    console.log("🚚 handleConfirmOrder - isDeliveryMode:", isDeliveryMode);
+    console.log("🚚 handleConfirmOrder - deliveryAddress:", deliveryAddress);
+    
+    // === Flujo para pedidos DELIVERY ===
+    if (isDeliveryMode) {
       // Validar que haya productos en el carrito
       if (cartItems.length === 0) {
         showAlert(
@@ -333,16 +356,24 @@ export default function CartModal({
         return;
       }
 
-      // Validar que exista una dirección guardada
-      if (!deliveryAddress) {
+      // Usar la dirección del prop con prioridad sobre el contexto
+      const finalDeliveryAddress = deliveryAddressProp || deliveryAddress;
+      
+      if (!finalDeliveryAddress) {
+        console.error("❌ No hay dirección de delivery disponible", {
+          deliveryAddressProp,
+          deliveryAddress,
+        });
         showAlert(
           "Error",
-          "No se ha seleccionado una dirección de entrega",
+          "No se ha seleccionado una dirección de entrega. Por favor, regresa y confirma tu dirección.",
           undefined,
           "error",
         );
         return;
       }
+      
+      console.log("✅ Usando dirección de delivery:", finalDeliveryAddress);
 
       try {
         // Crear el pedido de delivery con los items del carrito
@@ -368,10 +399,10 @@ export default function CartModal({
         // Crear el registro de delivery con la dirección
         const deliveryData = {
           delivery_order_id: deliveryOrderId,
-          delivery_address: deliveryAddress.address,
-          delivery_latitude: deliveryAddress.latitude,
-          delivery_longitude: deliveryAddress.longitude,
-          delivery_notes: deliveryAddress.notes || "",
+          delivery_address: finalDeliveryAddress.address,
+          delivery_latitude: finalDeliveryAddress.latitude,
+          delivery_longitude: finalDeliveryAddress.longitude,
+          delivery_notes: finalDeliveryAddress.notes || "",
           origin_latitude: RESTAURANT_LOCATION.latitude,
           origin_longitude: RESTAURANT_LOCATION.longitude,
         };
@@ -449,7 +480,7 @@ export default function CartModal({
     }
 
     // Verificar mesa solo si NO es delivery
-    if (!isDeliveryOrder) {
+    if (!isDeliveryMode) {
       if (loadingTable) {
         showAlert("Espera", "Verificando tu mesa asignada...", undefined, "info");
         return;
@@ -542,7 +573,7 @@ export default function CartModal({
                   marginLeft: 8,
                 }}
               >
-                {isDeliveryOrder && cartItems.length > 0
+                {isDeliveryMode && cartItems.length > 0
                   ? "Pedido Delivery"
                   : cartItems.length > 0
                     ? canAddMoreItems
@@ -573,8 +604,8 @@ export default function CartModal({
               marginTop: 4,
             }}
           >
-            {isDeliveryOrder && cartItems.length > 0
-              ? `${cartCount} ${cartCount === 1 ? "producto" : "productos"} • Seleccioná tu ubicación en el siguiente paso`
+            {isDeliveryMode && cartItems.length > 0
+              ? `${cartCount} ${cartCount === 1 ? "producto" : "productos"} • Dirección de entrega confirmada`
               : cartItems.length > 0
                 ? canAddMoreItems
                   ? `${cartCount} ${cartCount === 1 ? "producto" : "productos"} • Se agregará a tu pedido existente`
@@ -1012,7 +1043,7 @@ export default function CartModal({
               >
                 {loadingTable
                   ? "Verificando mesa..."
-                  : isDeliveryOrder && cartItems.length > 0
+                  : isDeliveryMode && cartItems.length > 0
                     ? `Confirmar Pedido • ${formatPrice(cartAmount)}`
                     : canAddMoreItems
                       ? `Agregar Nueva Tanda • ${formatPrice(cartAmount)}`
