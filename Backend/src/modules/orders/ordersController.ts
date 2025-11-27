@@ -497,10 +497,22 @@ export async function waiterOrderActionHandler(
 
             // Separar items por categoría (platos vs bebidas)
             const orderItems = (orderData as any).order_items;
+            console.log(
+              `🔍 [CONFIRM ORDER] Total items en orden: ${orderItems.length}`,
+            );
+
+            // FILTRAR items rechazados - solo notificar los que NO están rejected
+            const activeItems = orderItems.filter(
+              (item: any) => item.status !== "rejected",
+            );
+            console.log(
+              `✅ [CONFIRM ORDER] Items activos (no rechazados): ${activeItems.length}`,
+            );
+
             const dishItems: Array<{ name: string; quantity: number }> = [];
             const drinkItems: Array<{ name: string; quantity: number }> = [];
 
-            orderItems.forEach((item: any) => {
+            activeItems.forEach((item: any) => {
               const menuItem = item.menu_items;
               const itemData = {
                 name: menuItem.name,
@@ -509,19 +521,25 @@ export async function waiterOrderActionHandler(
 
               // Categorías que van a cocina
               if (
-                ["platos", "entradas", "postres", "ensaladas"].includes(
+                ["plato", "entrada", "postre", "ensalada"].includes(
                   menuItem.category.toLowerCase(),
                 )
               ) {
                 dishItems.push(itemData);
+                console.log(
+                  `   🍳 Item para cocina: ${itemData.quantity}x ${itemData.name}`,
+                );
               }
               // Categorías que van a bar
               else if (
-                ["bebidas", "tragos", "cervezas", "vinos", "aguas"].includes(
+                ["bebida", "trago", "cerveza", "vino", "agua"].includes(
                   menuItem.category.toLowerCase(),
                 )
               ) {
                 drinkItems.push(itemData);
+                console.log(
+                  `   🍹 Item para bar: ${itemData.quantity}x ${itemData.name}`,
+                );
               }
             });
 
@@ -832,6 +850,146 @@ export async function waiterItemsActionHandler(
       }
     } catch (socketError) {
       console.error("Error emitiendo socket:", socketError);
+    }
+
+    // ✨ NUEVO: Enviar notificaciones a cocina/bar cuando se aceptan items
+    if (action === "accept") {
+      try {
+        // Obtener información completa de los items aceptados
+        const { data: acceptedItemsData, error: itemsError } =
+          await supabaseAdmin
+            .from("order_items")
+            .select(
+              `
+              id,
+              quantity,
+              menu_items(
+                name,
+                category
+              )
+            `,
+            )
+            .in("id", itemIds);
+
+        if (itemsError) {
+          console.error("❌ Error obteniendo items aceptados:", itemsError);
+          throw itemsError;
+        }
+        acceptedItemsData?.forEach((item: any) => {
+          console.log(
+            `   - ${item.quantity}x ${item.menu_items?.name} (${item.menu_items?.category})`,
+          );
+        });
+
+        // Obtener información de la mesa y cliente
+        const { data: orderInfo, error: orderError } = await supabaseAdmin
+          .from("orders")
+          .select(
+            `
+            table_id,
+            tables(
+              number,
+              id_client
+            )
+          `,
+          )
+          .eq("id", orderId)
+          .single();
+
+        if (orderError || !orderInfo) {
+          console.error("❌ Error obteniendo info de orden:", orderError);
+          throw orderError;
+        }
+
+        const tableData = (orderInfo as any).tables;
+
+        // Obtener nombre del cliente
+        const { data: clientData } = await supabaseAdmin
+          .from("users")
+          .select("first_name, last_name")
+          .eq("id", tableData.id_client)
+          .single();
+
+        const clientName = clientData
+          ? `${clientData.first_name} ${clientData.last_name}`.trim()
+          : "Cliente";
+
+        // Separar items por categoría (platos vs bebidas)
+        const dishItems: Array<{ name: string; quantity: number }> = [];
+        const drinkItems: Array<{ name: string; quantity: number }> = [];
+
+        console.log(`🔍 [WAITER ACCEPT] Clasificando items por categoría...`);
+
+        (acceptedItemsData || []).forEach((item: any) => {
+          const menuItem = item.menu_items;
+          
+          if (!menuItem) {
+            return;
+          }
+
+          const itemData = {
+            name: menuItem.name,
+            quantity: item.quantity,
+          };
+
+          const category = menuItem.category.toLowerCase();
+
+          // Categorías que van a cocina
+          if (
+            ["plato", "entrada", "postre", "ensalada"].includes(category)
+          ) {
+            dishItems.push(itemData);
+            console.log(
+              `      ✅ Clasificado como COCINA`,
+            );
+          }
+          // Categorías que van a bar
+          else if (
+            ["bebida", "trago", "cerveza", "vino", "agua"].includes(category)
+          ) {
+            drinkItems.push(itemData);
+            console.log(
+              `      ✅ Clasificado como BAR`,
+            );
+          }
+        });
+
+        console.log(`📊 [WAITER ACCEPT] Resultado clasificación: ${dishItems.length} platos, ${drinkItems.length} bebidas`);
+
+        // Notificar a cocina si hay platos
+        if (dishItems.length > 0) {
+          console.log(
+            `📤 [WAITER ACCEPT] Enviando ${dishItems.length} platos a cocina (Mesa #${tableData.number})`,
+          );
+          await notifyKitchenNewItems(
+            tableData.number.toString(),
+            dishItems,
+            clientName,
+          );
+        }
+
+        // Notificar a bartender si hay bebidas
+        if (drinkItems.length > 0) {
+          console.log(
+            `📤 [WAITER ACCEPT] Enviando ${drinkItems.length} bebidas a bar (Mesa #${tableData.number})`,
+          );
+          await notifyBartenderNewItems(
+            tableData.number.toString(),
+            drinkItems,
+            clientName,
+          );
+        }
+
+        console.log(
+          `✅ [WAITER ACCEPT] Notificaciones procesadas exitosamente`,
+        );
+      } catch (notifyError) {
+        console.error(
+          "❌ [WAITER ACCEPT] Error enviando notificaciones:",
+          notifyError,
+        );
+        // No bloqueamos la respuesta por error de notificación
+      }
     }
 
     res.json({

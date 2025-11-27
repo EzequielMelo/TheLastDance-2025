@@ -368,8 +368,11 @@ async function getRoleTokens(positionCode: string): Promise<string[]> {
     );
     if (users && users.length > 0) {
       users.forEach(user => {
+        const tokenPreview = user.push_token 
+          ? `${user.push_token.substring(0, 30)}...` 
+          : "❌ Sin token";
         console.log(
-          `   - ${user.first_name} ${user.last_name}: ${user.push_token ? "Tiene token" : "Sin token"}`,
+          `   - ${user.first_name} ${user.last_name}: ${tokenPreview}`,
         );
       });
     }
@@ -381,6 +384,15 @@ async function getRoleTokens(positionCode: string): Promise<string[]> {
     console.log(
       `📤 [getRoleTokens] Tokens válidos para ${positionCode}: ${tokens.length}`,
     );
+    
+    if (tokens.length > 0) {
+      tokens.forEach((token, index) => {
+        console.log(`   Token ${index + 1}: ${token.substring(0, 30)}...`);
+      });
+    } else {
+      console.log(`   ⚠️ NO se encontraron tokens válidos para enviar notificaciones`);
+    }
+    
     return tokens;
   } catch (error) {
     console.error(
