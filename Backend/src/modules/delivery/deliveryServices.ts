@@ -3,6 +3,8 @@ import { RESTAURANT_CONFIG } from "../../config/restaurantConfig";
 import {
   notifyNewDeliveryOrder,
   notifyDeliveryReadyForDrivers,
+  notifyKitchenNewItems,
+  notifyBartenderNewItems,
 } from "../../services/pushNotificationService";
 import { calculateDeliveryEstimate } from "../../utils/distanceCalculator";
 import type {
@@ -448,65 +450,140 @@ async function autoDistributeItemsToStations(
     `📋 Distribuyendo automáticamente items de la orden ${deliveryOrderId}`,
   );
 
-  // Obtener todos los items de la orden
-  const { data: items, error: itemsError } = await supabaseAdmin
+  // PASO 1: Actualizar DIRECTAMENTE todos los items pending a accepted
+  console.log(`📦 Actualizando items de delivery_order_id=${deliveryOrderId} de 'pending' a 'accepted'...`);
+  
+  // Primero obtener todos los items de este delivery order
+  const { data: allItems, error: fetchError } = await supabaseAdmin
     .from("delivery_order_items")
-    .select(
-      `
-      id,
-      status,
-      menu_item:menu_items (
-        category
-      )
-    `,
-    )
-    .eq("delivery_order_id", deliveryOrderId)
-    .eq("status", "pending");
+    .select("id, status")
+    .eq("delivery_order_id", deliveryOrderId);
 
-  if (itemsError) {
-    console.error("❌ Error obteniendo items:", itemsError);
+  if (fetchError) {
+    console.error("❌ Error obteniendo items:", fetchError);
     return;
   }
 
-  console.log(`📊 Items encontrados: ${items?.length || 0}`);
-  if (items && items.length > 0) {
-    console.log(`📦 Detalles de items:`, JSON.stringify(items, null, 2));
-  }
+  // Filtrar los que tienen status "pending" (con trim por si tienen espacios/saltos de línea)
+  const pendingItemIds = allItems
+    ?.filter((item: any) => item.status?.trim() === "pending")
+    .map((item: any) => item.id) || [];
 
-  if (!items || items.length === 0) {
+  console.log(`📋 Items con status 'pending' encontrados: ${pendingItemIds.length} de ${allItems?.length || 0} totales`);
+
+  if (pendingItemIds.length === 0) {
     console.log("⚠️ No hay items pendientes para distribuir");
     return;
   }
 
-  // Separar items por estación
-  const kitchenItems = items.filter(
-    (item: any) => item.menu_item?.category === "plato",
-  );
-  const barItems = items.filter(
-    (item: any) => item.menu_item?.category === "bebida",
-  );
-
-  console.log(`🍳 Items para cocina (plato): ${kitchenItems.length}`);
-  console.log(`🍷 Items para bar (bebida): ${barItems.length}`);
-
-  // Simplemente cambiar todos los items a 'accepted' para que aparezcan en cocina/bar
-  const allItemIds = items.map((item: any) => item.id);
-
-  console.log(`🔄 Actualizando ${allItemIds.length} items a 'accepted'...`);
-
+  // Actualizar por IDs
   const { data: updatedData, error: updateError } = await supabaseAdmin
     .from("delivery_order_items")
     .update({
       status: "accepted",
     })
-    .in("id", allItemIds)
-    .select();
+    .in("id", pendingItemIds)
+    .select(
+      `
+      id,
+      quantity,
+      status,
+      menu_item:menu_items (
+        name,
+        category
+      )
+    `
+    );
 
   if (updateError) {
     console.error("❌ Error actualizando items:", updateError);
-  } else {
-    console.log(`✅ ${allItemIds.length} items actualizados a 'accepted'`);
-    console.log(`📊 Items actualizados:`, JSON.stringify(updatedData, null, 2));
+    return;
+  }
+
+  if (!updatedData || updatedData.length === 0) {
+    console.log("⚠️ No hay items pendientes para distribuir (todos ya fueron procesados)");
+    return;
+  }
+
+  console.log(`✅ ${updatedData.length} items actualizados a 'accepted'`);
+
+  // PASO 2: Clasificar items por categoría para notificaciones
+  const dishItems: Array<{ name: string; quantity: number }> = [];
+  const drinkItems: Array<{ name: string; quantity: number }> = [];
+
+  updatedData.forEach((item: any) => {
+    const menuItem = item.menu_item;
+    const category = menuItem?.category?.toLowerCase() || "";
+    const itemData = {
+      name: menuItem?.name || "Item desconocido",
+      quantity: item.quantity,
+    };
+
+    if (category === "plato") {
+      dishItems.push(itemData);
+    } else if (category === "bebida") {
+      drinkItems.push(itemData);
+    }
+  });
+
+  console.log(`🍽️ Items para COCINA: ${dishItems.length}`);
+  console.log(`🍺 Items para BAR: ${drinkItems.length}`);
+
+  // PASO 3: Obtener nombre del cliente para las notificaciones
+  const { data: orderData, error: orderError } = await supabaseAdmin
+    .from("delivery_orders")
+    .select("id, user_id")
+    .eq("id", deliveryOrderId)
+    .single();
+
+  let clientName = "Cliente Delivery";
+  if (orderData?.user_id && !orderError) {
+    const { data: userData, error: userError } = await supabaseAdmin
+      .from("users")
+      .select("first_name, last_name")
+      .eq("id", orderData.user_id)
+      .single();
+
+    if (userData && !userError) {
+      clientName = `${userData.first_name} ${userData.last_name}`.trim();
+    }
+  }
+
+  console.log(`👤 Cliente del delivery: ${clientName}`);
+
+  // PASO 4: Enviar notificaciones push
+  try {
+    console.log("\n🔔 [DELIVERY NOTIFICATIONS] Enviando notificaciones push...");
+
+    // Enviar notificación a cocina si hay platos
+    if (dishItems.length > 0) {
+      console.log(`🔔 Enviando notificación a COCINA para ${dishItems.length} platos...`);
+      await notifyKitchenNewItems(
+        `Delivery #${deliveryOrderId.slice(0, 8)}`,
+        dishItems,
+        clientName,
+      );
+      console.log("✅ Notificación enviada a cocina");
+    }
+
+    // Enviar notificación a bar si hay bebidas
+    if (drinkItems.length > 0) {
+      console.log(`🔔 Enviando notificación a BAR para ${drinkItems.length} bebidas...`);
+      await notifyBartenderNewItems(
+        `Delivery #${deliveryOrderId.slice(0, 8)}`,
+        drinkItems,
+        clientName,
+      );
+      console.log("✅ Notificación enviada a bar");
+    }
+
+    console.log("✅ Notificaciones push completadas exitosamente\n");
+  } catch (notificationError) {
+    console.error(
+      "❌ Error enviando notificaciones push:",
+      notificationError,
+    );
+    // No lanzar error, la distribución de items ya se completó exitosamente
   }
 }
 

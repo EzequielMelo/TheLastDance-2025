@@ -836,8 +836,11 @@ export async function notifyKitchenNewItems(
   clientName?: string,
 ) {
   try {
+    // Detectar si es un pedido delivery (tableNumber empieza con "Delivery")
+    const isDelivery = tableNumber.toLowerCase().startsWith("delivery");
+    
     console.log(
-      `🍳 [notifyKitchenNewItems] Iniciando notificación para cocina - Mesa #${tableNumber}`,
+      `🍳 [notifyKitchenNewItems] Iniciando notificación para cocina - ${isDelivery ? tableNumber : `Mesa #${tableNumber}`}`,
     );
     console.log(`   Items:`, dishItems);
 
@@ -855,18 +858,25 @@ export async function notifyKitchenNewItems(
       .map(item => `${item.quantity}x ${item.name}`)
       .join(", ");
 
+    // Ajustar título y body según el tipo de pedido
+    const title = isDelivery 
+      ? `Nuevo pedido - ${tableNumber}${clientName ? ` (${clientName})` : ''}`
+      : `Nuevo pedido - Mesa #${tableNumber}`;
+    
     const notificationData: PushNotificationData = {
-      title: `Nuevo pedido - Mesa #${tableNumber}`,
+      title,
       body: `${totalItems} platos: ${itemsText}`,
       channelId: "kitchen_orders",
       priority: "high",
       data: {
         type: "kitchen_new_items",
-        tableNumber,
+        tableNumber: isDelivery ? null : tableNumber,
+        deliveryId: isDelivery ? tableNumber : null,
         clientName,
         itemsCount: totalItems,
         items: dishItems,
         screen: "KitchenDashboard",
+        isDelivery,
       },
     };
 
@@ -890,8 +900,11 @@ export async function notifyBartenderNewItems(
   clientName?: string,
 ) {
   try {
+    // Detectar si es un pedido delivery (tableNumber empieza con "Delivery")
+    const isDelivery = tableNumber.toLowerCase().startsWith("delivery");
+    
     console.log(
-      `🍹 [notifyBartenderNewItems] Iniciando notificación para bar - Mesa #${tableNumber}`,
+      `🍹 [notifyBartenderNewItems] Iniciando notificación para bar - ${isDelivery ? tableNumber : `Mesa #${tableNumber}`}`,
     );
     console.log(`   Items:`, drinkItems);
 
@@ -909,18 +922,25 @@ export async function notifyBartenderNewItems(
       .map(item => `${item.quantity}x ${item.name}`)
       .join(", ");
 
+    // Ajustar título y body según el tipo de pedido
+    const title = isDelivery 
+      ? `Nuevo pedido - ${tableNumber}${clientName ? ` (${clientName})` : ''}`
+      : `Nuevo pedido - Mesa #${tableNumber}`;
+    
     const notificationData: PushNotificationData = {
-      title: `Nuevo pedido - Mesa #${tableNumber}`,
+      title,
       body: `${totalItems} bebidas: ${itemsText}`,
       channelId: "bar_orders",
       priority: "high",
       data: {
         type: "bartender_new_items",
-        tableNumber,
+        tableNumber: isDelivery ? null : tableNumber,
+        deliveryId: isDelivery ? tableNumber : null,
         clientName,
         itemsCount: totalItems,
         items: drinkItems,
         screen: "BartenderDashboard",
+        isDelivery,
       },
     };
 
