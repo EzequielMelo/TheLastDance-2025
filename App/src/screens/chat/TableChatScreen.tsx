@@ -104,9 +104,11 @@ export default function TableChatScreen() {
   }, [autoMessage, autoMessageSent, isConnected, isLoading, sendMessage]);
 
   const handleSendMessage = () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim()) {
+      return;
+    }
 
-    const success = sendMessage(inputMessage);
+    const success = sendMessage(inputMessage);    
     if (success) {
       setInputMessage("");
     } else {

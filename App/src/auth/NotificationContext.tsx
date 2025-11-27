@@ -11,7 +11,6 @@ import { AuthContext } from "./AuthContext";
 import api from "../api/axios";
 import { useChatNotificationHandler } from "../Hooks/useChatNotificationHandler";
 import CustomAlert from "../components/common/CustomAlert";
-import CustomAlert from "../components/common/CustomAlert";
 
 interface CustomAlertConfig {
   visible: boolean;

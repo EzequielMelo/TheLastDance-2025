@@ -16,10 +16,22 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
  * Se ejecuta cuando llegan notificaciones push de mensajes de chat
  */
 export const useChatNotificationHandler = () => {
-  const navigation = useNavigation<NavigationProp>();
+  // Usar try-catch para manejar el caso donde NavigationContainer no está listo
+  let navigation: NavigationProp | null = null;
+  try {
+    navigation = useNavigation<NavigationProp>();
+  } catch (error) {
+    // NavigationContainer no está disponible aún, navigation será null
+  }
+  
   const { showCustomAlert } = useNotifications();
 
   useEffect(() => {
+    // Si no hay navegación disponible, no configurar handlers
+    if (!navigation) {
+      return;
+    }
+
     const handleChatNotification = (data: NotificationData) => {
       Logger.info("📨 [CHAT NOTIFICATION] Recibida:", data);
 
@@ -70,8 +82,8 @@ export const useChatNotificationHandler = () => {
           text: "Ver Chat",
           style: "default",
           onPress: () => {
-            if (data.chatId && data.tableNumber) {
-              navigation.navigate("TableChatScreen", {
+            if (navigation && data.chatId && data.tableNumber) {
+              navigation.navigate("TableChatScreen" as any, {
                 tableId: data.tableNumber,
                 chatId: data.chatId,
               });
@@ -103,8 +115,8 @@ export const useChatNotificationHandler = () => {
           text: "Ver Chat",
           style: "default",
           onPress: () => {
-            if (data.chatId && data.tableNumber) {
-              navigation.navigate("TableChatScreen", {
+            if (navigation && data.chatId && data.tableNumber) {
+              navigation.navigate("TableChatScreen" as any, {
                 tableId: data.tableNumber,
                 chatId: data.chatId,
               });
@@ -136,8 +148,8 @@ export const useChatNotificationHandler = () => {
           text: "Ver Chat",
           style: "default",
           onPress: () => {
-            if (data.deliveryId) {
-              navigation.navigate("DeliveryChatScreen", {
+            if (navigation && data.deliveryId) {
+              navigation.navigate("DeliveryChatScreen" as any, {
                 deliveryId: data.deliveryId,
               });
             }

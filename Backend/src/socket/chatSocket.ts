@@ -101,9 +101,9 @@ export const setupSocketIO = (httpServer: HttpServer) => {
       }
 
       socket.data.user = userData;
+
       next();
     } catch (error) {
-      console.error("Error de autenticación Socket.IO:", error);
       next(new Error("Error de autenticación"));
     }
   });

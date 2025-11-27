@@ -2298,7 +2298,7 @@ export async function submitTandaModificationsHandler(
 
     // Enviar notificación push al mozo sobre la resubmisión
     try {
-      // Obtener información de la orden y mesa con items para calcular total real
+      // Obtener información de la orden y mesa con items
       const { data: orderData, error: orderError } = await supabaseAdmin
         .from("orders")
         .select(
@@ -2310,17 +2310,24 @@ export async function submitTandaModificationsHandler(
           tables!inner(
             number,
             id_waiter,
-            users!tables_id_client_fkey(first_name, last_name)
+            id_client
           )
         `,
         )
         .eq("id", orderId)
         .single();
 
-      if (!orderError && orderData?.table_id) {
+      if (!orderError && orderData?.table_id) {        
         const tableData = (orderData as any).tables;
-        const clientData = tableData?.users;
-        const clientName = clientData
+
+        // Obtener datos del cliente usando id_client de la mesa
+        const { data: clientData, error: clientError } = await supabaseAdmin
+          .from("users")
+          .select("first_name, last_name")
+          .eq("id", tableData.id_client)
+          .single();
+
+        const clientName = clientData && !clientError
           ? `${clientData.first_name} ${clientData.last_name}`.trim()
           : "Cliente";
 

@@ -71,6 +71,11 @@ export const setupTableChatSocket = (io: Server) => {
       "send_table_message",
       async (data: { chatId: string; message: string; tableId: string }) => {
         try {
+          console.log(
+            `🔵 [TABLE CHAT] Evento send_table_message recibido de ${user.first_name} (${user.appUserId})`,
+          );
+          console.log(`   Profile: ${user.profile_code}, Data:`, data);
+
           const { chatId, message, tableId } = data;
 
           console.log(
@@ -192,21 +197,20 @@ export const setupTableChatSocket = (io: Server) => {
             const { supabaseAdmin } = await import("../config/supabase");
             const { data: tableData, error: tableError } = await supabaseAdmin
               .from("tables")
-              .select(
-                `
-                number,
-                id_client,
-                id_waiter,
-                users!tables_id_client_fkey(first_name, last_name)
-              `,
-              )
+              .select("number, id_client, id_waiter")
               .eq("id", tableId)
               .single();
 
             if (!tableError && tableData) {
               if (senderType === "client") {
                 // Cliente envía mensaje al mozo
-                const clientData = (tableData as any).users;
+                // Obtener datos del cliente por separado
+                const { data: clientData } = await supabaseAdmin
+                  .from("users")
+                  .select("first_name, last_name")
+                  .eq("id", tableData.id_client)
+                  .single();
+
                 const clientName = clientData
                   ? `${clientData.first_name} ${clientData.last_name}`.trim()
                   : "Cliente";
@@ -215,7 +219,7 @@ export const setupTableChatSocket = (io: Server) => {
                 // Solo enviar notificación si el mozo NO está en la sala
                 if (waiterId && !connectedUserIds.has(waiterId)) {
                   console.log(
-                    `📲 [TABLE CHAT] Enviando notificación push al mozo ${waiterId}`,
+                    `   ✅ ENVIANDO notificación push al mozo ${waiterId}`,
                   );
                   const { notifyWaiterClientMessage } = await import(
                     "../services/pushNotificationService"
@@ -226,7 +230,7 @@ export const setupTableChatSocket = (io: Server) => {
                     tableData.number.toString(),
                     message.trim(),
                     chatId,
-                  );
+                  );              
                 }
               } else if (senderType === "waiter") {
                 // Mozo envía mensaje al cliente
@@ -237,7 +241,7 @@ export const setupTableChatSocket = (io: Server) => {
                 // Solo enviar notificación si el cliente NO está en la sala
                 if (clientId && !connectedUserIds.has(clientId)) {
                   console.log(
-                    `📲 [TABLE CHAT] Enviando notificación push al cliente ${clientId}`,
+                    `   ✅ ENVIANDO notificación push al cliente ${clientId}`,
                   );
                   const { notifyClientWaiterMessage } = await import(
                     "../services/pushNotificationService"
