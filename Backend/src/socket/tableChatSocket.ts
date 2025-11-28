@@ -216,8 +216,30 @@ export const setupTableChatSocket = (io: Server) => {
                   : "Cliente";
                 const waiterId = tableData.id_waiter;
 
-                // Solo enviar notificación si el mozo NO está en la sala
-                if (waiterId && !connectedUserIds.has(waiterId)) {
+                // Verificar si es el primer mensaje del cliente
+                const { data: previousMessages } = await supabaseAdmin
+                  .from("messages")
+                  .select("id")
+                  .eq("chat_id", chatId)
+                  .order("created_at", { ascending: true });
+
+                const isFirstMessage = previousMessages?.length === 1;
+
+                if (isFirstMessage) {
+                  // Primer mensaje: notificar a TODOS los mozos
+                  console.log(
+                    `   🔔 PRIMER mensaje del cliente - notificando a TODOS los mozos`,
+                  );
+                  const { notifyWaitersNewClientMessage } = await import(
+                    "../services/pushNotificationService"
+                  );
+                  await notifyWaitersNewClientMessage(
+                    clientName,
+                    tableData.number.toString(),
+                    message.trim(),
+                  );
+                } else if (waiterId && !connectedUserIds.has(waiterId)) {
+                  // Mensajes subsecuentes: notificar solo al mozo asignado si NO está en la sala
                   console.log(
                     `   ✅ ENVIANDO notificación push al mozo ${waiterId}`,
                   );
@@ -230,7 +252,7 @@ export const setupTableChatSocket = (io: Server) => {
                     tableData.number.toString(),
                     message.trim(),
                     chatId,
-                  );              
+                  );
                 }
               } else if (senderType === "waiter") {
                 // Mozo envía mensaje al cliente
@@ -241,7 +263,7 @@ export const setupTableChatSocket = (io: Server) => {
                 // Solo enviar notificación si el cliente NO está en la sala
                 if (clientId && !connectedUserIds.has(clientId)) {
                   console.log(
-                    `   ✅ ENVIANDO notificación push al cliente ${clientId}`,
+                    `   ✅ ENVIANDO notificación push al cliente ${clientId} - Mozo: ${waiterName}`,
                   );
                   const { notifyClientWaiterMessage } = await import(
                     "../services/pushNotificationService"
@@ -252,6 +274,10 @@ export const setupTableChatSocket = (io: Server) => {
                     tableData.number.toString(),
                     message.trim(),
                     chatId,
+                  );
+                } else if (clientId) {
+                  console.log(
+                    `   ℹ️ Cliente ${clientId} está conectado en la sala - NO enviando notificación push`,
                   );
                 }
               }
