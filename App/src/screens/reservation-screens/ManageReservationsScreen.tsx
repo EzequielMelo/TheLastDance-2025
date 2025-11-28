@@ -168,6 +168,7 @@ export default function ManageReservationsScreen({ navigation }: ManageReservati
       case 'approved': return 'Aprobada';
       case 'rejected': return 'Rechazada';
       case 'cancelled': return 'Cancelada';
+      case 'completed': return 'Completada';
       default: return status;
     }
   };
@@ -319,12 +320,17 @@ export default function ManageReservationsScreen({ navigation }: ManageReservati
                     <View style={{ 
                       backgroundColor: 'rgba(212, 175, 55, 0.1)',
                       borderRadius: 8,
-                      padding: 10,
+                      padding: 12,
                       marginTop: 4,
                     }}>
-                      <Text style={{ fontSize: 15, color: '#d4af37', fontWeight: '600' }}>
-                        Mesa {reservation.table.number}{' '}(Cap: {reservation.table.capacity})
+                      <Text style={{ fontSize: 16, color: '#d4af37', fontWeight: '700', marginBottom: 4 }}>
+                        Mesa {reservation.table.number}
                       </Text>
+                      <View style={{ flexDirection: 'row', gap: 12 }}>
+                        <Text style={{ fontSize: 14, color: '#d4af37' }}>
+                          Tipo: {reservation.table.type || 'N/A'}
+                        </Text>
+                      </View>
                     </View>
                   )}
 
