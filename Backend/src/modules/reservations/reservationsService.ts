@@ -61,8 +61,17 @@ export class ReservationsService {
     // Verificar si hay alguna reserva dentro de los próximos 45 minutos
     // O si ya pasó la hora (seguir mostrando hasta que el maitre la cancele)
     for (const reservation of reservations) {
+      // Parsear la hora de la reserva en formato HH:MM:SS
+      const [hours, minutes] = reservation.time.split(":").map(Number);
+
+      // Crear el datetime de la reserva en Argentina
       const reservationDateTime = new Date(
-        `${reservation.date}T${reservation.time}`,
+        nowArgentina.getFullYear(),
+        nowArgentina.getMonth(),
+        nowArgentina.getDate(),
+        hours ?? 0,
+        minutes ?? 0,
+        0,
       );
 
       // Mostrar si la reserva es en los próximos 45 minutos O si ya pasó la hora
