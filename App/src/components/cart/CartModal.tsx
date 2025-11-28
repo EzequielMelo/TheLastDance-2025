@@ -97,6 +97,7 @@ export default function CartModal({
   const [tableId, setTableId] = useState<string | null>(null);
   const [loadingTable, setLoadingTable] = useState(false);
   const [confirmingDelivery, setConfirmingDelivery] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [deliveryStatus, setDeliveryStatus] = useState<{
     allDelivered: boolean;
     totalItems: number;
@@ -106,7 +107,8 @@ export default function CartModal({
   // 🚚 Estado local para capturar el modo delivery al abrir el modal
   // Priorizar el prop forceDeliveryMode sobre el contexto (evita race conditions)
   const [isDeliveryMode, setIsDeliveryMode] = useState(() => {
-    const mode = forceDeliveryMode || isDeliveryOrder || deliveryAddress !== null;
+    const mode =
+      forceDeliveryMode || isDeliveryOrder || deliveryAddress !== null;
     return mode;
   });
 
@@ -165,7 +167,8 @@ export default function CartModal({
     if (visible) {
       // 🚚 Capturar el modo delivery al abrir el modal
       // Priorizar forceDeliveryMode prop sobre el contexto
-      const deliveryMode = forceDeliveryMode || isDeliveryOrder || deliveryAddress !== null;     
+      const deliveryMode =
+        forceDeliveryMode || isDeliveryOrder || deliveryAddress !== null;
       setIsDeliveryMode(deliveryMode);
 
       // Solo verificar mesa si NO es un pedido delivery
@@ -185,7 +188,14 @@ export default function CartModal({
       // Resetear estado local del modal
       setIsDeliveryMode(false);
     }
-  }, [visible, occupiedTable?.id, cartItems.length, forceDeliveryMode, isDeliveryOrder, deliveryAddress]);
+  }, [
+    visible,
+    occupiedTable?.id,
+    cartItems.length,
+    forceDeliveryMode,
+    isDeliveryOrder,
+    deliveryAddress,
+  ]);
 
   const fetchUserTable = async () => {
     try {
@@ -339,10 +349,16 @@ export default function CartModal({
   };
 
   const handleConfirmOrder = async () => {
+    // Prevenir múltiples envíos simultáneos
+    if (isSubmitting) {
+      console.log("⚠️ Ya se está procesando un pedido, ignorando...");
+      return;
+    }
+
     // 🚚 Usar el estado local capturado al abrir el modal
     console.log("🚚 handleConfirmOrder - isDeliveryMode:", isDeliveryMode);
     console.log("🚚 handleConfirmOrder - deliveryAddress:", deliveryAddress);
-    
+
     // === Flujo para pedidos DELIVERY ===
     if (isDeliveryMode) {
       // Validar que haya productos en el carrito
@@ -358,7 +374,7 @@ export default function CartModal({
 
       // Usar la dirección del prop con prioridad sobre el contexto
       const finalDeliveryAddress = deliveryAddressProp || deliveryAddress;
-      
+
       if (!finalDeliveryAddress) {
         console.error("❌ No hay dirección de delivery disponible", {
           deliveryAddressProp,
@@ -372,10 +388,12 @@ export default function CartModal({
         );
         return;
       }
-      
+
       console.log("✅ Usando dirección de delivery:", finalDeliveryAddress);
 
       try {
+        setIsSubmitting(true);
+
         // Crear el pedido de delivery con los items del carrito
         const deliveryOrderData = {
           items: cartItems.map(item => ({
@@ -429,6 +447,8 @@ export default function CartModal({
           undefined,
           "error",
         );
+      } finally {
+        setIsSubmitting(false);
       }
       return;
     }
@@ -458,6 +478,7 @@ export default function CartModal({
     // Si hay un pedido activo, agregar como nueva tanda
     if (canAddMoreItems) {
       try {
+        setIsSubmitting(true);
         await submitToAcceptedOrder();
 
         showAlert(
@@ -476,13 +497,20 @@ export default function CartModal({
           "error",
         );
         return;
+      } finally {
+        setIsSubmitting(false);
       }
     }
 
     // Verificar mesa solo si NO es delivery
     if (!isDeliveryMode) {
       if (loadingTable) {
-        showAlert("Espera", "Verificando tu mesa asignada...", undefined, "info");
+        showAlert(
+          "Espera",
+          "Verificando tu mesa asignada...",
+          undefined,
+          "info",
+        );
         return;
       }
 
@@ -498,6 +526,8 @@ export default function CartModal({
     }
 
     try {
+      setIsSubmitting(true);
+
       const orderData: CreateOrderRequest = {
         table_id: tableId || undefined, // undefined para delivery, string para mesa
         items: cartItems.map(item => ({
@@ -530,6 +560,8 @@ export default function CartModal({
         undefined,
         "error",
       );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -617,6 +649,158 @@ export default function CartModal({
         </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24 }}>
+          {/* Botón de Confirmar Recepción - Arriba de todo cuando está disponible */}
+          {!isDeliveryMode && occupiedTable?.id && (
+            <>
+              {deliveryStatus === null ? (
+                // Skeleton mientras carga
+                <View
+                  style={{
+                    marginBottom: 24,
+                    backgroundColor: "rgba(156, 163, 175, 0.1)",
+                    borderRadius: 12,
+                    padding: 16,
+                    borderWidth: 1,
+                    borderColor: "rgba(156, 163, 175, 0.2)",
+                    minHeight: 100,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#9ca3af",
+                      fontSize: 14,
+                      textAlign: "center",
+                    }}
+                  >
+                    Verificando estado de entrega...
+                  </Text>
+                </View>
+              ) : deliveryStatus?.allDelivered &&
+                deliveryStatus.totalItems > 0 &&
+                deliveryConfirmationStatus === "pending" ? (
+                // Mostrar botón de confirmación cuando TODO está entregado
+                <View
+                  style={{
+                    marginBottom: 24,
+                    backgroundColor: "rgba(34, 197, 94, 0.1)",
+                    borderRadius: 12,
+                    padding: 16,
+                    borderWidth: 1,
+                    borderColor: "rgba(34, 197, 94, 0.3)",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#22c55e",
+                      fontSize: 16,
+                      fontWeight: "600",
+                      textAlign: "center",
+                      marginBottom: 8,
+                    }}
+                  >
+                    ✅ ¡Pedido Completo!
+                  </Text>
+                  <Text
+                    style={{
+                      color: "#d1d5db",
+                      fontSize: 14,
+                      textAlign: "center",
+                      marginBottom: 16,
+                    }}
+                  >
+                    Todos tus productos han sido entregados.
+                  </Text>
+                  <TouchableOpacity
+                    onPress={handleConfirmDelivery}
+                    disabled={confirmingDelivery}
+                    style={{
+                      backgroundColor: confirmingDelivery
+                        ? "#9ca3af"
+                        : "#22c55e",
+                      borderRadius: 12,
+                      padding: 16,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      opacity: confirmingDelivery ? 0.7 : 1,
+                    }}
+                  >
+                    <CheckCircle size={20} color="white" />
+                    <Text
+                      style={{
+                        color: "white",
+                        fontSize: 16,
+                        fontWeight: "600",
+                        marginLeft: 8,
+                      }}
+                    >
+                      {confirmingDelivery
+                        ? "Confirmando recepción..."
+                        : "Confirmar Recepción"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : deliveryStatus &&
+                deliveryStatus.totalItems > 0 &&
+                !deliveryStatus.allDelivered ? (
+                // Mostrar progreso cuando hay items pero NO todos están entregados
+                <View
+                  style={{
+                    marginBottom: 24,
+                    backgroundColor: "rgba(59, 130, 246, 0.1)",
+                    borderRadius: 12,
+                    padding: 16,
+                    borderWidth: 1,
+                    borderColor: "rgba(59, 130, 246, 0.3)",
+                    minHeight: 100,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#3b82f6",
+                      fontSize: 16,
+                      fontWeight: "600",
+                      textAlign: "center",
+                      marginBottom: 8,
+                    }}
+                  >
+                    🚀 Pedido en camino
+                  </Text>
+                  <Text
+                    style={{
+                      color: "#d1d5db",
+                      fontSize: 14,
+                      textAlign: "center",
+                    }}
+                  >
+                    {deliveryStatus.deliveredItems} de{" "}
+                    {deliveryStatus.totalItems} productos entregados
+                  </Text>
+                  <View
+                    style={{
+                      marginTop: 12,
+                      height: 8,
+                      backgroundColor: "rgba(59, 130, 246, 0.2)",
+                      borderRadius: 4,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <View
+                      style={{
+                        height: "100%",
+                        width: `${(deliveryStatus.deliveredItems / deliveryStatus.totalItems) * 100}%`,
+                        backgroundColor: "#3b82f6",
+                        borderRadius: 4,
+                      }}
+                    />
+                  </View>
+                </View>
+              ) : null}
+            </>
+          )}
+
           {/* Carrito Local (Nueva Tanda) */}
           {cartItems.length > 0 && (
             <View style={{ marginBottom: 24 }}>
@@ -896,71 +1080,6 @@ export default function CartModal({
               />
             </View>
           )}
-
-          {/* Botón de Confirmar Recepción - Solo si hay items delivered */}
-          {deliveryStatus?.allDelivered &&
-            deliveryStatus.totalItems > 0 &&
-            deliveryConfirmationStatus === "pending" && (
-              <View
-                style={{
-                  marginTop: 24,
-                  backgroundColor: "rgba(34, 197, 94, 0.1)",
-                  borderRadius: 12,
-                  padding: 16,
-                  borderWidth: 1,
-                  borderColor: "rgba(34, 197, 94, 0.3)",
-                }}
-              >
-                <Text
-                  style={{
-                    color: "#22c55e",
-                    fontSize: 16,
-                    fontWeight: "600",
-                    textAlign: "center",
-                    marginBottom: 8,
-                  }}
-                >
-                  ✅ ¡Pedido Completo!
-                </Text>
-                <Text
-                  style={{
-                    color: "#d1d5db",
-                    fontSize: 14,
-                    textAlign: "center",
-                    marginBottom: 16,
-                  }}
-                >
-                  Todos tus productos han sido entregados.
-                </Text>
-                <TouchableOpacity
-                  onPress={handleConfirmDelivery}
-                  disabled={confirmingDelivery}
-                  style={{
-                    backgroundColor: confirmingDelivery ? "#9ca3af" : "#22c55e",
-                    borderRadius: 12,
-                    padding: 16,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    opacity: confirmingDelivery ? 0.7 : 1,
-                  }}
-                >
-                  <CheckCircle size={20} color="white" />
-                  <Text
-                    style={{
-                      color: "white",
-                      fontSize: 16,
-                      fontWeight: "600",
-                      marginLeft: 8,
-                    }}
-                  >
-                    {confirmingDelivery
-                      ? "Confirmando..."
-                      : "Confirmar Recepción"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
         </ScrollView>
 
         {/* Footer */}
@@ -1021,15 +1140,16 @@ export default function CartModal({
 
             <TouchableOpacity
               onPress={handleConfirmOrder}
-              disabled={loadingTable}
+              disabled={loadingTable || isSubmitting}
               style={{
-                backgroundColor: loadingTable ? "#9ca3af" : "#d4af37",
+                backgroundColor:
+                  loadingTable || isSubmitting ? "#9ca3af" : "#d4af37",
                 borderRadius: 12,
                 padding: 16,
                 flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "center",
-                opacity: loadingTable ? 0.7 : 1,
+                opacity: loadingTable || isSubmitting ? 0.7 : 1,
               }}
             >
               <CheckCircle size={20} color="#1a1a1a" />
@@ -1043,11 +1163,13 @@ export default function CartModal({
               >
                 {loadingTable
                   ? "Verificando mesa..."
-                  : isDeliveryMode && cartItems.length > 0
-                    ? `Confirmar Pedido • ${formatPrice(cartAmount)}`
-                    : canAddMoreItems
-                      ? `Agregar Nueva Tanda • ${formatPrice(cartAmount)}`
-                      : `Enviar Pedido • ${formatPrice(cartAmount)}`}
+                  : isSubmitting
+                    ? "Enviando pedido..."
+                    : isDeliveryMode && cartItems.length > 0
+                      ? `Confirmar Pedido • ${formatPrice(cartAmount)}`
+                      : canAddMoreItems
+                        ? `Agregar Nueva Tanda • ${formatPrice(cartAmount)}`
+                        : `Enviar Pedido • ${formatPrice(cartAmount)}`}
               </Text>
             </TouchableOpacity>
           </View>

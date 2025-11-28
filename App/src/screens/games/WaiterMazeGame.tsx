@@ -59,6 +59,14 @@ export default function WaiterMazeGame() {
     x: GAME_WIDTH / 2 - WAITER_SIZE / 2,
     y: GAME_HEIGHT - WAITER_SIZE - 20,
   });
+  // Ref para la posición actual (para movimiento fluido)
+  const waiterPosRef = useRef<Position>({
+    x: GAME_WIDTH / 2 - WAITER_SIZE / 2,
+    y: GAME_HEIGHT - WAITER_SIZE - 20,
+  });
+  // Ref para el elemento visual del mozo
+  const waiterViewRef = useRef<View>(null);
+
   const [tablePos] = useState<Position>({
     x: GAME_WIDTH / 2 - TABLE_SIZE / 2,
     y: 20,
@@ -216,95 +224,71 @@ export default function WaiterMazeGame() {
 
   // Configurar giroscopio para control completo (x e y)
   const startGyroscope = () => {
-    Gyroscope.setUpdateInterval(16); // ~60fps para mayor fluidez
+    Gyroscope.setUpdateInterval(16); // ~60fps
+
     gyroSubscription.current = Gyroscope.addListener(gyroscopeData => {
       if (gameOver || won || isSlipping) return;
 
-      const { x, y } = gyroscopeData; // x = adelante/atrás, y = izquierda/derecha
+      const { x, y } = gyroscopeData;
 
-      setWaiterPos(prevPos => {
-        let newX = prevPos.x;
-        let newY = prevPos.y;
+      // Usar ref para actualizaciones más rápidas sin re-render
+      const prevPos = waiterPosRef.current;
+      let newX = prevPos.x;
+      let newY = prevPos.y;
 
-        // Movimiento lateral (eje Y del giroscopio) - MUY SENSIBLE
-        if (Math.abs(y) > GYRO_THRESHOLD) {
-          newX = prevPos.x + y * GYRO_SPEED * GYRO_MULTIPLIER_Y;
-        }
+      // Movimiento lateral (eje Y del giroscopio)
+      if (Math.abs(y) > GYRO_THRESHOLD) {
+        newX = prevPos.x + y * GYRO_SPEED * GYRO_MULTIPLIER_Y;
+      }
 
-        // Movimiento vertical (eje X del giroscopio) - SENSIBLE
-        if (Math.abs(x) > GYRO_THRESHOLD) {
-          newY = prevPos.y + x * GYRO_SPEED * GYRO_MULTIPLIER_X;
-        }
+      // Movimiento vertical (eje X del giroscopio)
+      if (Math.abs(x) > GYRO_THRESHOLD) {
+        newY = prevPos.y + x * GYRO_SPEED * GYRO_MULTIPLIER_X;
+      }
 
-        // Verificar colisión con bordes (solo cuando el sprite realmente toca la pared)
-        const wallMargin = WALL_THICKNESS;
+      // Verificar colisión con bordes
+      const wallMargin = WALL_THICKNESS;
 
-        // Log para debugging
-        if (newY + WAITER_SIZE > GAME_HEIGHT - wallMargin - 50) {
-          console.log("⚠️ Cerca del borde inferior!", {
-            posicionMozo: Math.round(newY),
-            bordeInferiorMozo: Math.round(newY + WAITER_SIZE),
-            limitePared: Math.round(GAME_HEIGHT - wallMargin),
-            distancia: Math.round(
-              GAME_HEIGHT - wallMargin - (newY + WAITER_SIZE),
-            ),
-          });
-        }
+      if (
+        newX < wallMargin ||
+        newX + WAITER_SIZE > GAME_WIDTH - wallMargin ||
+        newY < wallMargin ||
+        newY + WAITER_SIZE > GAME_HEIGHT - wallMargin
+      ) {
+        handleCollision("borde");
+        return;
+      }
 
-        // El mozo toca la pared cuando su borde (no su esquina) alcanza la pared
-        if (
-          newX < wallMargin || // Borde izquierdo del mozo toca pared izquierda
-          newX + WAITER_SIZE > GAME_WIDTH - wallMargin || // Borde derecho del mozo toca pared derecha
-          newY < wallMargin || // Borde superior del mozo toca pared superior
-          newY + WAITER_SIZE > GAME_HEIGHT - wallMargin // Borde inferior del mozo toca pared inferior
-        ) {
-          console.log("🚫 COLISIÓN CON BORDE!", {
-            newX: Math.round(newX),
-            newY: Math.round(newY),
-            GAME_HEIGHT,
-            limite: Math.round(GAME_HEIGHT - wallMargin - WAITER_SIZE),
-          });
-          handleCollision("borde");
-          return prevPos;
-        }
-
-        // Verificar colisión con obstáculos ANTES de mover
-        const obstaclesList = obstaclesRef.current;
-        console.log(
-          "🔍 Verificando colisiones. Obstáculos:",
-          obstaclesList.length,
-          "Posición mozo:",
-          { x: Math.round(newX), y: Math.round(newY) },
-        );
-
-        if (obstaclesList.length > 0) {
-          for (const obstacle of obstaclesList) {
-            const willCollide = checkCollision(
-              { x: newX, y: newY },
-              obstacle.position,
-            );
-            if (willCollide) {
-              console.log(
-                "🎯 Colisión detectada con obstáculo:",
-                obstacle.type,
-              );
-              handleSlip(prevPos);
-              return prevPos; // Mantener posición actual, el slip se aplicará después
-            }
+      // Verificar colisión con obstáculos
+      const obstaclesList = obstaclesRef.current;
+      if (obstaclesList.length > 0) {
+        for (const obstacle of obstaclesList) {
+          const willCollide = checkCollision(
+            { x: newX, y: newY },
+            obstacle.position,
+            obstacle.type,
+          );
+          if (willCollide) {
+            handleSlip(prevPos);
+            return;
           }
         }
+      }
 
-        // Verificar si llegó a la mesa
-        const distance = Math.sqrt(
-          Math.pow(newX - tablePos.x, 2) + Math.pow(newY - tablePos.y, 2),
-        );
-        if (distance < TABLE_SIZE / 2) {
-          handleWin();
-          return prevPos;
-        }
+      // Verificar si llegó a la mesa
+      const distance = Math.sqrt(
+        Math.pow(newX - tablePos.x, 2) + Math.pow(newY - tablePos.y, 2),
+      );
+      if (distance < TABLE_SIZE / 2) {
+        handleWin();
+        return;
+      }
 
-        return { x: newX, y: newY };
-      });
+      // Actualizar posición en ref
+      waiterPosRef.current = { x: newX, y: newY };
+
+      // Actualizar estado para re-render (solo cada cierto tiempo para mejor performance)
+      setWaiterPos({ x: newX, y: newY });
     });
   };
 
@@ -314,7 +298,6 @@ export default function WaiterMazeGame() {
     pos2: Position,
     obstacleType?: "skates" | "banana" | "oil",
   ): boolean => {
-    // Calcular centro de cada sprite
     const center1X = pos1.x + WAITER_SIZE / 2;
     const center1Y = pos1.y + WAITER_SIZE / 2;
     const center2X = pos2.x + OBSTACLE_SIZE / 2;
@@ -324,79 +307,36 @@ export default function WaiterMazeGame() {
       Math.pow(center1X - center2X, 2) + Math.pow(center1Y - center2Y, 2),
     );
 
-    // ⚙️ AJUSTE INDIVIDUAL DE HITBOX POR TIPO DE OBSTÁCULO
-    // Valores más altos = hitbox más grande = más fácil colisionar
-    // Valores más bajos = hitbox más pequeña = más difícil colisionar
-    let hitboxMultiplier = 1.15; // Valor por defecto
-
-    if (obstacleType === "skates") {
-      hitboxMultiplier = 1.15; // Patineta - Ajustar aquí
-    } else if (obstacleType === "banana") {
-      hitboxMultiplier = 1.15; // Cáscara de banana - Ajustar aquí
-    } else if (obstacleType === "oil") {
-      hitboxMultiplier = 1.15; // Aceite - Ajustar aquí
-    }
-
+    const hitboxMultiplier = 1.15;
     const collisionRadius =
       ((WAITER_SIZE + OBSTACLE_SIZE) / 2) * hitboxMultiplier;
-    const isColliding = distance < collisionRadius;
 
-    // Log para debugging - mostrar siempre las distancias cuando está cerca
-    if (distance < collisionRadius * 1.2) {
-      console.log(
-        "📍 Cerca de obstáculo - Distancia:",
-        Math.round(distance),
-        "Radio necesario:",
-        Math.round(collisionRadius),
-        "¿Colisión?",
-        isColliding,
-      );
-    }
-
-    if (isColliding) {
-      console.log(
-        "💥 ¡COLISIÓN! Mozo en:",
-        { x: Math.round(center1X), y: Math.round(center1Y) },
-        "Obstáculo en:",
-        { x: Math.round(center2X), y: Math.round(center2Y) },
-        "Distancia:",
-        Math.round(distance),
-        "Radio:",
-        Math.round(collisionRadius),
-      );
-    }
-
-    return isColliding;
+    return distance < collisionRadius;
   };
 
   // Manejar resbalón al tocar obstáculo
   const handleSlip = (currentPos: Position) => {
-    if (isSlipping) return; // Evitar múltiples resbalones simultáneos
+    if (isSlipping) return;
 
     setIsSlipping(true);
-    playErrorSound(); // Reproducir sonido de error
-    Vibration.vibrate(200); // Vibración al resbalar
+    playErrorSound();
+    Vibration.vibrate(200);
 
-    console.log("💨 ¡RESBALÓN DETECTADO! Posición actual:", currentPos);
-
-    // Direcciones posibles: hacia abajo (porque ahora empezamos abajo y subimos)
+    // Direcciones posibles
     const directions = [
-      { x: -SLIP_SPEED, y: 0 }, // Izquierda
-      { x: SLIP_SPEED, y: 0 }, // Derecha
-      { x: -SLIP_SPEED, y: SLIP_SPEED }, // Izquierda-abajo diagonal
-      { x: SLIP_SPEED, y: SLIP_SPEED }, // Derecha-abajo diagonal
-      { x: 0, y: SLIP_SPEED }, // Directamente abajo
+      { x: -SLIP_SPEED, y: 0 },
+      { x: SLIP_SPEED, y: 0 },
+      { x: -SLIP_SPEED, y: SLIP_SPEED },
+      { x: SLIP_SPEED, y: SLIP_SPEED },
+      { x: 0, y: SLIP_SPEED },
     ];
 
-    // Elegir dirección aleatoria
     const randomDirection =
       directions[Math.floor(Math.random() * directions.length)];
 
-    console.log("💨 Dirección del resbalón:", randomDirection);
-
-    // Animación del resbalón en múltiples pasos
-    const steps = 15; // Número de pasos para la animación
-    const stepDelay = 15; // Milisegundos entre cada paso
+    // Animación del resbalón
+    const steps = 20; // Más pasos para movimiento más suave
+    const stepDelay = 10; // Delay más corto para movimiento más fluido
     const deltaX = randomDirection.x / steps;
     const deltaY = randomDirection.y / steps;
 
@@ -404,36 +344,41 @@ export default function WaiterMazeGame() {
     const slipInterval = setInterval(() => {
       currentStep++;
 
-      setWaiterPos(prevPos => {
-        let newX = prevPos.x + deltaX;
-        let newY = prevPos.y + deltaY;
+      const prevPos = waiterPosRef.current;
+      let newX = prevPos.x + deltaX;
+      let newY = prevPos.y + deltaY;
 
-        // Asegurar que no salga de los límites
-        newX = Math.max(0, Math.min(GAME_WIDTH - WAITER_SIZE, newX));
-        newY = Math.max(0, Math.min(GAME_HEIGHT - WAITER_SIZE, newY));
+      // Asegurar límites
+      newX = Math.max(
+        WALL_THICKNESS,
+        Math.min(GAME_WIDTH - WAITER_SIZE - WALL_THICKNESS, newX),
+      );
+      newY = Math.max(
+        WALL_THICKNESS,
+        Math.min(GAME_HEIGHT - WAITER_SIZE - WALL_THICKNESS, newY),
+      );
 
-        // Verificar si el resbalón lo hace chocar contra un borde
-        if (
-          newX <= 0 ||
-          newX >= GAME_WIDTH - WAITER_SIZE ||
-          newY <= 0 ||
-          newY >= GAME_HEIGHT - WAITER_SIZE
-        ) {
-          clearInterval(slipInterval);
-          handleCollision("borde después de resbalar");
-        }
+      // Verificar colisión con borde
+      if (
+        newX <= WALL_THICKNESS ||
+        newX >= GAME_WIDTH - WAITER_SIZE - WALL_THICKNESS ||
+        newY <= WALL_THICKNESS ||
+        newY >= GAME_HEIGHT - WAITER_SIZE - WALL_THICKNESS
+      ) {
+        clearInterval(slipInterval);
+        handleCollision("borde después de resbalar");
+        return;
+      }
 
-        return { x: newX, y: newY };
-      });
+      // Actualizar posición
+      waiterPosRef.current = { x: newX, y: newY };
+      setWaiterPos({ x: newX, y: newY });
 
-      // Terminar animación cuando se completan todos los pasos
+      // Terminar animación
       if (currentStep >= steps) {
         clearInterval(slipInterval);
-        console.log("💨 Nueva posición después de resbalar");
-
         setTimeout(() => {
           setIsSlipping(false);
-          console.log("💨 Resbalón terminado, control restaurado");
         }, 100);
       }
     }, stepDelay);

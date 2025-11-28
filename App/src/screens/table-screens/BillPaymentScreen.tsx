@@ -79,6 +79,7 @@ const BillPaymentScreen: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showPaymentAlert, setShowPaymentAlert] = useState(false);
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentDiscount, setCurrentDiscount] = useState<{
     amount: number;
     received: boolean;
@@ -195,8 +196,16 @@ const BillPaymentScreen: React.FC = () => {
   };
 
   const processPay = async () => {
+    // Prevenir múltiples envíos simultáneos
+    if (isSubmitting) {
+      console.log("⚠️ Ya se está procesando el pago, ignorando...");
+      return;
+    }
+
     try {
       if (!billData) return;
+
+      setIsSubmitting(true);
 
       const tipAmount = calculateTipAmount();
       const gameDiscountAmount = calculateGameDiscountAmount();
@@ -223,6 +232,8 @@ const BillPaymentScreen: React.FC = () => {
     } catch (err) {
       console.error("Error processing payment:", err);
       ToastAndroid.show("❌ Error al procesar el pago", ToastAndroid.SHORT);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -404,17 +415,24 @@ const BillPaymentScreen: React.FC = () => {
       <View className="p-4 bg-gray-800 border-t border-gray-700">
         <TouchableOpacity
           onPress={handlePayment}
-          className="bg-green-600 py-4 rounded-lg flex-row justify-center items-center"
+          disabled={isSubmitting}
+          style={{
+            backgroundColor: isSubmitting ? "#9ca3af" : "#059669",
+            opacity: isSubmitting ? 0.7 : 1,
+          }}
+          className="py-4 rounded-lg flex-row justify-center items-center"
         >
           <CheckCircle size={20} color="white" className="mr-2" />
-          <Text className="text-white text-lg font-bold ml-2">Pagar</Text>
+          <Text className="text-white text-lg font-bold ml-2">
+            {isSubmitting ? "Procesando pago..." : "Pagar"}
+          </Text>
         </TouchableOpacity>
       </View>
 
       {/* Custom Alert para confirmación de pago */}
       <CustomAlert
         visible={showPaymentAlert}
-        onClose={() => setShowPaymentAlert(false)}
+        onClose={() => !isSubmitting && setShowPaymentAlert(false)}
         title="Confirmar Pago"
         message={getPaymentSummaryMessage()}
         type="info"
@@ -422,14 +440,16 @@ const BillPaymentScreen: React.FC = () => {
           {
             text: "Cancelar",
             style: "cancel",
-            onPress: () => setShowPaymentAlert(false),
+            onPress: () => !isSubmitting && setShowPaymentAlert(false),
           },
           {
-            text: "Confirmar Pago",
+            text: isSubmitting ? "Procesando..." : "Confirmar Pago",
             style: "default",
             onPress: () => {
-              setShowPaymentAlert(false);
-              processPay();
+              if (!isSubmitting) {
+                setShowPaymentAlert(false);
+                processPay();
+              }
             },
           },
         ]}

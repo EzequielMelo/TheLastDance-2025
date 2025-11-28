@@ -89,11 +89,18 @@ export default function WaiterOrdersScreen() {
 
   const handleBatchAction = async (
     orderId: string,
+    batchId: string,
     batchItems: any[],
     action: "accept" | "reject",
   ) => {
+    const batchKey = `${orderId}_${batchId}`;
+
+    // Prevenir múltiples envíos simultáneos
+    if (actionLoading === batchKey) {
+      return;
+    }
+
     try {
-      const batchKey = `${orderId}_${batchItems[0]?.batch_id}`;
       setActionLoading(batchKey);
 
       // Obtener IDs de todos los items de la tanda
@@ -157,6 +164,11 @@ export default function WaiterOrdersScreen() {
     batchKey: string,
     batchItems: any[],
   ) => {
+    // Prevenir múltiples envíos simultáneos
+    if (actionLoading === batchKey) {
+      return;
+    }
+
     const rejectedItemIds = selectedItems[batchKey] || [];
 
     if (rejectedItemIds.length === 0) {
@@ -533,6 +545,8 @@ export default function WaiterOrdersScreen() {
                             justifyContent: "space-between",
                             alignItems: "center",
                             marginBottom: 12,
+                            flexWrap: "wrap",
+                            gap: 8,
                           }}
                         >
                           <Text
@@ -549,7 +563,7 @@ export default function WaiterOrdersScreen() {
                             <Text
                               style={{
                                 color: "#ef4444",
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: "600",
                                 backgroundColor: "rgba(239, 68, 68, 0.1)",
                                 paddingHorizontal: 8,
@@ -559,7 +573,7 @@ export default function WaiterOrdersScreen() {
                                 borderColor: "rgba(239, 68, 68, 0.3)",
                               }}
                             >
-                              Selecciona items SIN STOCK
+                              Selecciona SIN STOCK
                             </Text>
                           )}
                         </View>
@@ -722,7 +736,9 @@ export default function WaiterOrdersScreen() {
                                   backgroundColor:
                                     (selectedItems[batchKey] || []).length === 0
                                       ? "#374151"
-                                      : "#ef4444",
+                                      : isProcessing
+                                        ? "#9ca3af"
+                                        : "#ef4444",
                                   borderRadius: 10,
                                   padding: 14,
                                   flexDirection: "row",
@@ -740,9 +756,9 @@ export default function WaiterOrdersScreen() {
                                     marginLeft: 6,
                                   }}
                                 >
-                                  Confirmar (
-                                  {(selectedItems[batchKey] || []).length} sin
-                                  stock)
+                                  {isProcessing
+                                    ? "Procesando..."
+                                    : `Confirmar (${(selectedItems[batchKey] || []).length} sin stock)`}
                                 </Text>
                               </TouchableOpacity>
 
@@ -778,6 +794,7 @@ export default function WaiterOrdersScreen() {
                                 onPress={() =>
                                   handleBatchAction(
                                     batch.order_id,
+                                    batch.batch_id,
                                     batch.items,
                                     "accept",
                                   )
@@ -785,7 +802,9 @@ export default function WaiterOrdersScreen() {
                                 disabled={isProcessing}
                                 style={{
                                   flex: 1,
-                                  backgroundColor: "#22c55e",
+                                  backgroundColor: isProcessing
+                                    ? "#9ca3af"
+                                    : "#22c55e",
                                   borderRadius: 10,
                                   padding: 16,
                                   flexDirection: "row",
@@ -803,7 +822,9 @@ export default function WaiterOrdersScreen() {
                                     marginLeft: 6,
                                   }}
                                 >
-                                  Aceptar Tanda Completa
+                                  {isProcessing
+                                    ? "Procesando..."
+                                    : "Aceptar Tanda Completa"}
                                 </Text>
                               </TouchableOpacity>
 
@@ -812,7 +833,9 @@ export default function WaiterOrdersScreen() {
                                 disabled={isProcessing}
                                 style={{
                                   flex: 1,
-                                  backgroundColor: "#ef4444",
+                                  backgroundColor: isProcessing
+                                    ? "#9ca3af"
+                                    : "#ef4444",
                                   borderRadius: 10,
                                   padding: 16,
                                   flexDirection: "row",
@@ -830,7 +853,9 @@ export default function WaiterOrdersScreen() {
                                     marginLeft: 6,
                                   }}
                                 >
-                                  Rechazar (Seleccionar Items)
+                                  {isProcessing
+                                    ? "Procesando..."
+                                    : "Rechazar (Seleccionar Items)"}
                                 </Text>
                               </TouchableOpacity>
                             </View>

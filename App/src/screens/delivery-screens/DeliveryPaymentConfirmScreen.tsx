@@ -123,7 +123,11 @@ const DeliveryPaymentConfirmScreen: React.FC = () => {
   const finalTotal = subtotalAfterDiscount + tipAmount;
 
   const handleConfirmPayment = async () => {
-    if (processing) return;
+    // Prevenir múltiples envíos simultáneos
+    if (processing) {
+      console.log("⚠️ Ya se está procesando el pago, ignorando...");
+      return;
+    }
 
     try {
       setProcessing(true);
