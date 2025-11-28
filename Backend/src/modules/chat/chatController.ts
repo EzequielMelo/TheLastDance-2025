@@ -205,50 +205,77 @@ export class ChatController {
         tableData.id_waiter,
       );
 
-      // NOTIFICACIONES TIPO WHATSAPP - Siempre enviar notificación en cada mensaje
+      // Crear el mensaje PRIMERO
+      const newMessage = await ChatServices.createMessage(
+        chat.id,
+        userId,
+        senderType,
+        message,
+      );
+
+      console.log(`✅ Mensaje creado: ${newMessage.id} - Tipo: ${senderType}`);
+
+      // NOTIFICACIONES TIPO WHATSAPP - Enviar después de crear el mensaje
       if (senderType === "client") {
         // Cliente envía mensaje al mozo específico
         try {
           // Obtener nombre del cliente para la notificación
-          const { data: clientData } = await supabaseAdmin
+          const { data: clientData, error: clientError } = await supabaseAdmin
             .from("users")
-            .select("name")
+            .select("first_name, last_name")
             .eq("id", tableData.id_client)
             .single();
 
-          const clientName = clientData?.name || "Cliente";
+          if (clientError) {
+            console.error("❌ Error obteniendo datos del cliente:", clientError);
+          }
 
-          // Enviar notificación al mozo específico de la mesa
-          await notifyWaiterClientMessage(
-            tableData.id_waiter,
-            clientName,
-            tableData.number.toString(),
-            message,
-            chat.id,
-          );
+          const clientName = clientData
+            ? `${clientData.first_name} ${clientData.last_name}`.trim()
+            : "Cliente";
 
-          // Si es el primer mensaje del cliente, también notificar a todos los mozos
-          const { data: previousMessages } = await supabaseAdmin
+          console.log(`📤 Enviando notificación al mozo ${tableData.id_waiter} - Cliente: ${clientName}`);
+
+          // Verificar si es el primer mensaje del cliente (para enviar a todos los mozos)
+          const { data: previousMessages, error: messagesError } = await supabaseAdmin
             .from("messages")
             .select("id")
             .eq("chat_id", chat.id)
             .eq("sender_type", "client")
-            .limit(1);
+            .limit(2); // Límite 2 para incluir el que acabamos de crear
 
-          const isFirstMessage =
-            !previousMessages || previousMessages.length === 0;
+          if (messagesError) {
+            console.error("❌ Error verificando mensajes previos:", messagesError);
+          }
+
+          const isFirstMessage = previousMessages && previousMessages.length === 1;
+
+          console.log(`🔍 Es primer mensaje del cliente? ${isFirstMessage} (Total mensajes cliente: ${previousMessages?.length || 0})`);
 
           if (isFirstMessage) {
-            // Enviar notificación a todos los mozos (solo el primer mensaje)
+            // Si es el primer mensaje, notificar a TODOS los mozos
+            console.log(`📢 Primer mensaje del cliente - Notificando a TODOS los mozos`);
             await notifyWaitersNewClientMessage(
               clientName,
               tableData.number.toString(),
               message,
             );
+          } else {
+            // Si no es el primer mensaje, solo notificar al mozo específico
+            console.log(`📱 Mensaje subsecuente - Notificando solo al mozo asignado`);
+            await notifyWaiterClientMessage(
+              tableData.id_waiter,
+              clientName,
+              tableData.number.toString(),
+              message,
+              chat.id,
+            );
           }
+
+          console.log(`✅ Notificación enviada exitosamente`);
         } catch (notifyError) {
           console.error(
-            "Error enviando notificaciones de cliente:",
+            "❌ Error enviando notificaciones de cliente:",
             notifyError,
           );
           // No bloqueamos el envío del mensaje por error de notificación
@@ -257,15 +284,21 @@ export class ChatController {
         // Mozo envía mensaje al cliente
         try {
           // Obtener nombre del mozo para la notificación
-          const { data: waiterData } = await supabaseAdmin
+          const { data: waiterData, error: waiterError } = await supabaseAdmin
             .from("users")
             .select("first_name, last_name")
             .eq("id", userId)
             .single();
 
+          if (waiterError) {
+            console.error("❌ Error obteniendo datos del mozo:", waiterError);
+          }
+
           const waiterName = waiterData
             ? `${waiterData.first_name} ${waiterData.last_name}`.trim()
             : "Mesero";
+
+          console.log(`📤 Enviando notificación al cliente ${tableData.id_client} - Mozo: ${waiterName}`);
 
           // Enviar notificación al cliente específico (tipo WhatsApp)
           await notifyClientWaiterMessage(
@@ -275,19 +308,13 @@ export class ChatController {
             message,
             chat.id,
           );
+
+          console.log(`✅ Notificación enviada exitosamente al cliente`);
         } catch (notifyError) {
-          console.error("Error enviando notificación de mozo:", notifyError);
+          console.error("❌ Error enviando notificación de mozo:", notifyError);
           // No bloqueamos el envío del mensaje por error de notificación
         }
       }
-
-      // Crear el mensaje
-      const newMessage = await ChatServices.createMessage(
-        chat.id,
-        userId,
-        senderType,
-        message,
-      );
 
       return res.json({
         success: true,
