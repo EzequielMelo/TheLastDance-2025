@@ -113,14 +113,20 @@ export class ReservationsService {
     }
 
     // Verificar que la fecha y hora sean futuras o válidas para hoy
+    // Usar hora de Argentina (UTC-3)
     const now = new Date();
+    const nowArgentina = new Date(
+      now.toLocaleString("en-US", {
+        timeZone: "America/Argentina/Buenos_Aires",
+      }),
+    );
 
     // Parsear la fecha de la reserva en formato YYYY-MM-DD
     const [year, month, day] = data.date.split("-").map(Number);
     const reservationDate = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
     reservationDate.setHours(0, 0, 0, 0);
 
-    const today = new Date();
+    const today = new Date(nowArgentina);
     today.setHours(0, 0, 0, 0);
 
     // Validar horario de operación: 19:00 a 02:30
@@ -153,7 +159,8 @@ export class ReservationsService {
     }
 
     // Verificar que el datetime completo sea futuro (al menos 15 minutos de anticipación)
-    const minReservationTime = new Date(now.getTime() + 15 * 60000);
+    // Usar hora de Argentina para la comparación
+    const minReservationTime = new Date(nowArgentina.getTime() + 15 * 60000);
 
     if (reservationDateTime < minReservationTime) {
       throw new Error(
@@ -285,11 +292,13 @@ export class ReservationsService {
   static async getAllReservations(): Promise<ReservationWithDetails[]> {
     const { data: reservations, error } = await supabase
       .from("reservations")
-      .select(`
+      .select(
+        `
         *,
         users:user_id (id, first_name, last_name),
         tables:table_id (id, number, type)
-      `)
+      `,
+      )
       .order("date", { ascending: true })
       .order("time", { ascending: true });
 
@@ -301,18 +310,22 @@ export class ReservationsService {
     // Transformar datos para que coincidan con el tipo esperado
     const formattedReservations = (reservations || []).map((res: any) => ({
       ...res,
-      user: res.users ? {
-        id: res.users.id,
-        first_name: res.users.first_name,
-        last_name: res.users.last_name,
-        email: res.users.email
-      } : undefined,
-      table: res.tables ? {
-        id: res.tables.id,
-        number: res.tables.number,
-        capacity: res.tables.capacity,
-        type: res.tables.type
-      } : undefined
+      user: res.users
+        ? {
+            id: res.users.id,
+            first_name: res.users.first_name,
+            last_name: res.users.last_name,
+            email: res.users.email,
+          }
+        : undefined,
+      table: res.tables
+        ? {
+            id: res.tables.id,
+            number: res.tables.number,
+            capacity: res.tables.capacity,
+            type: res.tables.type,
+          }
+        : undefined,
     }));
 
     return formattedReservations;
