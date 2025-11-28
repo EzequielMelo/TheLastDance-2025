@@ -189,6 +189,15 @@ export class NotificationService {
       lightColor: "#22c55e",
       sound: "default",
     });
+
+    await Notifications.setNotificationChannelAsync("reservation_updates", {
+      name: "Reservas",
+      description: "Notificaciones de nuevas reservas y actualizaciones",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#d4af37",
+      sound: "default",
+    });
   }
 
   static getExpoPushToken(): string | null {

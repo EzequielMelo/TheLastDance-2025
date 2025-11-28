@@ -306,8 +306,10 @@ async function getDriverTokens(): Promise<string[]> {
 // Función para obtener token de un cliente específico
 async function getClientToken(clientId: string): Promise<string | null> {
   try {
-    console.log(`🔍 [getClientToken] Buscando push_token para cliente: ${clientId}`);
-    
+    console.log(
+      `🔍 [getClientToken] Buscando push_token para cliente: ${clientId}`,
+    );
+
     const { data: user, error } = await supabaseAdmin
       .from("users")
       .select("push_token")
@@ -325,11 +327,15 @@ async function getClientToken(clientId: string): Promise<string | null> {
     }
 
     const hasValidToken = user.push_token && user.push_token.trim() !== "";
-    
+
     if (hasValidToken) {
-      console.log(`✅ [getClientToken] Token encontrado: ${user.push_token.substring(0, 20)}...`);
+      console.log(
+        `✅ [getClientToken] Token encontrado: ${user.push_token.substring(0, 20)}...`,
+      );
     } else {
-      console.warn(`⚠️ [getClientToken] Cliente ${clientId} NO tiene push_token registrado`);
+      console.warn(
+        `⚠️ [getClientToken] Cliente ${clientId} NO tiene push_token registrado`,
+      );
     }
 
     return hasValidToken ? user.push_token : null;
@@ -368,8 +374,8 @@ async function getRoleTokens(positionCode: string): Promise<string[]> {
     );
     if (users && users.length > 0) {
       users.forEach(user => {
-        const tokenPreview = user.push_token 
-          ? `${user.push_token.substring(0, 30)}...` 
+        const tokenPreview = user.push_token
+          ? `${user.push_token.substring(0, 30)}...`
           : "❌ Sin token";
         console.log(
           `   - ${user.first_name} ${user.last_name}: ${tokenPreview}`,
@@ -384,15 +390,17 @@ async function getRoleTokens(positionCode: string): Promise<string[]> {
     console.log(
       `📤 [getRoleTokens] Tokens válidos para ${positionCode}: ${tokens.length}`,
     );
-    
+
     if (tokens.length > 0) {
       tokens.forEach((token, index) => {
         console.log(`   Token ${index + 1}: ${token.substring(0, 30)}...`);
       });
     } else {
-      console.log(`   ⚠️ NO se encontraron tokens válidos para enviar notificaciones`);
+      console.log(
+        `   ⚠️ NO se encontraron tokens válidos para enviar notificaciones`,
+      );
     }
-    
+
     return tokens;
   } catch (error) {
     console.error(
@@ -838,7 +846,7 @@ export async function notifyKitchenNewItems(
   try {
     // Detectar si es un pedido delivery (tableNumber empieza con "Delivery")
     const isDelivery = tableNumber.toLowerCase().startsWith("delivery");
-    
+
     console.log(
       `🍳 [notifyKitchenNewItems] Iniciando notificación para cocina - ${isDelivery ? tableNumber : `Mesa #${tableNumber}`}`,
     );
@@ -859,10 +867,10 @@ export async function notifyKitchenNewItems(
       .join(", ");
 
     // Ajustar título y body según el tipo de pedido
-    const title = isDelivery 
-      ? `Nuevo pedido - ${tableNumber}${clientName ? ` (${clientName})` : ''}`
+    const title = isDelivery
+      ? `Nuevo pedido - ${tableNumber}${clientName ? ` (${clientName})` : ""}`
       : `Nuevo pedido - Mesa #${tableNumber}`;
-    
+
     const notificationData: PushNotificationData = {
       title,
       body: `${totalItems} platos: ${itemsText}`,
@@ -902,7 +910,7 @@ export async function notifyBartenderNewItems(
   try {
     // Detectar si es un pedido delivery (tableNumber empieza con "Delivery")
     const isDelivery = tableNumber.toLowerCase().startsWith("delivery");
-    
+
     console.log(
       `🍹 [notifyBartenderNewItems] Iniciando notificación para bar - ${isDelivery ? tableNumber : `Mesa #${tableNumber}`}`,
     );
@@ -923,10 +931,10 @@ export async function notifyBartenderNewItems(
       .join(", ");
 
     // Ajustar título y body según el tipo de pedido
-    const title = isDelivery 
-      ? `Nuevo pedido - ${tableNumber}${clientName ? ` (${clientName})` : ''}`
+    const title = isDelivery
+      ? `Nuevo pedido - ${tableNumber}${clientName ? ` (${clientName})` : ""}`
       : `Nuevo pedido - Mesa #${tableNumber}`;
-    
+
     const notificationData: PushNotificationData = {
       title,
       body: `${totalItems} bebidas: ${itemsText}`,
@@ -1492,6 +1500,8 @@ export async function notifyNewReservation(
         tableType,
         screen: "ManageReservations",
       },
+      channelId: "reservation_updates",
+      priority: "high",
     };
 
     await sendExpoPushNotification(tokens, notificationData);
