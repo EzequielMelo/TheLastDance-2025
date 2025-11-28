@@ -238,20 +238,30 @@ export const setupTableChatSocket = (io: Server) => {
                     tableData.number.toString(),
                     message.trim(),
                   );
-                } else if (waiterId && !connectedUserIds.has(waiterId)) {
-                  // Mensajes subsecuentes: notificar solo al mozo asignado si NO está en la sala
+                } else if (waiterId) {
+                  if (!connectedUserIds.has(waiterId)) {
+                    // Mensajes subsecuentes: notificar solo al mozo asignado si NO está en la sala
+                    console.log(
+                      `   ✅ ENVIANDO notificación push al mozo ${waiterId}`,
+                    );
+                    const { notifyWaiterClientMessage } = await import(
+                      "../services/pushNotificationService"
+                    );
+                    await notifyWaiterClientMessage(
+                      waiterId,
+                      clientName,
+                      tableData.number.toString(),
+                      message.trim(),
+                      chatId,
+                    );
+                  } else {
+                    console.log(
+                      `   ℹ️ Mozo ${waiterId} está conectado en la sala - NO enviando notificación push`,
+                    );
+                  }
+                } else {
                   console.log(
-                    `   ✅ ENVIANDO notificación push al mozo ${waiterId}`,
-                  );
-                  const { notifyWaiterClientMessage } = await import(
-                    "../services/pushNotificationService"
-                  );
-                  await notifyWaiterClientMessage(
-                    waiterId,
-                    clientName,
-                    tableData.number.toString(),
-                    message.trim(),
-                    chatId,
+                    `   ⚠️ NO hay mozo asignado a la mesa (id_waiter es null)`,
                   );
                 }
               } else if (senderType === "waiter") {
@@ -336,9 +346,29 @@ export const setupTableChatSocket = (io: Server) => {
     // Evento para salir del chat de mesa
     socket.on("leave_table_chat", (tableId: string) => {
       const roomName = `table_chat_${tableId}`;
+      
+      // Obtener info de la sala ANTES de salir
+      const roomBefore = io.sockets.adapter.rooms.get(roomName);
+      const userCountBefore = roomBefore?.size || 0;
+      
       socket.leave(roomName);
+      
+      // Obtener info de la sala DESPUÉS de salir
+      const roomAfter = io.sockets.adapter.rooms.get(roomName);
+      const userCountAfter = roomAfter?.size || 0;
+      
       console.log(
-        `👋 [TABLE CHAT] Usuario ${user.appUserId} salió de ${roomName}`,
+        `👋 [TABLE CHAT] Usuario ${user.first_name} ${user.last_name} (${user.appUserId}) salió de ${roomName}`,
+      );
+      console.log(
+        `   📊 Usuarios en sala: ${userCountBefore} → ${userCountAfter}`,
+      );
+    });
+
+    // Cuando el usuario se desconecta completamente, limpiarlo de todas las salas
+    socket.on("disconnect", (reason) => {
+      console.log(
+        `🔌 [TABLE CHAT] Usuario ${user.first_name} ${user.last_name} (${user.appUserId}) desconectado. Razón: ${reason}`,
       );
     });
   });
