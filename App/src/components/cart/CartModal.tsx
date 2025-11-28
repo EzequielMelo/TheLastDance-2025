@@ -1108,7 +1108,7 @@ export default function CartModal({
               >
                 <Text style={{ color: "#d4af37", fontSize: 16 }}>
                   {canAddMoreItems ? "Nueva Tanda" : "Total"} ({cartCount}{" "}
-                  items)
+                  productos)
                 </Text>
                 <Text
                   style={{

@@ -122,7 +122,7 @@ export const useChat = ({ tableId, onError, onUserJoined }: UseChatProps) => {
           reconnectionAttempts: 3,
           reconnectionDelay: 1000,
           timeout: 20000,
-          forceNew: true, // Crear nueva conexión en lugar de reutilizar
+          forceNew: false, // Reutilizar conexión existente para evitar múltiples sockets
         });
 
         // Eventos de conexión
@@ -131,11 +131,8 @@ export const useChat = ({ tableId, onError, onUserJoined }: UseChatProps) => {
           setIsConnected(true);
           setConnectionError(null);
 
-          // Unirse al chat de la mesa
-          Logger.info(
-            `🚪 [TABLE CHAT] Intentando unirse al chat de mesa: ${tableId}`,
-          );
-          socketInstance.emit("join_table_chat", tableId);
+          // NO unirse aquí - se hará en un useEffect separado
+          // para poder controlar mejor el join/leave
         });
 
         socketInstance.on("disconnect", () => {
@@ -251,17 +248,47 @@ export const useChat = ({ tableId, onError, onUserJoined }: UseChatProps) => {
 
     initializeChat();
 
-    // Cleanup
+    // Cleanup - desconectar socket completamente cuando se desmonta el hook
     return () => {
       if (socket) {
         Logger.info(
-          `👋 [TABLE CHAT] Desconectando y saliendo del chat de mesa ${tableId}`,
+          `🧹 [TABLE CHAT] Limpiando socket del chat de mesa ${tableId}`,
         );
-        socket.emit("leave_table_chat", tableId);
+        // Limpiar listeners
+        socket.off("new_table_message");
+        socket.off("user_joined");
+        socket.off("table_messages_read");
+        socket.off("error");
+        socket.off("joined_table_room");
+        socket.off("table_chat_closed");
+        socket.off("connect");
+        socket.off("disconnect");
+        socket.off("connect_error");
+        
+        // Desconectar completamente
         socket.disconnect();
+        setSocket(null);
       }
     };
   }, [token, tableId, user]);
+
+  // Effect separado para manejar join/leave de la sala del chat
+  useEffect(() => {
+    if (!socket || !isConnected || !tableId) return;
+
+    Logger.info(
+      `🚪 [TABLE CHAT] Uniéndose al chat de mesa: ${tableId}`,
+    );
+    socket.emit("join_table_chat", tableId);
+
+    // Cleanup: salir de la sala cuando se desmonta
+    return () => {
+      Logger.info(
+        `👋 [TABLE CHAT] Saliendo del chat de mesa ${tableId}`,
+      );
+      socket.emit("leave_table_chat", tableId);
+    };
+  }, [socket, isConnected, tableId]);
 
   // Polling de respaldo para sincronizar mensajes cada 5 segundos
   useEffect(() => {

@@ -283,9 +283,13 @@ export class ReservationsService {
    * Obtener todas las reservas (para admin)
    */
   static async getAllReservations(): Promise<ReservationWithDetails[]> {
-    const { data, error } = await supabase
+    const { data: reservations, error } = await supabase
       .from("reservations")
-      .select(`*`)
+      .select(`
+        *,
+        users:user_id (id, first_name, last_name),
+        tables:table_id (id, number, type)
+      `)
       .order("date", { ascending: true })
       .order("time", { ascending: true });
 
@@ -294,7 +298,24 @@ export class ReservationsService {
       throw new Error("Error al obtener las reservas");
     }
 
-    return data || [];
+    // Transformar datos para que coincidan con el tipo esperado
+    const formattedReservations = (reservations || []).map((res: any) => ({
+      ...res,
+      user: res.users ? {
+        id: res.users.id,
+        first_name: res.users.first_name,
+        last_name: res.users.last_name,
+        email: res.users.email
+      } : undefined,
+      table: res.tables ? {
+        id: res.tables.id,
+        number: res.tables.number,
+        capacity: res.tables.capacity,
+        type: res.tables.type
+      } : undefined
+    }));
+
+    return formattedReservations;
   }
 
   /**
