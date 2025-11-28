@@ -74,9 +74,9 @@ function FormLayoutContent({
       className="flex-1"
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior="height"
         className="flex-1"
-        keyboardVerticalOffset={0}
+        keyboardVerticalOffset={50}
       >
         <ScrollView
           ref={scrollViewRef}
@@ -109,7 +109,7 @@ function FormLayoutContent({
           {/* Form content */}
           <View className="w-full">
             {(() => {
-              if (renderSubmitInside && typeof children === 'function') {
+              if (renderSubmitInside && typeof children === "function") {
                 const renderSubmitButton = () => (
                   <TouchableOpacity
                     className="overflow-hidden rounded-xl mt-2"

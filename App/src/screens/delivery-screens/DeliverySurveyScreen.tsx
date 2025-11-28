@@ -7,7 +7,9 @@ import {
   ScrollView,
   TextInput,
   Keyboard,
+  KeyboardAvoidingView,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -287,162 +289,171 @@ export default function DeliverySurveyScreen() {
   }
 
   return (
-    <LinearGradient
-      colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
-      style={styles.container}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <ArrowLeft size={24} color="#d4af37" />
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Truck size={28} color="#d4af37" />
-          <Text style={styles.headerTitle}>Encuesta de Delivery</Text>
-        </View>
-        <View style={{ width: 40 }} />
-      </View>
-
-      {/* Content */}
-      <ScrollView
-        ref={scrollRef}
-        style={styles.scrollContent}
-        contentContainerStyle={[
-          styles.scrollContentContainer,
-          {
-            paddingBottom: isKeyboardVisible ? 150 : 32,
-          },
-        ]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+      <LinearGradient
+        colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
+        style={styles.container}
       >
-        <View style={styles.introCard}>
-          <Text style={styles.introTitle}>Tu opinión es importante</Text>
-          <Text style={styles.introText}>
-            Ayúdanos a mejorar tu experiencia de delivery calificando los
-            siguientes aspectos
-          </Text>
-        </View>
-
-        {/* Calificación de la comida */}
-        {renderStars(foodRating, setFoodRating, "🍽️ Calidad de la comida")}
-
-        {/* Calificación del servicio de delivery */}
-        {renderStars(
-          serviceRating,
-          setServiceRating,
-          "🚚 Servicio de delivery",
-        )}
-
-        {/* Calificación del restaurante - Dropdown */}
-        <View style={styles.ratingContainer}>
-          <Text style={styles.ratingLabel}>🏪 Experiencia general</Text>
-
-          <TouchableOpacity
-            onPress={() => !hasAnswered && setDropdownOpen(!dropdownOpen)}
-            disabled={hasAnswered}
-            style={styles.dropdownButton}
-          >
-            <Text style={styles.dropdownButtonText}>
-              {restaurantRating === 0
-                ? "Selecciona una calificación"
-                : `${restaurantRating} - ${getRatingLabel(restaurantRating)}`}
-            </Text>
-            <ChevronDown
-              size={20}
-              color="#d4af37"
-              style={{
-                transform: [{ rotate: dropdownOpen ? "180deg" : "0deg" }],
-              }}
-            />
-          </TouchableOpacity>
-
-          {dropdownOpen && (
-            <View style={styles.dropdownList}>
-              {[5, 4, 3, 2, 1].map(rating => (
-                <TouchableOpacity
-                  key={rating}
-                  onPress={() => {
-                    setRestaurantRating(rating);
-                    setDropdownOpen(false);
-                  }}
-                  style={[
-                    styles.dropdownItem,
-                    restaurantRating === rating && styles.dropdownItemSelected,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownItemText,
-                      restaurantRating === rating &&
-                        styles.dropdownItemTextSelected,
-                    ]}
-                  >
-                    {rating} - {getRatingLabel(rating)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-
-        {/* Comentario opcional */}
-        <View style={styles.commentContainer}>
-          <View style={styles.commentHeader}>
-            <MessageSquare size={20} color="#d4af37" />
-            <Text style={styles.commentLabel}>
-              Comentarios adicionales (opcional)
-            </Text>
-          </View>
-          <TextInput
-            style={styles.commentInput}
-            placeholder="Comparte tu experiencia del delivery..."
-            placeholderTextColor="#6b7280"
-            multiline
-            numberOfLines={4}
-            maxLength={500}
-            value={comment}
-            onChangeText={setComment}
-            editable={!hasAnswered}
-            textAlignVertical="top"
-          />
-          <Text style={styles.characterCount}>{comment.length}/500</Text>
-        </View>
-      </ScrollView>
-
-      {/* Bottom Actions */}
-      <View style={styles.bottomActions}>
-        <TouchableOpacity
-          onPress={handleSubmit}
-          disabled={submitting || hasAnswered}
-          style={[
-            styles.submitButton,
-            (submitting || hasAnswered) && styles.submitButtonDisabled,
-          ]}
+        <KeyboardAvoidingView
+          behavior="height"
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={150}
         >
-          {submitting ? (
-            <ChefLoading size="small" text="Enviando..." color="#1a1a1a" />
-          ) : (
-            <>
-              <Send size={20} color="#1a1a1a" />
-              <Text style={styles.submitButtonText}>Enviar Encuesta</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={styles.backButton}
+            >
+              <ArrowLeft size={24} color="#d4af37" />
+            </TouchableOpacity>
+            <View style={styles.headerContent}>
+              <Truck size={28} color="#d4af37" />
+              <Text style={styles.headerTitle}>Encuesta de Delivery</Text>
+            </View>
+            <View style={{ width: 40 }} />
+          </View>
 
-      <CustomAlert
-        visible={showAlert}
-        type={alertConfig.type}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        buttons={alertConfig.buttons}
-        onClose={() => setShowAlert(false)}
-      />
-    </LinearGradient>
+          {/* Content */}
+          <ScrollView
+            ref={scrollRef}
+            style={styles.scrollContent}
+            contentContainerStyle={[
+              styles.scrollContentContainer,
+              {
+                paddingBottom: isKeyboardVisible ? 150 : 32,
+              },
+            ]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.introCard}>
+              <Text style={styles.introTitle}>Tu opinión es importante</Text>
+              <Text style={styles.introText}>
+                Ayúdanos a mejorar tu experiencia de delivery calificando los
+                siguientes aspectos
+              </Text>
+            </View>
+
+            {/* Calificación de la comida */}
+            {renderStars(foodRating, setFoodRating, "🍽️ Calidad de la comida")}
+
+            {/* Calificación del servicio de delivery */}
+            {renderStars(
+              serviceRating,
+              setServiceRating,
+              "🚚 Servicio de delivery",
+            )}
+
+            {/* Calificación del restaurante - Dropdown */}
+            <View style={styles.ratingContainer}>
+              <Text style={styles.ratingLabel}>🏪 Experiencia general</Text>
+
+              <TouchableOpacity
+                onPress={() => !hasAnswered && setDropdownOpen(!dropdownOpen)}
+                disabled={hasAnswered}
+                style={styles.dropdownButton}
+              >
+                <Text style={styles.dropdownButtonText}>
+                  {restaurantRating === 0
+                    ? "Selecciona una calificación"
+                    : `${restaurantRating} - ${getRatingLabel(restaurantRating)}`}
+                </Text>
+                <ChevronDown
+                  size={20}
+                  color="#d4af37"
+                  style={{
+                    transform: [{ rotate: dropdownOpen ? "180deg" : "0deg" }],
+                  }}
+                />
+              </TouchableOpacity>
+
+              {dropdownOpen && (
+                <View style={styles.dropdownList}>
+                  {[5, 4, 3, 2, 1].map(rating => (
+                    <TouchableOpacity
+                      key={rating}
+                      onPress={() => {
+                        setRestaurantRating(rating);
+                        setDropdownOpen(false);
+                      }}
+                      style={[
+                        styles.dropdownItem,
+                        restaurantRating === rating &&
+                          styles.dropdownItemSelected,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.dropdownItemText,
+                          restaurantRating === rating &&
+                            styles.dropdownItemTextSelected,
+                        ]}
+                      >
+                        {rating} - {getRatingLabel(rating)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            {/* Comentario opcional */}
+            <View style={styles.commentContainer}>
+              <View style={styles.commentHeader}>
+                <MessageSquare size={20} color="#d4af37" />
+                <Text style={styles.commentLabel}>
+                  Comentarios adicionales (opcional)
+                </Text>
+              </View>
+              <TextInput
+                style={styles.commentInput}
+                placeholder="Comparte tu experiencia del delivery..."
+                placeholderTextColor="#6b7280"
+                multiline
+                numberOfLines={4}
+                maxLength={500}
+                value={comment}
+                onChangeText={setComment}
+                editable={!hasAnswered}
+                textAlignVertical="top"
+              />
+              <Text style={styles.characterCount}>{comment.length}/500</Text>
+            </View>
+          </ScrollView>
+
+          {/* Bottom Actions */}
+          <View style={styles.bottomActions}>
+            <TouchableOpacity
+              onPress={handleSubmit}
+              disabled={submitting || hasAnswered}
+              style={[
+                styles.submitButton,
+                (submitting || hasAnswered) && styles.submitButtonDisabled,
+              ]}
+            >
+              {submitting ? (
+                <ChefLoading size="small" text="Enviando..." color="#1a1a1a" />
+              ) : (
+                <>
+                  <Send size={20} color="#1a1a1a" />
+                  <Text style={styles.submitButtonText}>Enviar Encuesta</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <CustomAlert
+            visible={showAlert}
+            type={alertConfig.type}
+            title={alertConfig.title}
+            message={alertConfig.message}
+            buttons={alertConfig.buttons}
+            onClose={() => setShowAlert(false)}
+          />
+        </KeyboardAvoidingView>
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
 

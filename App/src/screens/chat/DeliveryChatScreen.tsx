@@ -360,8 +360,8 @@ export default function DeliveryChatScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+        behavior="height"
+        keyboardVerticalOffset={0}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -424,7 +424,6 @@ export default function DeliveryChatScreen() {
         <View
           style={[
             styles.inputContainer,
-            { marginBottom: Platform.OS === "ios" ? keyboardHeight : 0 },
             isChatClosed && styles.inputContainerDisabled,
           ]}
         >

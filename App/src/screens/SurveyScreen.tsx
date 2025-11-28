@@ -11,6 +11,7 @@ import {
   Keyboard,
   Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -48,7 +49,7 @@ export default function SurveyScreen() {
   const [serviceRating, setServiceRating] = useState(0);
   const [restaurantRating, setRestaurantRating] = useState(0);
   const [comment, setComment] = useState("");
-  
+
   // Dropdown state
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -72,7 +73,7 @@ export default function SurveyScreen() {
   const showCustomAlert = (
     title: string,
     message: string,
-    type: "success" | "error" | "warning" | "info" = "info"
+    type: "success" | "error" | "warning" | "info" = "info",
   ) => {
     setAlertConfig({ type, title, message });
     setShowAlert(true);
@@ -110,7 +111,7 @@ export default function SurveyScreen() {
       showCustomAlert(
         "Error",
         "No se proporcionó información de la mesa",
-        "error"
+        "error",
       );
       setLoading(false);
       return;
@@ -124,7 +125,8 @@ export default function SurveyScreen() {
         setAlertConfig({
           type: "info",
           title: "Encuesta ya respondida",
-          message: "Ya has respondido una encuesta para esta estadía. ¡Gracias por tu opinión!",
+          message:
+            "Ya has respondido una encuesta para esta estadía. ¡Gracias por tu opinión!",
           buttons: [
             {
               text: "Cancelar",
@@ -143,7 +145,7 @@ export default function SurveyScreen() {
       showCustomAlert(
         "Error",
         "No se pudo verificar el estado de la encuesta",
-        "error"
+        "error",
       );
     } finally {
       setLoading(false);
@@ -167,7 +169,7 @@ export default function SurveyScreen() {
       showCustomAlert(
         "Calificaciones incompletas",
         "Por favor, califica todos los aspectos antes de enviar",
-        "warning"
+        "warning",
       );
       return;
     }
@@ -187,7 +189,7 @@ export default function SurveyScreen() {
         showCustomAlert(
           "¡Gracias!",
           "Tu encuesta ha sido enviada exitosamente. ¡Apreciamos mucho tu opinión!",
-          "success"
+          "success",
         );
         setHasAnswered(true);
 
@@ -209,13 +211,13 @@ export default function SurveyScreen() {
   const renderStars = (
     currentRating: number,
     onPress: (rating: number) => void,
-    label: string
+    label: string,
   ) => {
     return (
       <View style={styles.ratingContainer}>
         <Text style={styles.ratingLabel}>{label}</Text>
         <View style={styles.starsRow}>
-          {[1, 2, 3, 4, 5].map((star) => (
+          {[1, 2, 3, 4, 5].map(star => (
             <TouchableOpacity
               key={star}
               onPress={() => onPress(star)}
@@ -258,189 +260,197 @@ export default function SurveyScreen() {
           style={{ flex: 1 }}
           keyboardVerticalOffset={0}
         >
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <FileText size={32} color="#d4af37" />
-            <Text style={styles.headerTitle}>Encuesta</Text>
+          <View style={styles.header}>
+            <View style={styles.headerContent}>
+              <FileText size={32} color="#d4af37" />
+              <Text style={styles.headerTitle}>Encuesta</Text>
+            </View>
           </View>
-        </View>
 
-        <View style={styles.centerContent}>
-          <CheckCircle size={64} color="#22c55e" />
-          <Text style={styles.messageTitle}>¡Gracias!</Text>
-          <Text style={styles.messageText}>
-            Ya has respondido esta encuesta. Apreciamos mucho tu opinión.
-          </Text>
-        </View>
+          <View style={styles.centerContent}>
+            <CheckCircle size={64} color="#22c55e" />
+            <Text style={styles.messageTitle}>¡Gracias!</Text>
+            <Text style={styles.messageText}>
+              Ya has respondido esta encuesta. Apreciamos mucho tu opinión.
+            </Text>
+          </View>
 
-        <CustomAlert
-          visible={showAlert}
-          type={alertConfig.type}
-          title={alertConfig.title}
-          message={alertConfig.message}
-          buttons={alertConfig.buttons}
-          onClose={() => setShowAlert(false)}
-        />
+          <CustomAlert
+            visible={showAlert}
+            type={alertConfig.type}
+            title={alertConfig.title}
+            message={alertConfig.message}
+            buttons={alertConfig.buttons}
+            onClose={() => setShowAlert(false)}
+          />
         </KeyboardAvoidingView>
       </LinearGradient>
     );
   }
 
   return (
-    <LinearGradient
-      colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
-      style={styles.container}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
-        keyboardVerticalOffset={0}
+    <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+      <LinearGradient
+        colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
+        style={styles.container}
       >
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <FileText size={32} color="#d4af37" />
-          <Text style={styles.headerTitle}>Encuesta de Satisfacción</Text>
-        </View>
-      </View>
-
-      {/* Content */}
-      <ScrollView
-        ref={scrollRef}
-        style={styles.scrollContent}
-        contentContainerStyle={[
-          styles.scrollContentContainer,
-          { 
-            flexGrow: 1,
-            paddingBottom: isKeyboardVisible ? 150 : 32,
-            paddingTop: isKeyboardVisible ? 20 : 0,
-          },
-        ]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets={false}
-        scrollEventThrottle={16}
-      >
-        <View style={styles.introCard}>
-          <Text style={styles.introTitle}>Tu opinión es importante</Text>
-          <Text style={styles.introText}>
-            Ayúdanos a mejorar tu experiencia calificando los siguientes
-            aspectos
-          </Text>
-        </View>
-
-        {/* Calificación de la comida */}
-        {renderStars(foodRating, setFoodRating, "🍽️ Calidad de la comida")}
-
-        {/* Calificación del servicio */}
-        {renderStars(
-          serviceRating,
-          setServiceRating,
-          "👨‍🍳 Atención del mozo"
-        )}
-
-        {/* Calificación del restaurante - Dropdown */}
-        <View style={styles.ratingContainer}>
-          <Text style={styles.ratingLabel}>🏪 Experiencia general</Text>
-          
-          <TouchableOpacity
-            onPress={() => !hasAnswered && setDropdownOpen(!dropdownOpen)}
-            disabled={hasAnswered}
-            style={styles.dropdownButton}
-          >
-            <Text style={styles.dropdownButtonText}>
-              {restaurantRating === 0 ? "Selecciona una calificación" : `${restaurantRating} - ${getRatingLabel(restaurantRating)}`}
-            </Text>
-            <ChevronDown 
-              size={20} 
-              color="#d4af37" 
-              style={{ transform: [{ rotate: dropdownOpen ? "180deg" : "0deg" }] }}
-            />
-          </TouchableOpacity>
-
-          {dropdownOpen && (
-            <View style={styles.dropdownList}>
-              {[5, 4, 3, 2, 1].map((rating) => (
-                <TouchableOpacity
-                  key={rating}
-                  onPress={() => {
-                    setRestaurantRating(rating);
-                    setDropdownOpen(false);
-                  }}
-                  style={[
-                    styles.dropdownItem,
-                    restaurantRating === rating && styles.dropdownItemSelected,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownItemText,
-                      restaurantRating === rating && styles.dropdownItemTextSelected,
-                    ]}
-                  >
-                    {rating} - {getRatingLabel(rating)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-
-        {/* Comentario opcional */}
-        <View style={styles.commentContainer}>
-          <View style={styles.commentHeader}>
-            <MessageSquare size={20} color="#d4af37" />
-            <Text style={styles.commentLabel}>
-              Comentarios adicionales (opcional)
-            </Text>
-          </View>
-          <TextInput
-            style={styles.commentInput}
-            placeholder="Comparte tu experiencia..."
-            placeholderTextColor="#6b7280"
-            multiline
-            numberOfLines={4}
-            maxLength={500}
-            value={comment}
-            onChangeText={setComment}
-            editable={!hasAnswered}
-            textAlignVertical="top"
-          />
-          <Text style={styles.characterCount}>{comment.length}/500</Text>
-        </View>
-      </ScrollView>
-
-      {/* Bottom Actions */}
-      <View style={styles.bottomActions}>
-        <TouchableOpacity
-          onPress={handleSubmit}
-          disabled={submitting || hasAnswered}
-          style={[
-            styles.submitButton,
-            (submitting || hasAnswered) && styles.submitButtonDisabled,
-          ]}
+        <KeyboardAvoidingView
+          behavior="height"
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={50}
         >
-          {submitting ? (
-            <ChefLoading size="small" text="Enviando..." color="#1a1a1a" />
-          ) : (
-            <>
-              <Send size={20} color="#1a1a1a" />
-              <Text style={styles.submitButtonText}>Enviar Encuesta</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.headerContent}>
+              <FileText size={32} color="#d4af37" />
+              <Text style={styles.headerTitle}>Encuesta de Satisfacción</Text>
+            </View>
+          </View>
 
-      <CustomAlert
-        visible={showAlert}
-        type={alertConfig.type}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        buttons={alertConfig.buttons}
-        onClose={() => setShowAlert(false)}
-      />
-      </KeyboardAvoidingView>
-    </LinearGradient>
+          {/* Content */}
+          <ScrollView
+            ref={scrollRef}
+            style={styles.scrollContent}
+            contentContainerStyle={[
+              styles.scrollContentContainer,
+              {
+                flexGrow: 1,
+                paddingBottom: isKeyboardVisible ? 150 : 32,
+                paddingTop: isKeyboardVisible ? 20 : 0,
+              },
+            ]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={false}
+            scrollEventThrottle={16}
+          >
+            <View style={styles.introCard}>
+              <Text style={styles.introTitle}>Tu opinión es importante</Text>
+              <Text style={styles.introText}>
+                Ayúdanos a mejorar tu experiencia calificando los siguientes
+                aspectos
+              </Text>
+            </View>
+
+            {/* Calificación de la comida */}
+            {renderStars(foodRating, setFoodRating, "🍽️ Calidad de la comida")}
+
+            {/* Calificación del servicio */}
+            {renderStars(
+              serviceRating,
+              setServiceRating,
+              "👨‍🍳 Atención del mozo",
+            )}
+
+            {/* Calificación del restaurante - Dropdown */}
+            <View style={styles.ratingContainer}>
+              <Text style={styles.ratingLabel}>🏪 Experiencia general</Text>
+
+              <TouchableOpacity
+                onPress={() => !hasAnswered && setDropdownOpen(!dropdownOpen)}
+                disabled={hasAnswered}
+                style={styles.dropdownButton}
+              >
+                <Text style={styles.dropdownButtonText}>
+                  {restaurantRating === 0
+                    ? "Selecciona una calificación"
+                    : `${restaurantRating} - ${getRatingLabel(restaurantRating)}`}
+                </Text>
+                <ChevronDown
+                  size={20}
+                  color="#d4af37"
+                  style={{
+                    transform: [{ rotate: dropdownOpen ? "180deg" : "0deg" }],
+                  }}
+                />
+              </TouchableOpacity>
+
+              {dropdownOpen && (
+                <View style={styles.dropdownList}>
+                  {[5, 4, 3, 2, 1].map(rating => (
+                    <TouchableOpacity
+                      key={rating}
+                      onPress={() => {
+                        setRestaurantRating(rating);
+                        setDropdownOpen(false);
+                      }}
+                      style={[
+                        styles.dropdownItem,
+                        restaurantRating === rating &&
+                          styles.dropdownItemSelected,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.dropdownItemText,
+                          restaurantRating === rating &&
+                            styles.dropdownItemTextSelected,
+                        ]}
+                      >
+                        {rating} - {getRatingLabel(rating)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            {/* Comentario opcional */}
+            <View style={styles.commentContainer}>
+              <View style={styles.commentHeader}>
+                <MessageSquare size={20} color="#d4af37" />
+                <Text style={styles.commentLabel}>
+                  Comentarios adicionales (opcional)
+                </Text>
+              </View>
+              <TextInput
+                style={styles.commentInput}
+                placeholder="Comparte tu experiencia..."
+                placeholderTextColor="#6b7280"
+                multiline
+                numberOfLines={4}
+                maxLength={500}
+                value={comment}
+                onChangeText={setComment}
+                editable={!hasAnswered}
+                textAlignVertical="top"
+              />
+              <Text style={styles.characterCount}>{comment.length}/500</Text>
+            </View>
+          </ScrollView>
+
+          {/* Bottom Actions */}
+          <View style={styles.bottomActions}>
+            <TouchableOpacity
+              onPress={handleSubmit}
+              disabled={submitting || hasAnswered}
+              style={[
+                styles.submitButton,
+                (submitting || hasAnswered) && styles.submitButtonDisabled,
+              ]}
+            >
+              {submitting ? (
+                <ChefLoading size="small" text="Enviando..." color="#1a1a1a" />
+              ) : (
+                <>
+                  <Send size={20} color="#1a1a1a" />
+                  <Text style={styles.submitButtonText}>Enviar Encuesta</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <CustomAlert
+            visible={showAlert}
+            type={alertConfig.type}
+            title={alertConfig.title}
+            message={alertConfig.message}
+            buttons={alertConfig.buttons}
+            onClose={() => setShowAlert(false)}
+          />
+        </KeyboardAvoidingView>
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
 

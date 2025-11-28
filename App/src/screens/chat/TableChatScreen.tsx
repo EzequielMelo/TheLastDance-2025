@@ -108,7 +108,7 @@ export default function TableChatScreen() {
       return;
     }
 
-    const success = sendMessage(inputMessage);    
+    const success = sendMessage(inputMessage);
     if (success) {
       setInputMessage("");
     } else {
@@ -207,8 +207,8 @@ export default function TableChatScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+        behavior="height"
+        keyboardVerticalOffset={0}
       >
         {/* Header */}
         <View style={styles.header}>

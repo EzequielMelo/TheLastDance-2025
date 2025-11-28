@@ -101,8 +101,7 @@ const DeliveryLocationScreen: React.FC = () => {
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       "keyboardDidShow",
-      (e) => {
-        console.log("🎹 Teclado abierto, altura:", e.endCoordinates.height);
+      e => {
         setKeyboardVisible(true);
         // Forzar scroll hacia abajo cuando se abre el teclado
         setTimeout(() => {
@@ -113,7 +112,6 @@ const DeliveryLocationScreen: React.FC = () => {
     const keyboardDidHideListener = Keyboard.addListener(
       "keyboardDidHide",
       () => {
-        console.log("🎹 Teclado cerrado");
         setKeyboardVisible(false);
       },
     );
@@ -325,7 +323,7 @@ const DeliveryLocationScreen: React.FC = () => {
 
     // 🚚 Activar modo delivery ANTES de guardar la dirección
     setIsDeliveryOrder(true);
-    
+
     // Guardar la dirección de delivery en el contexto
     setDeliveryAddress({
       address: address,
@@ -339,20 +337,20 @@ const DeliveryLocationScreen: React.FC = () => {
   };
 
   return (
-    <View className="flex-1 bg-[#1a1a1a]">
+    <SafeAreaView className="flex-1 bg-[#1a1a1a]" edges={["top", "bottom"]}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior="height"
         className="flex-1"
-        keyboardVerticalOffset={0}
+        keyboardVerticalOffset={50}
       >
-        <ScrollView 
+        <ScrollView
           ref={scrollRef}
           contentContainerStyle={{
             flexGrow: 1,
             paddingBottom: isKeyboardVisible ? 100 : 50,
             justifyContent: "flex-start",
           }}
-          className="px-8 py-12"
+          className="px-6 pt-2 pb-12"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           automaticallyAdjustKeyboardInsets={false}
@@ -380,238 +378,246 @@ const DeliveryLocationScreen: React.FC = () => {
           </View>
 
           <View className="w-full">
-          {/* Mapa interactivo */}
-          <View className="rounded-2xl overflow-hidden h-64 mb-4 border border-gray-800">
-            <MapView
-              ref={mapRef}
-              provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
-              style={{ flex: 1 }}
-              initialRegion={region}
-              onPress={handleMapPress}
-              showsUserLocation
-              showsMyLocationButton={false}
-            >
-              {/* Marcador de ubicación seleccionada */}
-              <Marker
-                coordinate={selectedLocation}
-                title="Ubicación de entrega"
-                description={address || "Selecciona tu ubicación"}
-                pinColor="#d4af37"
-              />
+            {/* Mapa interactivo */}
+            <View className="rounded-2xl overflow-hidden h-64 mb-4 border border-gray-800">
+              <MapView
+                ref={mapRef}
+                provider={
+                  Platform.OS === "android" ? PROVIDER_GOOGLE : undefined
+                }
+                style={{ flex: 1 }}
+                initialRegion={region}
+                onPress={handleMapPress}
+                showsUserLocation
+                showsMyLocationButton={false}
+              >
+                {/* Marcador de ubicación seleccionada */}
+                <Marker
+                  coordinate={selectedLocation}
+                  title="Ubicación de entrega"
+                  description={address || "Selecciona tu ubicación"}
+                  pinColor="#d4af37"
+                />
 
-              {/* Marcador del restaurante */}
-              <Marker
-                coordinate={restaurantLocation}
-                title={RESTAURANT_LOCATION.name}
-                description="Punto de origen"
-                pinColor="#ef4444"
-              />
-            </MapView>
+                {/* Marcador del restaurante */}
+                <Marker
+                  coordinate={restaurantLocation}
+                  title={RESTAURANT_LOCATION.name}
+                  description="Punto de origen"
+                  pinColor="#ef4444"
+                />
+              </MapView>
 
-            {/* Botón de ubicación actual flotante */}
-            <TouchableOpacity
-              onPress={getCurrentLocation}
-              disabled={isLoadingLocation}
-              className="absolute bottom-3 right-3 rounded-full p-3 shadow-lg"
+              {/* Botón de ubicación actual flotante */}
+              <TouchableOpacity
+                onPress={getCurrentLocation}
+                disabled={isLoadingLocation}
+                className="absolute bottom-3 right-3 rounded-full p-3 shadow-lg"
+                style={{
+                  backgroundColor: "rgba(212, 175, 55, 0.9)",
+                  elevation: 5,
+                }}
+              >
+                {isLoadingLocation ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Crosshair size={24} color="#ffffff" />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Instrucción */}
+            <View
+              className="rounded-xl p-3 mb-4 border-l-4"
               style={{
-                backgroundColor: "rgba(212, 175, 55, 0.9)",
-                elevation: 5,
+                backgroundColor: "rgba(212, 175, 55, 0.1)",
+                borderLeftColor: "#d4af37",
               }}
             >
-              {isLoadingLocation ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <Crosshair size={24} color="#ffffff" />
-              )}
-            </TouchableOpacity>
-          </View>
+              <Text className="text-sm text-gray-300 text-center">
+                📍 Toca en el mapa para seleccionar tu ubicación de entrega
+              </Text>
+            </View>
 
-          {/* Instrucción */}
-          <View
-            className="rounded-xl p-3 mb-4 border-l-4"
-            style={{
-              backgroundColor: "rgba(212, 175, 55, 0.1)",
-              borderLeftColor: "#d4af37",
-            }}
-          >
-            <Text className="text-sm text-gray-300 text-center">
-              📍 Toca en el mapa para seleccionar tu ubicación de entrega
-            </Text>
-          </View>
+            {/* Formulario de dirección */}
+            <View
+              className="rounded-2xl p-5 mb-4"
+              style={{ backgroundColor: "rgba(255, 255, 255, 0.05)" }}
+            >
+              <Text className="text-sm font-semibold text-gray-300 mb-2">
+                Dirección completa *
+              </Text>
+              <View className="relative">
+                <View
+                  className="flex-row items-center rounded-xl px-4 py-3 border border-gray-700"
+                  style={{ backgroundColor: "rgba(255, 255, 255, 0.05)" }}
+                >
+                  <Search size={20} color="#6b7280" />
+                  <TextInput
+                    value={address}
+                    onChangeText={handleAddressChange}
+                    placeholder="Busca tu dirección..."
+                    placeholderTextColor="#6b7280"
+                    className="flex-1 text-white ml-2"
+                    multiline={!showSuggestions}
+                    numberOfLines={showSuggestions ? 1 : 2}
+                    onFocus={() => {
+                      if (predictions.length > 0) setShowSuggestions(true);
+                    }}
+                  />
+                  {address.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setAddress("");
+                        setPredictions([]);
+                        setShowSuggestions(false);
+                      }}
+                    >
+                      <X size={20} color="#6b7280" />
+                    </TouchableOpacity>
+                  )}
+                  {isSearching && (
+                    <ActivityIndicator
+                      size="small"
+                      color="#d4af37"
+                      className="ml-2"
+                    />
+                  )}
+                </View>
 
-          {/* Formulario de dirección */}
-          <View
-            className="rounded-2xl p-5 mb-4"
-            style={{ backgroundColor: "rgba(255, 255, 255, 0.05)" }}
-          >
-            <Text className="text-sm font-semibold text-gray-300 mb-2">
-              Dirección completa *
-            </Text>
-            <View className="relative">
-              <View
-                className="flex-row items-center rounded-xl px-4 py-3 border border-gray-700"
-                style={{ backgroundColor: "rgba(255, 255, 255, 0.05)" }}
-              >
-                <Search size={20} color="#6b7280" />
-                <TextInput
-                  value={address}
-                  onChangeText={handleAddressChange}
-                  placeholder="Busca tu dirección..."
-                  placeholderTextColor="#6b7280"
-                  className="flex-1 text-white ml-2"
-                  multiline={!showSuggestions}
-                  numberOfLines={showSuggestions ? 1 : 2}
-                  onFocus={() => {
-                    if (predictions.length > 0) setShowSuggestions(true);
-                  }}
-                />
-                {address.length > 0 && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setAddress("");
-                      setPredictions([]);
-                      setShowSuggestions(false);
+                {/* Dropdown de sugerencias */}
+                {showSuggestions && predictions.length > 0 && (
+                  <View
+                    className="absolute top-full left-0 right-0 mt-2 rounded-xl border border-gray-700 overflow-hidden"
+                    style={{
+                      backgroundColor: "rgba(26, 26, 26, 0.98)",
+                      maxHeight: 250,
+                      zIndex: 1000,
+                      elevation: 5,
                     }}
                   >
-                    <X size={20} color="#6b7280" />
-                  </TouchableOpacity>
-                )}
-                {isSearching && (
-                  <ActivityIndicator
-                    size="small"
-                    color="#d4af37"
-                    className="ml-2"
-                  />
+                    <ScrollView
+                      nestedScrollEnabled
+                      showsVerticalScrollIndicator={false}
+                    >
+                      {predictions.map(item => (
+                        <TouchableOpacity
+                          key={item.place_id}
+                          onPress={() => selectAddress(item)}
+                          className="p-4 border-b border-gray-800"
+                          style={{
+                            backgroundColor: "rgba(255, 255, 255, 0.03)",
+                          }}
+                        >
+                          <View className="flex-row items-start">
+                            <MapPin
+                              size={16}
+                              color="#d4af37"
+                              className="mt-1"
+                            />
+                            <View className="flex-1 ml-3">
+                              <Text className="text-white font-semibold text-sm">
+                                {item.structured_formatting.main_text}
+                              </Text>
+                              <Text className="text-gray-400 text-xs mt-1">
+                                {item.structured_formatting.secondary_text}
+                              </Text>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
                 )}
               </View>
 
-              {/* Dropdown de sugerencias */}
-              {showSuggestions && predictions.length > 0 && (
-                <View
-                  className="absolute top-full left-0 right-0 mt-2 rounded-xl border border-gray-700 overflow-hidden"
-                  style={{
-                    backgroundColor: "rgba(26, 26, 26, 0.98)",
-                    maxHeight: 250,
-                    zIndex: 1000,
-                    elevation: 5,
-                  }}
-                >
-                  <ScrollView
-                    nestedScrollEnabled
-                    showsVerticalScrollIndicator={false}
-                  >
-                    {predictions.map(item => (
-                      <TouchableOpacity
-                        key={item.place_id}
-                        onPress={() => selectAddress(item)}
-                        className="p-4 border-b border-gray-800"
-                        style={{ backgroundColor: "rgba(255, 255, 255, 0.03)" }}
-                      >
-                        <View className="flex-row items-start">
-                          <MapPin size={16} color="#d4af37" className="mt-1" />
-                          <View className="flex-1 ml-3">
-                            <Text className="text-white font-semibold text-sm">
-                              {item.structured_formatting.main_text}
-                            </Text>
-                            <Text className="text-gray-400 text-xs mt-1">
-                              {item.structured_formatting.secondary_text}
-                            </Text>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-            </View>
-
-            <View>
-              <Text className="text-sm font-semibold text-gray-300 mt-4 mb-2">
-                Indicaciones adicionales (opcional)
-              </Text>
-              <TextInput
-                value={notes}
-                onChangeText={setNotes}
-                placeholder="Ej: Casa de esquina, portón azul, 2do piso"
-                placeholderTextColor="#6b7280"
-                className="rounded-xl px-4 py-3 text-white border border-gray-700"
-                style={{ backgroundColor: "rgba(255, 255, 255, 0.05)" }}
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-          </View>
-
-          {/* Botón para usar ubicación actual */}
-          <TouchableOpacity
-            onPress={getCurrentLocation}
-            disabled={isLoadingLocation}
-            className="rounded-xl p-4 flex-row items-center justify-center mb-6"
-            style={{
-              backgroundColor: isLoadingLocation
-                ? "rgba(255, 255, 255, 0.05)"
-                : "rgba(212, 175, 55, 0.1)",
-            }}
-          >
-            {isLoadingLocation ? (
-              <ActivityIndicator size="small" color="#d4af37" />
-            ) : (
-              <Navigation size={20} color="#d4af37" />
-            )}
-            <Text className="text-[#d4af37] font-semibold ml-2">
-              Usar mi ubicación actual
-            </Text>
-          </TouchableOpacity>
-
-          {/* Información */}
-          <View
-            className="rounded-xl p-4 mb-6 border-l-4"
-            style={{
-              backgroundColor: "rgba(251, 191, 36, 0.1)",
-              borderLeftColor: "#fbbf24",
-            }}
-          >
-            <Text className="text-sm text-gray-300">
-              <Text className="font-semibold text-[#fbbf24]">Nota:</Text> El
-              restaurante confirmará tu pedido antes de comenzar la preparación.
-              Recibirás una notificación cuando sea aceptado.
-            </Text>
-          </View>
-
-          {/* Botón de confirmación */}
-          <TouchableOpacity
-            onPress={handleConfirmLocation}
-            disabled={isLoading || !address.trim()}
-            className={`rounded-2xl py-4 flex-row items-center justify-center shadow-lg ${
-              isLoading || !address.trim() ? "opacity-50" : ""
-            }`}
-            style={{ backgroundColor: "#d4af37" }}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <>
-                <MapPin size={20} color="white" />
-                <Text className="text-white font-bold text-lg ml-2">
-                  Confirmar Dirección
+              <View>
+                <Text className="text-sm font-semibold text-gray-300 mt-4 mb-2">
+                  Indicaciones adicionales (opcional)
                 </Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+                <TextInput
+                  value={notes}
+                  onChangeText={setNotes}
+                  placeholder="Ej: Casa de esquina, portón azul, 2do piso"
+                  placeholderTextColor="#6b7280"
+                  className="rounded-xl px-4 py-3 text-white border border-gray-700"
+                  style={{ backgroundColor: "rgba(255, 255, 255, 0.05)" }}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+            </View>
 
-      {/* CustomAlert */}
-      <CustomAlert
-        visible={alertVisible}
-        onClose={() => setAlertVisible(false)}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        type={alertConfig.type}
-        buttons={alertConfig.buttons}
-      />
+            {/* Botón para usar ubicación actual */}
+            <TouchableOpacity
+              onPress={getCurrentLocation}
+              disabled={isLoadingLocation}
+              className="rounded-xl p-4 flex-row items-center justify-center mb-6"
+              style={{
+                backgroundColor: isLoadingLocation
+                  ? "rgba(255, 255, 255, 0.05)"
+                  : "rgba(212, 175, 55, 0.1)",
+              }}
+            >
+              {isLoadingLocation ? (
+                <ActivityIndicator size="small" color="#d4af37" />
+              ) : (
+                <Navigation size={20} color="#d4af37" />
+              )}
+              <Text className="text-[#d4af37] font-semibold ml-2">
+                Usar mi ubicación actual
+              </Text>
+            </TouchableOpacity>
+
+            {/* Información */}
+            <View
+              className="rounded-xl p-4 mb-6 border-l-4"
+              style={{
+                backgroundColor: "rgba(251, 191, 36, 0.1)",
+                borderLeftColor: "#fbbf24",
+              }}
+            >
+              <Text className="text-sm text-gray-300">
+                <Text className="font-semibold text-[#fbbf24]">Nota:</Text> El
+                restaurante confirmará tu pedido antes de comenzar la
+                preparación. Recibirás una notificación cuando sea aceptado.
+              </Text>
+            </View>
+
+            {/* Botón de confirmación */}
+            <TouchableOpacity
+              onPress={handleConfirmLocation}
+              disabled={isLoading || !address.trim()}
+              className={`rounded-2xl py-4 flex-row items-center justify-center shadow-lg ${
+                isLoading || !address.trim() ? "opacity-50" : ""
+              }`}
+              style={{ backgroundColor: "#d4af37" }}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <>
+                  <MapPin size={20} color="white" />
+                  <Text className="text-white font-bold text-lg ml-2">
+                    Confirmar Dirección
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+
+        {/* CustomAlert */}
+        <CustomAlert
+          visible={alertVisible}
+          onClose={() => setAlertVisible(false)}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          type={alertConfig.type}
+          buttons={alertConfig.buttons}
+        />
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView>
   );
 };
 
