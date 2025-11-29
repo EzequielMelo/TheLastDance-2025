@@ -13,6 +13,238 @@
 </p>
 
 <hr/>
+<h2 id="preview-app" align="center">📱 Vista previa de la App</h2>
+
+<p align="center">
+  A continuación se muestran algunas pantallas representativas de la aplicación móvil desarrollada por el equipo <strong>The Last Dance</strong>.
+</p>
+
+<div align="center">
+<table align="center" style="margin-left:auto; margin-right:auto;">
+  <tr>
+    <td align="center" width="50%">
+      <img src="screenshots/splashscreen.png" alt="Pantalla de Login" width="250"/><br/>
+      <strong>Splash Screen</strong><br/>
+      <sub>Pantalla de carga inicial</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="screenshots/login.png" alt="Pantalla de Registro" width="250"/><br/>
+      <strong>Login</strong><br/>
+      <sub>Pantalla de inicio de sesion</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="screenshots/register.png" alt="Pantalla Principal" width="250"/><br/>
+      <strong>Pantalla de registro</strong><br/>
+      <sub>Pantalla de registro de usuarios</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/registeranon.png" alt="Pantalla Principal" width="250"/><br/>
+      <strong>Pantalla de registro de usuarios anonimos</strong><br/>
+      <sub>Pantalla de registro de usuarios de tipo anonimos</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="screenshots/homesinestadocliente.png" alt="Carrito Cliente" width="250"/><br/>
+      <strong>Home Cliente</strong><br/>
+      <sub>Pantalla inicial y principal de cliente</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/sidebarcliente.png" alt="Lista de Espera" width="250"/><br/>
+      <strong>Sidebar Cliente</strong><br/>
+      <sub>Sidebar accesible desde menu burguer para los clientes</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="screenshots/waitinglistcliente.png" alt="Añadir Platos" width="250"/><br/>
+      <strong>Pantalla para unirse a la lista de espera</strong><br/>
+      <sub>Pantalla que utiliza el cliente para unirse a la lista de espera</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/inwaitinglistcliente.png" alt="Visualizar Platos" width="250"/><br/>
+      <strong>Estado del cliente dentro de una lista de espera</strong><br/>
+      <sub>Estado que ve el cliente en su pantalla principal cuando se encuentra en una lista de espera</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="screenshots/waitinglistpositioncliente.png" alt="Pedidos Cocinero" width="250"/><br/>
+      <strong>Posicion en la lista de espera</strong><br/>
+      <sub>Pantalla en la cual el cliente ve en que posicion se encuentra en la lista de espera (ademas de poder cancelar la espera)</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/surveysview.png" alt="Agregar Personal" width="250"/><br/>
+      <strong>Resultados de encuestas</strong><br/>
+      <sub>Pantalla donde el cliente puede visualizar el resultado de las encuestas</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="screenshots/tableasignedcliente.png" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Mesa asignada Cliente</strong><br/>
+      <sub>Pantalla donde el usuario ve la mesa que tiene asignada y puede acceder a escanear el qr de esta</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/tableconfirmedcliente.png" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Mesa confirmada Cliente</strong><br/>
+      <sub>Pantalla donde el usuario ve que su mesa esta confirmada luego de scanear el qr de la mesa</sub>
+    </td>
+  </tr>
+   <tr>
+    <td align="center">
+      <img src="screenshots/menu.png" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Menu Cliente</strong><br/>
+      <sub>Pantalla donde el cliente puede ver el menu completo</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/gamescliente.png" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Juegos</strong><br/>
+      <sub>Pantalla donde el usuario ve y puede acceder a los distintos juegos para ganar un descuento</sub>
+    </td>
+  </tr>
+   <tr>
+    <td align="center">
+      <img src="screenshots/chatcliente.png" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Chat cliente</strong><br/>
+      <sub>Pantalla donde el usuario puede chatear con los mozos (aplica para otros chats)</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/cartcliente.png" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Carrito cliente</strong><br/>
+      <sub>Carrito donde el usuario sumas sus productos para enviarlos al mozo</sub>
+    </td>
+  </tr>
+   <tr>
+    <td align="center">
+      <img src="screenshots/orderintablecliente.png" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Productos en la mesa</strong><br/>
+      <sub>Pantalla donde el cliente ve que ya tiene los productos en su mesa</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/surveycreatecliente.png" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Responder encuesta Cliente</strong><br/>
+      <sub>Pantalla donde el usuario puede responder a la encuesta</sub>
+    </td>
+  </tr>
+   <tr>
+    <td align="center">
+      <img src="screenshots/payaccountcliente.png" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Solicitud de pago de cuenta</strong><br/>
+      <sub>Pantalla que ve el usuario luego de que confirme que quiere pagar la cuenta</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/payaccountscreencliente.png" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Pago de la cuenta</strong><br/>
+      <sub>Pantalla que ve el usuario mientras esta pagando la cuenta</sub>
+    </td>
+  </tr>
+     <tr>
+    <td align="center">
+      <img src="screenshots/waitingpayconfirmedcliente.png" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Esperando confirmacion de pago</strong><br/>
+      <sub>Pantalla que ve el usuario luego de pagar y espera la confirmacion de pago por parte del mozo</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/tablereservationscreen1.png" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Formulario de reserva parte 1</strong><br/>
+      <sub>Formulario que debe llenar el cliente para hacer una reserva (parte 1)</sub>
+    </td>
+  </tr>
+     <tr>
+    <td align="center">
+      <img src="screenshots/tablereservationscreen2.png" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Formulario de reserva parte 2</strong><br/>
+      <sub>Formulario que debe llenar el cliente para hacer una reserva (parte 2)</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/myreservationscreen.png" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Mis reservas</strong><br/>
+      <sub>Pantalla donde el usuario ve el estado de sus reservas</sub>
+    </td>
+  </tr>
+     <tr>
+    <td align="center">
+      <img src="screenshots/createdelivery.png" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Formulario de delivery</strong><br/>
+      <sub>Pantalla donde el usuario deja sus datos para acceder al delivery</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/waitingconfirmdelivery.png" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Esperando confirmacion de delivery</strong><br/>
+      <sub>Pantalla donde el usuario ve que su pedido ya fue enviado pero esta aun sin confirmar</sub>
+    </td>
+  </tr>
+     <tr>
+    <td align="center">
+      <img src="screenshots/deliveryconfirmed.png" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Confirmacion de delivery</strong><br/>
+      <sub>Pantalla que ve el usuario ve que su pedido fue aceptado</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/waitingpreparationdelivery.png" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Pedido en preparacion</strong><br/>
+      <sub>Pantalla donde el usuario ve que su pedido ya se encuentra en preparacion</sub>
+    </td>
+  </tr>
+     <tr>
+    <td align="center">
+      <img src="screenshots/deliveryisready.png" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Pedido listo</strong><br/>
+      <sub>Pantalla donde el usuario ve que su pedido ya esta preparado y listo para enviar</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/deliveryontheway.png" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Pedido en camino</strong><br/>
+      <sub>Pantalla donde el usuario ve que su pedido ya se encuentra en camino</sub>
+    </td>
+  </tr>
+       <tr>
+    <td align="center">
+      <img src="screenshots/deliverymapscreen.png" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Seguimiento del pedido</strong><br/>
+      <sub>Pantalla donde el usuario ve donde se encuentra el conductor de su pedido</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/deliveryonplace.png" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Pedido en el lugar</strong><br/>
+      <sub>Pantalla donde el usuario ve que su pedido ya se encuentra en su casa</sub>
+    </td>
+  </tr>
+       <tr>
+    <td align="center">
+      <img src="screenshots/confirmpaydelivery.png" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Pagar pedido</strong><br/>
+      <sub>Pantalla donde el usuario efectua el pago de su pedido</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/deliveryontheway.png" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Pedido en camino</strong><br/>
+      <sub>Pantalla donde el usuario ve que su pedido ya se encuentra en camino</sub>
+    </td>
+  </tr>
+       <tr>
+    <td align="center">
+      <img src="screenshots/deliveryisready.png" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Pedido listo</strong><br/>
+      <sub>Pantalla qdonde el usuario ve que su pedido ya esta preparado y listo para enviar</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/deliveryontheway.png" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Pedido en camino</strong><br/>
+      <sub>Pantalla donde el usuario ve que su pedido ya se encuentra en camino</sub>
+    </td>
+  </tr>
+</table>
+</div>
+
+<p align="center">
+  <em>Estas capturas corresponden a la versión actual de la app desarrollada en Expo (React Native).</em>
+</p>
+
+<hr/>
 
 <h2 id="bitacora-commits">📝 Bitácora de Commits (hitos)</h2>
 
