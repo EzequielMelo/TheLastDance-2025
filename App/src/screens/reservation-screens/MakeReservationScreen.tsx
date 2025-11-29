@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   TextInput,
   KeyboardAvoidingView,
+  StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Calendar, ChevronDown, Clock, ChevronLeft } from "lucide-react-native";
@@ -387,15 +388,17 @@ export default function MakeReservationScreen({
 
   return (
     <SafeAreaView className="flex-1 bg-neutral-900" edges={["top", "bottom"]}>
+      <StatusBar barStyle="light-content" backgroundColor="#171717" />
       <KeyboardAvoidingView
         behavior="height"
         style={{ flex: 1 }}
-        keyboardVerticalOffset={50}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
-          className="flex-1 px-6"
+          className="px-6"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 20 }}
         >
           <View className="py-6">
             <View className="flex-row items-center mb-2">

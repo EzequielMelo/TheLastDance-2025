@@ -8,6 +8,7 @@ import {
   TextInput,
   Keyboard,
   KeyboardAvoidingView,
+  StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -289,7 +290,11 @@ export default function DeliverySurveyScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: "#1a1a1a" }}
+      edges={["top", "bottom"]}
+    >
+      <StatusBar barStyle="light-content" backgroundColor="#1a1a1a" />
       <LinearGradient
         colors={["#1a1a1a", "#2d1810", "#1a1a1a"]}
         style={styles.container}
@@ -297,7 +302,7 @@ export default function DeliverySurveyScreen() {
         <KeyboardAvoidingView
           behavior="height"
           style={{ flex: 1 }}
-          keyboardVerticalOffset={150}
+          keyboardVerticalOffset={0}
         >
           {/* Header */}
           <View style={styles.header}>

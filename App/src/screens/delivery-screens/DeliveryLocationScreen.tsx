@@ -9,6 +9,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   Keyboard,
+  StatusBar,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import CustomAlert from "../../components/common/CustomAlert";
@@ -338,24 +339,20 @@ const DeliveryLocationScreen: React.FC = () => {
 
   return (
     <SafeAreaView className="flex-1 bg-[#1a1a1a]" edges={["top", "bottom"]}>
+      <StatusBar barStyle="light-content" backgroundColor="#1a1a1a" />
       <KeyboardAvoidingView
         behavior="height"
         className="flex-1"
-        keyboardVerticalOffset={50}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={{
-            flexGrow: 1,
-            paddingBottom: isKeyboardVisible ? 100 : 50,
-            justifyContent: "flex-start",
+            paddingBottom: 20,
           }}
-          className="px-6 pt-2 pb-12"
+          className="px-6 pt-2"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          automaticallyAdjustKeyboardInsets={false}
-          scrollEventThrottle={16}
-          nestedScrollEnabled={true}
         >
           {/* Header */}
           <View className="border-b border-gray-800 px-4 py-3 mb-4">

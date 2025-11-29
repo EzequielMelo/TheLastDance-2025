@@ -76,7 +76,7 @@ function FormLayoutContent({
       <KeyboardAvoidingView
         behavior="height"
         className="flex-1"
-        keyboardVerticalOffset={50}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
           ref={scrollViewRef}

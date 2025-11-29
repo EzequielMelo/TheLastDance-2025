@@ -232,7 +232,7 @@ export default function JoinWaitingListScreen() {
         <KeyboardAvoidingView
           behavior="height"
           style={{ flex: 1 }}
-          keyboardVerticalOffset={50}
+          keyboardVerticalOffset={0}
         >
           <ScrollView
             className="flex-1 px-6 pt-6"
