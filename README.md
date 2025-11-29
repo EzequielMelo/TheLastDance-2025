@@ -220,21 +220,105 @@
       <sub>Pantalla donde el usuario efectua el pago de su pedido</sub>
     </td>
     <td align="center">
-      <img src="screenshots/deliveryontheway.png" alt="Gestión Meseros" width="250"/><br/>
-      <strong>Pedido en camino</strong><br/>
-      <sub>Pantalla donde el usuario ve que su pedido ya se encuentra en camino</sub>
+      <img src="screenshots/Maitre-Asigna-mesa.jpg" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Maitre asigna mesa</strong><br/>
+      <sub>Pantalla donde el maitre asigna una mesa a un cliente</sub>
     </td>
   </tr>
-       <tr>
+  <tr>
     <td align="center">
-      <img src="screenshots/deliveryisready.png" alt="Agregar Mesa" width="250"/><br/>
-      <strong>Pedido listo</strong><br/>
-      <sub>Pantalla qdonde el usuario ve que su pedido ya esta preparado y listo para enviar</sub>
+      <img src="screenshots/Estado-de-Mesas.jpg" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Maitre ve las mesas</strong><br/>
+      <sub>Pantalla donde el maitre ve el estado de todas las mesas</sub>
     </td>
     <td align="center">
-      <img src="screenshots/deliveryontheway.png" alt="Gestión Meseros" width="250"/><br/>
-      <strong>Pedido en camino</strong><br/>
-      <sub>Pantalla donde el usuario ve que su pedido ya se encuentra en camino</sub>
+      <img src="screenshots/Home-Maitre.jpg" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Pantalla principal del Maitre</strong><br/>
+      <sub>Pantalla donde maitre puede acceder a todas sus funciones </sub>
+    </td>
+  </tr>
+    <tr>
+    <td align="center">
+      <img src="screenshots/Home-Mozo.jpg" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Pantalla principal del Mozo</strong><br/>
+      <sub>Pantalla donde el mozo puede acceder a todas sus funciones</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/Panel-de-Mozo-Tandas.jpg" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Pantalla de pedidos del Mozo</strong><br/>
+      <sub>Pantalla donde el Mozo puede aceptar o rechazar pedidos y sus tandas </sub>
+    </td>
+  </tr>
+    <tr>
+    <td align="center">
+      <img src="screenshots/Panel-de-Mozo-Mesas.jpg" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Panel de las mesas asignadas al mozo</strong><br/>
+      <sub>Pantalla donde el mozo ve sus mesas asignadas junto con el chat de cada mesa</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/Home-Bartender.jpg" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Pantalla principal del Bartender (Aplica para el cocinero)</strong><br/>
+      <sub>Pantalla donde el cocinero puede acceder a sus funciones (Es la misma para el cocinero) </sub>
+    </td>
+  </tr>
+    <tr>
+    <td align="center">
+      <img src="screenshots/Sector-Preparación-Bar.jpg" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Pantalla para preparacion Bar</strong><br/>
+      <sub>Pantalla donde el bartender puede ir cambiando el estatus de un trago (igual para el cocinero)</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/Nueva-bebida.jpg" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Formulario para nueva bebida</strong><br/>
+      <sub>Pantalla donde el bartender puede añadir nuevas bebidas a la coleccion (igual para el cocinero)</sub>
+    </td>
+  </tr>
+    <tr>
+    <td align="center">
+      <img src="screenshots/Dueño-home.jpg" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Pantalla principal del dueño</strong><br/>
+      <sub>Pantalla donde el dueño puede acceder a todas sus funciones</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/Gestión-reservas.jpg" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Gestion de reservas</strong><br/>
+      <sub>Pantalla donde el dueño/supervisor puede gestionar las reservas</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="screenshots/Gestión-Deliveries.jpg" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Gestion de deliveries</strong><br/>
+      <sub>Pantalla donde el dueño/supervisor puede gestionar los deliveries</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/Pedidos-Disponibles.jpg" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Pedidos disponibles</strong><br/>
+      <sub>Pantalla donde el repartidor puede tomar un pedido </sub>
+    </td>
+  </tr>
+      <tr>
+    <td align="center">
+      <img src="screenshots/Pedido-Tomado.jpg" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Pedidos tomados</strong><br/>
+      <sub>Pantalla donde el repartidor ve los pedidos tomados por el</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/Mapa-Delivery.jpg" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Mapa del delivery</strong><br/>
+      <sub>Pantalla donde repartidor ve el recorrido para entregar su pedido ademas de informacion y acceso al chat </sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="screenshots/Método-de-Pago.jpg" alt="Agregar Mesa" width="250"/><br/>
+      <strong>Metodos de pago del delivery</strong><br/>
+      <sub>Pantalla donde el repartidor puede seleccionar el metodo de pago con el que prefiere pagar el cliente</sub>
+    </td>
+    <td align="center">
+      <img src="screenshots/Pago-QR-Delivery.jpg" alt="Gestión Meseros" width="250"/><br/>
+      <strong>Pago por QR Delivery</strong><br/>
+      <sub>Pantalla que el repartidor debe mostrarle al cliente para pagar su pedido con QR</sub>
     </td>
   </tr>
 </table>
@@ -289,6 +373,7 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
     <li>[x] Correcciones: Menu que muestra un producto a la vez</li>
     <li>[x] Sistema de login con redes sociales</li>
     <li>[x] Sistema pedidos a domicilio</li>
+    <li>[x] Nuevo juego extra</li>
   </ul>
 </details>
 
@@ -301,8 +386,7 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
   <summary>Lista de tareas</summary>
   <ul>
     <li>[x] Login funcional completo</li>
-    <li>[x] Registro de usuario completo</li>
-    <li>[x] Version preliminar del SplashScreen</li>
+    <li>[x] Registro de usuario (Modelo)</li>
     <li>[x] Creacion de juegos</li>
   </ul>
 </details>
