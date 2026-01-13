@@ -13,6 +13,91 @@
 </p>
 
 <hr/>
+
+<h2 align="center">📌 Descripción del Proyecto</h2>
+
+<p align="center">
+  <strong>The Last Dance – Restaurant</strong> es una aplicación móvil full-stack desarrollada como proyecto final de la materia 
+  <em>Práctica Profesional Supervisada</em>. El objetivo principal fue simular el funcionamiento real de un restaurante moderno,
+  abarcando tanto la experiencia del cliente como la gestión interna del negocio.
+</p>
+
+<p align="center">
+  El sistema contempla procesos reales como pedidos, reservas, asignación de mesas, comunicación en tiempo real, 
+  gestión de usuarios con distintos roles y validaciones de datos, replicando un entorno profesional similar al de una aplicación en producción.
+</p>
+
+<hr/>
+
+<h2 align="center">🎓 Contexto Académico y Metodología de Trabajo</h2>
+
+<p align="center">
+  El proyecto fue desarrollado por un equipo de <strong>tres integrantes</strong>, trabajando bajo una modalidad 
+  <strong>iterativa</strong>, con entregas semanales y revisiones constantes por parte de los docentes.
+</p>
+
+<p align="center">
+  Durante el desarrollo, los profesores actuaron como un <strong>cliente simulado</strong>, solicitando cambios,
+  ajustes y nuevas funcionalidades, lo que permitió experimentar un flujo de trabajo similar al de un proyecto real,
+  donde los requerimientos evolucionan con el tiempo.
+</p>
+
+<hr/>
+
+<h2 align="center">🧱 Arquitectura del Sistema</h2>
+
+<p align="center">
+  La aplicación se compone de tres grandes capas:
+</p>
+
+<ul>
+  <li>
+    <strong>Frontend Mobile:</strong> desarrollado con React Native utilizando Expo, enfocado en una experiencia fluida
+    y adaptable a los distintos roles de usuario.
+  </li>
+  <li>
+    <strong>Backend API REST:</strong> construido con Node.js y Express, encargado de la lógica de negocio, validaciones,
+    control de accesos y comunicación con la base de datos.
+  </li>
+  <li>
+    <strong>Base de datos y servicios:</strong> implementados con Supabase, utilizando PostgreSQL para el almacenamiento de datos,
+    Supabase Auth para la autenticación y Supabase Storage para la gestión de archivos.
+  </li>
+</ul>
+
+<p>
+  La comunicación entre frontend y backend se realiza mediante Axios, y el backend se encuentra desplegado de forma
+  independiente en Render.
+</p>
+
+<hr/>
+
+<h2 align="center">⚙️ Funcionalidades Principales</h2>
+
+<ul>
+  <li>Autenticación de usuarios con manejo de sesiones y renovación automática</li>
+  <li>Diferenciación de roles: clientes, dueños, supervisores, mozos, cocineros, bartender, maitre, repartidores y usuarios no registrados</li>
+  <li>Gestión de pedidos con actualización de estados en tiempo real mediante Socket.IO</li>
+  <li>Sistema de reservas que impide la ocupación de mesas previamente reservadas</li>
+  <li>Lectura de códigos QR asociados a mesas</li>
+  <li>Chat en tiempo real entre mesa y mozo</li>
+  <li>Asignación y administración de mesas por parte del maitre</li>
+  <li>Subida y gestión de archivos (usuarios e ítems del menú)</li>
+  <li>Integración con servicios de Google (Maps, notificaciones y login social)</li>
+</ul>
+
+<hr/>
+
+<h2 align="center">🎯 Objetivo del Proyecto</h2>
+
+<p align="center">
+  El objetivo principal fue aplicar de forma práctica los conocimientos adquiridos durante la carrera,
+  enfrentando problemáticas reales del desarrollo de software y trabajando en un entorno colaborativo
+  similar al profesional.
+</p>
+
+<hr/>
+
 <h2 id="preview-app" align="center">📱 Vista previa de la App</h2>
 
 <p align="center">
@@ -330,21 +415,6 @@
 
 <hr/>
 
-<h2 id="bitacora-commits">📝 Bitácora de Commits (hitos)</h2>
-
-<!--
-Sugerencia: registrar aquí los hitos o commits importantes (no todos).
-Formato recomendado:
-- Fecha (YYYY-MM-DD) · Autor · Ramas/Áreas · Mensaje breve · Hash corto/enlace
--->
-
-<ul>
-  <!-- EJEMPLOS -->
-  <li><strong>2025-09-12</strong> · Juan Pablo · backend:fix · Corrige handler 404 para Express 5 · </li>
-</ul>
-
-<hr/>
-
 <h2 id="secciones-por-integrante">👤 Lista de tareas por Integrante</h2>
 
 <p>
@@ -437,7 +507,3 @@ Cada integrante gestiona su lista de tareas y progreso. <br/>
 </ul>
 
 <hr/>
-
-<p align="center">
-  <sub>Plantilla inicial · Actualizar según necesidades del proyecto.</sub>
-</p>
